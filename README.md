@@ -21,7 +21,7 @@ Req.build(:get, "https://api.github.com/repos/elixir-lang/elixir")
 #=> {:ok, %{body: %{"description" => "Elixir is a dynamic," <> ...}, ...}, ...}
 ```
 
-## Request step
+## Request steps
 
 Request step is a function that accepts a request struct and returns one of the following:
 
