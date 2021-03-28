@@ -36,7 +36,7 @@ defmodule ReqTest do
       Req.build(:get, c.url <> "/not-found")
       |> Req.add_request_steps([
         fn request ->
-          %{request | path: "/ok"}
+          %{request | url: c.url <> "/ok"}
         end
       ])
 
@@ -47,13 +47,13 @@ defmodule ReqTest do
     state =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_request_steps([
-        fn _request ->
-          %Finch.Response{status: 200, body: "from cache"}
+        fn request ->
+          {request, %Finch.Response{status: 200, body: "from cache"}}
         end
       ])
       |> Req.add_response_steps([
-        fn response ->
-          update_in(response.body, &(&1 <> " - updated"))
+        fn request, response ->
+          {request, update_in(response.body, &(&1 <> " - updated"))}
         end
       ])
 
@@ -64,13 +64,13 @@ defmodule ReqTest do
     state =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_request_steps([
-        fn _request ->
-          RuntimeError.exception("oops")
+        fn request ->
+          {request, RuntimeError.exception("oops")}
         end
       ])
       |> Req.add_error_steps([
-        fn exception ->
-          update_in(exception.message, &(&1 <> " - updated"))
+        fn request, exception ->
+          {request, update_in(exception.message, &(&1 <> " - updated"))}
         end
       ])
 
@@ -81,15 +81,16 @@ defmodule ReqTest do
     state =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_request_steps([
-        fn _request ->
-          {:halt, %Finch.Response{status: 200, body: "from cache"}}
-        end
+        fn request ->
+          {Req.Request.halt(request), %Finch.Response{status: 200, body: "from cache"}}
+        end,
+        &unreachable/1
       ])
       |> Req.add_response_steps([
-        &unreachable/1
+        &unreachable/2
       ])
       |> Req.add_error_steps([
-        &unreachable/1
+        &unreachable/2
       ])
 
     assert {:ok, %{status: 200, body: "from cache"}} = Req.run(state)
@@ -99,15 +100,16 @@ defmodule ReqTest do
     state =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_request_steps([
-        fn _request ->
-          {:halt, RuntimeError.exception("oops")}
-        end
+        fn request ->
+          {Req.Request.halt(request), RuntimeError.exception("oops")}
+        end,
+        &unreachable/1
       ])
       |> Req.add_response_steps([
-        &unreachable/1
+        &unreachable/2
       ])
       |> Req.add_error_steps([
-        &unreachable/1
+        &unreachable/2
       ])
 
     assert {:error, %RuntimeError{message: "oops"}} = Req.run(state)
@@ -121,8 +123,8 @@ defmodule ReqTest do
     state =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_response_steps([
-        fn response ->
-          update_in(response.body, &(&1 <> " - updated"))
+        fn request, response ->
+          {request, update_in(response.body, &(&1 <> " - updated"))}
         end
       ])
 
@@ -137,14 +139,14 @@ defmodule ReqTest do
     state =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_response_steps([
-        fn response ->
+        fn request, response ->
           assert response.body == "ok"
-          RuntimeError.exception("oops")
+          {request, RuntimeError.exception("oops")}
         end
       ])
       |> Req.add_error_steps([
-        fn exception ->
-          update_in(exception.message, &(&1 <> " - updated"))
+        fn request, exception ->
+          {request, update_in(exception.message, &(&1 <> " - updated"))}
         end
       ])
 
@@ -159,13 +161,13 @@ defmodule ReqTest do
     state =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_response_steps([
-        fn response ->
-          {:halt, update_in(response.body, &(&1 <> " - updated"))}
+        fn request, response ->
+          {Req.Request.halt(request), update_in(response.body, &(&1 <> " - updated"))}
         end,
-        &unreachable/1
+        &unreachable/2
       ])
       |> Req.add_error_steps([
-        &unreachable/1
+        &unreachable/2
       ])
 
     assert {:ok, %{status: 200, body: "ok - updated"}} = Req.run(state)
@@ -179,13 +181,14 @@ defmodule ReqTest do
     state =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_response_steps([
-        fn _response ->
-          {:halt, RuntimeError.exception("oops")}
+        fn request, response ->
+          assert response.body == "ok"
+          {Req.Request.halt(request), RuntimeError.exception("oops")}
         end,
-        &unreachable/1
+        &unreachable/2
       ])
       |> Req.add_error_steps([
-        &unreachable/1
+        &unreachable/2
       ])
 
     assert {:error, %RuntimeError{message: "oops"}} = Req.run(state)
@@ -197,9 +200,9 @@ defmodule ReqTest do
     state =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_error_steps([
-        fn exception ->
+        fn request, exception ->
           assert exception.reason == :econnrefused
-          RuntimeError.exception("oops")
+          {request, RuntimeError.exception("oops")}
         end
       ])
 
@@ -212,16 +215,16 @@ defmodule ReqTest do
     state =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_response_steps([
-        fn response ->
-          update_in(response.body, &(&1 <> " - updated"))
+        fn request, response ->
+          {request, update_in(response.body, &(&1 <> " - updated"))}
         end
       ])
       |> Req.add_error_steps([
-        fn exception ->
+        fn request, exception ->
           assert exception.reason == :econnrefused
-          %Finch.Response{status: 200, body: "ok"}
+          {request, %Finch.Response{status: 200, body: "ok"}}
         end,
-        &unreachable/1
+        &unreachable/2
       ])
 
     assert {:ok, %{status: 200, body: "ok - updated"}} = Req.run(state)
@@ -233,14 +236,14 @@ defmodule ReqTest do
     state =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_response_steps([
-        &unreachable/1
+        &unreachable/2
       ])
       |> Req.add_error_steps([
-        fn exception ->
+        fn request, exception ->
           assert exception.reason == :econnrefused
-          {:halt, %Finch.Response{status: 200, body: "ok"}}
+          {Req.Request.halt(request), %Finch.Response{status: 200, body: "ok"}}
         end,
-        &unreachable/1
+        &unreachable/2
       ])
 
     assert {:ok, %{status: 200, body: "ok"}} = Req.run(state)
@@ -255,7 +258,7 @@ defmodule ReqTest do
         &Req.default_headers/1,
         fn request ->
           {_, user_agent} = List.keyfind(request.headers, "user-agent", 0)
-          %Finch.Response{status: 200, body: user_agent}
+          {request, %Finch.Response{status: 200, body: user_agent}}
         end
       ])
 
@@ -264,7 +267,7 @@ defmodule ReqTest do
 
   ## Response steps
 
-  test "decode/1", c do
+  test "decode/2", c do
     Bypass.expect(c.bypass, "GET", "/json", fn conn ->
       conn
       |> Plug.Conn.put_resp_content_type("application/json")
@@ -274,7 +277,7 @@ defmodule ReqTest do
     state =
       Req.build(:get, c.url <> "/json")
       |> Req.add_response_steps([
-        &Req.decode/1
+        &Req.decode/2
       ])
 
     assert {:ok, %{status: 200, body: %{"a" => 1}}} = Req.run(state)
@@ -297,8 +300,8 @@ defmodule ReqTest do
       Req.build(:get, c.url <> "/retry")
       |> Req.add_response_steps([
         &Req.retry/2,
-        fn response ->
-          update_in(response.body, &(&1 <> " - updated"))
+        fn request, response ->
+          {request, update_in(response.body, &(&1 <> " - updated"))}
         end
       ])
 
@@ -318,8 +321,8 @@ defmodule ReqTest do
       Req.build(:get, c.url <> "/retry")
       |> Req.add_response_steps([
         &Req.retry/2,
-        fn response ->
-          update_in(response.body, &(&1 <> " - updated"))
+        fn request, response ->
+          {request, update_in(response.body, &(&1 <> " - updated"))}
         end
       ])
 
@@ -332,7 +335,11 @@ defmodule ReqTest do
 
   ## Helpers
 
-  defp unreachable(_response) do
+  defp unreachable(_request) do
+    raise "unreachable"
+  end
+
+  defp unreachable(_request, _response_or_exception) do
     raise "unreachable"
   end
 end

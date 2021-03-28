@@ -1,29 +1,4 @@
-defmodule Req.Application do
-  @moduledoc false
-
-  use Application
-
-  @impl true
-  def start(_type, _args) do
-    children = [{Finch, name: Req.Finch}]
-    Supervisor.start_link(children, strategy: :one_for_one)
-  end
-end
-
 defmodule Req do
-  @moduledoc """
-  """
-
-  defstruct [
-    :request,
-    request_steps: [],
-    response_steps: [],
-    error_steps: [],
-    private: %{}
-  ]
-
-  ## High-level API
-
   @doc """
   Makes a GET request.
   """
@@ -44,7 +19,7 @@ defmodule Req do
       &default_headers/1
     ])
     |> add_response_steps([
-      &decode/1
+      &decode/2
     ])
     |> run()
   end
@@ -52,121 +27,128 @@ defmodule Req do
   ## Low-level API
 
   @doc """
-  Builds a Req pipeline.
+  Builds a request pipeline.
   """
   def build(method, url, opts \\ []) do
     body = Keyword.get(opts, :body, "")
     headers = Keyword.get(opts, :headers, [])
-    request = Finch.build(method, url, headers, body)
 
-    %Req{
-      request: request
+    %Req.Request{
+      method: method,
+      url: url,
+      headers: headers,
+      body: body
     }
   end
 
   @doc """
-  Runs a pipeline.
+  Adds a request step.
   """
-  def run(state) do
+  def add_request_steps(request, steps) do
+    update_in(request.request_steps, &(&1 ++ steps))
+  end
+
+  @doc """
+  Adds a response step.
+  """
+  def add_response_steps(request, steps) do
+    update_in(request.response_steps, &(&1 ++ steps))
+  end
+
+  @doc """
+  Adds an error step.
+  """
+  def add_error_steps(request, steps) do
+    update_in(request.error_steps, &(&1 ++ steps))
+  end
+
+  @doc """
+  Runs a request pipeline.
+  """
+  def run(request) do
     result =
-      Enum.reduce_while(state.request_steps, state.request, fn step, acc ->
-        case run(step, acc, state) do
-          %Finch.Request{} = request ->
+      Enum.reduce_while(request.request_steps, request, fn step, acc ->
+        case step.(acc) do
+          %Req.Request{} = request ->
             {:cont, request}
 
-          %Finch.Response{} = response ->
-            {:halt, {:response, response}}
+          {%Req.Request{halted: true}, _response_or_exception} = halt ->
+            {:halt, {:halt, halt}}
 
-          %{__exception__: true} = exception ->
-            {:halt, {:error, exception}}
+          {request, %Finch.Response{} = response} ->
+            {:halt, {:response, request, response}}
 
-          {:halt, result} ->
-            {:halt, {:halt, result}}
+          {request, %{__exception__: true} = exception} ->
+            {:halt, {:error, request, exception}}
         end
       end)
 
     case result do
-      %Finch.Request{} = request ->
-        run_request(request, state)
+      %Req.Request{} = request ->
+        finch_request = Finch.build(request.method, request.url, request.headers, request.body)
 
-      {:response, response} ->
-        run_response(response, state)
+        case Finch.request(finch_request, Req.Finch) do
+          {:ok, response} ->
+            run_response(request, response)
 
-      {:error, exception} ->
-        run_error(exception, state)
+          {:error, exception} ->
+            run_error(request, exception)
+        end
 
-      {:halt, result} ->
-        halt(result)
+      {:response, request, response} ->
+        run_response(request, response)
+
+      {:error, request, exception} ->
+        run_error(request, exception)
+
+      {:halt, {_request, response_or_exception}} ->
+        result(response_or_exception)
     end
   end
 
-  defp run_request(request, state) do
-    case Finch.request(request, Req.Finch) do
-      {:ok, response} ->
-        run_response(response, state)
+  defp run_response(request, response) do
+    {_request, response_or_exception} =
+      Enum.reduce_while(request.response_steps, {request, response}, fn step,
+                                                                        {request, response} ->
+        case step.(request, response) do
+          {%Req.Request{halted: true} = request, response_or_exception} ->
+            {:halt, {request, response_or_exception}}
 
-      {:error, exception} ->
-        run_error(exception, state)
-    end
+          {request, %Finch.Response{} = response} ->
+            {:cont, {request, response}}
+
+          {request, %{__exception__: true} = exception} ->
+            {:halt, run_error(request, exception)}
+        end
+      end)
+
+    result(response_or_exception)
   end
 
-  defp run_response(response, state) do
-    Enum.reduce_while(state.response_steps, {:ok, response}, fn step, {:ok, acc} ->
-      case run(step, acc, state) do
-        %Finch.Response{} = response ->
-          {:cont, {:ok, response}}
+  defp run_error(request, exception) do
+    {_request, response_or_exception} =
+      Enum.reduce_while(request.error_steps, {request, exception}, fn step,
+                                                                      {request, exception} ->
+        case step.(request, exception) do
+          {%Req.Request{halted: true} = request, response_or_exception} ->
+            {:halt, {request, response_or_exception}}
 
-        %{__exception__: true} = exception ->
-          {:halt, run_error(exception, state)}
+          {request, %{__exception__: true} = exception} ->
+            {:cont, {request, exception}}
 
-        {:halt, result} ->
-          {:halt, halt(result)}
-      end
-    end)
+          {request, %Finch.Response{} = response} ->
+            {:halt, run_response(request, response)}
+        end
+      end)
+
+    result(response_or_exception)
   end
 
-  defp run_error(exception, state) do
-    Enum.reduce_while(state.error_steps, {:error, exception}, fn step, {:error, acc} ->
-      case run(step, acc, state) do
-        %{__exception__: true} = exception ->
-          {:cont, {:error, exception}}
-
-        %Finch.Response{} = response ->
-          {:halt, run_response(response, state)}
-
-        {:halt, result} ->
-          {:halt, halt(result)}
-      end
-    end)
-  end
-
-  defp run(fun, request_or_response_or_exception, _state) when is_function(fun, 1) do
-    fun.(request_or_response_or_exception)
-  end
-
-  defp run(fun, request_or_response_or_exception, state) when is_function(fun, 2) do
-    fun.(request_or_response_or_exception, state)
-  end
-
-  @doc """
-  Assigns a new private `key` and `value`.
-  """
-  def put_private(state, key, value) do
-    update_in(state.private, &Map.put(&1, key, value))
-  end
-
-  @doc """
-  Gets the value for a specific private `key`.
-  """
-  def get_private(state, key, default \\ nil) do
-    Map.get(state.private, key, default)
-  end
-
-  defp halt(%Finch.Response{} = response) do
+  defp result(%Finch.Response{} = response) do
     {:ok, response}
   end
 
-  defp halt(%{__exception__: true} = exception) do
+  defp result(%{__exception__: true} = exception) do
     {:error, exception}
   end
 
@@ -181,13 +163,13 @@ defmodule Req do
   @doc """
   Decodes a response body based on its `content-type`.
   """
-  def decode(response) do
+  def decode(request, response) do
     case List.keyfind(response.headers, "content-type", 0) do
       {_, "application/json" <> _} ->
-        update_in(response.body, &Jason.decode!/1)
+        {request, update_in(response.body, &Jason.decode!/1)}
 
       _ ->
-        response
+        {request, response}
     end
   end
 
@@ -204,31 +186,21 @@ defmodule Req do
     * an exception
 
   """
-  def retry(response_or_exception, state) do
+  def retry(request, %{status: status} = response) when status < 500 do
+    {request, response}
+  end
+
+  def retry(request, response_or_exception) do
     max_attempts = 2
-    attempt = get_private(state, :retry_attempt, 0)
+    attempt = Req.Request.get_private(request, :retry_attempt, 0)
 
     if attempt < max_attempts do
-      state = put_private(state, :retry_attempt, attempt + 1)
-      {_, result} = run(%{state | request_steps: []})
-      {:halt, result}
+      request = Req.Request.put_private(request, :retry_attempt, attempt + 1)
+      {_, result} = run(%{request | request_steps: []})
+      {Req.Request.halt(request), result}
     else
-      response_or_exception
+      {request, response_or_exception}
     end
-  end
-
-  ## Utilities
-
-  def add_request_steps(state, steps) do
-    update_in(state.request_steps, &(&1 ++ steps))
-  end
-
-  def add_response_steps(state, steps) do
-    update_in(state.response_steps, &(&1 ++ steps))
-  end
-
-  def add_error_steps(state, steps) do
-    update_in(state.error_steps, &(&1 ++ steps))
   end
 
   defp put_new_header(struct, name, value) do
