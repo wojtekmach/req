@@ -28,6 +28,12 @@ defmodule Req do
   def request(method, url, opts \\ []) do
     method
     |> build(url, opts)
+    |> add_request_steps([
+      &default_headers/1
+    ])
+    |> add_response_steps([
+      &decode/1
+    ])
     |> run()
   end
 

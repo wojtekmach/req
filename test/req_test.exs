@@ -7,11 +7,13 @@ defmodule ReqTest do
   end
 
   test "high-level API", c do
-    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
+    Bypass.expect(c.bypass, "GET", "/json", fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(%{"a" => 1}))
     end)
 
-    assert Req.get!(c.url <> "/ok").body == "ok"
+    assert Req.get!(c.url <> "/json").body == %{"a" => 1}
   end
 
   ## Low-level API
