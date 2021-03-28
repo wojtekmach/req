@@ -100,10 +100,7 @@ defmodule Req do
     end
   end
 
-  @doc """
-  Executes a request and runs its result through a pipeline.
-  """
-  def run_request(request, state) do
+  defp run_request(request, state) do
     case Finch.request(request, Req.Finch) do
       {:ok, response} ->
         run_response(response, state)
@@ -113,10 +110,7 @@ defmodule Req do
     end
   end
 
-  @doc """
-  Runs a response through a pipeline.
-  """
-  def run_response(response, state) do
+  defp run_response(response, state) do
     Enum.reduce_while(state.response_steps, {:ok, response}, fn step, {:ok, acc} ->
       case run(step, acc, state) do
         %Finch.Response{} = response ->
@@ -131,10 +125,7 @@ defmodule Req do
     end)
   end
 
-  @doc """
-  Runs an exception through a pipeline.
-  """
-  def run_error(exception, state) do
+  defp run_error(exception, state) do
     Enum.reduce_while(state.error_steps, {:error, exception}, fn step, {:error, acc} ->
       case run(step, acc, state) do
         %{__exception__: true} = exception ->
@@ -219,7 +210,8 @@ defmodule Req do
 
     if attempt < max_attempts do
       state = put_private(state, :retry_attempt, attempt + 1)
-      {:halt, state.request |> run_request(state) |> elem(1)}
+      {_, result} = run(%{state | request_steps: []})
+      {:halt, result}
     else
       response_or_exception
     end
