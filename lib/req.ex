@@ -167,6 +167,21 @@ defmodule Req do
     put_new_header(request, "user-agent", "req/0.1.0-dev")
   end
 
+  ## Response steps
+
+  @doc """
+  Decodes a response body based on its `content-type`.
+  """
+  def decode(response) do
+    case List.keyfind(response.headers, "content-type", 0) do
+      {_, "application/json" <> _} ->
+        update_in(response.body, &Jason.decode!/1)
+
+      _ ->
+        response
+    end
+  end
+
   ## Error steps
 
   @doc """
@@ -180,10 +195,6 @@ defmodule Req do
     * an exception
 
   """
-  def retry(%{status: status} = response, _state) when status < 500 do
-    response
-  end
-
   def retry(response_or_exception, state) do
     max_attempts = 2
     attempt = get_private(state, :retry_attempt, 0)

@@ -260,6 +260,24 @@ defmodule ReqTest do
     assert {:ok, %{status: 200, body: "req/0.1.0-dev"}} = Req.run(state)
   end
 
+  ## Response steps
+
+  test "decode/1", c do
+    Bypass.expect(c.bypass, "GET", "/json", fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(%{"a" => 1}))
+    end)
+
+    state =
+      Req.build(:get, c.url <> "/json")
+      |> Req.add_response_steps([
+        &Req.decode/1
+      ])
+
+    assert {:ok, %{status: 200, body: %{"a" => 1}}} = Req.run(state)
+  end
+
   ## Error steps
 
   test "retry: eventually successful", c do
