@@ -79,8 +79,8 @@ Similarly, an error step is a function that accepts an exception and returns one
     with `{:ok, response}` or `{:error, exception}` respectively
 
 Response and error steps can also be 2-arity functions where the second argument is pipeline
-state. The state gives access to the request and transient data. Such steps, must return one of
-the following:
+state. The state gives access to the request as well as pipeline transient data. Such steps must
+return one of the following:
 
   * For response step, returning a response continues the pipeline
 
