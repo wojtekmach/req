@@ -197,6 +197,12 @@ defmodule Req do
       {_, "application/json" <> _} ->
         {request, update_in(response.body, &Jason.decode!/1)}
 
+      {_, "application/gzip" <> _} ->
+        {request, update_in(response.body, &:zlib.gunzip/1)}
+
+      {_, "application/x-gzip" <> _} ->
+        {request, update_in(response.body, &:zlib.gunzip/1)}
+
       _ ->
         {request, response}
     end

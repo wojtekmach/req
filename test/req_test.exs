@@ -283,7 +283,7 @@ defmodule ReqTest do
     assert {:ok, %{status: 200, body: "foo"}} = Req.run(state)
   end
 
-  test "decode/2", c do
+  test "decode/2: json", c do
     Bypass.expect(c.bypass, "GET", "/json", fn conn ->
       conn
       |> Plug.Conn.put_resp_content_type("application/json")
@@ -297,6 +297,22 @@ defmodule ReqTest do
       ])
 
     assert {:ok, %{status: 200, body: %{"a" => 1}}} = Req.run(state)
+  end
+
+  test "decode/2: gzip", c do
+    Bypass.expect(c.bypass, "GET", "/gzip", fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/x-gzip")
+      |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
+    end)
+
+    state =
+      Req.build(:get, c.url <> "/gzip")
+      |> Req.add_response_steps([
+        &Req.decode/2
+      ])
+
+    assert {:ok, %{status: 200, body: "foo"}} = Req.run(state)
   end
 
   ## Error steps
