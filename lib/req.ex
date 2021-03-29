@@ -65,6 +65,8 @@ defmodule Req do
 
   @doc """
   Runs a request pipeline.
+
+  Returns `{:ok, response}` or `{:error, exception}`.
   """
   def run(request) do
     result =
@@ -104,6 +106,18 @@ defmodule Req do
 
       {:halt, {_request, response_or_exception}} ->
         result(response_or_exception)
+    end
+  end
+
+  @doc """
+  Runs a request pipeline.
+
+  Similar to `run/1` but returns a response or raises an exception.
+  """
+  def run!(request) do
+    case run(request) do
+      {:ok, response} -> response
+      {:error, exception} -> raise exception
     end
   end
 
