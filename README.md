@@ -23,20 +23,21 @@ Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
 
 Under the hood, Req works by passing a request through a series of steps.
 
-The request struct, `%Req.Request{}`, initially contains data like HTTP method,
-request headers, etc. You can also add request, response, and error steps to it.
+The request struct, `%Req.Request{}`, initially contains data like HTTP method and 
+request headers. You can also add request, response, and error steps to it.
 
 Request steps are used to refine the data that will be sent to the server.
 
-Response steps are used to refine the response we got from the server.
+After making the actual HTTP request, we'll either get a HTTP response or an error.
+The request, along with the response or error, will go through response or
+error steps, respectively.
 
-Error steps are executed after we got an error from the socket.
+Nothing is actually executed until we run the pipeline with `Req.run/1`.
 
-Calling `Req.run/1` on the request runs the request through the steps.
+Example:
 
 ```elixir
 Req.build(:get, "https://api.github.com/repos/elixir-lang/elixir")
-|> IO.inspect()
 |> Req.add_request_steps([
   &Req.default_headers/1
 ])
@@ -48,16 +49,18 @@ Req.build(:get, "https://api.github.com/repos/elixir-lang/elixir")
 ```
 
 We can also build more complex flows like returning a response from a request step
-or an error from a response step. We will explore those complex flows next.
+or an error from a response step. We will explore those next.
 
 ### Request steps
 
-Request step is a function that accepts a `request` and returns one of the following:
+A request step is a function that accepts a `request` and returns one of the following:
 
   * A `request`
 
   * A `{request, response_or_error}` tuple. In that case no further request steps are executed
     and the return value goes through response or error steps
+
+Examples:
 
 ```elixir
 def default_headers(request) do
@@ -90,6 +93,8 @@ of the following:
   * A `{request, response}` tuple. In that case, no further error steps are executed but the
     response goes through response steps
 
+Examples:
+
 ```elixir
 def decode(request, response) do
   case List.keyfind(response.headers, "content-type", 0) do
@@ -111,6 +116,8 @@ end
 
 Any step can call `Req.Request.halt/1` to halt the pipeline. This will prevent any further steps
 from being invoked.
+
+Examples:
 
 ```elixir
 def circuit_breaker(request) do
