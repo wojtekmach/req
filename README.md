@@ -1,5 +1,7 @@
 # Req
 
+A work-in-progress HTTP client.
+
 # Features
 
   * Extensibility via request, response, and error steps
@@ -35,7 +37,7 @@ Req.build(:get, "https://api.github.com/repos/elixir-lang/elixir")
 
 ### Request steps
 
-Request step is a function that accepts a `request` and returns either:
+Request step is a function that accepts a `request` and returns one of the following:
 
   * A `request`
 
@@ -57,14 +59,16 @@ end
 
 ### Response and error steps
 
-A response step is a function that accepts a `request` and `response` and returns:
+A response step is a function that accepts a `request` and a `response` and returns one of the
+following:
 
   * A `{request, response}` tuple
 
   * A `{request, exception}` tuple. In that case, no further response steps are executed but the
     exception goes through error steps
 
-Similarly, an error step is a function that accepts an exception and returns one of the following:
+Similarly, an error step is a function that accepts a `request` and an `exception` and returns one
+of the following:
 
   * A `{request, exception}` tuple
 
@@ -72,7 +76,7 @@ Similarly, an error step is a function that accepts an exception and returns one
     response goes through response steps
 
 ```elixir
-def decode(response) do
+def decode(request, response) do
   case List.keyfind(response.headers, "content-type", 0) do
     {_, "application/json" <> _} ->
       {request, update_in(response.body, &Jason.decode!/1)}
@@ -93,7 +97,7 @@ end
 Any step can call `Req.Request.halt/1` to halt the pipeline. This will prevent any further steps
 from being invoked.
 
-```
+```elixir
 def circuit_breaker(request) do
   if CircuitBreaker.open?() do
     {Req.Request.halt(request), RuntimeError.exception("circuit breaker is open")}
