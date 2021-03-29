@@ -6,6 +6,8 @@ A work-in-progress HTTP client.
 
   * Extensibility via request, response, and error steps
 
+  * Automatic body decompression (via `decompress/2` step)
+
   * Automatic body decoding (via `decode/2` step)
 
   * Retries on errors (via `retry/2` step)

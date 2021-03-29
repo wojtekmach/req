@@ -19,6 +19,7 @@ defmodule Req do
       &default_headers/1
     ])
     |> add_response_steps([
+      &decompress/2,
       &decode/2
     ])
     |> run()
@@ -161,7 +162,35 @@ defmodule Req do
   ## Response steps
 
   @doc """
-  Decodes a response body based on its `content-type`.
+  Decompresses the response body based on the `content-encoding` header.
+  """
+  def decompress(request, response) do
+    compression_algorithms = get_content_encoding_header(response.headers)
+    {request, update_in(response.body, &decompress_body(&1, compression_algorithms))}
+  end
+
+  defp decompress_body(body, algorithms) do
+    Enum.reduce(algorithms, body, &decompress_with_algorithm(&1, &2))
+  end
+
+  defp decompress_with_algorithm(gzip, body) when gzip in ["gzip", "x-gzip"] do
+    :zlib.gunzip(body)
+  end
+
+  defp decompress_with_algorithm("deflate", body) do
+    :zlib.unzip(body)
+  end
+
+  defp decompress_with_algorithm("identity", body) do
+    body
+  end
+
+  defp decompress_with_algorithm(algorithm, _body) do
+    raise("unsupported decompression algorithm: #{inspect(algorithm)}")
+  end
+
+  @doc """
+  Decodes the response body based on the `content-type` header.
   """
   def decode(request, response) do
     case List.keyfind(response.headers, "content-type", 0) do
@@ -203,11 +232,35 @@ defmodule Req do
     end
   end
 
+  ## Utilities
+
   defp put_new_header(struct, name, value) do
     if Enum.any?(struct.headers, fn {key, _} -> String.downcase(key) == name end) do
       struct
     else
       update_in(struct.headers, &[{name, value} | &1])
     end
+  end
+
+  defp get_content_encoding_header(headers) do
+    if value = get_header(headers, "content-encoding") do
+      value
+      |> String.downcase()
+      |> String.split(",", trim: true)
+      |> Stream.map(&String.trim/1)
+      |> Enum.reverse()
+    else
+      []
+    end
+  end
+
+  defp get_header(headers, name) do
+    Enum.find_value(headers, nil, fn {key, value} ->
+      if String.downcase(key) == name do
+        value
+      else
+        nil
+      end
+    end)
   end
 end
