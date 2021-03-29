@@ -21,10 +21,20 @@ Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
 
 Under the hood, Req works by passing a request through a series of steps.
 
+The request struct, `%Req.Request{}`, initially contains data like HTTP method,
+request headers, etc. You can also add request, response, and error steps to it.
+
+Request steps are used to refine the data that will be sent to the server.
+
+Response steps are used to refine the response we got from the server.
+
+Error steps are executed after we got an error from the socket.
+
+Calling `Req.run/1` on the request runs the request through the steps.
+
 ```elixir
 Req.build(:get, "https://api.github.com/repos/elixir-lang/elixir")
 |> IO.inspect()
-# Outputs: %Req.Request{...}
 |> Req.add_request_steps([
   &Req.default_headers/1
 ])
@@ -34,6 +44,9 @@ Req.build(:get, "https://api.github.com/repos/elixir-lang/elixir")
 |> Req.run()
 #=> {:ok, %{body: %{"description" => "Elixir is a dynamic," <> ...}, ...}, ...}
 ```
+
+We can also build more complex flows like returning a response from a request step
+or an error from a response step. We will explore those complex flows next.
 
 ### Request steps
 
@@ -46,7 +59,7 @@ Request step is a function that accepts a `request` and returns one of the follo
 
 ```elixir
 def default_headers(request) do
-  Req.Request.put_new_header(request, "user-agent", "req/0.1.0-dev")
+  update_in(request.headers, &[{"user-agent", "req/0.1.0-dev"} | &1])
 end
 
 def read_from_cache(request) do
