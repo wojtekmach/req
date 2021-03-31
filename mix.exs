@@ -4,14 +4,14 @@ defmodule Req.MixProject do
   def project do
     [
       app: :req,
-      version: "0.1.0",
+      version: "0.1.0-dev",
       elixir: "~> 1.11",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      docs: docs()
     ]
   end
 
-  # Run "mix help compile.app" to learn about applications.
   def application do
     [
       mod: {Req.Application, []},
@@ -19,13 +19,26 @@ defmodule Req.MixProject do
     ]
   end
 
-  # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
       {:finch, "~> 0.6.0"},
       {:mint, github: "elixir-mint/mint", override: true},
       {:jason, "~> 1.0"},
-      {:bypass, "~> 2.1", only: :test}
+      {:bypass, "~> 2.1", only: :test},
+      {:ex_doc, ">= 0.0.0", only: :docs}
+    ]
+  end
+
+  defp docs do
+    [
+      main: "Req",
+      groups_for_functions: [
+        "High-level API": &(&1[:api] == :high_level),
+        "Low-level API": &(&1[:api] == :low_level),
+        "Request steps": &(&1[:api] == :request),
+        "Response steps": &(&1[:api] == :response),
+        "Error steps": &(&1[:api] == :error)
+      ]
     ]
   end
 end

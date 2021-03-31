@@ -1,7 +1,15 @@
 defmodule Req do
+  @external_resource "README.md"
+
+  @moduledoc "README.md"
+             |> File.read!()
+             |> String.split("<!-- MDOC !-->")
+             |> Enum.fetch!(1)
+
   @doc """
   Makes a GET request.
   """
+  @doc api: :high_level
   def get!(url, opts \\ []) do
     case request(:get, url, opts) do
       {:ok, response} -> response
@@ -12,6 +20,7 @@ defmodule Req do
   @doc """
   Makes an HTTP request.
   """
+  @doc api: :high_level
   def request(method, url, opts \\ []) do
     method
     |> build(url, opts)
@@ -24,6 +33,7 @@ defmodule Req do
   @doc """
   Builds a request pipeline.
   """
+  @doc api: :low_level
   def build(method, url, opts \\ []) do
     body = Keyword.get(opts, :body, "")
     headers = Keyword.get(opts, :headers, [])
@@ -37,20 +47,19 @@ defmodule Req do
   end
 
   @doc """
-  Adds default steps.
+  Adds steps that should be reasonable defaults for most users.
 
-  This function adds the following steps:
+    * request:
 
-  * request:
+      * `default_headers/1`
 
-    * `default_headers/1`
+    * response:
 
-  * response:
-
-    * `decompress/2`
-    * `decode/2`
+      * `decompress/2`
+      * `decode/2`
 
   """
+  @doc api: :low_level
   def add_default_steps(request) do
     request
     |> add_request_steps([
@@ -63,22 +72,25 @@ defmodule Req do
   end
 
   @doc """
-  Adds a request step.
+  Adds request steps.
   """
+  @doc api: :low_level
   def add_request_steps(request, steps) do
     update_in(request.request_steps, &(&1 ++ steps))
   end
 
   @doc """
-  Adds a response step.
+  Adds response steps.
   """
+  @doc api: :low_level
   def add_response_steps(request, steps) do
     update_in(request.response_steps, &(&1 ++ steps))
   end
 
   @doc """
-  Adds an error step.
+  Adds error steps.
   """
+  @doc api: :low_level
   def add_error_steps(request, steps) do
     update_in(request.error_steps, &(&1 ++ steps))
   end
@@ -88,6 +100,7 @@ defmodule Req do
 
   Returns `{:ok, response}` or `{:error, exception}`.
   """
+  @doc api: :low_level
   def run(request) do
     result =
       Enum.reduce_while(request.request_steps, request, fn step, acc ->
@@ -130,10 +143,11 @@ defmodule Req do
   end
 
   @doc """
-  Runs a request pipeline.
+  Runs a request pipeline and returns a response or raises an error.
 
-  Similar to `run/1` but returns a response or raises an exception.
+  See `run/1`.
   """
+  @doc api: :low_level
   def run!(request) do
     case run(request) do
       {:ok, response} -> response
@@ -189,8 +203,19 @@ defmodule Req do
 
   ## Request steps
 
+  @user_agent "req/#{Mix.Project.config()[:version]}"
+
+  @doc """
+  Adds common request headers.
+
+  Currently the following headers are added:
+
+    * `"user-agent"` - `#{inspect(@user_agent)}`
+
+  """
+  @doc api: :request
   def default_headers(request) do
-    put_new_header(request, "user-agent", "req/0.1.0-dev")
+    put_new_header(request, "user-agent", @user_agent)
   end
 
   ## Response steps
@@ -198,6 +223,7 @@ defmodule Req do
   @doc """
   Decompresses the response body based on the `content-encoding` header.
   """
+  @doc api: :response
   def decompress(request, response) do
     compression_algorithms = get_content_encoding_header(response.headers)
     {request, update_in(response.body, &decompress_body(&1, compression_algorithms))}
@@ -226,6 +252,7 @@ defmodule Req do
   @doc """
   Decodes the response body based on the `content-type` header.
   """
+  @doc api: :response
   def decode(request, response) do
     case List.keyfind(response.headers, "content-type", 0) do
       {_, "application/json" <> _} ->
@@ -255,6 +282,7 @@ defmodule Req do
     * an exception
 
   """
+  @doc api: :error
   def retry(request, %{status: status} = response) when status < 500 do
     {request, response}
   end

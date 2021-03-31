@@ -1,5 +1,7 @@
 # Req
 
+<!-- MDOC !-->
+
 A work-in-progress HTTP client.
 
 # Features
@@ -128,6 +130,8 @@ def circuit_breaker(request) do
   end
 end
 ```
+
+<!-- MDOC !-->
 
 ## License
 
