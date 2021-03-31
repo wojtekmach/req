@@ -15,13 +15,7 @@ defmodule Req do
   def request(method, url, opts \\ []) do
     method
     |> build(url, opts)
-    |> add_request_steps([
-      &default_headers/1
-    ])
-    |> add_response_steps([
-      &decompress/2,
-      &decode/2
-    ])
+    |> add_default_steps()
     |> run()
   end
 
@@ -40,6 +34,32 @@ defmodule Req do
       headers: headers,
       body: body
     }
+  end
+
+  @doc """
+  Adds default steps.
+
+  This function adds the following steps:
+
+  * request:
+
+    * `default_headers/1`
+
+  * response:
+
+    * `decompress/2`
+    * `decode/2`
+
+  """
+  def add_default_steps(request) do
+    request
+    |> add_request_steps([
+      &default_headers/1
+    ])
+    |> add_response_steps([
+      &decompress/2,
+      &decode/2
+    ])
   end
 
   @doc """
