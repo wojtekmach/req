@@ -254,20 +254,23 @@ defmodule Req do
   """
   @doc api: :response
   def decode(request, response) do
-    case List.keyfind(response.headers, "content-type", 0) do
-      {_, "application/json" <> _} ->
+    {_, content_type} = List.keyfind(response.headers, "content-type", 0)
+    extensions = content_type |> normalize_content_type() |> MIME.extensions()
+
+    case extensions do
+      ["json" | _] ->
         {request, update_in(response.body, &Jason.decode!/1)}
 
-      {_, "application/gzip" <> _} ->
-        {request, update_in(response.body, &:zlib.gunzip/1)}
-
-      {_, "application/x-gzip" <> _} ->
+      ["gz" | _] ->
         {request, update_in(response.body, &:zlib.gunzip/1)}
 
       _ ->
         {request, response}
     end
   end
+
+  defp normalize_content_type("application/x-gzip"), do: "application/gzip"
+  defp normalize_content_type(other), do: other
 
   ## Error steps
 

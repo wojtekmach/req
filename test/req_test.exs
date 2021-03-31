@@ -302,7 +302,7 @@ defmodule ReqTest do
   test "decode/2: gzip", c do
     Bypass.expect(c.bypass, "GET", "/gzip", fn conn ->
       conn
-      |> Plug.Conn.put_resp_content_type("application/x-gzip")
+      |> Plug.Conn.put_resp_content_type("application/x-gzip", nil)
       |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
     end)
 
