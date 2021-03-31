@@ -283,6 +283,8 @@ defmodule Req do
 
   """
   @doc api: :error
+  def retry(request, response_or_exception)
+
   def retry(request, %{status: status} = response) when status < 500 do
     {request, response}
   end
