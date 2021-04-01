@@ -158,24 +158,7 @@ defmodule Req do
   """
   @doc api: :low_level
   def run(request) do
-    result =
-      Enum.reduce_while(request.request_steps, request, fn step, acc ->
-        case step.(acc) do
-          %Req.Request{} = request ->
-            {:cont, request}
-
-          {%Req.Request{halted: true}, _response_or_exception} = halt ->
-            {:halt, {:halt, halt}}
-
-          {request, %Finch.Response{} = response} ->
-            {:halt, {:response, request, response}}
-
-          {request, %{__exception__: true} = exception} ->
-            {:halt, {:error, request, exception}}
-        end
-      end)
-
-    case result do
+    case run_request(request) do
       %Req.Request{} = request ->
         finch_request = Finch.build(request.method, request.url, request.headers, request.body)
 
@@ -187,14 +170,8 @@ defmodule Req do
             run_error(request, exception)
         end
 
-      {:response, request, response} ->
-        run_response(request, response)
-
-      {:error, request, exception} ->
-        run_error(request, exception)
-
-      {:halt, {_request, response_or_exception}} ->
-        result(response_or_exception)
+      result ->
+        result
     end
   end
 
@@ -211,15 +188,36 @@ defmodule Req do
     end
   end
 
+  defp run_request(request) do
+    steps = request.request_steps
+
+    Enum.reduce_while(steps, request, fn step, acc ->
+      case step.(acc) do
+        %Req.Request{} = request ->
+          {:cont, request}
+
+        {%Req.Request{halted: true}, response_or_exception} ->
+          {:halt, result(response_or_exception)}
+
+        {request, %{status: _, headers: _, body: _} = response} ->
+          {:halt, run_response(request, response)}
+
+        {request, %{__exception__: true} = exception} ->
+          {:halt, run_error(request, exception)}
+      end
+    end)
+  end
+
   defp run_response(request, response) do
+    steps = request.response_steps
+
     {_request, response_or_exception} =
-      Enum.reduce_while(request.response_steps, {request, response}, fn step,
-                                                                        {request, response} ->
+      Enum.reduce_while(steps, {request, response}, fn step, {request, response} ->
         case step.(request, response) do
           {%Req.Request{halted: true} = request, response_or_exception} ->
             {:halt, {request, response_or_exception}}
 
-          {request, %Finch.Response{} = response} ->
+          {request, %{status: _, headers: _, body: _} = response} ->
             {:cont, {request, response}}
 
           {request, %{__exception__: true} = exception} ->
@@ -231,9 +229,10 @@ defmodule Req do
   end
 
   defp run_error(request, exception) do
+    steps = request.error_steps
+
     {_request, response_or_exception} =
-      Enum.reduce_while(request.error_steps, {request, exception}, fn step,
-                                                                      {request, exception} ->
+      Enum.reduce_while(steps, {request, exception}, fn step, {request, exception} ->
         case step.(request, exception) do
           {%Req.Request{halted: true} = request, response_or_exception} ->
             {:halt, {request, response_or_exception}}
@@ -241,7 +240,7 @@ defmodule Req do
           {request, %{__exception__: true} = exception} ->
             {:cont, {request, exception}}
 
-          {request, %Finch.Response{} = response} ->
+          {request, %{status: _, headers: _, body: _} = response} ->
             {:halt, run_response(request, response)}
         end
       end)
@@ -249,7 +248,7 @@ defmodule Req do
     result(response_or_exception)
   end
 
-  defp result(%Finch.Response{} = response) do
+  defp result(%{status: _, headers: _, body: _} = response) do
     {:ok, response}
   end
 
