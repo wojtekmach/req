@@ -43,6 +43,8 @@ defmodule Req do
 
     * `:body` - request body, defaults to `""`
 
+  The options are passed down to `add_default_steps/1` so see the documentation of that
+  function for more information.
   """
   @doc api: :high_level
   def request(method, url, opts \\ []) do
