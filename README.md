@@ -137,7 +137,7 @@ end
 
 ## Acknowledgments
 
-Req is built on top of [Finch](http://github.com/keathley/finch) and is inspired and learnt from [Requests](https://docs.python-requests.org/en/master/), [Tesla](https://github.com/teamon/tesla), and many other HTTP clients - Thank you!
+Req is built on top of [Finch](http://github.com/keathley/finch) and is inspired by and learnt from [Requests](https://docs.python-requests.org/en/master/), [Tesla](https://github.com/teamon/tesla), and many other HTTP clients - Thank you!
 
 ## License
 
