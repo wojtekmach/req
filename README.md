@@ -2,7 +2,7 @@
 
 <!-- MDOC !-->
 
-A work-in-progress HTTP client.
+An HTTP client with a focus on composability, built on top of [Finch](https://github.com/keathley/finch).
 
 # Features
 
