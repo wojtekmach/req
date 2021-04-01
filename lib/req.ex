@@ -81,6 +81,8 @@ defmodule Req do
 
     * `default_headers/1`
 
+    * `encode/1`
+
     * [`&auth(&1, options[:auth])`](`auth/2`) (if `options[:auth]` is set)
 
   Response steps:
@@ -100,7 +102,8 @@ defmodule Req do
   def add_default_steps(request, options \\ []) do
     request_steps =
       [
-        &default_headers/1
+        &default_headers/1,
+        &encode/1
       ] ++ maybe_step(options[:auth], &auth(&1, options[:auth]))
 
     response_steps =
@@ -291,6 +294,41 @@ defmodule Req do
   @doc api: :request
   def default_headers(request) do
     put_new_header(request, "user-agent", @user_agent)
+  end
+
+  @doc """
+  Encodes the request body based on its shape.
+
+  If body is of the following shape, it's encoded and its `content-type` set
+  accordingly. Otherwise it's unchanged.
+
+  | Shape           | Encoder                     | Content-Type                          |
+  | --------------- | --------------------------- | ------------------------------------- |
+  | `{:form, data}` | `URI.encode_query/1`        | `"application/x-www-form-urlencoded"` |
+  | `{:json, data}` | `Jason.encode_to_iodata!/1` | `"application/json"`                  |
+
+  ## Examples
+
+      iex> Req.post!("https://httpbin.org/post", {:form, comments: "hello!"}).body["form"]
+      %{"comments" => "hello!"}
+
+  """
+  @doc api: :request
+  def encode(request) do
+    case request.body do
+      {:form, data} ->
+        request
+        |> Map.put(:body, URI.encode_query(data))
+        |> put_new_header("content-type", "application/x-www-form-urlencoded")
+
+      {:json, data} ->
+        request
+        |> Map.put(:body, Jason.encode_to_iodata!(data))
+        |> put_new_header("content-type", "application/json")
+
+      _other ->
+        request
+    end
   end
 
   ## Response steps
