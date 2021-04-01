@@ -4,6 +4,8 @@
 
 An HTTP client with a focus on composability, built on top of [Finch](https://github.com/keathley/finch).
 
+This is a work in progress!
+
 # Features
 
   * Extensibility via request, response, and error steps
