@@ -8,6 +8,8 @@ defmodule Req do
 
   @doc """
   Makes a GET request.
+
+  See `request/3` for a list of supported options.
   """
   @doc api: :high_level
   def get!(url, opts \\ []) do
@@ -19,6 +21,13 @@ defmodule Req do
 
   @doc """
   Makes an HTTP request.
+
+  ## Options
+
+    * `:header` - request headers, defaults to `[]`
+
+    * `:body` - request body, defaults to `""`
+
   """
   @doc api: :high_level
   def request(method, url, opts \\ []) do
@@ -32,44 +41,70 @@ defmodule Req do
 
   @doc """
   Builds a request pipeline.
+
+  ## Options
+
+    * `:header` - request headers, defaults to `[]`
+
+    * `:body` - request body, defaults to `""`
+
   """
   @doc api: :low_level
-  def build(method, url, opts \\ []) do
-    body = Keyword.get(opts, :body, "")
-    headers = Keyword.get(opts, :headers, [])
-
+  def build(method, url, options \\ []) do
     %Req.Request{
       method: method,
       url: url,
-      headers: headers,
-      body: body
+      headers: Keyword.get(options, :headers, []),
+      body: Keyword.get(options, :body, "")
     }
   end
 
   @doc """
   Adds steps that should be reasonable defaults for most users.
 
-    * request:
+  Request steps:
 
-      * `default_headers/1`
+    * `default_headers/1`
 
-    * response:
+    * [`&auth(&1, options[:auth])`](`auth/2`) (if `options[:auth]` is set)
 
-      * `decompress/2`
-      * `decode/2`
+  Response steps:
+
+    * `retry/2` (if `options[:retry]` is set)
+
+    * `decompress/2`
+
+    * `decode/2`
+
+  Error steps:
+
+    * `retry/2` (if `options[:retry]` is set)
 
   """
   @doc api: :low_level
-  def add_default_steps(request) do
+  def add_default_steps(request, options \\ []) do
+    request_steps =
+      [
+        &default_headers/1
+      ] ++ maybe_step(options[:auth], &auth(&1, options[:auth]))
+
+    response_steps =
+      maybe_step(options[:retry], &retry/2) ++
+        [
+          &decompress/2,
+          &decode/2
+        ]
+
+    error_steps = maybe_step(options[:retry], &retry/2)
+
     request
-    |> add_request_steps([
-      &default_headers/1
-    ])
-    |> add_response_steps([
-      &decompress/2,
-      &decode/2
-    ])
+    |> add_request_steps(request_steps)
+    |> add_response_steps(response_steps)
+    |> add_error_steps(error_steps)
   end
+
+  defp maybe_step(true, step), do: [step]
+  defp maybe_step(_, _step), do: []
 
   @doc """
   Adds request steps.
@@ -203,6 +238,31 @@ defmodule Req do
 
   ## Request steps
 
+  @doc """
+  Sets request authentication.
+
+  `auth` can be one of:
+
+    * `{username, password}` - same as `{:basic, username, password}`
+
+    * `{:basic, username, password}` - uses Basic HTTP authentication
+
+  ## Examples
+
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {"bad", "bad"}).status
+      401
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {"foo", "bar"}).status
+      200
+
+  """
+  @doc api: :request
+  def auth(request, auth)
+
+  def auth(request, {username, password}) when is_binary(username) and is_binary(password) do
+    value = Base.encode64("#{username}:#{password}")
+    put_new_header(request, "authorization", "Basic #{value}")
+  end
+
   @user_agent "req/#{Mix.Project.config()[:version]}"
 
   @doc """
@@ -254,15 +314,20 @@ defmodule Req do
   """
   @doc api: :response
   def decode(request, response) do
-    {_, content_type} = List.keyfind(response.headers, "content-type", 0)
-    extensions = content_type |> normalize_content_type() |> MIME.extensions()
+    case List.keyfind(response.headers, "content-type", 0) do
+      {_, content_type} ->
+        extensions = content_type |> normalize_content_type() |> MIME.extensions()
 
-    case extensions do
-      ["json" | _] ->
-        {request, update_in(response.body, &Jason.decode!/1)}
+        case extensions do
+          ["json" | _] ->
+            {request, update_in(response.body, &Jason.decode!/1)}
 
-      ["gz" | _] ->
-        {request, update_in(response.body, &:zlib.gunzip/1)}
+          ["gz" | _] ->
+            {request, update_in(response.body, &:zlib.gunzip/1)}
+
+          _ ->
+            {request, response}
+        end
 
       _ ->
         {request, response}
