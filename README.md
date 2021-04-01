@@ -1,5 +1,7 @@
 # Req
 
+[Docs](http://wojtekmach.pl/docs/req/)
+
 <!-- MDOC !-->
 
 An HTTP client with a focus on composability, built on top of [Finch](https://github.com/keathley/finch).
@@ -12,7 +14,9 @@ This is a work in progress!
 
   * Automatic body decompression (via `decompress/2` step)
 
-  * Automatic body decoding (via `decode/2` step)
+  * Automatic body encoding and decoding (via `encode/1` and `decode/2` steps)
+
+  * Basic authentication (via `auth/2` step)
 
   * Retries on errors (via `retry/2` step)
 

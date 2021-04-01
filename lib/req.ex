@@ -261,9 +261,7 @@ defmodule Req do
 
   `auth` can be one of:
 
-    * `{username, password}` - same as `{:basic, username, password}`
-
-    * `{:basic, username, password}` - uses Basic HTTP authentication
+    * `{username, password}` - uses Basic HTTP authentication
 
   ## Examples
 

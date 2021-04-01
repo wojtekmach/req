@@ -33,6 +33,8 @@ defmodule Req.MixProject do
   defp docs do
     [
       main: "Req",
+      source_url: "https://github.com/wojtekmach/req",
+      source_ref: "master",
       groups_for_functions: [
         "High-level API": &(&1[:api] == :high_level),
         "Low-level API": &(&1[:api] == :low_level),
