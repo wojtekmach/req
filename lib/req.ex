@@ -367,6 +367,24 @@ defmodule Req do
 
   @doc """
   Decodes the response body based on the `content-type` header.
+
+  Supported formats:
+
+  | Format  | Decoder           |
+  | ------- | ----------------- |
+  | JSON    | `Jason.decode!/1` |
+  | gzip    | `:zlib.gunzip/1`  |
+
+  ## Examples
+
+      iex> Req.get!("https://hex.pm/api/packages/finch").body["meta"]
+      %{
+        "description" => "An HTTP client focused on performance.",
+        "licenses" => ["MIT"],
+        "links" => %{"GitHub" => "https://github.com/keathley/finch"},
+        ...
+      }
+
   """
   @doc api: :response
   def decode(request, response) do
