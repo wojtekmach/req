@@ -48,7 +48,7 @@ defmodule Req do
   def request(method, url, opts \\ []) do
     method
     |> build(url, opts)
-    |> add_default_steps()
+    |> add_default_steps(opts)
     |> run()
   end
 
@@ -121,8 +121,9 @@ defmodule Req do
     |> add_error_steps(error_steps)
   end
 
-  defp maybe_step(true, step), do: [step]
-  defp maybe_step(_, _step), do: []
+  defp maybe_step(nil, _step), do: []
+  defp maybe_step(false, _step), do: []
+  defp maybe_step(_, step), do: [step]
 
   @doc """
   Adds request steps.
