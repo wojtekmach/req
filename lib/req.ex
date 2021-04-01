@@ -424,6 +424,27 @@ defmodule Req do
 
     * an exception
 
+  ## Examples
+
+      iex> Req.get!("https://httpbin.org/status/500,200", retry: true)
+      # 19:02:08.463 [error] Got response with status 500. Will retry in 2000ms, 2 attempts left
+      # 19:02:10.710 [error] Got response with status 500. Will retry in 2000ms, 1 attempt left
+      %Finch.Response{
+        body: "",
+        headers: [
+          {"date", "Thu, 01 Apr 2021 16:39:02 GMT"},
+          ...
+        ],
+        status: 200
+      }
+
+      iex> Req.request(:get, "http://localhost:9999", retry: true)
+      # 19:04:11.152 [error] Got exception. Will retry in 2000ms, 2 attempts left
+      # 19:04:11.160 [error] ** (Mint.TransportError) connection refused
+      # 19:04:13.163 [error] Got exception. Will retry in 2000ms, 1 attempt left
+      # 19:04:13.164 [error] ** (Mint.TransportError) connection refused
+      {:error, %Mint.TransportError{reason: :econnrefused}}
+
   """
   @doc api: :error
   def retry(request, response_or_exception)
@@ -433,15 +454,46 @@ defmodule Req do
   end
 
   def retry(request, response_or_exception) do
+    delay = 2000
     max_attempts = 2
     attempt = Req.Request.get_private(request, :retry_attempt, 0)
 
     if attempt < max_attempts do
+      log_retry(response_or_exception, attempt, max_attempts, delay)
+      Process.sleep(delay)
       request = Req.Request.put_private(request, :retry_attempt, attempt + 1)
       {_, result} = run(%{request | request_steps: []})
       {Req.Request.halt(request), result}
     else
       {request, response_or_exception}
+    end
+  end
+
+  defp log_retry(response_or_exception, attempt, max_attempts, delay) do
+    require Logger
+
+    attempts_left =
+      case max_attempts - attempt do
+        1 -> "1 attempt"
+        n -> "#{n} attempts"
+      end
+
+    message = ["Will retry in #{delay}ms, ", attempts_left, " left"]
+
+    case response_or_exception do
+      %{__exception__: true} = exception ->
+        Logger.error([
+          "Got exception. ",
+          message
+        ])
+
+        Logger.error([
+          "** (#{inspect(exception.__struct__)}) ",
+          Exception.message(exception)
+        ])
+
+      response ->
+        Logger.error(["Got response with status #{response.status}. ", message])
     end
   end
 
