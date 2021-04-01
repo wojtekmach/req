@@ -289,10 +289,14 @@ defmodule Req do
 
     * `"user-agent"` - `#{inspect(@user_agent)}`
 
+    * `"accept-encoding"` - `"gzip"`
+
   """
   @doc api: :request
   def default_headers(request) do
-    put_new_header(request, "user-agent", @user_agent)
+    request
+    |> put_new_header("user-agent", @user_agent)
+    |> put_new_header("accept-encoding", "gzip")
   end
 
   @doc """
