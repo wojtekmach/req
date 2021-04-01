@@ -20,6 +20,21 @@ defmodule Req do
   end
 
   @doc """
+  Makes a POST request.
+
+  See `request/3` for a list of supported options.
+  """
+  @doc api: :high_level
+  def post!(url, body, opts \\ []) do
+    opts = Keyword.put(opts, :body, body)
+
+    case request(:post, url, opts) do
+      {:ok, response} -> response
+      {:error, error} -> raise error
+    end
+  end
+
+  @doc """
   Makes an HTTP request.
 
   ## Options
