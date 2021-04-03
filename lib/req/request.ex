@@ -1,7 +1,7 @@
 defmodule Req.Request do
   defstruct [
     :method,
-    :url,
+    :uri,
     :headers,
     body: "",
     halted: false,

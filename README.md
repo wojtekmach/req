@@ -16,6 +16,8 @@ This is a work in progress!
 
   * Automatic body encoding and decoding (via `encode/1` and `decode/2` steps)
 
+  * Encode params as query string (via `params/2` step)
+
   * Basic authentication (via `auth/2` step)
 
   * Retries on errors (via `retry/2` step)

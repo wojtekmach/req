@@ -12,8 +12,8 @@ defmodule Req do
   See `request/3` for a list of supported options.
   """
   @doc api: :high_level
-  def get!(url, opts \\ []) do
-    case request(:get, url, opts) do
+  def get!(uri, opts \\ []) do
+    case request(:get, uri, opts) do
       {:ok, response} -> response
       {:error, error} -> raise error
     end
@@ -25,10 +25,10 @@ defmodule Req do
   See `request/3` for a list of supported options.
   """
   @doc api: :high_level
-  def post!(url, body, opts \\ []) do
+  def post!(uri, body, opts \\ []) do
     opts = Keyword.put(opts, :body, body)
 
-    case request(:post, url, opts) do
+    case request(:post, uri, opts) do
       {:ok, response} -> response
       {:error, error} -> raise error
     end
@@ -47,9 +47,9 @@ defmodule Req do
   function for more information.
   """
   @doc api: :high_level
-  def request(method, url, opts \\ []) do
+  def request(method, uri, opts \\ []) do
     method
-    |> build(url, opts)
+    |> build(uri, opts)
     |> add_default_steps(opts)
     |> run()
   end
@@ -67,10 +67,10 @@ defmodule Req do
 
   """
   @doc api: :low_level
-  def build(method, url, options \\ []) do
+  def build(method, uri, options \\ []) do
     %Req.Request{
       method: method,
-      url: url,
+      uri: URI.parse(uri),
       headers: Keyword.get(options, :headers, []),
       body: Keyword.get(options, :body, "")
     }
@@ -86,6 +86,8 @@ defmodule Req do
     * `encode/1`
 
     * [`&auth(&1, options[:auth])`](`auth/2`) (if `options[:auth]` is set)
+
+    * [`&params(&1, options[:params])`](`params/2`) (if `options[:params]` is set)
 
   Response steps:
 
@@ -106,7 +108,9 @@ defmodule Req do
       [
         &default_headers/1,
         &encode/1
-      ] ++ maybe_step(options[:auth], &auth(&1, options[:auth]))
+      ] ++
+        maybe_step(options[:auth], &auth(&1, options[:auth])) ++
+        maybe_step(options[:params], &params(&1, options[:params]))
 
     response_steps =
       maybe_step(options[:retry], &retry/2) ++
@@ -160,7 +164,7 @@ defmodule Req do
   def run(request) do
     case run_request(request) do
       %Req.Request{} = request ->
-        finch_request = Finch.build(request.method, request.url, request.headers, request.body)
+        finch_request = Finch.build(request.method, request.uri, request.headers, request.body)
 
         case Finch.request(finch_request, Req.Finch) do
           {:ok, response} ->
@@ -279,6 +283,25 @@ defmodule Req do
   def auth(request, {username, password}) when is_binary(username) and is_binary(password) do
     value = Base.encode64("#{username}:#{password}")
     put_new_header(request, "authorization", "Basic #{value}")
+  end
+
+  @doc """
+  Adds params to request query string.
+
+  ## Examples
+
+      iex> Req.get!("https://httpbin.org/anything/query", params: [x: "1", y: "2"]).body["args"]
+      %{"x" => "1", "y" => "2"}
+
+  """
+  @doc api: :request
+  def params(request, params) do
+    encoded = URI.encode_query(params)
+
+    update_in(request.uri.query, fn
+      nil -> encoded
+      query -> query <> "&" <> encoded
+    end)
   end
 
   @user_agent "req/#{Mix.Project.config()[:version]}"

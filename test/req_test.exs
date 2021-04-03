@@ -36,7 +36,7 @@ defmodule ReqTest do
       Req.build(:get, c.url <> "/not-found")
       |> Req.add_request_steps([
         fn request ->
-          %{request | url: c.url <> "/ok"}
+          put_in(request.uri.path, "/ok")
         end
       ])
 
@@ -266,7 +266,7 @@ defmodule ReqTest do
   end
 
   test "auth/2", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+    Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
       expected = "Basic " <> Base.encode64("foo:bar")
 
       case Plug.Conn.get_req_header(conn, "authorization") do
@@ -278,8 +278,17 @@ defmodule ReqTest do
       end
     end)
 
-    assert Req.get!("http://localhost:#{c.bypass.port}/", auth: {"bad", "bad"}).status == 401
-    assert Req.get!("http://localhost:#{c.bypass.port}/", auth: {"foo", "bar"}).status == 200
+    assert Req.get!(c.url <> "/auth", auth: {"bad", "bad"}).status == 401
+    assert Req.get!(c.url <> "/auth", auth: {"foo", "bar"}).status == 200
+  end
+
+  test "params/2", c do
+    Bypass.expect(c.bypass, "GET", "/params", fn conn ->
+      Plug.Conn.send_resp(conn, 200, conn.query_string)
+    end)
+
+    assert Req.get!(c.url <> "/params", params: [x: 1, y: 2]).body == "x=1&y=2"
+    assert Req.get!(c.url <> "/params?x=1", params: [y: 2, z: 3]).body == "x=1&y=2&z=3"
   end
 
   ## Response steps
