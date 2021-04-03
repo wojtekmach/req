@@ -265,6 +265,23 @@ defmodule ReqTest do
     assert {:ok, %{status: 200, body: "req/0.1.0-dev"}} = Req.run(state)
   end
 
+  test "auth/2", c do
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      expected = "Basic " <> Base.encode64("foo:bar")
+
+      case Plug.Conn.get_req_header(conn, "authorization") do
+        [^expected] ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+
+        _ ->
+          Plug.Conn.send_resp(conn, 401, "unauthorized")
+      end
+    end)
+
+    assert Req.get!("http://localhost:#{c.bypass.port}/", auth: {"bad", "bad"}).status == 401
+    assert Req.get!("http://localhost:#{c.bypass.port}/", auth: {"foo", "bar"}).status == 200
+  end
+
   ## Response steps
 
   test "decompress/2", c do
