@@ -343,6 +343,7 @@ defmodule ReqTest do
 
   ## Error steps
 
+  @tag :capture_log
   test "retry: eventually successful", c do
     {:ok, _} = Agent.start_link(fn -> 0 end, name: :counter)
 
@@ -357,7 +358,7 @@ defmodule ReqTest do
     state =
       Req.build(:get, c.url <> "/retry")
       |> Req.add_response_steps([
-        &Req.retry/2,
+        &Req.retry(&1, &2, delay: 10),
         fn request, response ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
         end
@@ -367,6 +368,7 @@ defmodule ReqTest do
     assert Agent.get(:counter, & &1) == 3
   end
 
+  @tag :capture_log
   test "retry: always failing", c do
     pid = self()
 
@@ -378,7 +380,7 @@ defmodule ReqTest do
     state =
       Req.build(:get, c.url <> "/retry")
       |> Req.add_response_steps([
-        &Req.retry/2,
+        &Req.retry(&1, &2, delay: 10),
         fn request, response ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
         end

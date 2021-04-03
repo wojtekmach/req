@@ -20,7 +20,7 @@ This is a work in progress!
 
   * Basic authentication (via `auth/2` step)
 
-  * Retries on errors (via `retry/2` step)
+  * Retries on errors (via `retry/3` step)
 
 ## High-level API
 

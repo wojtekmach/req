@@ -91,7 +91,8 @@ defmodule Req do
 
   Response steps:
 
-    * `retry/2` (if `options[:retry]` is set)
+    * [`&retry(&1, &2, options[:retry])`](`retry/3`) (if `options[:retry]` is set and is a
+      keywords list or an atom `true`)
 
     * `decompress/2`
 
@@ -99,7 +100,8 @@ defmodule Req do
 
   Error steps:
 
-    * `retry/2` (if `options[:retry]` is set)
+    * [`&retry(&1, &2, options[:retry])`](`retry/3`) (if `options[:retry]` is set and is a
+      keywords list or an atom `true`)
 
   """
   @doc api: :low_level
@@ -112,14 +114,17 @@ defmodule Req do
         maybe_step(options[:auth], &auth(&1, options[:auth])) ++
         maybe_step(options[:params], &params(&1, options[:params]))
 
+    retry = options[:retry]
+    retry = if retry == true, do: [], else: retry
+
     response_steps =
-      maybe_step(options[:retry], &retry/2) ++
+      maybe_step(retry, &retry(&1, &2, retry)) ++
         [
           &decompress/2,
           &decode/2
         ]
 
-    error_steps = maybe_step(options[:retry], &retry/2)
+    error_steps = maybe_step(retry, &retry(&1, &2, retry))
 
     request
     |> add_request_steps(request_steps)
@@ -447,7 +452,16 @@ defmodule Req do
 
     * an exception
 
+  ## Options
+
+    * `:delay` - sleep this number of milliseconds before making another attempt, defaults
+      to `2000`
+
+    * `:max_attempts` - maximum number of attempts, defaults to `2`
+
   ## Examples
+
+  With default options:
 
       iex> Req.get!("https://httpbin.org/status/500,200", retry: true)
       # 19:02:08.463 [error] Got response with status 500. Will retry in 2000ms, 2 attempts left
@@ -461,24 +475,24 @@ defmodule Req do
         status: 200
       }
 
-      iex> Req.request(:get, "http://localhost:9999", retry: true)
-      # 19:04:11.152 [error] Got exception. Will retry in 2000ms, 2 attempts left
-      # 19:04:11.160 [error] ** (Mint.TransportError) connection refused
-      # 19:04:13.163 [error] Got exception. Will retry in 2000ms, 1 attempt left
+  With custom options:
+
+      iex> Req.request(:get, "http://localhost:9999", retry: [delay: 100, max_attempts: 1])
+      # 19:04:13.163 [error] Got exception. Will retry in 100ms, 1 attempt left
       # 19:04:13.164 [error] ** (Mint.TransportError) connection refused
       {:error, %Mint.TransportError{reason: :econnrefused}}
 
   """
   @doc api: :error
-  def retry(request, response_or_exception)
+  def retry(request, response_or_exception, options \\ [])
 
-  def retry(request, %{status: status} = response) when status < 500 do
+  def retry(request, %{status: status} = response, _options) when status < 500 do
     {request, response}
   end
 
-  def retry(request, response_or_exception) do
-    delay = 2000
-    max_attempts = 2
+  def retry(request, response_or_exception, options) when is_list(options) do
+    delay = Keyword.get(options, :delay, 2000)
+    max_attempts = Keyword.get(options, :max_attempts, 2)
     attempt = Req.Request.get_private(request, :retry_attempt, 0)
 
     if attempt < max_attempts do
