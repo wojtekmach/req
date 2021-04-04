@@ -42,10 +42,10 @@ defmodule Req do
   information.
   """
   @doc api: :high_level
-  def request(method, uri, opts \\ []) do
+  def request(method, uri, options \\ []) do
     method
-    |> build(uri, opts)
-    |> add_default_steps(opts)
+    |> build(uri, options)
+    |> add_default_steps(options)
     |> run()
   end
 
@@ -55,10 +55,10 @@ defmodule Req do
   See `request/3` for more information.
   """
   @doc api: :high_level
-  def request!(method, uri, opts \\ []) do
+  def request!(method, uri, options \\ []) do
     method
-    |> build(uri, opts)
-    |> add_default_steps(opts)
+    |> build(uri, options)
+    |> add_default_steps(options)
     |> run!()
   end
 
