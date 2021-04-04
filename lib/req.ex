@@ -56,6 +56,19 @@ defmodule Req do
     |> run()
   end
 
+  @doc """
+  Makes an HTTP request and returns a response or raises an error.
+
+  See `request/3` for more information.
+  """
+  @doc api: :high_level
+  def request!(method, uri, opts \\ []) do
+    method
+    |> build(uri, opts)
+    |> add_default_steps(opts)
+    |> run!()
+  end
+
   ## Low-level API
 
   @doc """
@@ -195,7 +208,7 @@ defmodule Req do
   @doc """
   Runs a request pipeline and returns a response or raises an error.
 
-  See `run/1`.
+  See `run/1` for more information.
   """
   @doc api: :low_level
   def run!(request) do
