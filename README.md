@@ -62,6 +62,22 @@ Req.build(:get, "https://api.github.com/repos/elixir-lang/elixir")
 #=> {:ok, %{body: %{"description" => "Elixir is a dynamic," <> ...}, ...}, ...}
 ```
 
+The high-level API shown before:
+
+```elixir
+Req.get!("https://api.github.com/repos/elixir-lang/elixir")
+```
+
+is equivalent to this composition of lower-level API functions:
+
+```
+Req.build(:get, "https://api.github.com/repos/elixir-lang/elixir")
+|> Req.add_default_steps()
+|> Req.run!()
+```
+
+(See `Req.build/3`, `Req.add_default_steps/2`, and `Req.run!/1` for more information.)
+
 We can also build more complex flows like returning a response from a request step
 or an error from a response step. We will explore those next.
 
