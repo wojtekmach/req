@@ -338,6 +338,24 @@ defmodule ReqTest do
     assert Req.get!(c.url <> "/gzip").body == "foo"
   end
 
+  test "decode/2: csv", c do
+    csv = [
+      ["x", "y"],
+      ["1", "2"],
+      ["3", "4"]
+    ]
+
+    Bypass.expect(c.bypass, "GET", "/csv", fn conn ->
+      data = NimbleCSV.RFC4180.dump_to_iodata(csv)
+
+      conn
+      |> Plug.Conn.put_resp_content_type("text/csv")
+      |> Plug.Conn.send_resp(200, data)
+    end)
+
+    assert Req.get!(c.url <> "/csv").body == csv
+  end
+
   test "follow_redirects/2: absolute", c do
     Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
       location = c.url <> "/ok"

@@ -404,10 +404,11 @@ defmodule Req do
 
   Supported formats:
 
-  | Format  | Decoder           |
-  | ------- | ----------------- |
-  | JSON    | `Jason.decode!/1` |
-  | gzip    | `:zlib.gunzip/1`  |
+  | Format  | Decoder                                                          |
+  | ------- | ---------------------------------------------------------------- |
+  | JSON    | `Jason.decode!/1`                                                |
+  | gzip    | `:zlib.gunzip/1`                                                 |
+  | csv     | `NimbleCSV.RFC4180.parse_string/2` (if `NimbleCSV` is installed) |
 
   ## Examples
 
@@ -432,6 +433,14 @@ defmodule Req do
 
           ["gz" | _] ->
             {request, update_in(response.body, &:zlib.gunzip/1)}
+
+          ["csv" | _] ->
+            if Code.ensure_loaded?(NimbleCSV) do
+              options = [skip_headers: false]
+              {request, update_in(response.body, &NimbleCSV.RFC4180.parse_string(&1, options))}
+            else
+              {request, response}
+            end
 
           _ ->
             {request, response}
