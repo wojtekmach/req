@@ -338,11 +338,8 @@ defmodule Req do
 
   ## Examples
 
-      iex> Req.get!("https://httpbin.org/headers", headers: [x_foo: "bar"]).body["headers"]
-      %{
-        "X-Foo" => "bar",
-        ...
-      }
+      iex> Req.get!("https://httpbin.org/user-agent", headers: [user_agent: "my_agent"]).body
+      %{"user-agent" => "my_agent"}
 
   """
   @doc api: :request
