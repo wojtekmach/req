@@ -83,6 +83,8 @@ defmodule Req do
 
   Request steps:
 
+    * `normalize_headers/1`
+
     * `default_headers/1`
 
     * `encode/1`
@@ -112,6 +114,7 @@ defmodule Req do
   def add_default_steps(request, options \\ []) do
     request_steps =
       [
+        &normalize_headers/1,
         &default_headers/1,
         &encode/1
       ] ++
@@ -312,6 +315,35 @@ defmodule Req do
     request
     |> put_new_header("user-agent", @user_agent)
     |> put_new_header("accept-encoding", "gzip")
+  end
+
+  @doc """
+  Normalizes request headers.
+
+  Turns atom header names into strings, e.g.: `:user_agent` becomes `"user-agent"`. Non-atom names
+  are returned as is.
+
+  ## Examples
+
+      iex> Req.get!("https://httpbin.org/headers", headers: [x_foo: "bar"]).body["headers"]
+      %{
+        "X-Foo" => "bar",
+        ...
+      }
+
+  """
+  @doc api: :request
+  def normalize_headers(request) do
+    headers =
+      for {name, value} <- request.headers do
+        if is_atom(name) do
+          {name |> Atom.to_string() |> String.replace("_", "-"), value}
+        else
+          {name, value}
+        end
+      end
+
+    %{request | headers: headers}
   end
 
   @doc """
