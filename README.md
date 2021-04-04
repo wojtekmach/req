@@ -1,5 +1,7 @@
 # Req
 
+[![CI](https://github.com/wojtekmach/req/actions/workflows/ci.yml/badge.svg)](https://github.com/wojtekmach/req/actions/workflows/ci.yml)
+
 [Docs](http://wojtekmach.pl/docs/req/)
 
 <!-- MDOC !-->
