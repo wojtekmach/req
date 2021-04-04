@@ -251,20 +251,6 @@ defmodule ReqTest do
 
   ## Request steps
 
-  test "default_headers/1" do
-    state =
-      Req.build(:get, "http://localhost")
-      |> Req.add_request_steps([
-        &Req.default_headers/1,
-        fn request ->
-          {_, user_agent} = List.keyfind(request.headers, "user-agent", 0)
-          {request, %Finch.Response{status: 200, body: user_agent}}
-        end
-      ])
-
-    assert {:ok, %{status: 200, body: "req/0.1.0-dev"}} = Req.run(state)
-  end
-
   test "auth/2", c do
     Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
       expected = "Basic " <> Base.encode64("foo:bar")
@@ -280,6 +266,20 @@ defmodule ReqTest do
 
     assert Req.get!(c.url <> "/auth", auth: {"bad", "bad"}).status == 401
     assert Req.get!(c.url <> "/auth", auth: {"foo", "bar"}).status == 200
+  end
+
+  test "default_headers/1" do
+    state =
+      Req.build(:get, "http://localhost")
+      |> Req.add_request_steps([
+        &Req.default_headers/1,
+        fn request ->
+          {_, user_agent} = List.keyfind(request.headers, "user-agent", 0)
+          {request, %Finch.Response{status: 200, body: user_agent}}
+        end
+      ])
+
+    assert {:ok, %{status: 200, body: "req/0.1.0-dev"}} = Req.run(state)
   end
 
   test "params/2", c do

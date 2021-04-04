@@ -290,25 +290,6 @@ defmodule Req do
     put_new_header(request, "authorization", "Basic #{value}")
   end
 
-  @doc """
-  Adds params to request query string.
-
-  ## Examples
-
-      iex> Req.get!("https://httpbin.org/anything/query", params: [x: "1", y: "2"]).body["args"]
-      %{"x" => "1", "y" => "2"}
-
-  """
-  @doc api: :request
-  def params(request, params) do
-    encoded = URI.encode_query(params)
-
-    update_in(request.uri.query, fn
-      nil -> encoded
-      query -> query <> "&" <> encoded
-    end)
-  end
-
   @user_agent "req/#{Mix.Project.config()[:version]}"
 
   @doc """
@@ -361,6 +342,25 @@ defmodule Req do
       _other ->
         request
     end
+  end
+
+  @doc """
+  Adds params to request query string.
+
+  ## Examples
+
+      iex> Req.get!("https://httpbin.org/anything/query", params: [x: "1", y: "2"]).body["args"]
+      %{"x" => "1", "y" => "2"}
+
+  """
+  @doc api: :request
+  def params(request, params) do
+    encoded = URI.encode_query(params)
+
+    update_in(request.uri.query, fn
+      nil -> encoded
+      query -> query <> "&" <> encoded
+    end)
   end
 
   ## Response steps
