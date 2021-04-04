@@ -23,8 +23,8 @@ defmodule ReqTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
-    state = Req.build(:get, c.url <> "/ok")
-    assert {:ok, %{status: 200, body: "ok"}} = Req.run(state)
+    request = Req.build(:get, c.url <> "/ok")
+    assert {:ok, %{status: 200, body: "ok"}} = Req.run(request)
   end
 
   test "simple request step", c do
@@ -32,7 +32,7 @@ defmodule ReqTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
-    state =
+    request =
       Req.build(:get, c.url <> "/not-found")
       |> Req.add_request_steps([
         fn request ->
@@ -40,11 +40,11 @@ defmodule ReqTest do
         end
       ])
 
-    assert {:ok, %{status: 200, body: "ok"}} = Req.run(state)
+    assert {:ok, %{status: 200, body: "ok"}} = Req.run(request)
   end
 
   test "request step returns response", c do
-    state =
+    request =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_request_steps([
         fn request ->
@@ -57,11 +57,11 @@ defmodule ReqTest do
         end
       ])
 
-    assert {:ok, %{status: 200, body: "from cache - updated"}} = Req.run(state)
+    assert {:ok, %{status: 200, body: "from cache - updated"}} = Req.run(request)
   end
 
   test "request step returns exception", c do
-    state =
+    request =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_request_steps([
         fn request ->
@@ -74,11 +74,11 @@ defmodule ReqTest do
         end
       ])
 
-    assert {:error, %RuntimeError{message: "oops - updated"}} = Req.run(state)
+    assert {:error, %RuntimeError{message: "oops - updated"}} = Req.run(request)
   end
 
   test "request step halts with response", c do
-    state =
+    request =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_request_steps([
         fn request ->
@@ -93,11 +93,11 @@ defmodule ReqTest do
         &unreachable/2
       ])
 
-    assert {:ok, %{status: 200, body: "from cache"}} = Req.run(state)
+    assert {:ok, %{status: 200, body: "from cache"}} = Req.run(request)
   end
 
   test "request step halts with exception", c do
-    state =
+    request =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_request_steps([
         fn request ->
@@ -112,7 +112,7 @@ defmodule ReqTest do
         &unreachable/2
       ])
 
-    assert {:error, %RuntimeError{message: "oops"}} = Req.run(state)
+    assert {:error, %RuntimeError{message: "oops"}} = Req.run(request)
   end
 
   test "simple response step", c do
@@ -120,7 +120,7 @@ defmodule ReqTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
-    state =
+    request =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_response_steps([
         fn request, response ->
@@ -128,7 +128,7 @@ defmodule ReqTest do
         end
       ])
 
-    assert {:ok, %{status: 200, body: "ok - updated"}} = Req.run(state)
+    assert {:ok, %{status: 200, body: "ok - updated"}} = Req.run(request)
   end
 
   test "response step returns exception", c do
@@ -136,7 +136,7 @@ defmodule ReqTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
-    state =
+    request =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_response_steps([
         fn request, response ->
@@ -150,7 +150,7 @@ defmodule ReqTest do
         end
       ])
 
-    assert {:error, %RuntimeError{message: "oops - updated"}} = Req.run(state)
+    assert {:error, %RuntimeError{message: "oops - updated"}} = Req.run(request)
   end
 
   test "response step halts with response", c do
@@ -158,7 +158,7 @@ defmodule ReqTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
-    state =
+    request =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_response_steps([
         fn request, response ->
@@ -170,7 +170,7 @@ defmodule ReqTest do
         &unreachable/2
       ])
 
-    assert {:ok, %{status: 200, body: "ok - updated"}} = Req.run(state)
+    assert {:ok, %{status: 200, body: "ok - updated"}} = Req.run(request)
   end
 
   test "response step halts with exception", c do
@@ -178,7 +178,7 @@ defmodule ReqTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
-    state =
+    request =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_response_steps([
         fn request, response ->
@@ -191,13 +191,13 @@ defmodule ReqTest do
         &unreachable/2
       ])
 
-    assert {:error, %RuntimeError{message: "oops"}} = Req.run(state)
+    assert {:error, %RuntimeError{message: "oops"}} = Req.run(request)
   end
 
   test "simple error step", c do
     Bypass.down(c.bypass)
 
-    state =
+    request =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_error_steps([
         fn request, exception ->
@@ -206,13 +206,13 @@ defmodule ReqTest do
         end
       ])
 
-    assert {:error, %RuntimeError{message: "oops"}} = Req.run(state)
+    assert {:error, %RuntimeError{message: "oops"}} = Req.run(request)
   end
 
   test "error step returns response", c do
     Bypass.down(c.bypass)
 
-    state =
+    request =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_response_steps([
         fn request, response ->
@@ -227,13 +227,13 @@ defmodule ReqTest do
         &unreachable/2
       ])
 
-    assert {:ok, %{status: 200, body: "ok - updated"}} = Req.run(state)
+    assert {:ok, %{status: 200, body: "ok - updated"}} = Req.run(request)
   end
 
   test "error step halts with response", c do
     Bypass.down(c.bypass)
 
-    state =
+    request =
       Req.build(:get, c.url <> "/ok")
       |> Req.add_response_steps([
         &unreachable/2
@@ -246,7 +246,7 @@ defmodule ReqTest do
         &unreachable/2
       ])
 
-    assert {:ok, %{status: 200, body: "ok"}} = Req.run(state)
+    assert {:ok, %{status: 200, body: "ok"}} = Req.run(request)
   end
 
   ## Request steps
@@ -268,18 +268,13 @@ defmodule ReqTest do
     assert Req.get!(c.url <> "/auth", auth: {"foo", "bar"}).status == 200
   end
 
-  test "default_headers/1" do
-    state =
-      Req.build(:get, "http://localhost")
-      |> Req.add_request_steps([
-        &Req.default_headers/1,
-        fn request ->
-          {_, user_agent} = List.keyfind(request.headers, "user-agent", 0)
-          {request, %Finch.Response{status: 200, body: user_agent}}
-        end
-      ])
+  test "default_headers/1", c do
+    Bypass.expect(c.bypass, "GET", "/user-agent", fn conn ->
+      [user_agent] = Plug.Conn.get_req_header(conn, "user-agent")
+      Plug.Conn.send_resp(conn, 200, user_agent)
+    end)
 
-    assert {:ok, %{status: 200, body: "req/0.1.0-dev"}} = Req.run(state)
+    assert %{body: "req/" <> _} = Req.get!(c.url <> "/user-agent")
   end
 
   test "encode/2: json", c do
@@ -320,13 +315,7 @@ defmodule ReqTest do
       |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
     end)
 
-    state =
-      Req.build(:get, c.url <> "/gzip")
-      |> Req.add_response_steps([
-        &Req.decompress/2
-      ])
-
-    assert {:ok, %{status: 200, body: "foo"}} = Req.run(state)
+    assert Req.get!(c.url <> "/gzip").body == "foo"
   end
 
   test "decode/2: json", c do
@@ -336,13 +325,7 @@ defmodule ReqTest do
       |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(%{"a" => 1}))
     end)
 
-    state =
-      Req.build(:get, c.url <> "/json")
-      |> Req.add_response_steps([
-        &Req.decode/2
-      ])
-
-    assert {:ok, %{status: 200, body: %{"a" => 1}}} = Req.run(state)
+    assert Req.get!(c.url <> "/json").body == %{"a" => 1}
   end
 
   test "decode/2: gzip", c do
@@ -352,13 +335,7 @@ defmodule ReqTest do
       |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
     end)
 
-    state =
-      Req.build(:get, c.url <> "/gzip")
-      |> Req.add_response_steps([
-        &Req.decode/2
-      ])
-
-    assert {:ok, %{status: 200, body: "foo"}} = Req.run(state)
+    assert Req.get!(c.url <> "/gzip").body == "foo"
   end
 
   ## Error steps
@@ -375,7 +352,7 @@ defmodule ReqTest do
       end
     end)
 
-    state =
+    request =
       Req.build(:get, c.url <> "/retry")
       |> Req.add_response_steps([
         &Req.retry(&1, &2, delay: 10),
@@ -384,7 +361,7 @@ defmodule ReqTest do
         end
       ])
 
-    assert {:ok, %{status: 200, body: "ok - updated"}} = Req.run(state)
+    assert {:ok, %{status: 200, body: "ok - updated"}} = Req.run(request)
     assert Agent.get(:counter, & &1) == 3
   end
 
@@ -397,7 +374,7 @@ defmodule ReqTest do
       Plug.Conn.send_resp(conn, 500, "oops")
     end)
 
-    state =
+    request =
       Req.build(:get, c.url <> "/retry")
       |> Req.add_response_steps([
         &Req.retry(&1, &2, delay: 10),
@@ -406,7 +383,7 @@ defmodule ReqTest do
         end
       ])
 
-    assert {:ok, %{status: 500, body: "oops - updated"}} = Req.run(state)
+    assert {:ok, %{status: 500, body: "oops - updated"}} = Req.run(request)
     assert_received :ping
     assert_received :ping
     assert_received :ping
