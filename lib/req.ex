@@ -14,11 +14,8 @@ defmodule Req do
   See `request/3` for a list of supported options.
   """
   @doc api: :high_level
-  def get!(uri, opts \\ []) do
-    case request(:get, uri, opts) do
-      {:ok, response} -> response
-      {:error, error} -> raise error
-    end
+  def get!(uri, options \\ []) do
+    request!(:get, uri, options)
   end
 
   @doc """
@@ -27,13 +24,9 @@ defmodule Req do
   See `request/3` for a list of supported options.
   """
   @doc api: :high_level
-  def post!(uri, body, opts \\ []) do
-    opts = Keyword.put(opts, :body, body)
-
-    case request(:post, uri, opts) do
-      {:ok, response} -> response
-      {:error, error} -> raise error
-    end
+  def post!(uri, body, options \\ []) do
+    options = Keyword.put(options, :body, body)
+    request!(:post, uri, options)
   end
 
   @doc """
