@@ -282,6 +282,26 @@ defmodule ReqTest do
     assert {:ok, %{status: 200, body: "req/0.1.0-dev"}} = Req.run(state)
   end
 
+  test "encode/2: json", c do
+    Bypass.expect(c.bypass, "POST", "/json", fn conn ->
+      conn = Plug.Parsers.call(conn, Plug.Parsers.init(parsers: [{:json, json_decoder: Jason}]))
+      assert conn.body_params == %{"a" => 1}
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    assert Req.post!(c.url <> "/json", {:json, %{a: 1}}).body == "ok"
+  end
+
+  test "encode/2: form", c do
+    Bypass.expect(c.bypass, "POST", "/form", fn conn ->
+      conn = Plug.Parsers.call(conn, Plug.Parsers.init(parsers: [:urlencoded]))
+      assert conn.body_params == %{"a" => "1"}
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    assert Req.post!(c.url <> "/form", {:form, a: 1}).body == "ok"
+  end
+
   test "params/2", c do
     Bypass.expect(c.bypass, "GET", "/params", fn conn ->
       Plug.Conn.send_resp(conn, 200, conn.query_string)
