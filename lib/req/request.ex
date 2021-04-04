@@ -22,7 +22,7 @@ defmodule Req.Request do
   Assigns a new private `key` and `value`.
   """
   def put_private(request, key, value) do
-    update_in(request.private, &Map.put(&1, key, value))
+    put_in(request.private[key], value)
   end
 
   @doc """

@@ -338,6 +338,54 @@ defmodule ReqTest do
     assert Req.get!(c.url <> "/gzip").body == "foo"
   end
 
+  test "follow_redirects/2: absolute", c do
+    Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+      location = c.url <> "/ok"
+
+      conn
+      |> Plug.Conn.put_resp_header("location", location)
+      |> Plug.Conn.send_resp(302, "redirecting to #{location}")
+    end)
+
+    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    assert ExUnit.CaptureLog.capture_log(fn ->
+             assert Req.get!(c.url <> "/redirect").status == 200
+           end) =~ "[info]  Redirecting to #{c.url}/ok"
+  end
+
+  test "follow_redirects/2: relative", c do
+    Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+      location =
+        case conn.query_string do
+          nil -> "/ok"
+          string -> "/ok?" <> string
+        end
+
+      conn
+      |> Plug.Conn.put_resp_header("location", location)
+      |> Plug.Conn.send_resp(302, "redirecting to #{location}")
+    end)
+
+    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+      Plug.Conn.send_resp(conn, 200, conn.query_string)
+    end)
+
+    assert ExUnit.CaptureLog.capture_log(fn ->
+             response = Req.get!(c.url <> "/redirect")
+             assert response.status == 200
+             assert response.body == ""
+           end) =~ "[info]  Redirecting to /ok"
+
+    assert ExUnit.CaptureLog.capture_log(fn ->
+             response = Req.get!(c.url <> "/redirect?a=1")
+             assert response.status == 200
+             assert response.body == "a=1"
+           end) =~ "[info]  Redirecting to /ok?a=1"
+  end
+
   ## Error steps
 
   @tag :capture_log

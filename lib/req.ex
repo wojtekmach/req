@@ -1,4 +1,6 @@
 defmodule Req do
+  require Logger
+
   @external_resource "README.md"
 
   @moduledoc "README.md"
@@ -94,6 +96,8 @@ defmodule Req do
     * [`&retry(&1, &2, options[:retry])`](`retry/3`) (if `options[:retry]` is set and is a
       keywords list or an atom `true`)
 
+    * `follow_redirects/2`
+
     * `decompress/2`
 
     * `decode/2`
@@ -120,6 +124,7 @@ defmodule Req do
     response_steps =
       maybe_step(retry, &retry(&1, &2, retry)) ++
         [
+          &follow_redirects/2,
           &decompress/2,
           &decode/2
         ]
@@ -440,6 +445,42 @@ defmodule Req do
   defp normalize_content_type("application/x-gzip"), do: "application/gzip"
   defp normalize_content_type(other), do: other
 
+  @doc """
+  Follows redirects.
+
+  ## Examples
+
+      iex> Req.get!("http://api.github.com").status
+      # 23:24:11.670 [info]  Redirecting to https://api.github.com/
+      200
+
+  """
+  @doc api: :response
+  def follow_redirects(request, response)
+
+  def follow_redirects(request, %{status: status} = response) when status in 301..302 do
+    {_, location} = List.keyfind(response.headers, "location", 0)
+    Logger.info(["Redirecting to ", location])
+
+    request =
+      if String.starts_with?(location, "/") do
+        uri = URI.parse(location)
+        update_in(request.uri, &%{&1 | path: uri.path, query: uri.query})
+      else
+        uri = URI.parse(location)
+        put_in(request.uri, uri)
+      end
+
+    # request has all the request steps already applied
+    {_, result} = run(%{request | request_steps: []})
+
+    {Req.Request.halt(request), result}
+  end
+
+  def follow_redirects(request, response) do
+    {request, response}
+  end
+
   ## Error steps
 
   @doc """
@@ -499,7 +540,10 @@ defmodule Req do
       log_retry(response_or_exception, attempt, max_attempts, delay)
       Process.sleep(delay)
       request = Req.Request.put_private(request, :retry_attempt, attempt + 1)
+
+      # request has all the request steps already applied
       {_, result} = run(%{request | request_steps: []})
+
       {Req.Request.halt(request), result}
     else
       {request, response_or_exception}
@@ -507,8 +551,6 @@ defmodule Req do
   end
 
   defp log_retry(response_or_exception, attempt, max_attempts, delay) do
-    require Logger
-
     attempts_left =
       case max_attempts - attempt do
         1 -> "1 attempt"
