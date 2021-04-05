@@ -515,9 +515,7 @@ defmodule Req do
         put_in(request.uri, uri)
       end
 
-    # request has all the request steps already applied
-    {_, result} = run(%{request | request_steps: []})
-
+    {_, result} = run(request)
     {Req.Request.halt(request), result}
   end
 
@@ -585,9 +583,7 @@ defmodule Req do
       Process.sleep(delay)
       request = Req.Request.put_private(request, :retry_attempt, attempt + 1)
 
-      # request has all the request steps already applied
-      {_, result} = run(%{request | request_steps: []})
-
+      {_, result} = run(request)
       {Req.Request.halt(request), result}
     else
       {request, response_or_exception}
