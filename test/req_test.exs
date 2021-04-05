@@ -371,7 +371,7 @@ defmodule ReqTest do
 
     assert ExUnit.CaptureLog.capture_log(fn ->
              assert Req.get!(c.url <> "/redirect").status == 200
-           end) =~ "[info]  Redirecting to #{c.url}/ok"
+           end) =~ "[debug] Req.follow_redirects/2: Redirecting to #{c.url}/ok"
   end
 
   test "follow_redirects/2: relative", c do
@@ -395,13 +395,13 @@ defmodule ReqTest do
              response = Req.get!(c.url <> "/redirect")
              assert response.status == 200
              assert response.body == ""
-           end) =~ "[info]  Redirecting to /ok"
+           end) =~ "[debug] Req.follow_redirects/2: Redirecting to /ok"
 
     assert ExUnit.CaptureLog.capture_log(fn ->
              response = Req.get!(c.url <> "/redirect?a=1")
              assert response.status == 200
              assert response.body == "a=1"
-           end) =~ "[info]  Redirecting to /ok?a=1"
+           end) =~ "[debug] Req.follow_redirects/2: Redirecting to /ok?a=1"
   end
 
   ## Error steps

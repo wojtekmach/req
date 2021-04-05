@@ -495,7 +495,7 @@ defmodule Req do
   ## Examples
 
       iex> Req.get!("http://api.github.com").status
-      # 23:24:11.670 [info]  Redirecting to https://api.github.com/
+      # 23:24:11.670 [debug]  Req.follow_redirects/2: Redirecting to https://api.github.com/
       200
 
   """
@@ -504,7 +504,7 @@ defmodule Req do
 
   def follow_redirects(request, %{status: status} = response) when status in 301..302 do
     {_, location} = List.keyfind(response.headers, "location", 0)
-    Logger.info(["Redirecting to ", location])
+    Logger.debug(["Req.follow_redirects/2: Redirecting to ", location])
 
     request =
       if String.starts_with?(location, "/") do
@@ -549,8 +549,8 @@ defmodule Req do
   With default options:
 
       iex> Req.get!("https://httpbin.org/status/500,200", retry: true)
-      # 19:02:08.463 [error] Got response with status 500. Will retry in 2000ms, 2 attempts left
-      # 19:02:10.710 [error] Got response with status 500. Will retry in 2000ms, 1 attempt left
+      # 19:02:08.463 [error] Req.retry/3: Got response with status 500. Will retry in 2000ms, 2 attempts left
+      # 19:02:10.710 [error] Req.retry/3: Got response with status 500. Will retry in 2000ms, 1 attempt left
       %Finch.Response{
         body: "",
         headers: [
@@ -563,7 +563,7 @@ defmodule Req do
   With custom options:
 
       iex> Req.request(:get, "http://localhost:9999", retry: [delay: 100, max_attempts: 1])
-      # 19:04:13.163 [error] Got exception. Will retry in 100ms, 1 attempt left
+      # 19:04:13.163 [error] Req.retry/3: Got exception. Will retry in 100ms, 1 attempt left
       # 19:04:13.164 [error] ** (Mint.TransportError) connection refused
       {:error, %Mint.TransportError{reason: :econnrefused}}
 
@@ -606,7 +606,7 @@ defmodule Req do
     case response_or_exception do
       %{__exception__: true} = exception ->
         Logger.error([
-          "Got exception. ",
+          "Req.retry/3: Got exception. ",
           message
         ])
 
@@ -616,7 +616,7 @@ defmodule Req do
         ])
 
       response ->
-        Logger.error(["Got response with status #{response.status}. ", message])
+        Logger.error(["Req.retry/3: Got response with status #{response.status}. ", message])
     end
   end
 
