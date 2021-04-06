@@ -70,7 +70,7 @@ Req.get!("https://api.github.com/repos/elixir-lang/elixir")
 
 is equivalent to this composition of lower-level API functions:
 
-```
+```elixir
 Req.build(:get, "https://api.github.com/repos/elixir-lang/elixir")
 |> Req.add_default_steps()
 |> Req.run!()
