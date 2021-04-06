@@ -407,6 +407,22 @@ defmodule Req do
 
   @doc """
   Decompresses the response body based on the `content-encoding` header.
+
+  ## Examples
+
+      iex> response = Req.get!("https://httpbin.org/gzip")
+      iex> response.headers
+      [
+        {"content-encoding", "gzip"},
+        {"content-type", "application/json"},
+        ...
+      ]
+      iex> response.body
+      %{
+        "gzipped" => true,
+        ...
+      }
+
   """
   @doc api: :response
   def decompress(request, response) do
