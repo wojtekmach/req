@@ -562,24 +562,21 @@ defmodule Req do
 
   With default options:
 
-      iex> Req.get!("https://httpbin.org/status/500,200", retry: true)
+      iex> Req.get!("https://httpbin.org/status/500,200", retry: true).status
       # 19:02:08.463 [error] Req.retry/3: Got response with status 500. Will retry in 2000ms, 2 attempts left
       # 19:02:10.710 [error] Req.retry/3: Got response with status 500. Will retry in 2000ms, 1 attempt left
-      %Finch.Response{
-        body: "",
-        headers: [
-          {"date", "Thu, 01 Apr 2021 16:39:02 GMT"},
-          ...
-        ],
-        status: 200
-      }
+      200
 
   With custom options:
 
-      iex> Req.request(:get, "http://localhost:9999", retry: [delay: 100, max_attempts: 1])
-      # 19:04:13.163 [error] Req.retry/3: Got exception. Will retry in 100ms, 1 attempt left
-      # 19:04:13.164 [error] ** (Mint.TransportError) connection refused
-      {:error, %Mint.TransportError{reason: :econnrefused}}
+      iex> Req.get!("http://localhost:9999", retry: [delay: 100, max_attempts: 3])
+      17:00:38.371 [error] Req.retry/3: Got exception. Will retry in 100ms, 3 attempts left
+      17:00:38.371 [error] ** (Mint.TransportError) connection refused
+      17:00:38.473 [error] Req.retry/3: Got exception. Will retry in 100ms, 2 attempts left
+      17:00:38.473 [error] ** (Mint.TransportError) connection refused
+      17:00:38.575 [error] Req.retry/3: Got exception. Will retry in 100ms, 1 attempt left
+      17:00:38.575 [error] ** (Mint.TransportError) connection refused
+      ** (Mint.TransportError) connection refused
 
   """
   @doc api: :error
