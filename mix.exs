@@ -8,7 +8,12 @@ defmodule Req.MixProject do
       elixir: "~> 1.11",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      docs: docs()
+      docs: docs(),
+      xref: [
+        exclude: [
+          NimbleCSV.RFC4180
+        ]
+      ]
     ]
   end
 
