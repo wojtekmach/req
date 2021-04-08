@@ -570,12 +570,12 @@ defmodule Req do
   With custom options:
 
       iex> Req.get!("http://localhost:9999", retry: [delay: 100, max_attempts: 3])
-      17:00:38.371 [error] Req.retry/3: Got exception. Will retry in 100ms, 3 attempts left
-      17:00:38.371 [error] ** (Mint.TransportError) connection refused
-      17:00:38.473 [error] Req.retry/3: Got exception. Will retry in 100ms, 2 attempts left
-      17:00:38.473 [error] ** (Mint.TransportError) connection refused
-      17:00:38.575 [error] Req.retry/3: Got exception. Will retry in 100ms, 1 attempt left
-      17:00:38.575 [error] ** (Mint.TransportError) connection refused
+      # 17:00:38.371 [error] Req.retry/3: Got exception. Will retry in 100ms, 3 attempts left
+      # 17:00:38.371 [error] ** (Mint.TransportError) connection refused
+      # 17:00:38.473 [error] Req.retry/3: Got exception. Will retry in 100ms, 2 attempts left
+      # 17:00:38.473 [error] ** (Mint.TransportError) connection refused
+      # 17:00:38.575 [error] Req.retry/3: Got exception. Will retry in 100ms, 1 attempt left
+      # 17:00:38.575 [error] ** (Mint.TransportError) connection refused
       ** (Mint.TransportError) connection refused
 
   """
