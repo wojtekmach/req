@@ -38,8 +38,11 @@ defmodule Req do
 
     * `:body` - request body, defaults to `""`
 
-  The options are passed down to `add_default_steps/1`, see its documentation for more
-  information.
+    * `:finch` - Finch pool to use, defaults to `Req.Finch` which is automatically started
+      by the application. See `Finch` module documentation for more information on starting pools.
+
+  The `options` are passed down to `add_default_steps/2`, see its documentation for more
+  information how they are being used.
   """
   @doc api: :high_level
   def request(method, uri, options \\ []) do
@@ -73,6 +76,9 @@ defmodule Req do
 
     * `:body` - request body, defaults to `""`
 
+    * `:finch` - Finch pool to use, defaults to `Req.Finch` which is automatically started
+      by the application. See `Finch` module documentation for more information on starting pools.
+
   """
   @doc api: :low_level
   def build(method, uri, options \\ []) do
@@ -80,7 +86,8 @@ defmodule Req do
       method: method,
       uri: URI.parse(uri),
       headers: Keyword.get(options, :headers, []),
-      body: Keyword.get(options, :body, "")
+      body: Keyword.get(options, :body, ""),
+      finch: Keyword.get(options, :finch, Req.Finch)
     }
   end
 
@@ -185,7 +192,7 @@ defmodule Req do
       %Req.Request{} = request ->
         finch_request = Finch.build(request.method, request.uri, request.headers, request.body)
 
-        case Finch.request(finch_request, Req.Finch) do
+        case Finch.request(finch_request, request.finch) do
           {:ok, response} ->
             run_response(request, response)
 

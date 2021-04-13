@@ -5,6 +5,7 @@ defmodule Req.Request do
     :headers,
     body: "",
     halted: false,
+    finch: Req.Finch,
     request_steps: [],
     response_steps: [],
     error_steps: [],
