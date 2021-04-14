@@ -26,6 +26,8 @@ This is a work in progress!
 
   * Retries on errors (via `retry/3` step)
 
+  * Basic HTTP caching (via `cache/2` function)
+
 ## High-level API
 
 ```elixir

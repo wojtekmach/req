@@ -456,6 +456,33 @@ defmodule ReqTest do
     refute_received _
   end
 
+  @tag :tmp_dir
+  test "cache", c do
+    Bypass.expect(c.bypass, "GET", "/cache", fn conn ->
+      case Plug.Conn.get_req_header(conn, "if-modified-since") do
+        [] ->
+          conn
+          |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
+          |> Plug.Conn.send_resp(200, "ok")
+
+        _ ->
+          conn
+          |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
+          |> Plug.Conn.send_resp(304, "")
+      end
+    end)
+
+    request = Req.build(:get, c.url <> "/cache") |> Req.cache(dir: c.tmp_dir)
+
+    response = Req.run!(request)
+    assert response.status == 200
+    assert response.body == "ok"
+
+    response = Req.run!(request)
+    assert response.status == 304
+    assert response.body == "ok"
+  end
+
   test "mint", c do
     Bypass.expect(c.bypass, "GET", "/json", fn conn ->
       conn

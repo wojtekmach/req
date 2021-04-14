@@ -122,6 +122,8 @@ defmodule Req do
     * [`&retry(&1, &2, options[:retry])`](`retry/3`) (if `options[:retry]` is set and is a
       keywords list or an atom `true`)
 
+  If `options[:cache]` is set to `true`, the `cache/1` function is called which adds additional
+  request and response steps.
   """
   @doc api: :low_level
   def add_default_steps(request, options \\ []) do
@@ -147,10 +149,17 @@ defmodule Req do
 
     error_steps = maybe_step(retry, &retry(&1, &2, retry))
 
-    request
-    |> add_request_steps(request_steps)
-    |> add_response_steps(response_steps)
-    |> add_error_steps(error_steps)
+    request =
+      request
+      |> add_request_steps(request_steps)
+      |> add_response_steps(response_steps)
+      |> add_error_steps(error_steps)
+
+    if options[:cache] == true do
+      cache(request)
+    else
+      request
+    end
   end
 
   defp maybe_step(nil, _step), do: []
@@ -284,6 +293,68 @@ defmodule Req do
 
   defp result(%{__exception__: true} = exception) do
     {:error, exception}
+  end
+
+  @doc """
+  Adds steps for handling HTTP cache.
+
+  ## Options
+
+    * `:dir` - the directory to store the cache, defaults to `<user_cache_dir>/req` (see: `:filename.basedir/3`)
+
+  ## Examples
+
+      iex> Req.get!("https://storage.googleapis.com/cvdf-datasets/mnist/train-labels-idx1-ubyte.gz", cache: true)
+      %{
+        status: 200,
+        body: <<0, 0, 8, 1, ...>
+      }
+
+      iex> Req.get!("https://storage.googleapis.com/cvdf-datasets/mnist/train-labels-idx1-ubyte.gz", cache: true)
+      %{
+        status: 304,
+        body: <<0, 0, 8, 1, ...>
+      }
+
+  """
+  @doc api: :low_level
+  def cache(request, options \\ []) do
+    options = Keyword.put_new(options, :dir, :filename.basedir(:user_cache, 'req'))
+
+    request
+    |> add_request_steps([&set_if_modified_since(&1, options)])
+    |> add_response_steps([&handle_cache(&1, &2, options)])
+  end
+
+  defp set_if_modified_since(request, options) do
+    dir = Keyword.fetch!(options, :dir)
+
+    case cache_mtime(dir, request) do
+      {:ok, stat} ->
+        datetime = stat.mtime |> NaiveDateTime.from_erl!() |> format_http_datetime()
+        put_new_header(request, "if-modified-since", datetime)
+
+      _ ->
+        request
+    end
+  end
+
+  defp handle_cache(request, response, options) do
+    dir = Keyword.fetch!(options, :dir)
+
+    cond do
+      response.status == 200 ->
+        write_cache(dir, request, response.body)
+        {request, response}
+
+      response.status == 304 ->
+        body = load_cache(dir, request)
+        response = %{response | body: body}
+        {request, response}
+
+      true ->
+        {request, response}
+    end
   end
 
   ## Request steps
@@ -666,5 +737,34 @@ defmodule Req do
         nil
       end
     end)
+  end
+
+  defp cache_mtime(cache_dir, key) do
+    File.stat(Path.join(cache_dir, cache_key(key)))
+  end
+
+  defp write_cache(cache_dir, key, data) do
+    path = Path.join(cache_dir, cache_key(key))
+    File.mkdir_p!(Path.dirname(path))
+    File.write!(path, :erlang.term_to_binary(data))
+  end
+
+  defp load_cache(cache_dir, key) do
+    path = Path.join(cache_dir, cache_key(key))
+    path |> File.read!() |> :erlang.binary_to_term()
+  end
+
+  defp cache_key(request) do
+    term = %{request.uri | authority: nil, port: nil}
+
+    hash =
+      :crypto.hash(:sha256, :erlang.term_to_binary(term))
+      |> Base.encode16(case: :lower)
+
+    request.uri.host <> "-" <> hash
+  end
+
+  defp format_http_datetime(datetime) do
+    Calendar.strftime(datetime, "%a, %d %b %Y %H:%m:%S GMT")
   end
 end
