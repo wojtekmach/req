@@ -338,6 +338,57 @@ defmodule ReqTest do
     assert Req.get!(c.url <> "/gzip").body == "foo"
   end
 
+  @tag :tmp_dir
+  test "decode/2: tar (content-type)", c do
+    files = [{'foo.txt', "bar"}]
+
+    path = '#{c.tmp_dir}/foo.tar'
+    :ok = :erl_tar.create(path, files)
+    tar = File.read!(path)
+
+    Bypass.expect(c.bypass, "GET", "/tar", fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/x-tar")
+      |> Plug.Conn.send_resp(200, tar)
+    end)
+
+    assert Req.get!(c.url <> "/tar").body == files
+  end
+
+  @tag :tmp_dir
+  test "decode/2: tar (path)", c do
+    files = [{'foo.txt', "bar"}]
+
+    path = '#{c.tmp_dir}/foo.tar'
+    :ok = :erl_tar.create(path, files)
+    tar = File.read!(path)
+
+    Bypass.expect(c.bypass, "GET", "/foo.tar", fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+      |> Plug.Conn.send_resp(200, tar)
+    end)
+
+    assert Req.get!(c.url <> "/foo.tar").body == files
+  end
+
+  @tag :tmp_dir
+  test "decode/2: tar.gz (path)", c do
+    files = [{'foo.txt', "bar"}]
+
+    path = '#{c.tmp_dir}/foo.tar'
+    :ok = :erl_tar.create(path, files, [:compressed])
+    tar = File.read!(path)
+
+    Bypass.expect(c.bypass, "GET", "/foo.tar.gz", fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+      |> Plug.Conn.send_resp(200, tar)
+    end)
+
+    assert Req.get!(c.url <> "/foo.tar.gz").body == files
+  end
+
   test "decode/2: csv", c do
     csv = [
       ["x", "y"],

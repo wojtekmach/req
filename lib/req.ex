@@ -533,15 +533,16 @@ defmodule Req do
   end
 
   @doc """
-  Decodes the response body based on the `content-type` header.
+  Decodes response body based on the detected format.
 
   Supported formats:
 
-  | Format  | Decoder                                                          |
-  | ------- | ---------------------------------------------------------------- |
-  | JSON    | `Jason.decode!/1`                                                |
-  | gzip    | `:zlib.gunzip/1`                                                 |
-  | csv     | `NimbleCSV.RFC4180.parse_string/2` (if `NimbleCSV` is installed) |
+  | Format | Decoder                                                          |
+  | ------ | ---------------------------------------------------------------- |
+  | JSON   | `Jason.decode!/1`                                                |
+  | gzip   | `:zlib.gunzip/1`                                                 |
+  | tar    | `:erl_tar.extract/2`                                             |
+  | csv    | `NimbleCSV.RFC4180.parse_string/2` (if `NimbleCSV` is installed) |
 
   ## Examples
 
@@ -560,27 +561,27 @@ defmodule Req do
   end
 
   def decode(request, response) do
-    case List.keyfind(response.headers, "content-type", 0) do
-      {_, content_type} ->
-        extensions = content_type |> normalize_content_type() |> MIME.extensions()
+    case format(request, response) do
+      "json" ->
+        {request, update_in(response.body, &Jason.decode!/1)}
 
-        case extensions do
-          ["json" | _] ->
-            {request, update_in(response.body, &Jason.decode!/1)}
+      "gz" ->
+        {request, update_in(response.body, &:zlib.gunzip/1)}
 
-          ["gz" | _] ->
-            {request, update_in(response.body, &:zlib.gunzip/1)}
+      "tar" ->
+        {:ok, files} = :erl_tar.extract({:binary, response.body}, [:memory])
+        {request, put_in(response.body, files)}
 
-          ["csv" | _] ->
-            if Code.ensure_loaded?(NimbleCSV) do
-              options = [skip_headers: false]
-              {request, update_in(response.body, &NimbleCSV.RFC4180.parse_string(&1, options))}
-            else
-              {request, response}
-            end
+      "tgz" ->
+        {:ok, files} = :erl_tar.extract({:binary, response.body}, [:memory, :compressed])
+        {request, put_in(response.body, files)}
 
-          _ ->
-            {request, response}
+      "csv" ->
+        if Code.ensure_loaded?(NimbleCSV) do
+          options = [skip_headers: false]
+          {request, update_in(response.body, &NimbleCSV.RFC4180.parse_string(&1, options))}
+        else
+          {request, response}
         end
 
       _ ->
@@ -588,8 +589,44 @@ defmodule Req do
     end
   end
 
-  defp normalize_content_type("application/x-gzip"), do: "application/gzip"
-  defp normalize_content_type(other), do: other
+  defp format(request, response) do
+    with {_, content_type} <- List.keyfind(response.headers, "content-type", 0) do
+      [ext | _] = extensions(content_type, request)
+      ext
+    end
+  end
+
+  defp extensions("application/octet-stream", request) do
+    path = request.uri.path
+
+    if tgz?(path) do
+      ["tgz"]
+    else
+      path |> MIME.from_path() |> extensions(request)
+    end
+  end
+
+  defp extensions("application/" <> subtype, request) when subtype in ~w(gzip x-gzip) do
+    path = request.uri.path
+
+    if tgz?(path) do
+      ["tgz"]
+    else
+      ["gz"]
+    end
+  end
+
+  defp extensions(content_type, _request) do
+    MIME.extensions(content_type)
+  end
+
+  defp tgz?(path) do
+    case Path.extname(path) do
+      ".tgz" -> true
+      ".gz" -> String.ends_with?(path, ".tar.gz")
+      _ -> false
+    end
+  end
 
   @doc """
   Follows redirects.
