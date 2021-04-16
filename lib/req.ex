@@ -94,7 +94,7 @@ defmodule Req do
   @doc """
   Adds steps that should be reasonable defaults for most users.
 
-  Request steps:
+  ## Request steps
 
     * `normalize_headers/1`
 
@@ -106,7 +106,7 @@ defmodule Req do
 
     * [`&params(&1, options[:params])`](`params/2`) (if `options[:params]` is set)
 
-  Response steps:
+  ## Response steps
 
     * [`&retry(&1, &2, options[:retry])`](`retry/3`) (if `options[:retry]` is set and is a
       keywords list or an atom `true`)
@@ -117,13 +117,24 @@ defmodule Req do
 
     * `decode/2`
 
-  Error steps:
+  ## Error steps
 
     * [`&retry(&1, &2, options[:retry])`](`retry/3`) (if `options[:retry]` is set and is a
       keywords list or an atom `true`)
 
-  If `options[:cache]` is set to `true`, the `cache/1` function is called which adds additional
-  request and response steps.
+  ## Options
+
+    * `:auth` - if set, adds the `auth/2` step
+
+    * `:params` - if set, adds the `params/2` step
+
+    * `:cache` - if set to `true`, calls `cache/2` function which adds additional request and
+      response steps
+
+    * `:raw` if set to `true`, skips `decompress/2` and `decode/2` steps
+
+    * `:retry` - if set, adds the `retry/3` step to response and error steps
+
   """
   @doc api: :low_level
   def add_default_steps(request, options \\ []) do
@@ -133,21 +144,25 @@ defmodule Req do
         &default_headers/1,
         &encode/1
       ] ++
-        maybe_step(options[:auth], &auth(&1, options[:auth])) ++
-        maybe_step(options[:params], &params(&1, options[:params]))
+        maybe_steps(options[:auth], [&auth(&1, options[:auth])]) ++
+        maybe_steps(options[:params], [&params(&1, options[:params])])
 
     retry = options[:retry]
     retry = if retry == true, do: [], else: retry
 
+    raw? = options[:raw] == true
+
     response_steps =
-      maybe_step(retry, &retry(&1, &2, retry)) ++
+      maybe_steps(retry, [&retry(&1, &2, retry)]) ++
         [
-          &follow_redirects/2,
+          &follow_redirects/2
+        ] ++
+        maybe_steps(not raw?, [
           &decompress/2,
           &decode/2
-        ]
+        ])
 
-    error_steps = maybe_step(retry, &retry(&1, &2, retry))
+    error_steps = maybe_steps(retry, [&retry(&1, &2, retry)])
 
     request =
       request
@@ -162,9 +177,9 @@ defmodule Req do
     end
   end
 
-  defp maybe_step(nil, _step), do: []
-  defp maybe_step(false, _step), do: []
-  defp maybe_step(_, step), do: [step]
+  defp maybe_steps(nil, _step), do: []
+  defp maybe_steps(false, _step), do: []
+  defp maybe_steps(_, steps), do: steps
 
   @doc """
   Adds request steps.
