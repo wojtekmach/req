@@ -319,17 +319,18 @@ defmodule Req do
 
   ## Examples
 
-      iex> Req.get!("https://storage.googleapis.com/cvdf-datasets/mnist/train-labels-idx1-ubyte.gz", cache: true)
+      iex> url = "https://storage.googleapis.com/cvdf-datasets/mnist/train-labels-idx1-ubyte.gz"
+      iex> response = Req.get!(url, cache: true)
       %{
         status: 200,
-        body: <<0, 0, 8, 1, ...>
+        body: <<0, 0, 8, 1, ...>,
+        headers: [
+          {"date", "Fri, 16 Apr 2021 10:09:56 GMT"},
+          ...
+        ]
       }
-
-      iex> Req.get!("https://storage.googleapis.com/cvdf-datasets/mnist/train-labels-idx1-ubyte.gz", cache: true)
-      %{
-        status: 304,
-        body: <<0, 0, 8, 1, ...>
-      }
+      iex> Req.get!(url, cache: true) == response
+      true
 
   """
   @doc api: :low_level
