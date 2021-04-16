@@ -555,9 +555,10 @@ defmodule Req do
 
   | Format | Decoder                                                          |
   | ------ | ---------------------------------------------------------------- |
-  | JSON   | `Jason.decode!/1`                                                |
+  | json   | `Jason.decode!/1`                                                |
   | gzip   | `:zlib.gunzip/1`                                                 |
   | tar    | `:erl_tar.extract/2`                                             |
+  | zip    | `:zip.unzip/2`                                                   |
   | csv    | `NimbleCSV.RFC4180.parse_string/2` (if `NimbleCSV` is installed) |
 
   ## Examples
@@ -590,6 +591,10 @@ defmodule Req do
 
       "tgz" ->
         {:ok, files} = :erl_tar.extract({:binary, response.body}, [:memory, :compressed])
+        {request, put_in(response.body, files)}
+
+      "zip" ->
+        {:ok, files} = :zip.extract(response.body, [:memory])
         {request, put_in(response.body, files)}
 
       "csv" ->

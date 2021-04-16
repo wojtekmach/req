@@ -402,6 +402,34 @@ defmodule ReqTest do
     assert Req.get!(c.url <> "/foo.tar.gz").body == files
   end
 
+  test "decode/2: zip (content-type)", c do
+    files = [{'foo.txt', "bar"}]
+
+    Bypass.expect(c.bypass, "GET", "/zip", fn conn ->
+      {:ok, {'foo.zip', data}} = :zip.create('foo.zip', files, [:memory])
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/zip", nil)
+      |> Plug.Conn.send_resp(200, data)
+    end)
+
+    assert Req.get!(c.url <> "/zip").body == files
+  end
+
+  test "decode/2: zip (path)", c do
+    files = [{'foo.txt', "bar"}]
+
+    Bypass.expect(c.bypass, "GET", "/foo.zip", fn conn ->
+      {:ok, {'foo.zip', data}} = :zip.create('foo.zip', files, [:memory])
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+      |> Plug.Conn.send_resp(200, data)
+    end)
+
+    assert Req.get!(c.url <> "/foo.zip").body == files
+  end
+
   test "decode/2: csv", c do
     csv = [
       ["x", "y"],
