@@ -30,35 +30,47 @@ end
 
 defmodule Betamax do
   def with_betamax(tape_path, fun) do
-    case File.read(tape_path) do
-      {:ok, contents} ->
-        items = :erlang.binary_to_term(contents)
-        {:ok, tape} = Betamax.Tape.start_link(items)
-
+    case open_tape(tape_path) do
+      {:playback, tape} ->
         fun.(fn request ->
-          Req.add_request_steps(request, [&betamax_playback(&1, tape)])
+          Req.add_request_steps(request, [&playback(&1, tape)])
         end)
 
-      {:error, :enoent} ->
-        {:ok, tape} = Betamax.Tape.start_link([])
-
+      {:record, tape} ->
         result =
           fun.(fn request ->
-            prepend_response_steps(request, [&betamax_record(&1, &2, tape)])
+            prepend_response_steps(request, [&record(&1, &2, tape)])
           end)
 
-        items = tape |> Betamax.Tape.items() |> Enum.reverse()
-        File.write!(tape_path, :erlang.term_to_binary(items))
+        save_tape(tape_path, tape)
         result
     end
   end
 
-  defp betamax_playback(request, tape) do
+  defp open_tape(tape_path) do
+    case File.read(tape_path) do
+      {:ok, contents} ->
+        items = :erlang.binary_to_term(contents)
+        {:ok, tape} = Betamax.Tape.start_link(items)
+        {:playback, tape}
+
+      {:error, :enoent} ->
+        {:ok, tape} = Betamax.Tape.start_link([])
+        {:record, tape}
+    end
+  end
+
+  defp save_tape(tape_path, tape) do
+    items = tape |> Betamax.Tape.items() |> Enum.reverse()
+    File.write!(tape_path, :erlang.term_to_binary(items))
+  end
+
+  defp playback(request, tape) do
     response = Betamax.Tape.read(tape)
     {request, response}
   end
 
-  defp betamax_record(request, response, tape) do
+  defp record(request, response, tape) do
     :ok = Betamax.Tape.write(tape, response)
     {request, response}
   end
