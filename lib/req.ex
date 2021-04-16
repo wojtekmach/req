@@ -503,6 +503,10 @@ defmodule Req do
 
   """
   @doc api: :response
+  def decompress(request, %{body: ""} = response) do
+    {request, response}
+  end
+
   def decompress(request, response) do
     compression_algorithms = get_content_encoding_header(response.headers)
     {request, update_in(response.body, &decompress_body(&1, compression_algorithms))}
@@ -551,6 +555,10 @@ defmodule Req do
 
   """
   @doc api: :response
+  def decode(request, %{body: ""} = response) do
+    {request, response}
+  end
+
   def decode(request, response) do
     case List.keyfind(response.headers, "content-type", 0) do
       {_, content_type} ->
