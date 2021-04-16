@@ -591,8 +591,10 @@ defmodule Req do
 
   defp format(request, response) do
     with {_, content_type} <- List.keyfind(response.headers, "content-type", 0) do
-      [ext | _] = extensions(content_type, request)
-      ext
+      case extensions(content_type, request) do
+        [ext | _] -> ext
+        [] -> nil
+      end
     end
   end
 
@@ -602,7 +604,7 @@ defmodule Req do
     if tgz?(path) do
       ["tgz"]
     else
-      path |> MIME.from_path() |> extensions(request)
+      path |> MIME.from_path() |> MIME.extensions()
     end
   end
 
