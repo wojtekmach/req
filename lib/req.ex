@@ -318,6 +318,7 @@ defmodule Req do
 
   """
   @doc api: :low_level
+  # TODO: rename to if_modified_since/2
   def cache(request, options \\ []) do
     options = Keyword.put_new(options, :dir, :filename.basedir(:user_cache, 'req'))
 
@@ -344,12 +345,11 @@ defmodule Req do
 
     cond do
       response.status == 200 ->
-        write_cache(dir, request, response.body)
+        write_cache(dir, request, response)
         {request, response}
 
       response.status == 304 ->
-        body = load_cache(dir, request)
-        response = %{response | body: body}
+        response = load_cache(dir, request)
         {request, response}
 
       true ->
@@ -743,22 +743,20 @@ defmodule Req do
     File.stat(Path.join(cache_dir, cache_key(key)))
   end
 
-  defp write_cache(cache_dir, key, data) do
-    path = Path.join(cache_dir, cache_key(key))
+  defp write_cache(cache_dir, request, response) do
+    path = Path.join(cache_dir, cache_key(request))
     File.mkdir_p!(Path.dirname(path))
-    File.write!(path, :erlang.term_to_binary(data))
+    File.write!(path, :erlang.term_to_binary(response))
   end
 
-  defp load_cache(cache_dir, key) do
-    path = Path.join(cache_dir, cache_key(key))
+  defp load_cache(cache_dir, request) do
+    path = Path.join(cache_dir, cache_key(request))
     path |> File.read!() |> :erlang.binary_to_term()
   end
 
   defp cache_key(request) do
-    term = %{request.uri | authority: nil, port: nil}
-
     hash =
-      :crypto.hash(:sha256, :erlang.term_to_binary(term))
+      :crypto.hash(:sha256, :erlang.term_to_binary(request.uri))
       |> Base.encode16(case: :lower)
 
     request.uri.host <> "-" <> hash

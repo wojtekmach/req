@@ -458,14 +458,20 @@ defmodule ReqTest do
 
   @tag :tmp_dir
   test "cache", c do
+    pid = self()
+
     Bypass.expect(c.bypass, "GET", "/cache", fn conn ->
       case Plug.Conn.get_req_header(conn, "if-modified-since") do
         [] ->
+          send(pid, :cache_miss)
+
           conn
           |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
           |> Plug.Conn.send_resp(200, "ok")
 
         _ ->
+          send(pid, :cache_hit)
+
           conn
           |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
           |> Plug.Conn.send_resp(304, "")
@@ -477,10 +483,12 @@ defmodule ReqTest do
     response = Req.run!(request)
     assert response.status == 200
     assert response.body == "ok"
+    assert_received :cache_miss
 
     response = Req.run!(request)
-    assert response.status == 304
+    assert response.status == 200
     assert response.body == "ok"
+    assert_received :cache_hit
   end
 
   test "mint", c do
