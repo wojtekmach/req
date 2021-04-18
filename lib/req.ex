@@ -434,6 +434,11 @@ defmodule Req do
   @doc """
   Handles HTTP cache using `if-modified-since` header.
 
+  Only successful (200 OK) responses are cached.
+
+  This step also _prepends_ a response step that loads and writes the cache. Be careful when
+  _prepending_ other response steps, make sure the cache is loaded/written as soon as possible.
+
   ## Options
 
     * `:dir` - the directory to store the cache, defaults to `<user_cache_dir>/req`
