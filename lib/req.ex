@@ -446,15 +446,15 @@ defmodule Req do
 
   ## Examples
 
-      iex> url = "https://storage.googleapis.com/cvdf-datasets/mnist/train-labels-idx1-ubyte.gz"
+      iex> url = "https://hexdocs.pm/elixir/Kernel.html"
       iex> response = Req.get!(url, cache: true)
       %{
         status: 200,
-        body: <<0, 0, 8, 1, ...>,
         headers: [
           {"date", "Fri, 16 Apr 2021 10:09:56 GMT"},
           ...
-        ]
+        ],
+        ...
       }
       iex> Req.get!(url, cache: true) == response
       true
