@@ -13,8 +13,7 @@ defmodule Req.MixProject do
         exclude: [
           NimbleCSV.RFC4180
         ]
-      ],
-      lockfile: "lib/mix.lock"
+      ]
     ]
   end
 

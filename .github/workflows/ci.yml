@@ -36,13 +36,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-mix-
 
-      - name: Install Dependencies
-        run: mix deps.get --only test
+      - run: mix deps.get
 
       - run: mix format --check-formatted
         if: ${{ matrix.lint }}
 
-      - run: mix deps.get && mix deps.unlock --check-unused
+      - run: mix deps.unlock --check-unused
         if: ${{ matrix.lint }}
 
       - run: mix deps.compile
