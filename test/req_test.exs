@@ -570,7 +570,9 @@ defmodule ReqTest do
       end
     end)
 
-    request = Req.build(:get, c.url <> "/cache") |> Req.cache(dir: c.tmp_dir)
+    request =
+      Req.build(:get, c.url <> "/cache")
+      |> Req.add_request_steps([&Req.if_modified_since(&1, dir: c.tmp_dir)])
 
     response = Req.run!(request)
     assert response.status == 200
@@ -581,6 +583,55 @@ defmodule ReqTest do
     assert response.status == 200
     assert response.body == "ok"
     assert_received :cache_hit
+  end
+
+  @tag :tmp_dir
+  @tag :capture_log
+  test "cache + retry", c do
+    pid = self()
+    {:ok, _} = Agent.start_link(fn -> 0 end, name: :counter)
+
+    Bypass.expect(c.bypass, "GET", "/cache", fn conn ->
+      case Plug.Conn.get_req_header(conn, "if-modified-since") do
+        [] ->
+          send(pid, :cache_miss)
+
+          conn
+          |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
+          |> Plug.Conn.put_resp_content_type("application/json")
+          |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(%{"a" => 1}))
+
+        _ ->
+          send(pid, :cache_hit)
+          count = Agent.get_and_update(:counter, &{&1, &1 + 1})
+
+          if count < 2 do
+            Plug.Conn.send_resp(conn, 500, "")
+          else
+            conn
+            |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
+            |> Plug.Conn.send_resp(304, "")
+          end
+      end
+    end)
+
+    request =
+      Req.build(:get, c.url <> "/cache")
+      |> Req.add_request_steps([&Req.if_modified_since(&1, dir: c.tmp_dir)])
+      |> Req.add_response_steps([&Req.retry(&1, &2, delay: 10), &Req.decode/2])
+
+    response = Req.run!(request)
+    assert response.status == 200
+    assert response.body == %{"a" => 1}
+    assert_received :cache_miss
+
+    response = Req.run!(request)
+    assert response.status == 200
+    assert response.body == %{"a" => 1}
+    assert_received :cache_hit
+    assert_received :cache_hit
+    assert_received :cache_hit
+    refute_received _
   end
 
   test "mint", c do

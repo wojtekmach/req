@@ -26,7 +26,7 @@ This is a work in progress!
 
   * Retries on errors (via `retry/3` step)
 
-  * Basic HTTP caching (via `cache/2` function)
+  * Basic HTTP caching (via `if_modified_since/2` step)
 
 ## High-level API
 

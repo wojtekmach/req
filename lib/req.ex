@@ -128,8 +128,7 @@ defmodule Req do
 
     * `:params` - if set, adds the `params/2` step
 
-    * `:cache` - if set to `true`, calls `cache/2` function which adds additional request and
-      response steps
+    * `:cache` - if set to `true`, adds `if_modified_since/2` step
 
     * `:raw` if set to `true`, skips `decompress/2` and `decode/2` steps
 
@@ -145,7 +144,8 @@ defmodule Req do
         &encode/1
       ] ++
         maybe_steps(options[:auth], [&auth(&1, options[:auth])]) ++
-        maybe_steps(options[:params], [&params(&1, options[:params])])
+        maybe_steps(options[:params], [&params(&1, options[:params])]) ++
+        maybe_steps(options[:cache], [&if_modified_since/1])
 
     retry = options[:retry]
     retry = if retry == true, do: [], else: retry
@@ -164,17 +164,10 @@ defmodule Req do
 
     error_steps = maybe_steps(retry, [&retry(&1, &2, retry)])
 
-    request =
-      request
-      |> add_request_steps(request_steps)
-      |> add_response_steps(response_steps)
-      |> add_error_steps(error_steps)
-
-    if options[:cache] == true do
-      cache(request)
-    else
-      request
-    end
+    request
+    |> add_request_steps(request_steps)
+    |> add_response_steps(response_steps)
+    |> add_error_steps(error_steps)
   end
 
   defp maybe_steps(nil, _step), do: []
@@ -195,6 +188,10 @@ defmodule Req do
   @doc api: :low_level
   def add_response_steps(request, steps) do
     update_in(request.response_steps, &(&1 ++ steps))
+  end
+
+  defp prepend_response_steps(request, steps) do
+    update_in(request.response_steps, &(steps ++ &1))
   end
 
   @doc """
@@ -308,69 +305,6 @@ defmodule Req do
 
   defp result(%{__exception__: true} = exception) do
     {:error, exception}
-  end
-
-  @doc """
-  Adds steps for handling HTTP cache.
-
-  ## Options
-
-    * `:dir` - the directory to store the cache, defaults to `<user_cache_dir>/req` (see: `:filename.basedir/3`)
-
-  ## Examples
-
-      iex> url = "https://storage.googleapis.com/cvdf-datasets/mnist/train-labels-idx1-ubyte.gz"
-      iex> response = Req.get!(url, cache: true)
-      %{
-        status: 200,
-        body: <<0, 0, 8, 1, ...>,
-        headers: [
-          {"date", "Fri, 16 Apr 2021 10:09:56 GMT"},
-          ...
-        ]
-      }
-      iex> Req.get!(url, cache: true) == response
-      true
-
-  """
-  @doc api: :low_level
-  # TODO: rename to if_modified_since/2
-  def cache(request, options \\ []) do
-    options = Keyword.put_new(options, :dir, :filename.basedir(:user_cache, 'req'))
-
-    request
-    |> add_request_steps([&set_if_modified_since(&1, options)])
-    |> add_response_steps([&handle_cache(&1, &2, options)])
-  end
-
-  defp set_if_modified_since(request, options) do
-    dir = Keyword.fetch!(options, :dir)
-
-    case cache_mtime(dir, request) do
-      {:ok, stat} ->
-        datetime = stat.mtime |> NaiveDateTime.from_erl!() |> format_http_datetime()
-        put_new_header(request, "if-modified-since", datetime)
-
-      _ ->
-        request
-    end
-  end
-
-  defp handle_cache(request, response, options) do
-    dir = Keyword.fetch!(options, :dir)
-
-    cond do
-      response.status == 200 ->
-        write_cache(dir, request, response)
-        {request, response}
-
-      response.status == 304 ->
-        response = load_cache(dir, request)
-        {request, response}
-
-      true ->
-        {request, response}
-    end
   end
 
   ## Request steps
@@ -495,6 +429,65 @@ defmodule Req do
       nil -> encoded
       query -> query <> "&" <> encoded
     end)
+  end
+
+  @doc """
+  Handles HTTP cache using `if-modified-since` header.
+
+  ## Options
+
+    * `:dir` - the directory to store the cache, defaults to `<user_cache_dir>/req`
+      (see: `:filename.basedir/3`)
+
+  ## Examples
+
+      iex> url = "https://storage.googleapis.com/cvdf-datasets/mnist/train-labels-idx1-ubyte.gz"
+      iex> response = Req.get!(url, cache: true)
+      %{
+        status: 200,
+        body: <<0, 0, 8, 1, ...>,
+        headers: [
+          {"date", "Fri, 16 Apr 2021 10:09:56 GMT"},
+          ...
+        ]
+      }
+      iex> Req.get!(url, cache: true) == response
+      true
+
+  """
+  @doc api: :request
+  def if_modified_since(request, options \\ []) do
+    dir = options[:dir] || :filename.basedir(:user_cache, 'req')
+
+    request
+    |> put_if_modified_since(dir)
+    |> prepend_response_steps([&handle_cache(&1, &2, dir)])
+  end
+
+  defp put_if_modified_since(request, dir) do
+    case File.stat(cache_path(dir, request)) do
+      {:ok, stat} ->
+        datetime = stat.mtime |> NaiveDateTime.from_erl!() |> format_http_datetime()
+        put_new_header(request, "if-modified-since", datetime)
+
+      _ ->
+        request
+    end
+  end
+
+  defp handle_cache(request, response, dir) do
+    cond do
+      response.status == 200 ->
+        write_cache(dir, request, response)
+        {request, response}
+
+      response.status == 304 ->
+        response = load_cache(dir, request)
+        {request, response}
+
+      true ->
+        {request, response}
+    end
   end
 
   ## Response steps
@@ -807,18 +800,18 @@ defmodule Req do
     end)
   end
 
-  defp cache_mtime(cache_dir, key) do
-    File.stat(Path.join(cache_dir, cache_key(key)))
+  defp cache_path(cache_dir, request) do
+    Path.join(cache_dir, cache_key(request))
   end
 
   defp write_cache(cache_dir, request, response) do
-    path = Path.join(cache_dir, cache_key(request))
+    path = cache_path(cache_dir, request)
     File.mkdir_p!(Path.dirname(path))
     File.write!(path, :erlang.term_to_binary(response))
   end
 
   defp load_cache(cache_dir, request) do
-    path = Path.join(cache_dir, cache_key(request))
+    path = cache_path(cache_dir, request)
     path |> File.read!() |> :erlang.binary_to_term()
   end
 
