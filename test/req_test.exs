@@ -29,6 +29,33 @@ defmodule ReqTest do
     assert Req.get!(c.url <> "/json+gzip", raw: true).body == raw
   end
 
+  ## Finch errors
+
+  test "pool timeout", c do
+    Bypass.stub(c.bypass, "GET", "/", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    options = [finch_options: [pool_timeout: 0]]
+    assert {:timeout, _} = catch_exit(Req.get!(c.url <> "/", options))
+  end
+
+  test "receive timeout", c do
+    Bypass.stub(c.bypass, "GET", "/", fn conn ->
+      Process.sleep(1000)
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    options = [finch_options: [receive_timeout: 0]]
+
+    assert {:error, %Mint.TransportError{reason: :timeout}} =
+             Req.request(:get, c.url <> "/", options)
+
+    # TODO:
+    # when this is uncommented, we'll get an exit shutdown, figure out why
+    # Process.sleep(1000)
+  end
+
   ## Low-level API
 
   test "low-level API", c do

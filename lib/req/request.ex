@@ -6,6 +6,7 @@ defmodule Req.Request do
     body: "",
     halted: false,
     finch: Req.Finch,
+    finch_options: [],
     request_steps: [],
     response_steps: [],
     error_steps: [],
