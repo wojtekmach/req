@@ -113,6 +113,8 @@ defmodule Req do
 
     * [`&params(&1, options[:params])`](`params/2`) (if `options[:params]` is set)
 
+    * [`&range(&1, options[:range])`](`range/2`) (if `options[:range]` is set)
+
   ## Response steps
 
     * [`&retry(&1, &2, options[:retry])`](`retry/3`) (if `options[:retry]` is set and is a
@@ -135,6 +137,8 @@ defmodule Req do
 
     * `:params` - if set, adds the `params/2` step
 
+    * `:range` - if set, adds the `range/2` step
+
     * `:cache` - if set to `true`, adds `if_modified_since/2` step
 
     * `:raw` if set to `true`, skips `decompress/2` and `decode/2` steps
@@ -152,6 +156,7 @@ defmodule Req do
       ] ++
         maybe_steps(options[:auth], [&auth(&1, options[:auth])]) ++
         maybe_steps(options[:params], [&params(&1, options[:params])]) ++
+        maybe_steps(options[:range], [&range(&1, options[:range])]) ++
         maybe_steps(options[:cache], [&if_modified_since/1])
 
     retry = options[:retry]
@@ -436,6 +441,39 @@ defmodule Req do
       nil -> encoded
       query -> query <> "&" <> encoded
     end)
+  end
+
+  @doc """
+  Sets the "Range" request header.
+
+  `range` can be one of the following:
+
+    * a string - returned as is
+
+    * a `first..last` range - converted to `"bytes=<first>-<last>"`
+
+  ## Examples
+
+      iex> Req.get!("https://repo.hex.pm/builds/elixir/builds.txt", range: 0..67)
+      %{
+        status: 206,
+        headers: [
+          {"content-range", "bytes 0-67/45400"},
+          ...
+        ],
+        body: "master df65074a8143cebec810dfb91cafa43f19dcdbaf 2021-04-23T15:36:18Z"
+      }
+
+  """
+  @doc api: :request
+  def range(request, range)
+
+  def range(request, binary) when is_binary(binary) do
+    put_header(request, "range", binary)
+  end
+
+  def range(request, first..last) do
+    put_header(request, "range", "bytes=#{first}-#{last}")
   end
 
   @doc """
@@ -786,8 +824,12 @@ defmodule Req do
     if Enum.any?(struct.headers, fn {key, _} -> String.downcase(key) == name end) do
       struct
     else
-      update_in(struct.headers, &[{name, value} | &1])
+      put_header(struct, name, value)
     end
+  end
+
+  defp put_header(struct, name, value) do
+    update_in(struct.headers, &[{name, value} | &1])
   end
 
   defp get_content_encoding_header(headers) do

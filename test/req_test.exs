@@ -346,6 +346,16 @@ defmodule ReqTest do
     assert Req.get!(c.url <> "/params?x=1", params: [y: 2, z: 3]).body == "x=1&y=2&z=3"
   end
 
+  test "range/2", c do
+    Bypass.expect(c.bypass, "GET", "/range", fn conn ->
+      [range] = Plug.Conn.get_req_header(conn, "range")
+      Plug.Conn.send_resp(conn, 206, range)
+    end)
+
+    assert Req.get!(c.url <> "/range", range: "bytes=0-10").body == "bytes=0-10"
+    assert Req.get!(c.url <> "/range", range: 0..10).body == "bytes=0-10"
+  end
+
   ## Response steps
 
   test "decompress/2", c do
