@@ -308,6 +308,50 @@ defmodule ReqTest do
     assert Req.get!(c.url <> "/auth", auth: {"foo", "bar"}).status == 200
   end
 
+  @tag :tmp_dir
+  test "netrc/2", c do
+    Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
+      expected = "Basic " <> Base.encode64("foo:bar")
+
+      case Plug.Conn.get_req_header(conn, "authorization") do
+        [^expected] ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+
+        _ ->
+          Plug.Conn.send_resp(conn, 401, "unauthorized")
+      end
+    end)
+
+    assert Req.get!(c.url <> "/auth").status == 401
+
+    File.write!("#{c.tmp_dir}/empty_netrc", "")
+    assert Req.get!(c.url <> "/auth", netrc: "#{c.tmp_dir}/empty_netrc").status == 401
+
+    File.write!("#{c.tmp_dir}/wrong_netrc", """
+    machine localhost
+    username bad
+    password bad
+    """)
+
+    assert Req.get!(c.url <> "/auth", netrc: "#{c.tmp_dir}/wrong_netrc").status == 401
+
+    File.write!("#{c.tmp_dir}/correct_netrc", """
+    machine localhost
+    username foo
+    password bar
+    """)
+
+    assert Req.get!(c.url <> "/auth", netrc: "#{c.tmp_dir}/correct_netrc").status == 200
+
+    File.write!("#{c.tmp_dir}/bad_netrc", """
+    bad
+    """)
+
+    assert_raise RuntimeError, "parse error: \"bad\"", fn ->
+      Req.get!(c.url <> "/auth", netrc: "#{c.tmp_dir}/bad_netrc")
+    end
+  end
+
   test "default_headers/1", c do
     Bypass.expect(c.bypass, "GET", "/user-agent", fn conn ->
       [user_agent] = Plug.Conn.get_req_header(conn, "user-agent")

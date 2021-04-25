@@ -109,7 +109,10 @@ defmodule Req do
 
     * `encode/1`
 
-    * [`&auth(&1, options[:auth])`](`auth/2`) (if `options[:auth]` is set)
+    * [`&netrc(&1, options[:netrc])`](`netrc/2`) (if `options[:netrc]` is set
+      to an atom true for default path or a string for custom path)
+
+    * [`&auth(&1, options[:auth])`](`auth/2`) (if `options[:auth]` is set to)
 
     * [`&params(&1, options[:params])`](`params/2`) (if `options[:params]` is set)
 
@@ -117,8 +120,8 @@ defmodule Req do
 
   ## Response steps
 
-    * [`&retry(&1, &2, options[:retry])`](`retry/3`) (if `options[:retry]` is set and is a
-      keywords list or an atom `true`)
+    * [`&retry(&1, &2, options[:retry])`](`retry/3`) (if `options[:retry]` is set to
+      an atom true or a options keywords list)
 
     * `follow_redirects/2`
 
@@ -132,6 +135,8 @@ defmodule Req do
       keywords list or an atom `true`)
 
   ## Options
+
+    * `:netrc` - if set, adds the `netrc/2` step
 
     * `:auth` - if set, adds the `auth/2` step
 
@@ -154,6 +159,7 @@ defmodule Req do
         &default_headers/1,
         &encode/1
       ] ++
+        maybe_steps(options[:netrc], [&netrc(&1, options[:netrc])]) ++
         maybe_steps(options[:auth], [&auth(&1, options[:auth])]) ++
         maybe_steps(options[:params], [&params(&1, options[:params])]) ++
         maybe_steps(options[:range], [&range(&1, options[:range])]) ++
@@ -342,6 +348,43 @@ defmodule Req do
   def auth(request, {username, password}) when is_binary(username) and is_binary(password) do
     value = Base.encode64("#{username}:#{password}")
     put_new_header(request, "authorization", "Basic #{value}")
+  end
+
+  @doc """
+  Sets request authentication for a matching host from a netrc file.
+
+  ## Examples
+
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar").status
+      401
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", netrc: true).status
+      200
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", netrc: "/path/to/custom_netrc").status
+      200
+
+  """
+  @doc api: :request
+  def netrc(request, path)
+
+  def netrc(request, path) when is_binary(path) do
+    case Map.fetch(load_netrc(path), request.uri.host) do
+      {:ok, {username, password}} ->
+        auth(request, {username, password})
+
+      :error ->
+        request
+    end
+  end
+
+  def netrc(request, true) do
+    netrc(request, Path.join(System.user_home!(), ".netrc"))
+  end
+
+  defp load_netrc(path) do
+    path
+    |> File.read!()
+    |> String.split("\n")
+    |> parse_netrc(nil, %{})
   end
 
   @user_agent "req/#{Mix.Project.config()[:version]}"
@@ -879,5 +922,33 @@ defmodule Req do
 
   defp format_http_datetime(datetime) do
     Calendar.strftime(datetime, "%a, %d %b %Y %H:%m:%S GMT")
+  end
+
+  defp parse_netrc(["#" <> _ | rest], current_acc, acc) do
+    parse_netrc(rest, current_acc, acc)
+  end
+
+  defp parse_netrc(["machine " <> machine | rest], _, acc) do
+    parse_netrc(rest, {machine, nil, nil}, acc)
+  end
+
+  defp parse_netrc(["username " <> username | rest], {machine, nil, nil}, acc) do
+    parse_netrc(rest, {machine, username, nil}, acc)
+  end
+
+  defp parse_netrc(["password " <> password | rest], {machine, username, nil}, acc) do
+    parse_netrc(rest, nil, Map.put(acc, machine, {username, password}))
+  end
+
+  defp parse_netrc([other | rest], current_acc, acc) do
+    if String.trim(other) == "" do
+      parse_netrc(rest, current_acc, acc)
+    else
+      raise "parse error: #{inspect(other)}"
+    end
+  end
+
+  defp parse_netrc([], nil, acc) do
+    acc
   end
 end

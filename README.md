@@ -20,9 +20,11 @@ This is a work in progress!
 
   * Encode params as query string (via `params/2` step)
 
-  * Range requests (via `range/2` step)
-
   * Basic authentication (via `auth/2` step)
+
+  * `.netrc` file support (via `netrc/2` step)
+
+  * Range requests (via `range/2` step)
 
   * Follows redirects (via `follow_redirects/2` step)
 
