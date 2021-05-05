@@ -27,7 +27,6 @@ defmodule Req.MixProject do
   defp deps do
     [
       {:finch, "~> 0.6.0"},
-      {:mint, github: "elixir-mint/mint", override: true},
       {:mime, "~> 1.6"},
       {:jason, "~> 1.0"},
       {:nimble_csv, "~> 1.0", optional: true},
