@@ -1,11 +1,9 @@
 name: CI
-
 on:
   pull_request:
   push:
     branches:
       - main
-
 jobs:
   test:
     runs-on: ubuntu-20.04
@@ -19,9 +17,6 @@ jobs:
               elixir: 1.12.0-rc.1
               otp: 24.0-rc3
             lint: lint
-          - pair:
-              elixir: 1.11.4
-              otp: 23.3.3
     steps:
       - uses: actions/checkout@v2
 
