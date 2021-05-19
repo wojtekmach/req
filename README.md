@@ -32,18 +32,27 @@ This is a work in progress!
 
   * Basic HTTP caching (via `if_modified_since/2` step)
 
-## High-level API
+## Usage
+
+The easiest way to use Req is with `Mix.install/2` (requires Elixir v1.12+):
 
 ```elixir
+Mix.install([
+  {:req, "~> 0.1.0-dev", github: "wojtekmach/req", branch: "main"}
+])
+
 Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
 #=> "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
 ```
+
+If you want to use Req in a Mix project, you can add the above
+dependency to your mix.exs.
 
 ## Low-level API
 
 Under the hood, Req works by passing a request through a series of steps.
 
-The request struct, `%Req.Request{}`, initially contains data like HTTP method and 
+The request struct, `%Req.Request{}`, initially contains data like HTTP method and
 request headers. You can also add request, response, and error steps to it.
 
 Request steps are used to refine the data that will be sent to the server.
