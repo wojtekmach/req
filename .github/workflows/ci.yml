@@ -14,8 +14,8 @@ jobs:
       matrix:
         include:
           - pair:
-              elixir: '1.12.0-rc.1'
-              otp: '24.0'
+              elixir: '1.12'
+              otp: 24
             lint: lint
     steps:
       - uses: actions/checkout@v2
