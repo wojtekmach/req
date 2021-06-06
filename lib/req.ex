@@ -34,7 +34,7 @@ defmodule Req do
 
   ## Options
 
-    * `:header` - request headers, defaults to `[]`
+    * `:headers` - request headers, defaults to `[]`
 
     * `:body` - request body, defaults to `""`
 
