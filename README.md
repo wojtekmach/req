@@ -10,7 +10,7 @@ An HTTP client with a focus on composability, built on top of [Finch](https://gi
 
 This is a work in progress!
 
-# Features
+## Features
 
   * Extensibility via request, response, and error steps
 
