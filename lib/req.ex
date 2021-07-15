@@ -114,7 +114,7 @@ defmodule Req do
     * [`&netrc(&1, options[:netrc])`](`netrc/2`) (if `options[:netrc]` is set
       to an atom true for default path or a string for custom path)
 
-    * [`&auth(&1, options[:auth])`](`auth/2`) (if `options[:auth]` is set to)
+    * [`&auth(&1, options[:auth])`](`auth/2`) (if `options[:auth]` is set)
 
     * [`&params(&1, options[:params])`](`params/2`) (if `options[:params]` is set)
 
