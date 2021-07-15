@@ -1,13 +1,17 @@
 defmodule Req.MixProject do
   use Mix.Project
 
+  @version "0.1.0"
+  @source_url "https://github.com/wojtekmach/req"
+
   def project do
     [
       app: :req,
-      version: "0.1.0-dev",
+      version: "0.1.0",
       elixir: "~> 1.11",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      package: package(),
       docs: docs(),
       xref: [
         exclude: [
@@ -21,6 +25,17 @@ defmodule Req.MixProject do
     [
       mod: {Req.Application, []},
       extra_applications: [:logger]
+    ]
+  end
+
+  defp package do
+    [
+      description:
+        "Req is an HTTP client with a focus on ease of use and composability, built on top of Finch.",
+      licenses: ["Apache-2.0"],
+      links: %{
+        "GitHub" => @source_url
+      }
     ]
   end
 
@@ -38,14 +53,17 @@ defmodule Req.MixProject do
   defp docs do
     [
       main: "Req",
-      source_url: "https://github.com/wojtekmach/req",
-      source_ref: "main",
+      source_url: @source_url,
+      source_ref: "v#{@version}",
       groups_for_functions: [
         "High-level API": &(&1[:api] == :high_level),
         "Low-level API": &(&1[:api] == :low_level),
         "Request steps": &(&1[:api] == :request),
         "Response steps": &(&1[:api] == :response),
         "Error steps": &(&1[:api] == :error)
+      ],
+      extras: [
+        "CHANGELOG.md"
       ]
     ]
   end

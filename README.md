@@ -2,11 +2,11 @@
 
 [![CI](https://github.com/wojtekmach/req/actions/workflows/ci.yml/badge.svg)](https://github.com/wojtekmach/req/actions/workflows/ci.yml)
 
-[Docs](http://wojtekmach.pl/docs/req/)
+[Docs](https://hexdocs.pm/req)
 
 <!-- MDOC !-->
 
-An HTTP client with a focus on composability, built on top of [Finch](https://github.com/keathley/finch).
+Req is an HTTP client with a focus on ease of use and composability, built on top of [Finch](https://github.com/keathley/finch).
 
 This is a work in progress!
 
