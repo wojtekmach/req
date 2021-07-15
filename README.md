@@ -34,7 +34,7 @@ This is a work in progress!
 
 ## Usage
 
-The easiest way to use Req is with `Mix.install/2` (requires Elixir v1.12+):
+The easiest way to use Req is with [`Mix.install/2`](https://hexdocs.pm/mix/Mix.html#install/2) (requires Elixir v1.12+):
 
 ```elixir
 Mix.install([
