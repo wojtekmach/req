@@ -2,10 +2,27 @@ defmodule Req.Request do
   @moduledoc """
   The Request pipeline struct.
 
-  All fields are public.
+  Fields:
 
-  The `:private` field is reserved for libraries and frameworks to use.
-  Prefix the keys in the `:private` map with the name of your project.
+    * `:method` - the HTTP request method
+
+    * `:uri` - the HTTP request URI
+
+    * `:headers` - the HTTP request headers
+
+    * `:body` - the HTTP request body
+
+    * `:halted` - whether the request pipeline is halted. See `halt/1`
+
+    * `:request_steps` - the list of request steps
+
+    * `:response_steps` - the list of response steps
+
+    * `:error_steps` - the list of error steps
+
+    * `:private` - a map reserved for libraries and frameworks to use.
+      Prefix the keys with the name of your project to avoid any future
+      conflicts.
   """
 
   defstruct [
@@ -28,7 +45,7 @@ defmodule Req.Request do
   end
 
   @doc """
-  Assigns a new private `key` and `value`.
+  Assigns a private `key` to `value`.
   """
   def put_private(request, key, value) do
     put_in(request.private[key], value)

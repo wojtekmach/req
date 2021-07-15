@@ -814,7 +814,8 @@ defmodule Req do
     * `:delay` - sleep this number of milliseconds before making another attempt, defaults
       to `2000`
 
-    * `:max_attempts` - maximum number of attempts, defaults to `2`
+    * `:max_attempts` - maximum number of retry attempts, defaults to `2` (for a total of `3`
+      requests to the server, including the initial one.)
 
   ## Examples
 
