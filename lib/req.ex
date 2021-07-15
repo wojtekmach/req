@@ -93,8 +93,10 @@ defmodule Req do
       uri: URI.parse(uri),
       headers: Keyword.get(options, :headers, []),
       body: Keyword.get(options, :body, ""),
-      finch: Keyword.get(options, :finch, Req.Finch),
-      finch_options: Keyword.get(options, :finch_options, [])
+      private: %{
+        req_finch: Keyword.get(options, :finch, Req.Finch),
+        req_finch_options: Keyword.get(options, :finch_options, [])
+      }
     }
   end
 
@@ -251,7 +253,11 @@ defmodule Req do
       %Req.Request{} = request ->
         finch_request = Finch.build(request.method, request.uri, request.headers, request.body)
 
-        case Finch.request(finch_request, request.finch, request.finch_options) do
+        case Finch.request(
+               finch_request,
+               request.private.req_finch,
+               request.private.req_finch_options
+             ) do
           {:ok, response} ->
             run_response(request, response)
 

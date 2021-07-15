@@ -1,12 +1,19 @@
 defmodule Req.Request do
+  @moduledoc """
+  The Request pipeline struct.
+
+  All fields are public.
+
+  The `:private` field is reserved for libraries and frameworks to use.
+  Prefix the keys in the `:private` map with the name of your project.
+  """
+
   defstruct [
     :method,
     :uri,
     :headers,
     body: "",
     halted: false,
-    finch: Req.Finch,
-    finch_options: [],
     request_steps: [],
     response_steps: [],
     error_steps: [],
