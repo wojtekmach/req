@@ -67,10 +67,10 @@ Example:
 
 ```elixir
 Req.build(:get, "https://api.github.com/repos/elixir-lang/elixir")
-|> Req.add_request_steps([
+|> Req.prepend_request_steps([
   &Req.default_headers/1
 ])
-|> Req.add_response_steps([
+|> Req.prepend_response_steps([
   &Req.decode/2
 ])
 |> Req.run()
@@ -87,11 +87,11 @@ is equivalent to this composition of lower-level API functions:
 
 ```elixir
 Req.build(:get, "https://api.github.com/repos/elixir-lang/elixir")
-|> Req.add_default_steps()
+|> Req.prepend_default_steps()
 |> Req.run!()
 ```
 
-(See `Req.build/3`, `Req.add_default_steps/2`, and `Req.run!/1` for more information.)
+(See `Req.build/3`, `Req.prepend_default_steps/2`, and `Req.run!/1` for more information.)
 
 We can also build more complex flows like returning a response from a request step
 or an error from a response step. We will explore those next.

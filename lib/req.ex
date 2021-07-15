@@ -44,14 +44,14 @@ defmodule Req do
     * `:finch_options` - Options passed down to Finch when making the request, defaults to `[]`.
       See `Finch.request/3` for more information.
 
-  The `options` are passed down to `add_default_steps/2`, see its documentation for more
+  The `options` are passed down to `prepend_default_steps/2`, see its documentation for more
   information how they are being used.
   """
   @doc api: :high_level
   def request(method, uri, options \\ []) do
     method
     |> build(uri, options)
-    |> add_default_steps(options)
+    |> prepend_default_steps(options)
     |> run()
   end
 
@@ -64,7 +64,7 @@ defmodule Req do
   def request!(method, uri, options \\ []) do
     method
     |> build(uri, options)
-    |> add_default_steps(options)
+    |> prepend_default_steps(options)
     |> run!()
   end
 
@@ -99,7 +99,7 @@ defmodule Req do
   end
 
   @doc """
-  Adds steps that should be reasonable defaults for most users.
+  Prepends steps that should be reasonable defaults for most users.
 
   ## Request steps
 
@@ -152,7 +152,7 @@ defmodule Req do
 
   """
   @doc api: :low_level
-  def add_default_steps(request, options \\ []) do
+  def prepend_default_steps(request, options \\ []) do
     request_steps =
       [
         &normalize_headers/1,
@@ -183,9 +183,9 @@ defmodule Req do
     error_steps = maybe_steps(retry, [&retry(&1, &2, retry)])
 
     request
-    |> add_request_steps(request_steps)
-    |> add_response_steps(response_steps)
-    |> add_error_steps(error_steps)
+    |> append_request_steps(request_steps)
+    |> append_response_steps(response_steps)
+    |> append_error_steps(error_steps)
   end
 
   defp maybe_steps(nil, _step), do: []
@@ -193,31 +193,51 @@ defmodule Req do
   defp maybe_steps(_, steps), do: steps
 
   @doc """
-  Adds request steps.
+  Appends request steps.
   """
   @doc api: :low_level
-  def add_request_steps(request, steps) do
+  def append_request_steps(request, steps) do
+    update_in(request.request_steps, &(steps ++ &1))
+  end
+
+  @doc """
+  Prepends request steps.
+  """
+  @doc api: :low_level
+  def prepend_request_steps(request, steps) do
     update_in(request.request_steps, &(&1 ++ steps))
   end
 
   @doc """
-  Adds response steps.
+  Appends response steps.
   """
   @doc api: :low_level
-  def add_response_steps(request, steps) do
+  def append_response_steps(request, steps) do
     update_in(request.response_steps, &(&1 ++ steps))
   end
 
-  defp prepend_response_steps(request, steps) do
+  @doc """
+  Prepends response steps.
+  """
+  @doc api: :low_level
+  def prepend_response_steps(request, steps) do
     update_in(request.response_steps, &(steps ++ &1))
   end
 
   @doc """
-  Adds error steps.
+  Appends error steps.
   """
   @doc api: :low_level
-  def add_error_steps(request, steps) do
+  def append_error_steps(request, steps) do
     update_in(request.error_steps, &(&1 ++ steps))
+  end
+
+  @doc """
+  Prepends error steps.
+  """
+  @doc api: :low_level
+  def prepend_error_steps(request, steps) do
+    update_in(request.error_steps, &(steps ++ &1))
   end
 
   @doc """
