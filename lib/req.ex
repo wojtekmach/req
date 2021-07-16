@@ -199,7 +199,7 @@ defmodule Req do
   """
   @doc api: :low_level
   def append_request_steps(request, steps) do
-    update_in(request.request_steps, &(steps ++ &1))
+    update_in(request.request_steps, &(&1 ++ steps))
   end
 
   @doc """
@@ -207,7 +207,7 @@ defmodule Req do
   """
   @doc api: :low_level
   def prepend_request_steps(request, steps) do
-    update_in(request.request_steps, &(&1 ++ steps))
+    update_in(request.request_steps, &(steps ++ &1))
   end
 
   @doc """
