@@ -94,8 +94,8 @@ defmodule Req do
       headers: Keyword.get(options, :headers, []),
       body: Keyword.get(options, :body, ""),
       private: %{
-        req_finch: Keyword.get(options, :finch, Req.Finch),
-        req_finch_options: Keyword.get(options, :finch_options, [])
+        req_finch:
+          {Keyword.get(options, :finch, Req.Finch), Keyword.get(options, :finch_options, [])}
       }
     }
   end
@@ -243,31 +243,37 @@ defmodule Req do
   end
 
   @doc """
+  Make the HTTP request using `Finch`.
+
+  This is a request step but it is not documented as such because you don't
+  need to add it to your request pipeline. It is automatically added
+  by `run/1` as always the very last request step.
+
+  This function shows you that making the actual HTTP call is just another
+  request step, which means that you can write your own step that uses
+  another underlying HTTP client like `:httpc`, `:hackney`, etc.
+  """
+  @doc api: :low_level
+  def finch(request) do
+    finch_request = Finch.build(request.method, request.uri, request.headers, request.body)
+    {finch_name, finch_options} = request.private.req_finch
+
+    case Finch.request(finch_request, finch_name, finch_options) do
+      {:ok, response} -> {request, response}
+      {:error, exception} -> {request, exception}
+    end
+  end
+
+  @doc """
   Runs a request pipeline.
 
   Returns `{:ok, response}` or `{:error, exception}`.
   """
   @doc api: :low_level
   def run(request) do
-    case run_request(request) do
-      %Req.Request{} = request ->
-        finch_request = Finch.build(request.method, request.uri, request.headers, request.body)
-
-        case Finch.request(
-               finch_request,
-               request.private.req_finch,
-               request.private.req_finch_options
-             ) do
-          {:ok, response} ->
-            run_response(request, response)
-
-          {:error, exception} ->
-            run_error(request, exception)
-        end
-
-      result ->
-        result
-    end
+    request
+    |> append_request_steps([&finch/1])
+    |> run_request()
   end
 
   @doc """
