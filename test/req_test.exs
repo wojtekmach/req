@@ -308,6 +308,19 @@ defmodule ReqTest do
     assert Req.get!(c.url <> "/auth", auth: {"foo", "bar"}).status == 200
   end
 
+  test "encode_headers/1", c do
+    pid = self()
+
+    Bypass.expect(c.bypass, "GET", "/encode-headers", fn conn ->
+      send(pid, {:headers, conn.req_headers})
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    Req.get!(c.url <> "/encode-headers", headers: [user_agent: "foo"])
+    assert_receive {:headers, headers}
+    assert Map.new(headers)["user-agent"] == "foo"
+  end
+
   @tag :tmp_dir
   test "netrc/2", c do
     Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
