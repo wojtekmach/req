@@ -441,12 +441,15 @@ defmodule Req do
   @doc """
   Encodes request headers.
 
-  Turns atom header names into strings, e.g.: `:user_agent` becomes `"user-agent"`. Non-atom names
-  are returned as is.
+  Turns atom header names into strings, replacing `-` with `_`. For example, `:user_agent` becomes
+  `"user-agent"`. Non-atom header names are kept as is.
+
+  If a header value is a `NaiveDateTime` or `DateTime`, it is encoded as "HTTP date". Otherwise,
+  the header value is encoded with `String.Chars.to_string/1`.
 
   ## Examples
 
-      iex> Req.get!("https://httpbin.org/user-agent", headers: [user_agent: "my_agent"]).body
+      iex> Req.get!("https://httpbin.org/user-agent", headers: [user_agent: :my_agent]).body
       %{"user-agent" => "my_agent"}
 
   """
@@ -454,11 +457,28 @@ defmodule Req do
   def encode_headers(request) do
     headers =
       for {name, value} <- request.headers do
-        if is_atom(name) do
-          {name |> Atom.to_string() |> String.replace("_", "-"), value}
-        else
-          {name, value}
-        end
+        name =
+          case name do
+            atom when is_atom(atom) ->
+              atom |> Atom.to_string() |> String.replace("_", "-")
+
+            binary when is_binary(binary) ->
+              binary
+          end
+
+        value =
+          case value do
+            %NaiveDateTime{} = naive_datetime ->
+              format_http_datetime(naive_datetime)
+
+            %DateTime{} = datetime ->
+              datetime |> DateTime.shift_zone!("Etc/UTC") |> format_http_datetime()
+
+            _ ->
+              String.Chars.to_string(value)
+          end
+
+        {name, value}
       end
 
     %{request | headers: headers}

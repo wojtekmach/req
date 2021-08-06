@@ -316,9 +316,13 @@ defmodule ReqTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
-    Req.get!(c.url <> "/encode-headers", headers: [user_agent: "foo"])
+    Req.get!(c.url <> "/encode-headers",
+      headers: [user_agent: :foo, x_date: ~U[2021-01-01 09:00:00Z]]
+    )
+
     assert_receive {:headers, headers}
     assert Map.new(headers)["user-agent"] == "foo"
+    assert Map.new(headers)["x-date"] == "Fri, 01 Jan 2021 09:00:00 GMT"
   end
 
   @tag :tmp_dir
