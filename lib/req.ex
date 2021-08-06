@@ -105,7 +105,7 @@ defmodule Req do
 
   ## Request steps
 
-    * `normalize_headers/1`
+    * `encode_headers/1`
 
     * `default_headers/1`
 
@@ -157,7 +157,7 @@ defmodule Req do
   def prepend_default_steps(request, options \\ []) do
     request_steps =
       [
-        &normalize_headers/1,
+        &encode_headers/1,
         &default_headers/1,
         &encode/1
       ] ++
@@ -439,7 +439,7 @@ defmodule Req do
   end
 
   @doc """
-  Normalizes request headers.
+  Encodes request headers.
 
   Turns atom header names into strings, e.g.: `:user_agent` becomes `"user-agent"`. Non-atom names
   are returned as is.
@@ -451,7 +451,7 @@ defmodule Req do
 
   """
   @doc api: :request
-  def normalize_headers(request) do
+  def encode_headers(request) do
     headers =
       for {name, value} <- request.headers do
         if is_atom(name) do
