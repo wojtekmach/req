@@ -954,7 +954,7 @@ defmodule Req do
   end
 
   defp format_http_datetime(datetime) do
-    Calendar.strftime(datetime, "%a, %d %b %Y %H:%m:%S GMT")
+    Calendar.strftime(datetime, "%a, %d %b %Y %H:%M:%S GMT")
   end
 
   defp parse_netrc(["#" <> _ | rest], current_acc, acc) do
