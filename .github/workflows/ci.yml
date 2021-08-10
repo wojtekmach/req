@@ -27,12 +27,8 @@ jobs:
 
       - uses: actions/cache@v2
         with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-${{matrix.pair.elixir}}-${{matrix.pair.otp}}-${{ hashFiles('**/mix.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-mix-
+          path: deps
+          key: mix-deps-${{ hashFiles('**/mix.lock') }}
 
       - run: mix deps.get
 
