@@ -289,6 +289,34 @@ defmodule ReqTest do
     assert {:ok, %{status: 200, body: "ok"}} = Req.run(request)
   end
 
+  defmodule Plugin do
+    def run(request, opts) do
+      send(self(), {__MODULE__, opts})
+      request
+    end
+  end
+
+  test "plugins", c do
+    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    plugins = [
+      fn request ->
+        send(self(), :lambda)
+        request
+      end,
+      Plugin,
+      {Plugin, foo: :bar}
+    ]
+
+    assert Req.get!(c.url <> "/ok", plugins: plugins).body == "ok"
+    assert_received :lambda
+    assert_received {Plugin, []}
+    assert_received {Plugin, foo: :bar}
+    refute_received _
+  end
+
   ## Request steps
 
   test "auth/2", c do

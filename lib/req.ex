@@ -44,6 +44,9 @@ defmodule Req do
     * `:finch_options` - Options passed down to Finch when making the request, defaults to `[]`.
       See `Finch.request/3` for more information.
 
+    * `:plugins` - A list of plugins to use, defaults to: `[]`. See `run_plugins/2` for more
+      information.
+
   The `options` are passed down to `prepend_default_steps/2`, see its documentation for more
   information how they are being used.
   """
@@ -52,6 +55,7 @@ defmodule Req do
     method
     |> build(uri, options)
     |> prepend_default_steps(options)
+    |> run_plugins(options[:plugins] || [])
     |> run()
   end
 
@@ -65,6 +69,7 @@ defmodule Req do
     method
     |> build(uri, options)
     |> prepend_default_steps(options)
+    |> run_plugins(options[:plugins] || [])
     |> run!()
   end
 
@@ -193,6 +198,55 @@ defmodule Req do
   defp maybe_steps(nil, _step), do: []
   defp maybe_steps(false, _step), do: []
   defp maybe_steps(_, steps), do: steps
+
+  @doc """
+  Runs plugins.
+
+  A Req plugin is any function that takes a request and returns an updated request.
+
+  The given list of plugins may contain:
+
+    * 1-arity functions
+
+    * `{module, options}` tuples. The module must export a `run(request, options)`
+
+    * `module`, a shortcut for `{module, []}`
+
+  This function runs all the given plugins in order. Do not do any significant
+  work in the plugin as it will unnecessarily slow down your request pipeline.
+  Instead, the plugin should rather register steps using functions like
+  `prepend_request_steps/2`.
+
+  ## Examples
+
+      defmodule Debug do
+        def run(request, _) do
+          request
+          |> Req.prepend_request_steps([fn req -> IO.inspect(req, label: :request) end])
+          |> Req.prepend_response_steps([fn req, resp -> {req, IO.inspect(resp, label: :response)} end])
+          |> Req.prepend_error_steps([fn req, error -> {req, IO.inspect(error, label: :error)} end])
+        end
+      end
+
+      iex> Req.get!("https://httpbin.org/status/200", plugins: [Debug])
+      # Outputs: request: %Req.Request{...}
+      # Outputs: response: %{status: 200, ...}
+      %{status: 200, ...}
+
+  """
+  @doc api: :low_level
+  def run_plugins(request, plugins) when is_list(plugins) do
+    Enum.reduce(plugins, request, fn
+      fun, request when is_function(fun, 1) ->
+        apply(fun, [request])
+
+      module, request when is_atom(module) ->
+        apply(module, :run, [request, []])
+
+      {module, opts}, request when is_atom(module) and is_list(opts) ->
+        apply(module, :run, [request, opts])
+    end)
+  end
 
   @doc """
   Appends request steps.
