@@ -259,8 +259,17 @@ defmodule Req do
     {finch_name, finch_options} = request.private.req_finch
 
     case Finch.request(finch_request, finch_name, finch_options) do
-      {:ok, response} -> {request, response}
-      {:error, exception} -> {request, exception}
+      {:ok, response} ->
+        response = %Req.Response{
+          status: response.status,
+          headers: response.headers,
+          body: response.body
+        }
+
+        {request, response}
+
+      {:error, exception} ->
+        {request, exception}
     end
   end
 
@@ -300,7 +309,7 @@ defmodule Req do
         {%Req.Request{halted: true}, response_or_exception} ->
           {:halt, result(response_or_exception)}
 
-        {request, %{status: _, headers: _, body: _} = response} ->
+        {request, %Req.Response{} = response} ->
           {:halt, run_response(request, response)}
 
         {request, %{__exception__: true} = exception} ->
@@ -318,7 +327,7 @@ defmodule Req do
           {%Req.Request{halted: true} = request, response_or_exception} ->
             {:halt, {request, response_or_exception}}
 
-          {request, %{status: _, headers: _, body: _} = response} ->
+          {request, %Req.Response{} = response} ->
             {:cont, {request, response}}
 
           {request, %{__exception__: true} = exception} ->
@@ -341,7 +350,7 @@ defmodule Req do
           {request, %{__exception__: true} = exception} ->
             {:cont, {request, exception}}
 
-          {request, %{status: _, headers: _, body: _} = response} ->
+          {request, %Req.Response{} = response} ->
             {:halt, run_response(request, response)}
         end
       end)
@@ -349,7 +358,7 @@ defmodule Req do
     result(response_or_exception)
   end
 
-  defp result(%{status: _, headers: _, body: _} = response) do
+  defp result(%Req.Response{} = response) do
     {:ok, response}
   end
 
@@ -550,12 +559,9 @@ defmodule Req do
   ## Examples
 
       iex> Req.get!("https://repo.hex.pm/builds/elixir/builds.txt", range: 0..67)
-      %{
+      %Req.Response{
         status: 206,
-        headers: [
-          {"content-range", "bytes 0-67/45400"},
-          ...
-        ],
+        headers: [{"content-range", "bytes 0-67/45400"}, ...],
         body: "master df65074a8143cebec810dfb91cafa43f19dcdbaf 2021-04-23T15:36:18Z"
       }
 
@@ -587,16 +593,9 @@ defmodule Req do
   ## Examples
 
       iex> url = "https://hexdocs.pm/elixir/Kernel.html"
-      iex> response = Req.get!(url, cache: true)
-      %{
-        status: 200,
-        headers: [
-          {"date", "Fri, 16 Apr 2021 10:09:56 GMT"},
-          ...
-        ],
-        ...
-      }
-      iex> Req.get!(url, cache: true) == response
+      iex> response1 = Req.get!(url, cache: true)
+      iex> response2 = Req.get!(url, cache: true)
+      iex> response1 == response2
       true
 
   """

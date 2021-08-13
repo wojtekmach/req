@@ -1,6 +1,6 @@
 defmodule Req.Request do
   @moduledoc """
-  The Request pipeline struct.
+  The request pipeline struct.
 
   Fields:
 
@@ -28,7 +28,7 @@ defmodule Req.Request do
   defstruct [
     :method,
     :uri,
-    :headers,
+    headers: [],
     body: "",
     halted: false,
     request_steps: [],

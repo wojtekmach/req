@@ -88,7 +88,7 @@ defmodule ReqTest do
       Req.build(:get, c.url <> "/ok")
       |> Req.prepend_request_steps([
         fn request ->
-          {request, %Finch.Response{status: 200, body: "from cache"}}
+          {request, %Req.Response{status: 200, body: "from cache"}}
         end
       ])
       |> Req.prepend_response_steps([
@@ -122,7 +122,7 @@ defmodule ReqTest do
       Req.build(:get, c.url <> "/ok")
       |> Req.prepend_request_steps([
         fn request ->
-          {Req.Request.halt(request), %Finch.Response{status: 200, body: "from cache"}}
+          {Req.Request.halt(request), %Req.Response{status: 200, body: "from cache"}}
         end,
         &unreachable/1
       ])
@@ -262,7 +262,7 @@ defmodule ReqTest do
       |> Req.prepend_error_steps([
         fn {request, exception} ->
           assert exception.reason == :econnrefused
-          {request, %Finch.Response{status: 200, body: "ok"}}
+          {request, %Req.Response{status: 200, body: "ok"}}
         end,
         &unreachable/1
       ])
@@ -281,7 +281,7 @@ defmodule ReqTest do
       |> Req.prepend_error_steps([
         fn {request, exception} ->
           assert exception.reason == :econnrefused
-          {Req.Request.halt(request), %Finch.Response{status: 200, body: "ok"}}
+          {Req.Request.halt(request), %Req.Response{status: 200, body: "ok"}}
         end,
         &unreachable/1
       ])
