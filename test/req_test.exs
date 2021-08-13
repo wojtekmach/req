@@ -92,7 +92,7 @@ defmodule ReqTest do
         end
       ])
       |> Req.prepend_response_steps([
-        fn request, response ->
+        fn {request, response} ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
         end
       ])
@@ -109,7 +109,7 @@ defmodule ReqTest do
         end
       ])
       |> Req.prepend_error_steps([
-        fn request, exception ->
+        fn {request, exception} ->
           {request, update_in(exception.message, &(&1 <> " - updated"))}
         end
       ])
@@ -127,10 +127,10 @@ defmodule ReqTest do
         &unreachable/1
       ])
       |> Req.prepend_response_steps([
-        &unreachable/2
+        &unreachable/1
       ])
       |> Req.prepend_error_steps([
-        &unreachable/2
+        &unreachable/1
       ])
 
     assert {:ok, %{status: 200, body: "from cache"}} = Req.run(request)
@@ -146,10 +146,10 @@ defmodule ReqTest do
         &unreachable/1
       ])
       |> Req.prepend_response_steps([
-        &unreachable/2
+        &unreachable/1
       ])
       |> Req.prepend_error_steps([
-        &unreachable/2
+        &unreachable/1
       ])
 
     assert {:error, %RuntimeError{message: "oops"}} = Req.run(request)
@@ -163,7 +163,7 @@ defmodule ReqTest do
     request =
       Req.build(:get, c.url <> "/ok")
       |> Req.prepend_response_steps([
-        fn request, response ->
+        fn {request, response} ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
         end
       ])
@@ -179,13 +179,13 @@ defmodule ReqTest do
     request =
       Req.build(:get, c.url <> "/ok")
       |> Req.prepend_response_steps([
-        fn request, response ->
+        fn {request, response} ->
           assert response.body == "ok"
           {request, RuntimeError.exception("oops")}
         end
       ])
       |> Req.prepend_error_steps([
-        fn request, exception ->
+        fn {request, exception} ->
           {request, update_in(exception.message, &(&1 <> " - updated"))}
         end
       ])
@@ -201,13 +201,13 @@ defmodule ReqTest do
     request =
       Req.build(:get, c.url <> "/ok")
       |> Req.prepend_response_steps([
-        fn request, response ->
+        fn {request, response} ->
           {Req.Request.halt(request), update_in(response.body, &(&1 <> " - updated"))}
         end,
-        &unreachable/2
+        &unreachable/1
       ])
       |> Req.prepend_error_steps([
-        &unreachable/2
+        &unreachable/1
       ])
 
     assert {:ok, %{status: 200, body: "ok - updated"}} = Req.run(request)
@@ -221,14 +221,14 @@ defmodule ReqTest do
     request =
       Req.build(:get, c.url <> "/ok")
       |> Req.prepend_response_steps([
-        fn request, response ->
+        fn {request, response} ->
           assert response.body == "ok"
           {Req.Request.halt(request), RuntimeError.exception("oops")}
         end,
-        &unreachable/2
+        &unreachable/1
       ])
       |> Req.prepend_error_steps([
-        &unreachable/2
+        &unreachable/1
       ])
 
     assert {:error, %RuntimeError{message: "oops"}} = Req.run(request)
@@ -240,7 +240,7 @@ defmodule ReqTest do
     request =
       Req.build(:get, c.url <> "/ok")
       |> Req.prepend_error_steps([
-        fn request, exception ->
+        fn {request, exception} ->
           assert exception.reason == :econnrefused
           {request, RuntimeError.exception("oops")}
         end
@@ -255,16 +255,16 @@ defmodule ReqTest do
     request =
       Req.build(:get, c.url <> "/ok")
       |> Req.prepend_response_steps([
-        fn request, response ->
+        fn {request, response} ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
         end
       ])
       |> Req.prepend_error_steps([
-        fn request, exception ->
+        fn {request, exception} ->
           assert exception.reason == :econnrefused
           {request, %Finch.Response{status: 200, body: "ok"}}
         end,
-        &unreachable/2
+        &unreachable/1
       ])
 
     assert {:ok, %{status: 200, body: "ok - updated"}} = Req.run(request)
@@ -276,14 +276,14 @@ defmodule ReqTest do
     request =
       Req.build(:get, c.url <> "/ok")
       |> Req.prepend_response_steps([
-        &unreachable/2
+        &unreachable/1
       ])
       |> Req.prepend_error_steps([
-        fn request, exception ->
+        fn {request, exception} ->
           assert exception.reason == :econnrefused
           {Req.Request.halt(request), %Finch.Response{status: 200, body: "ok"}}
         end,
-        &unreachable/2
+        &unreachable/1
       ])
 
     assert {:ok, %{status: 200, body: "ok"}} = Req.run(request)
@@ -611,8 +611,8 @@ defmodule ReqTest do
     request =
       Req.build(:get, c.url <> "/retry")
       |> Req.prepend_response_steps([
-        &Req.retry(&1, &2, delay: 10),
-        fn request, response ->
+        &Req.retry(&1, delay: 10),
+        fn {request, response} ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
         end
       ])
@@ -633,8 +633,8 @@ defmodule ReqTest do
     request =
       Req.build(:get, c.url <> "/retry")
       |> Req.prepend_response_steps([
-        &Req.retry(&1, &2, delay: 10),
-        fn request, response ->
+        &Req.retry(&1, delay: 10),
+        fn {request, response} ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
         end
       ])
@@ -716,7 +716,7 @@ defmodule ReqTest do
     request =
       Req.build(:get, c.url <> "/cache")
       |> Req.prepend_request_steps([&Req.if_modified_since(&1, dir: c.tmp_dir)])
-      |> Req.prepend_response_steps([&Req.retry(&1, &2, delay: 10), &Req.decode/2])
+      |> Req.prepend_response_steps([&Req.retry(&1, delay: 10), &Req.decode/1])
 
     response = Req.run!(request)
     assert response.status == 200
@@ -734,11 +734,7 @@ defmodule ReqTest do
 
   ## Helpers
 
-  defp unreachable(_request) do
-    raise "unreachable"
-  end
-
-  defp unreachable(_request, _response_or_exception) do
+  defp unreachable(_) do
     raise "unreachable"
   end
 end

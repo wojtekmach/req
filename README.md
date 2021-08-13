@@ -46,7 +46,7 @@ Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
 ```
 
 If you want to use Req in a Mix project, you can add the above
-dependency to your mix.exs.
+dependency to your `mix.exs`.
 
 ## Low-level API
 
@@ -62,20 +62,6 @@ The request, along with the response or error, will go through response or
 error steps, respectively.
 
 Nothing is actually executed until we run the pipeline with `Req.run/1`.
-
-Example:
-
-```elixir
-Req.build(:get, "https://api.github.com/repos/elixir-lang/elixir")
-|> Req.prepend_request_steps([
-  &Req.default_headers/1
-])
-|> Req.prepend_response_steps([
-  &Req.decode/2
-])
-|> Req.run()
-#=> {:ok, %{body: %{"description" => "Elixir is a dynamic," <> ...}, ...}, ...}
-```
 
 The high-level API shown before:
 
@@ -122,7 +108,7 @@ end
 
 ### Response and error steps
 
-A response step is a function that accepts a `request` and a `response` and returns one of the
+A response step is a function that accepts a `{request, response}` tuple and returns one of the
 following:
 
   * A `{request, response}` tuple
@@ -130,7 +116,7 @@ following:
   * A `{request, exception}` tuple. In that case, no further response steps are executed but the
     exception goes through error steps
 
-Similarly, an error step is a function that accepts a `request` and an `exception` and returns one
+Similarly, an error step is a function that accepts a `{request, exception}` tuple and returns one
 of the following:
 
   * A `{request, exception}` tuple
@@ -141,7 +127,7 @@ of the following:
 Examples:
 
 ```elixir
-def decode(request, response) do
+def decode({request, response}) do
   case List.keyfind(response.headers, "content-type", 0) do
     {_, "application/json" <> _} ->
       {request, update_in(response.body, &Jason.decode!/1)}
@@ -151,7 +137,7 @@ def decode(request, response) do
   end
 end
 
-def log_error(request, exception) do
+def log_error({request, exception}) do
   Logger.error(["#{request.method} #{request.url}: ", Exception.message(exception)])
   {request, exception}
 end

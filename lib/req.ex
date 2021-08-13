@@ -122,18 +122,18 @@ defmodule Req do
 
   ## Response steps
 
-    * [`&retry(&1, &2, options[:retry])`](`retry/3`) (if `options[:retry]` is set to
+    * [`&retry(&1, options[:retry])`](`retry/2`) (if `options[:retry]` is set to
       an atom true or a options keywords list)
 
-    * `follow_redirects/2`
+    * `follow_redirects/1`
 
-    * `decompress/2`
+    * `decompress/1`
 
-    * `decode/2`
+    * `decode/1`
 
   ## Error steps
 
-    * [`&retry(&1, &2, options[:retry])`](`retry/3`) (if `options[:retry]` is set and is a
+    * [`&retry(&1, options[:retry])`](`retry/2`) (if `options[:retry]` is set and is a
       keywords list or an atom `true`)
 
   ## Options
@@ -148,9 +148,9 @@ defmodule Req do
 
     * `:cache` - if set to `true`, adds `if_modified_since/2` step
 
-    * `:raw` if set to `true`, skips `decompress/2` and `decode/2` steps
+    * `:raw` if set to `true`, skips `decompress/1` and `decode/1` steps
 
-    * `:retry` - if set, adds the `retry/3` step to response and error steps
+    * `:retry` - if set, adds the `retry/2` step to response and error steps
 
   """
   @doc api: :low_level
@@ -173,16 +173,16 @@ defmodule Req do
     raw? = options[:raw] == true
 
     response_steps =
-      maybe_steps(retry, [&retry(&1, &2, retry)]) ++
+      maybe_steps(retry, [&retry(&1, retry)]) ++
         [
-          &follow_redirects/2
+          &follow_redirects/1
         ] ++
         maybe_steps(not raw?, [
-          &decompress/2,
-          &decode/2
+          &decompress/1,
+          &decode/1
         ])
 
-    error_steps = maybe_steps(retry, [&retry(&1, &2, retry)])
+    error_steps = maybe_steps(retry, [&retry(&1, retry)])
 
     request
     |> append_request_steps(request_steps)
@@ -314,7 +314,7 @@ defmodule Req do
 
     {_request, response_or_exception} =
       Enum.reduce_while(steps, {request, response}, fn step, {request, response} ->
-        case step.(request, response) do
+        case step.({request, response}) do
           {%Req.Request{halted: true} = request, response_or_exception} ->
             {:halt, {request, response_or_exception}}
 
@@ -334,7 +334,7 @@ defmodule Req do
 
     {_request, response_or_exception} =
       Enum.reduce_while(steps, {request, exception}, fn step, {request, exception} ->
-        case step.(request, exception) do
+        case step.({request, exception}) do
           {%Req.Request{halted: true} = request, response_or_exception} ->
             {:halt, {request, response_or_exception}}
 
@@ -606,7 +606,7 @@ defmodule Req do
 
     request
     |> put_if_modified_since(dir)
-    |> prepend_response_steps([&handle_cache(&1, &2, dir)])
+    |> prepend_response_steps([&handle_cache(&1, dir)])
   end
 
   defp put_if_modified_since(request, dir) do
@@ -620,7 +620,7 @@ defmodule Req do
     end
   end
 
-  defp handle_cache(request, response, dir) do
+  defp handle_cache({request, response}, dir) do
     cond do
       response.status == 200 ->
         write_cache(dir, request, response)
@@ -657,11 +657,11 @@ defmodule Req do
 
   """
   @doc api: :response
-  def decompress(request, %{body: ""} = response) do
+  def decompress({request, %{body: ""} = response}) do
     {request, response}
   end
 
-  def decompress(request, response) do
+  def decompress({request, response}) do
     compression_algorithms = get_content_encoding_header(response.headers)
     {request, update_in(response.body, &decompress_body(&1, compression_algorithms))}
   end
@@ -711,11 +711,11 @@ defmodule Req do
 
   """
   @doc api: :response
-  def decode(request, %{body: ""} = response) do
+  def decode({request, %{body: ""} = response}) do
     {request, response}
   end
 
-  def decode(request, response) do
+  def decode({request, response}) do
     case format(request, response) do
       "json" ->
         {request, update_in(response.body, &Jason.decode!/1)}
@@ -800,9 +800,7 @@ defmodule Req do
 
   """
   @doc api: :response
-  def follow_redirects(request, response)
-
-  def follow_redirects(request, %{status: status} = response) when status in 301..302 do
+  def follow_redirects({request, %{status: status} = response}) when status in 301..302 do
     {_, location} = List.keyfind(response.headers, "location", 0)
     Logger.debug(["Req.follow_redirects/2: Redirecting to ", location])
 
@@ -819,8 +817,8 @@ defmodule Req do
     {Req.Request.halt(request), result}
   end
 
-  def follow_redirects(request, response) do
-    {request, response}
+  def follow_redirects(other) do
+    other
   end
 
   ## Error steps
@@ -865,13 +863,11 @@ defmodule Req do
 
   """
   @doc api: :error
-  def retry(request, response_or_exception, options \\ [])
-
-  def retry(request, %{status: status} = response, _options) when status < 500 do
+  def retry({request, %{status: status} = response}, _options) when status < 500 do
     {request, response}
   end
 
-  def retry(request, response_or_exception, options) when is_list(options) do
+  def retry({request, response_or_exception}, options) when is_list(options) do
     delay = Keyword.get(options, :delay, 2000)
     max_attempts = Keyword.get(options, :max_attempts, 2)
     attempt = Req.Request.get_private(request, :retry_attempt, 0)
