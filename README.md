@@ -138,7 +138,7 @@ def decode({request, response}) do
 end
 
 def log_error({request, exception}) do
-  Logger.error(["#{request.method} #{request.url}: ", Exception.message(exception)])
+  Logger.error(["#{request.method} #{request.uri}: ", Exception.message(exception)])
   {request, exception}
 end
 ```
