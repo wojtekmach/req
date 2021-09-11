@@ -13,6 +13,9 @@ defmodule Req.MixProject do
       deps: deps(),
       package: package(),
       docs: docs(),
+      preferred_cli_env: [
+        docs: :docs
+      ],
       xref: [
         exclude: [
           NimbleCSV.RFC4180

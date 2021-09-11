@@ -6,14 +6,46 @@ defmodule ReqTest do
     [bypass: bypass, url: "http://localhost:#{bypass.port}"]
   end
 
-  test "high-level API", c do
-    Bypass.expect(c.bypass, "GET", "/json", fn conn ->
-      conn
-      |> Plug.Conn.put_resp_content_type("application/json")
-      |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(%{"a" => 1}))
-    end)
+  describe "high-level API" do
+    test "get!/2", c do
+      Bypass.expect(c.bypass, "GET", "/json", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(%{"a" => 1}))
+      end)
 
-    assert Req.get!(c.url <> "/json").body == %{"a" => 1}
+      assert Req.get!(c.url <> "/json").body == %{"a" => 1}
+    end
+
+    test "post!/3", c do
+      Bypass.expect(c.bypass, "POST", "/json", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(%{"a" => 1}))
+      end)
+
+      assert Req.post!(c.url <> "/json", {:json, %{foo: "bar"}}).body == %{"a" => 1}
+    end
+
+    test "put!/3", c do
+      Bypass.expect(c.bypass, "PUT", "/json", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(%{"a" => 1}))
+      end)
+
+      assert Req.put!(c.url <> "/json", {:json, %{foo: "bar"}}).body == %{"a" => 1}
+    end
+
+    test "delete!/2", c do
+      Bypass.expect(c.bypass, "DELETE", "/json", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(%{"a" => 1}))
+      end)
+
+      assert Req.delete!(c.url <> "/json").body == %{"a" => 1}
+    end
   end
 
   test "raw mode", c do
