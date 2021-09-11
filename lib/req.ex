@@ -30,6 +30,27 @@ defmodule Req do
   end
 
   @doc """
+  Makes a PUT request.
+
+  See `request/3` for a list of supported options.
+  """
+  @doc api: :high_level
+  def put!(uri, body, options \\ []) do
+    options = Keyword.put(options, :body, body)
+    request!(:put, uri, options)
+  end
+
+  @doc """
+  Makes a DELETE request.
+
+  See `request/3` for a list of supported options.
+  """
+  @doc api: :high_level
+  def delete!(uri, options \\ []) do
+    request!(:delete, uri, options)
+  end
+
+  @doc """
   Makes an HTTP request.
 
   ## Options
