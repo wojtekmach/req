@@ -858,7 +858,7 @@ defmodule Req do
     * `:delay` - sleep this number of milliseconds before making another attempt, defaults
       to `2000`
 
-    * `:max_attempts` - maximum number of retry attempts, defaults to `2` (for a total of `3`
+    * `:max_retries` - maximum number of retry attempts, defaults to `2` (for a total of `3`
       requests to the server, including the initial one.)
 
   ## Examples
@@ -872,7 +872,7 @@ defmodule Req do
 
   With custom options:
 
-      iex> Req.get!("http://localhost:9999", retry: [delay: 100, max_attempts: 3])
+      iex> Req.get!("http://localhost:9999", retry: [delay: 100, max_retries: 3])
       # 17:00:38.371 [error] Req.retry/3: Got exception. Will retry in 100ms, 3 attempts left
       # 17:00:38.371 [error] ** (Mint.TransportError) connection refused
       # 17:00:38.473 [error] Req.retry/3: Got exception. Will retry in 100ms, 2 attempts left
@@ -889,13 +889,13 @@ defmodule Req do
 
   def retry({request, response_or_exception}, options) when is_list(options) do
     delay = Keyword.get(options, :delay, 2000)
-    max_attempts = Keyword.get(options, :max_attempts, 2)
-    attempt = Req.Request.get_private(request, :retry_attempt, 0)
+    max_retries = Keyword.get(options, :max_retries, 2)
+    retry_count = Req.Request.get_private(request, :retry_count, 0)
 
-    if attempt < max_attempts do
-      log_retry(response_or_exception, attempt, max_attempts, delay)
+    if retry_count < max_retries do
+      log_retry(response_or_exception, retry_count, max_retries, delay)
       Process.sleep(delay)
-      request = Req.Request.put_private(request, :retry_attempt, attempt + 1)
+      request = Req.Request.put_private(request, :retry_count, retry_count + 1)
 
       {_, result} = run(request)
       {Req.Request.halt(request), result}
@@ -904,14 +904,14 @@ defmodule Req do
     end
   end
 
-  defp log_retry(response_or_exception, attempt, max_attempts, delay) do
-    attempts_left =
-      case max_attempts - attempt do
+  defp log_retry(response_or_exception, retry_count, max_retries, delay) do
+    retries_left =
+      case max_retries - retry_count do
         1 -> "1 attempt"
         n -> "#{n} attempts"
       end
 
-    message = ["Will retry in #{delay}ms, ", attempts_left, " left"]
+    message = ["Will retry in #{delay}ms, ", retries_left, " left"]
 
     case response_or_exception do
       %{__exception__: true} = exception ->
