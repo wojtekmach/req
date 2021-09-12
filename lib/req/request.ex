@@ -22,7 +22,7 @@ defmodule Req.Request do
 
     * `:private` - a map reserved for libraries and frameworks to use.
       Prefix the keys with the name of your project to avoid any future
-      conflicts.
+      conflicts. Only accepts `t:atom/0` keys.
   """
 
   defstruct [
@@ -40,14 +40,14 @@ defmodule Req.Request do
   @doc """
   Gets the value for a specific private `key`.
   """
-  def get_private(request, key, default \\ nil) do
+  def get_private(request, key, default \\ nil) when is_atom(key) do
     Map.get(request.private, key, default)
   end
 
   @doc """
   Assigns a private `key` to `value`.
   """
-  def put_private(request, key, value) do
+  def put_private(request, key, value) when is_atom(key) do
     put_in(request.private[key], value)
   end
 
