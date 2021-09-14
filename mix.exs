@@ -44,7 +44,7 @@ defmodule Req.MixProject do
 
   defp deps do
     [
-      {:finch, "~> 0.6.0"},
+      {:finch, "~> 0.8.1"},
       {:mime, "~> 1.6 or ~> 2.0"},
       {:jason, "~> 1.0"},
       {:nimble_csv, "~> 1.0", optional: true},
