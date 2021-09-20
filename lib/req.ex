@@ -178,15 +178,15 @@ defmodule Req do
   def prepend_default_steps(request, options \\ []) do
     request_steps =
       [
-        &encode_headers/1,
-        &default_headers/1,
-        &encode/1
+        {Req, :encode_headers, []},
+        {Req, :default_headers, []},
+        {Req, :encode, []}
       ] ++
-        maybe_steps(options[:netrc], [&netrc(&1, options[:netrc])]) ++
-        maybe_steps(options[:auth], [&auth(&1, options[:auth])]) ++
-        maybe_steps(options[:params], [&params(&1, options[:params])]) ++
-        maybe_steps(options[:range], [&range(&1, options[:range])]) ++
-        maybe_steps(options[:cache], [&if_modified_since/1])
+        maybe_steps(options[:netrc], [{Req, :netrc, [options[:netrc]]}]) ++
+        maybe_steps(options[:auth], [{Req, :auth, [options[:auth]]}]) ++
+        maybe_steps(options[:params], [{Req, :params, [options[:params]]}]) ++
+        maybe_steps(options[:range], [{Req, :range, [options[:range]]}]) ++
+        maybe_steps(options[:cache], [{Req, :if_modified_since, []}])
 
     retry = options[:retry]
     retry = if retry == true, do: [], else: retry
@@ -194,16 +194,14 @@ defmodule Req do
     raw? = options[:raw] == true
 
     response_steps =
-      maybe_steps(retry, [&retry(&1, retry)]) ++
-        [
-          &follow_redirects/1
-        ] ++
+      maybe_steps(retry, [{Req, :retry, [retry]}]) ++
+        [{Req, :follow_redirects, []}] ++
         maybe_steps(not raw?, [
-          &decompress/1,
-          &decode/1
+          {Req, :decompress, []},
+          {Req, :decode, []}
         ])
 
-    error_steps = maybe_steps(retry, [&retry(&1, retry)])
+    error_steps = maybe_steps(retry, [{Req, :retry, [retry]}])
 
     request
     |> append_request_steps(request_steps)
@@ -323,7 +321,7 @@ defmodule Req do
     steps = request.request_steps
 
     Enum.reduce_while(steps, request, fn step, acc ->
-      case step.(acc) do
+      case run_step(step, acc) do
         %Req.Request{} = request ->
           {:cont, request}
 
@@ -344,7 +342,7 @@ defmodule Req do
 
     {_request, response_or_exception} =
       Enum.reduce_while(steps, {request, response}, fn step, {request, response} ->
-        case step.({request, response}) do
+        case run_step(step, {request, response}) do
           {%Req.Request{halted: true} = request, response_or_exception} ->
             {:halt, {request, response_or_exception}}
 
@@ -364,7 +362,7 @@ defmodule Req do
 
     {_request, response_or_exception} =
       Enum.reduce_while(steps, {request, exception}, fn step, {request, exception} ->
-        case step.({request, exception}) do
+        case run_step(step, {request, exception}) do
           {%Req.Request{halted: true} = request, response_or_exception} ->
             {:halt, {request, response_or_exception}}
 
@@ -377,6 +375,14 @@ defmodule Req do
       end)
 
     result(response_or_exception)
+  end
+
+  defp run_step({module, function, args}, arg) do
+    apply(module, function, [arg | args])
+  end
+
+  defp run_step(func, arg) when is_function(func, 1) do
+    func.(arg)
   end
 
   defp result(%Req.Response{} = response) do
