@@ -114,6 +114,7 @@ defmodule Req do
       uri: URI.parse(uri),
       headers: Keyword.get(options, :headers, []),
       body: Keyword.get(options, :body, ""),
+      unix_socket: Keyword.get(options, :unix_socket),
       private: %{
         req_finch:
           {Keyword.get(options, :finch, Req.Finch), Keyword.get(options, :finch_options, [])}
@@ -274,7 +275,10 @@ defmodule Req do
   """
   @doc api: :low_level
   def finch(request) do
-    finch_request = Finch.build(request.method, request.uri, request.headers, request.body)
+    finch_request =
+      Finch.build(request.method, request.uri, request.headers, request.body)
+      |> maybe_put_unix_socket(request)
+
     {finch_name, finch_options} = request.private.req_finch
 
     case Finch.request(finch_request, finch_name, finch_options) do
@@ -290,6 +294,14 @@ defmodule Req do
       {:error, exception} ->
         {request, exception}
     end
+  end
+
+  defp maybe_put_unix_socket(finch_request, %Req.Request{unix_socket: nil}) do
+    finch_request
+  end
+
+  defp maybe_put_unix_socket(finch_request, %Req.Request{unix_socket: socket}) do
+    %{finch_request | unix_socket: socket}
   end
 
   @doc """

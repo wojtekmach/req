@@ -12,6 +12,8 @@ defmodule Req.Request do
 
     * `:body` - the HTTP request body
 
+    * `:unix_socket` - if set, connect through the given UNIX domain socket
+
     * `:halted` - whether the request pipeline is halted. See `halt/1`
 
     * `:request_steps` - the list of request steps
@@ -30,6 +32,7 @@ defmodule Req.Request do
     :uri,
     headers: [],
     body: "",
+    unix_socket: nil,
     halted: false,
     request_steps: [],
     response_steps: [],
