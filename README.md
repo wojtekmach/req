@@ -14,7 +14,7 @@ This is a work in progress!
 
   * Extensibility via request, response, and error steps
 
-  * Automatic body decompression (via `decompress/2` step)
+  * Automatic body decompression (via `decompress/1` step)
 
   * Automatic body encoding and decoding (via `encode/1` and `decode/2` steps)
 
@@ -26,9 +26,9 @@ This is a work in progress!
 
   * Range requests (via `range/2` step)
 
-  * Follows redirects (via `follow_redirects/2` step)
+  * Follows redirects (via `follow_redirects/1` step)
 
-  * Retries on errors (via `retry/3` step)
+  * Retries on errors (via `retry/2` step)
 
   * Basic HTTP caching (via `if_modified_since/2` step)
 
