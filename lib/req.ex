@@ -301,6 +301,14 @@ defmodule Req do
     apply(module, function, [arg | args])
   end
 
+  defp run_step({module, args}, arg) when is_list(args) do
+    run_step({module, :run, args}, arg)
+  end
+
+  defp run_step(module, arg) when is_atom(module) do
+    run_step({module, :run, []}, arg)
+  end
+
   defp run_step(func, arg) when is_function(func, 1) do
     func.(arg)
   end
