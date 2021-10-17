@@ -324,7 +324,7 @@ defmodule Req do
 
     * `default_headers/1`
 
-    * `encode/1`
+    * `encode_body/1`
 
     * [`&netrc(&1, options[:netrc])`](`netrc/2`) (if `options[:netrc]` is set
       to an atom true for default path or a string for custom path)
@@ -344,7 +344,7 @@ defmodule Req do
 
     * `decompress/1`
 
-    * `decode/1`
+    * `decode_body/1`
 
   ## Error steps
 
@@ -363,7 +363,7 @@ defmodule Req do
 
     * `:cache` - if set to `true`, adds `if_modified_since/2` step
 
-    * `:raw` if set to `true`, skips `decompress/1` and `decode/1` steps
+    * `:raw` if set to `true`, skips `decompress/1` and `decode_body/1` steps
 
     * `:retry` - if set, adds the `retry/2` step to response and error steps
 
@@ -374,7 +374,7 @@ defmodule Req do
       [
         {Req, :encode_headers, []},
         {Req, :default_headers, []},
-        {Req, :encode, []}
+        {Req, :encode_body, []}
       ] ++
         maybe_steps(options[:netrc], [{Req, :netrc, [options[:netrc]]}]) ++
         maybe_steps(options[:auth], [{Req, :auth, [options[:auth]]}]) ++
@@ -392,7 +392,7 @@ defmodule Req do
         [{Req, :follow_redirects, []}] ++
         maybe_steps(not raw?, [
           {Req, :decompress, []},
-          {Req, :decode, []}
+          {Req, :decode_body, []}
         ])
 
     error_steps = maybe_steps(retry, [{Req, :retry, [retry]}])
@@ -550,7 +550,7 @@ defmodule Req do
 
   """
   @doc api: :request
-  def encode(request) do
+  def encode_body(request) do
     case request.body do
       {:form, data} ->
         request
@@ -749,11 +749,11 @@ defmodule Req do
 
   """
   @doc api: :response
-  def decode({request, %{body: ""} = response}) do
+  def decode_body({request, %{body: ""} = response}) do
     {request, response}
   end
 
-  def decode({request, response}) do
+  def decode_body({request, response}) do
     case format(request, response) do
       "json" ->
         {request, update_in(response.body, &Jason.decode!/1)}

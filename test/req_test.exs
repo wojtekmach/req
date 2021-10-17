@@ -748,7 +748,7 @@ defmodule ReqTest do
     request =
       Req.build(:get, c.url <> "/cache")
       |> Req.prepend_request_steps([&Req.if_modified_since(&1, dir: c.tmp_dir)])
-      |> Req.prepend_response_steps([&Req.retry(&1, delay: 10), &Req.decode/1])
+      |> Req.prepend_response_steps([&Req.retry(&1, delay: 10), &Req.decode_body/1])
 
     response = Req.run!(request)
     assert response.status == 200
