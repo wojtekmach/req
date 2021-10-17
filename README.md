@@ -69,15 +69,15 @@ The high-level API shown before:
 Req.get!("https://api.github.com/repos/elixir-lang/elixir")
 ```
 
-is equivalent to this composition of lower-level API functions:
+is equivalent to this composition of lower-level API functions and steps:
 
 ```elixir
 Req.build(:get, "https://api.github.com/repos/elixir-lang/elixir")
-|> Req.prepend_default_steps()
+|> Req.put_default_steps()
 |> Req.run!()
 ```
 
-(See `Req.build/3`, `Req.prepend_default_steps/2`, and `Req.run!/1` for more information.)
+(See `Req.build/3`, `Req.put_default_steps/2`, and `Req.run!/1` for more information.)
 
 We can also build more complex flows like returning a response from a request step
 or an error from a response step. We will explore those next.

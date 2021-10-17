@@ -65,14 +65,14 @@ defmodule Req do
     * `:finch_options` - Options passed down to Finch when making the request, defaults to `[]`.
       See `Finch.request/3` for more information.
 
-  The `options` are passed down to `prepend_default_steps/2`, see its documentation for more
+  The `options` are passed down to `put_default_steps/2`, see its documentation for more
   information how they are being used.
   """
   @doc api: :high_level
   def request(method, uri, options \\ []) do
     method
     |> build(uri, options)
-    |> prepend_default_steps(options)
+    |> put_default_steps(options)
     |> run()
   end
 
@@ -85,7 +85,7 @@ defmodule Req do
   def request!(method, uri, options \\ []) do
     method
     |> build(uri, options)
-    |> prepend_default_steps(options)
+    |> put_default_steps(options)
     |> run!()
   end
 
@@ -121,98 +121,6 @@ defmodule Req do
       }
     }
   end
-
-  @doc """
-  Prepends steps that should be reasonable defaults for most users.
-
-  ## Request steps
-
-    * `encode_headers/1`
-
-    * `default_headers/1`
-
-    * `encode/1`
-
-    * [`&netrc(&1, options[:netrc])`](`netrc/2`) (if `options[:netrc]` is set
-      to an atom true for default path or a string for custom path)
-
-    * [`&auth(&1, options[:auth])`](`auth/2`) (if `options[:auth]` is set)
-
-    * [`&params(&1, options[:params])`](`params/2`) (if `options[:params]` is set)
-
-    * [`&range(&1, options[:range])`](`range/2`) (if `options[:range]` is set)
-
-  ## Response steps
-
-    * [`&retry(&1, options[:retry])`](`retry/2`) (if `options[:retry]` is set to
-      an atom true or a options keywords list)
-
-    * `follow_redirects/1`
-
-    * `decompress/1`
-
-    * `decode/1`
-
-  ## Error steps
-
-    * [`&retry(&1, options[:retry])`](`retry/2`) (if `options[:retry]` is set and is a
-      keywords list or an atom `true`)
-
-  ## Options
-
-    * `:netrc` - if set, adds the `netrc/2` step
-
-    * `:auth` - if set, adds the `auth/2` step
-
-    * `:params` - if set, adds the `params/2` step
-
-    * `:range` - if set, adds the `range/2` step
-
-    * `:cache` - if set to `true`, adds `if_modified_since/2` step
-
-    * `:raw` if set to `true`, skips `decompress/1` and `decode/1` steps
-
-    * `:retry` - if set, adds the `retry/2` step to response and error steps
-
-  """
-  @doc api: :low_level
-  def prepend_default_steps(request, options \\ []) do
-    request_steps =
-      [
-        {Req, :encode_headers, []},
-        {Req, :default_headers, []},
-        {Req, :encode, []}
-      ] ++
-        maybe_steps(options[:netrc], [{Req, :netrc, [options[:netrc]]}]) ++
-        maybe_steps(options[:auth], [{Req, :auth, [options[:auth]]}]) ++
-        maybe_steps(options[:params], [{Req, :params, [options[:params]]}]) ++
-        maybe_steps(options[:range], [{Req, :range, [options[:range]]}]) ++
-        maybe_steps(options[:cache], [{Req, :if_modified_since, []}])
-
-    retry = options[:retry]
-    retry = if retry == true, do: [], else: retry
-
-    raw? = options[:raw] == true
-
-    response_steps =
-      maybe_steps(retry, [{Req, :retry, [retry]}]) ++
-        [{Req, :follow_redirects, []}] ++
-        maybe_steps(not raw?, [
-          {Req, :decompress, []},
-          {Req, :decode, []}
-        ])
-
-    error_steps = maybe_steps(retry, [{Req, :retry, [retry]}])
-
-    request
-    |> append_request_steps(request_steps)
-    |> append_response_steps(response_steps)
-    |> append_error_steps(error_steps)
-  end
-
-  defp maybe_steps(nil, _step), do: []
-  defp maybe_steps(false, _step), do: []
-  defp maybe_steps(_, steps), do: steps
 
   @doc """
   Appends request steps.
@@ -406,6 +314,98 @@ defmodule Req do
   end
 
   ## Request steps
+
+  @doc """
+  Adds default steps.
+
+  ## Request steps
+
+    * `encode_headers/1`
+
+    * `default_headers/1`
+
+    * `encode/1`
+
+    * [`&netrc(&1, options[:netrc])`](`netrc/2`) (if `options[:netrc]` is set
+      to an atom true for default path or a string for custom path)
+
+    * [`&auth(&1, options[:auth])`](`auth/2`) (if `options[:auth]` is set)
+
+    * [`&params(&1, options[:params])`](`params/2`) (if `options[:params]` is set)
+
+    * [`&range(&1, options[:range])`](`range/2`) (if `options[:range]` is set)
+
+  ## Response steps
+
+    * [`&retry(&1, options[:retry])`](`retry/2`) (if `options[:retry]` is set to
+      an atom true or a options keywords list)
+
+    * `follow_redirects/1`
+
+    * `decompress/1`
+
+    * `decode/1`
+
+  ## Error steps
+
+    * [`&retry(&1, options[:retry])`](`retry/2`) (if `options[:retry]` is set and is a
+      keywords list or an atom `true`)
+
+  ## Options
+
+    * `:netrc` - if set, adds the `netrc/2` step
+
+    * `:auth` - if set, adds the `auth/2` step
+
+    * `:params` - if set, adds the `params/2` step
+
+    * `:range` - if set, adds the `range/2` step
+
+    * `:cache` - if set to `true`, adds `if_modified_since/2` step
+
+    * `:raw` if set to `true`, skips `decompress/1` and `decode/1` steps
+
+    * `:retry` - if set, adds the `retry/2` step to response and error steps
+
+  """
+  @doc api: :request
+  def put_default_steps(request, options \\ []) do
+    request_steps =
+      [
+        {Req, :encode_headers, []},
+        {Req, :default_headers, []},
+        {Req, :encode, []}
+      ] ++
+        maybe_steps(options[:netrc], [{Req, :netrc, [options[:netrc]]}]) ++
+        maybe_steps(options[:auth], [{Req, :auth, [options[:auth]]}]) ++
+        maybe_steps(options[:params], [{Req, :params, [options[:params]]}]) ++
+        maybe_steps(options[:range], [{Req, :range, [options[:range]]}]) ++
+        maybe_steps(options[:cache], [{Req, :if_modified_since, []}])
+
+    retry = options[:retry]
+    retry = if retry == true, do: [], else: retry
+
+    raw? = options[:raw] == true
+
+    response_steps =
+      maybe_steps(retry, [{Req, :retry, [retry]}]) ++
+        [{Req, :follow_redirects, []}] ++
+        maybe_steps(not raw?, [
+          {Req, :decompress, []},
+          {Req, :decode, []}
+        ])
+
+    error_steps = maybe_steps(retry, [{Req, :retry, [retry]}])
+
+    request
+    |> append_request_steps(request_steps)
+    |> append_response_steps(response_steps)
+    |> append_error_steps(error_steps)
+  end
+
+  defp maybe_steps(nil, _step), do: []
+  defp maybe_steps(false, _step), do: []
+  defp maybe_steps(_, steps), do: steps
 
   @doc """
   Sets request authentication.
