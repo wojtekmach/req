@@ -358,7 +358,7 @@ defmodule ReqTest do
   end
 
   @tag :tmp_dir
-  test "netrc/2", c do
+  test "load_netrc/2", c do
     Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
       expected = "Basic " <> Base.encode64("foo:bar")
 

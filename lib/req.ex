@@ -334,7 +334,7 @@ defmodule Req do
 
     * `encode_body/1`
 
-    * [`&netrc(&1, options[:netrc])`](`netrc/2`) (if `options[:netrc]` is set
+    * [`&load_netrc(&1, options[:netrc])`](`load_netrc/2`) (if `options[:netrc]` is set
       to an atom true for default path or a string for custom path)
 
     * [`&auth(&1, options[:auth])`](`auth/2`) (if `options[:auth]` is set)
@@ -361,7 +361,7 @@ defmodule Req do
 
   ## Options
 
-    * `:netrc` - if set, adds the `netrc/2` step
+    * `:netrc` - if set, adds the `load_netrc/2` step
 
     * `:auth` - if set, adds the `auth/2` step
 
@@ -384,7 +384,7 @@ defmodule Req do
         {Req, :default_headers, []},
         {Req, :encode_body, []}
       ] ++
-        maybe_steps(options[:netrc], [{Req, :netrc, [options[:netrc]]}]) ++
+        maybe_steps(options[:netrc], [{Req, :load_netrc, [options[:netrc]]}]) ++
         maybe_steps(options[:auth], [{Req, :auth, [options[:auth]]}]) ++
         maybe_steps(options[:params], [{Req, :params, [options[:params]]}]) ++
         maybe_steps(options[:range], [{Req, :range, [options[:range]]}]) ++
@@ -452,9 +452,9 @@ defmodule Req do
 
   """
   @doc api: :request
-  def netrc(request, path)
+  def load_netrc(request, path)
 
-  def netrc(request, path) when is_binary(path) do
+  def load_netrc(request, path) when is_binary(path) do
     case Map.fetch(load_netrc(path), request.uri.host) do
       {:ok, {username, password}} ->
         auth(request, {username, password})
@@ -464,8 +464,8 @@ defmodule Req do
     end
   end
 
-  def netrc(request, true) do
-    netrc(request, Path.join(System.user_home!(), ".netrc"))
+  def load_netrc(request, true) do
+    load_netrc(request, Path.join(System.user_home!(), ".netrc"))
   end
 
   defp load_netrc(path) do
