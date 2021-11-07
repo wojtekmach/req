@@ -182,7 +182,7 @@ defmodule Req do
   another underlying HTTP client like `:httpc`, `:hackney`, etc.
   """
   @doc api: :low_level
-  def finch(request) do
+  def run_finch(request) do
     finch_request =
       Finch.build(request.method, request.uri, request.headers, request.body)
       |> maybe_put_unix_socket(request)
@@ -220,7 +220,7 @@ defmodule Req do
   @doc api: :low_level
   def run(request) do
     request
-    |> append_request_steps([&finch/1])
+    |> append_request_steps([&run_finch/1])
     |> run_request()
   end
 
