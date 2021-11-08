@@ -28,7 +28,7 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
   * Retries on errors (via `retry/2` step)
 
-  * Basic HTTP caching (via `if_modified_since/2` step)
+  * Basic HTTP caching (via `put_if_modified_since/2` step)
 
   * Setting base URL (via `put_base_url/2` step)
 

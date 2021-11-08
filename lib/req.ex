@@ -402,7 +402,7 @@ defmodule Req do
 
     * `:range` - if set, adds the `range/2` step
 
-    * `:cache` - if set to `true`, adds `if_modified_since/2` step
+    * `:cache` - if set to `true`, adds `put_if_modified_since/2` step
 
     * `:raw` if set to `true`, skips `decompress/1` and `decode_body/1` steps
 
@@ -422,7 +422,7 @@ defmodule Req do
         maybe_steps(options[:auth], [{Req, :auth, [options[:auth]]}]) ++
         maybe_steps(options[:params], [{Req, :params, [options[:params]]}]) ++
         maybe_steps(options[:range], [{Req, :range, [options[:range]]}]) ++
-        maybe_steps(options[:cache], [{Req, :if_modified_since, []}])
+        maybe_steps(options[:cache], [{Req, :put_if_modified_since, []}])
 
     retry = options[:retry]
     retry = if retry == true, do: [], else: retry
@@ -707,15 +707,15 @@ defmodule Req do
 
   """
   @doc api: :request
-  def if_modified_since(request, options \\ []) do
+  def put_if_modified_since(request, options \\ []) do
     dir = options[:dir] || :filename.basedir(:user_cache, 'req')
 
     request
-    |> put_if_modified_since(dir)
+    |> do_put_if_modified_since(dir)
     |> prepend_response_steps([&handle_cache(&1, dir)])
   end
 
-  defp put_if_modified_since(request, dir) do
+  defp do_put_if_modified_since(request, dir) do
     case File.stat(cache_path(dir, request)) do
       {:ok, stat} ->
         datetime = stat.mtime |> NaiveDateTime.from_erl!() |> format_http_datetime()
