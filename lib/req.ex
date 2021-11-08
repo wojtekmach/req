@@ -374,6 +374,8 @@ defmodule Req do
 
     * [`&put_range(&1, options[:range])`](`put_range/2`) (if `options[:range]` is set)
 
+    * [`&run_steps(&1, options[:steps])`](`run_steps/2`) (if `options[:steps]` is set)
+
   ## Response steps
 
     * [`&retry(&1, options[:retry])`](`retry/2`) (if `options[:retry]` is set to
@@ -408,6 +410,8 @@ defmodule Req do
 
     * `:retry` - if set, adds the `retry/2` step to response and error steps
 
+    * `:steps` - if set, runs the `run_steps/2` step with the given steps
+
   """
   @doc api: :request
   def put_default_steps(request, options \\ []) do
@@ -422,7 +426,8 @@ defmodule Req do
         maybe_steps(options[:auth], [{Req, :auth, [options[:auth]]}]) ++
         maybe_steps(options[:params], [{Req, :put_params, [options[:params]]}]) ++
         maybe_steps(options[:range], [{Req, :put_range, [options[:range]]}]) ++
-        maybe_steps(options[:cache], [{Req, :put_if_modified_since, []}])
+        maybe_steps(options[:cache], [{Req, :put_if_modified_since, []}]) ++
+        maybe_steps(options[:steps], [{Req, :run_steps, [options[:steps]]}])
 
     retry = options[:retry]
     retry = if retry == true, do: [], else: retry
@@ -739,6 +744,22 @@ defmodule Req do
       true ->
         {request, response}
     end
+  end
+
+  @doc """
+  Runs the given steps.
+
+  ## Examples
+
+      iex> inspect_host = fn request -> IO.inspect(request.url.host) ; request end
+      iex> Req.get!("https://httpbin.org/status/200", steps: [inspect_host]).status
+      Outputs: httpbin.org
+      iex> 200
+
+  """
+  @doc api: :request
+  def run_steps(request, steps) when is_list(steps) do
+    Enum.reduce(steps, request, &run_step/2)
   end
 
   ## Response steps
