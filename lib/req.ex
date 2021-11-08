@@ -372,7 +372,7 @@ defmodule Req do
 
     * [`&params(&1, options[:params])`](`params/2`) (if `options[:params]` is set)
 
-    * [`&range(&1, options[:range])`](`range/2`) (if `options[:range]` is set)
+    * [`&put_range(&1, options[:range])`](`put_range/2`) (if `options[:range]` is set)
 
   ## Response steps
 
@@ -400,7 +400,7 @@ defmodule Req do
 
     * `:params` - if set, adds the `params/2` step
 
-    * `:range` - if set, adds the `range/2` step
+    * `:range` - if set, adds the `put_range/2` step
 
     * `:cache` - if set to `true`, adds `put_if_modified_since/2` step
 
@@ -421,7 +421,7 @@ defmodule Req do
         maybe_steps(options[:netrc], [{Req, :load_netrc, [options[:netrc]]}]) ++
         maybe_steps(options[:auth], [{Req, :auth, [options[:auth]]}]) ++
         maybe_steps(options[:params], [{Req, :params, [options[:params]]}]) ++
-        maybe_steps(options[:range], [{Req, :range, [options[:range]]}]) ++
+        maybe_steps(options[:range], [{Req, :put_range, [options[:range]]}]) ++
         maybe_steps(options[:cache], [{Req, :put_if_modified_since, []}])
 
     retry = options[:retry]
@@ -674,13 +674,13 @@ defmodule Req do
 
   """
   @doc api: :request
-  def range(request, range)
+  def put_range(request, range)
 
-  def range(request, binary) when is_binary(binary) do
+  def put_range(request, binary) when is_binary(binary) do
     put_header(request, "range", binary)
   end
 
-  def range(request, first..last) do
+  def put_range(request, first..last) do
     put_header(request, "range", "bytes=#{first}-#{last}")
   end
 

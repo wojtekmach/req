@@ -22,7 +22,7 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
   * `.netrc` file support (via `netrc/2` step)
 
-  * Range requests (via `range/2` step)
+  * Range requests (via `put_range/2` step)
 
   * Follows redirects (via `follow_redirects/1` step)
 
