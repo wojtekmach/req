@@ -14,8 +14,8 @@ defmodule Req do
   See `request/3` for a list of supported options.
   """
   @doc api: :high_level
-  def get!(uri, options \\ []) do
-    request!(:get, uri, options)
+  def get!(url, options \\ []) do
+    request!(:get, url, options)
   end
 
   @doc """
@@ -24,9 +24,9 @@ defmodule Req do
   See `request/3` for a list of supported options.
   """
   @doc api: :high_level
-  def post!(uri, body, options \\ []) do
+  def post!(url, body, options \\ []) do
     options = Keyword.put(options, :body, body)
-    request!(:post, uri, options)
+    request!(:post, url, options)
   end
 
   @doc """
@@ -35,9 +35,9 @@ defmodule Req do
   See `request/3` for a list of supported options.
   """
   @doc api: :high_level
-  def put!(uri, body, options \\ []) do
+  def put!(url, body, options \\ []) do
     options = Keyword.put(options, :body, body)
-    request!(:put, uri, options)
+    request!(:put, url, options)
   end
 
   @doc """
@@ -46,8 +46,8 @@ defmodule Req do
   See `request/3` for a list of supported options.
   """
   @doc api: :high_level
-  def delete!(uri, options \\ []) do
-    request!(:delete, uri, options)
+  def delete!(url, options \\ []) do
+    request!(:delete, url, options)
   end
 
   @doc """
@@ -71,11 +71,11 @@ defmodule Req do
   The `options` are merged with default options set with `default_options/1`.
   """
   @doc api: :high_level
-  def request(method, uri, options \\ []) do
+  def request(method, url, options \\ []) do
     options = Keyword.merge(default_options(), options)
 
     method
-    |> build(uri, options)
+    |> build(url, options)
     |> put_default_steps(options)
     |> run()
   end
@@ -86,11 +86,11 @@ defmodule Req do
   See `request/3` for more information.
   """
   @doc api: :high_level
-  def request!(method, uri, options \\ []) do
+  def request!(method, url, options \\ []) do
     options = Keyword.merge(default_options(), options)
 
     method
-    |> build(uri, options)
+    |> build(url, options)
     |> put_default_steps(options)
     |> run!()
   end
@@ -137,10 +137,10 @@ defmodule Req do
 
   """
   @doc api: :low_level
-  def build(method, uri, options \\ []) do
+  def build(method, url, options \\ []) do
     %Req.Request{
       method: method,
-      uri: URI.parse(uri),
+      url: URI.parse(url),
       headers: Keyword.get(options, :headers, []),
       body: Keyword.get(options, :body, ""),
       unix_socket: Keyword.get(options, :unix_socket),
@@ -213,7 +213,7 @@ defmodule Req do
   @doc api: :low_level
   def run_finch(request) do
     finch_request =
-      Finch.build(request.method, request.uri, request.headers, request.body)
+      Finch.build(request.method, request.url, request.headers, request.body)
       |> maybe_put_unix_socket(request)
 
     {finch_name, finch_options} = request.private.req_finch
@@ -464,15 +464,15 @@ defmodule Req do
   def put_base_url(request, base_url) when is_binary(base_url) do
     # TODO: change build/3 so that the url is parsed later so that here it is not yet parsed
 
-    unless match?(%{scheme: nil, host: nil}, request.uri) do
-      raise "put_base_url/2 expects the request url to only contain a path, got: #{URI.to_string(request.uri)}"
+    unless match?(%{scheme: nil, host: nil}, request.url) do
+      raise "put_base_url/2 expects the request url to only contain a path, got: #{URI.to_string(request.url)}"
     end
 
     # remove when we require Elixir v1.13
-    url = request.uri.path || ""
+    url = request.url.path || ""
 
     url = URI.parse(base_url <> url)
-    %{request | uri: url}
+    %{request | url: url}
   end
 
   @doc """
@@ -515,7 +515,7 @@ defmodule Req do
   def load_netrc(request, path)
 
   def load_netrc(request, path) when is_binary(path) do
-    case Map.fetch(load_netrc(path), request.uri.host) do
+    case Map.fetch(load_netrc(path), request.url.host) do
       {:ok, {username, password}} ->
         auth(request, {username, password})
 
@@ -648,7 +648,7 @@ defmodule Req do
   def put_params(request, params) do
     encoded = URI.encode_query(params)
 
-    update_in(request.uri.query, fn
+    update_in(request.url.query, fn
       nil -> encoded
       query -> query <> "&" <> encoded
     end)
@@ -864,7 +864,7 @@ defmodule Req do
   end
 
   defp extensions("application/octet-stream", request) do
-    path = request.uri.path
+    path = request.url.path
 
     if tgz?(path) do
       ["tgz"]
@@ -874,7 +874,7 @@ defmodule Req do
   end
 
   defp extensions("application/" <> subtype, request) when subtype in ~w(gzip x-gzip) do
-    path = request.uri.path
+    path = request.url.path
 
     if tgz?(path) do
       ["tgz"]
@@ -912,11 +912,11 @@ defmodule Req do
 
     request =
       if String.starts_with?(location, "/") do
-        uri = URI.parse(location)
-        update_in(request.uri, &%{&1 | path: uri.path, query: uri.query})
+        url = URI.parse(location)
+        update_in(request.url, &%{&1 | path: url.path, query: url.query})
       else
-        uri = URI.parse(location)
-        put_in(request.uri, uri)
+        url = URI.parse(location)
+        put_in(request.url, url)
       end
 
     {_, result} = run(request)
@@ -1069,10 +1069,10 @@ defmodule Req do
 
   defp cache_key(request) do
     hash =
-      :crypto.hash(:sha256, :erlang.term_to_binary(request.uri))
+      :crypto.hash(:sha256, :erlang.term_to_binary(request.url))
       |> Base.encode16(case: :lower)
 
-    request.uri.host <> "-" <> hash
+    request.url.host <> "-" <> hash
   end
 
   defp format_http_datetime(datetime) do

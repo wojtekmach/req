@@ -6,7 +6,7 @@ defmodule Req.Request do
 
     * `:method` - the HTTP request method
 
-    * `:uri` - the HTTP request URI
+    * `:url` - the HTTP request URL
 
     * `:headers` - the HTTP request headers
 
@@ -29,7 +29,7 @@ defmodule Req.Request do
 
   defstruct [
     :method,
-    :uri,
+    :url,
     headers: [],
     body: "",
     unix_socket: nil,

@@ -108,7 +108,7 @@ defmodule ReqTest do
       Req.build(:get, c.url <> "/not-found")
       |> Req.prepend_request_steps([
         fn request ->
-          put_in(request.uri.path, "/ok")
+          put_in(request.url.path, "/ok")
         end
       ])
 
