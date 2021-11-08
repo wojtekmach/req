@@ -38,7 +38,7 @@ The easiest way to use Req is with [`Mix.install/2`](https://hexdocs.pm/mix/Mix.
 
 ```elixir
 Mix.install([
-  {:req, "~> 0.1.0"}
+  {:req, "~> 0.2.0"}
 ])
 
 Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
