@@ -67,9 +67,13 @@ defmodule Req do
 
   The `options` are passed down to `put_default_steps/2`, see its documentation for more
   information how they are being used.
+
+  The `options` are merged with default options set with `default_options/1`.
   """
   @doc api: :high_level
   def request(method, uri, options \\ []) do
+    options = Keyword.merge(default_options(), options)
+
     method
     |> build(uri, options)
     |> put_default_steps(options)
@@ -83,10 +87,35 @@ defmodule Req do
   """
   @doc api: :high_level
   def request!(method, uri, options \\ []) do
+    options = Keyword.merge(default_options(), options)
+
     method
     |> build(uri, options)
     |> put_default_steps(options)
     |> run!()
+  end
+
+  @doc """
+  Returns default options.
+
+  See `default_options/1` for more information.
+  """
+  @doc api: :high_level
+  def default_options() do
+    Application.get_env(:req, :default_options, [])
+  end
+
+  @doc """
+  Sets default options.
+
+  The default options are used by `get!/2`, `post!/3`, `put!/3`,
+  `delete!/2`, `request/3`, and `request!/3` functions.
+
+  Avoid setting default options in libraries as they are global.
+  """
+  @doc api: :high_level
+  def default_options(options) do
+    Application.put_env(:req, :default_options, options)
   end
 
   ## Low-level API
