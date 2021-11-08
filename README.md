@@ -94,8 +94,8 @@ A request step is a function that accepts a `request` and returns one of the fol
 Examples:
 
 ```elixir
-def default_headers(request) do
-  update_in(request.headers, &[{"user-agent", "req/0.1.0-dev"} | &1])
+def put_default_headers(request) do
+  update_in(request.headers, &[{"user-agent", "req"} | &1])
 end
 
 def read_from_cache(request) do
