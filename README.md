@@ -16,7 +16,7 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
   * Automatic body encoding and decoding (via `encode_body/1` and `decode_body/1` steps)
 
-  * Encode params as query string (via `params/2` step)
+  * Encode params as query string (via `put_params/2` step)
 
   * Basic authentication (via `auth/2` step)
 

@@ -370,7 +370,7 @@ defmodule Req do
 
     * [`&auth(&1, options[:auth])`](`auth/2`) (if `options[:auth]` is set)
 
-    * [`&params(&1, options[:params])`](`params/2`) (if `options[:params]` is set)
+    * [`&put_params(&1, options[:params])`](`put_params/2`) (if `options[:params]` is set)
 
     * [`&put_range(&1, options[:range])`](`put_range/2`) (if `options[:range]` is set)
 
@@ -398,7 +398,7 @@ defmodule Req do
 
     * `:auth` - if set, adds the `auth/2` step
 
-    * `:params` - if set, adds the `params/2` step
+    * `:params` - if set, adds the `put_params/2` step
 
     * `:range` - if set, adds the `put_range/2` step
 
@@ -420,7 +420,7 @@ defmodule Req do
         maybe_steps(options[:base_url], [{Req, :put_base_url, [options[:base_url]]}]) ++
         maybe_steps(options[:netrc], [{Req, :load_netrc, [options[:netrc]]}]) ++
         maybe_steps(options[:auth], [{Req, :auth, [options[:auth]]}]) ++
-        maybe_steps(options[:params], [{Req, :params, [options[:params]]}]) ++
+        maybe_steps(options[:params], [{Req, :put_params, [options[:params]]}]) ++
         maybe_steps(options[:range], [{Req, :put_range, [options[:range]]}]) ++
         maybe_steps(options[:cache], [{Req, :put_if_modified_since, []}])
 
@@ -645,7 +645,7 @@ defmodule Req do
 
   """
   @doc api: :request
-  def params(request, params) do
+  def put_params(request, params) do
     encoded = URI.encode_query(params)
 
     update_in(request.uri.query, fn
