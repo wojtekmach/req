@@ -363,6 +363,8 @@ defmodule Req do
 
     * `encode_body/1`
 
+    * [`&put_base_url(&1, options[:base_url])`](`base_url/2`) (if `options[:base_url]` is set)
+
     * [`&load_netrc(&1, options[:netrc])`](`load_netrc/2`) (if `options[:netrc]` is set
       to an atom true for default path or a string for custom path)
 
@@ -390,6 +392,8 @@ defmodule Req do
 
   ## Options
 
+    * `:base_url` - if set, adds the `put_base_url/2` step
+
     * `:netrc` - if set, adds the `load_netrc/2` step
 
     * `:auth` - if set, adds the `auth/2` step
@@ -413,6 +417,7 @@ defmodule Req do
         {Req, :default_headers, []},
         {Req, :encode_body, []}
       ] ++
+        maybe_steps(options[:base_url], [{Req, :put_base_url, [options[:base_url]]}]) ++
         maybe_steps(options[:netrc], [{Req, :load_netrc, [options[:netrc]]}]) ++
         maybe_steps(options[:auth], [{Req, :auth, [options[:auth]]}]) ++
         maybe_steps(options[:params], [{Req, :params, [options[:params]]}]) ++
@@ -443,6 +448,32 @@ defmodule Req do
   defp maybe_steps(nil, _step), do: []
   defp maybe_steps(false, _step), do: []
   defp maybe_steps(_, steps), do: steps
+
+  @doc """
+  Sets base URL for all requests.
+
+  ## Examples
+
+      iex> options = [base_url: "https://httpbin.org"]
+      iex> Req.get!("/status/200", options).status
+      200
+      iex> Req.get!("/status/201", options).status
+      201
+  """
+  @doc api: :request
+  def put_base_url(request, base_url) when is_binary(base_url) do
+    # TODO: change build/3 so that the url is parsed later so that here it is not yet parsed
+
+    unless match?(%{scheme: nil, host: nil}, request.uri) do
+      raise "put_base_url/2 expects the request url to only contain a path, got: #{URI.to_string(request.uri)}"
+    end
+
+    # remove when we require Elixir v1.13
+    url = request.uri.path || ""
+
+    url = URI.parse(base_url <> url)
+    %{request | uri: url}
+  end
 
   @doc """
   Sets request authentication.

@@ -30,6 +30,8 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
   * Basic HTTP caching (via `if_modified_since/2` step)
 
+  * Setting base URL (via `put_base_url/2` step)
+
 ## Usage
 
 The easiest way to use Req is with [`Mix.install/2`](https://hexdocs.pm/mix/Mix.html#install/2) (requires Elixir v1.12+):

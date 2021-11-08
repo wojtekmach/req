@@ -323,6 +323,15 @@ defmodule ReqTest do
 
   ## Request steps
 
+  test "put_base_url/2", c do
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    assert Req.get!("/", base_url: c.url).status == 200
+    assert Req.get!("", base_url: c.url).status == 200
+  end
+
   test "auth/2", c do
     Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
       expected = "Basic " <> Base.encode64("foo:bar")
