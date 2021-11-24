@@ -14,7 +14,8 @@ defmodule Req.MixProject do
       package: package(),
       docs: docs(),
       preferred_cli_env: [
-        docs: :docs
+        docs: :docs,
+        "hex.publish": :docs
       ],
       xref: [
         exclude: [
