@@ -15,6 +15,8 @@ defmodule Req.Response do
       conflicts. Only accepts `t:atom/0` keys.
   """
 
+  @type t :: %__MODULE__{}
+
   defstruct [
     :status,
     headers: [],
