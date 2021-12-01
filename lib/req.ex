@@ -106,7 +106,7 @@ defmodule Req do
   See `request/3` for more information.
   """
   @doc api: :high_level
-  @spec request!(method(), String.t(), options()) :: Req.Response.t() | no_return()
+  @spec request!(method(), String.t(), options()) :: Req.Response.t()
   def request!(method, url, options \\ []) do
     options = Keyword.merge(default_options(), options)
 
