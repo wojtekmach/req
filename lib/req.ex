@@ -90,7 +90,7 @@ defmodule Req do
   The `options` are merged with default options set with `default_options/1`.
   """
   @doc api: :high_level
-  @spec request(method(), String.t(), options()) :: {:ok, Req.Response.t()} | {:error, term()}
+  @spec request(method(), String.t(), options()) :: {:ok, Req.Response.t()} | {:error, Exception.t()}
   def request(method, url, options \\ []) do
     options = Keyword.merge(default_options(), options)
 
