@@ -18,7 +18,8 @@ defmodule Req.Response do
   @type t() :: %__MODULE__{
           status: non_neg_integer(),
           headers: [{binary(), binary()}],
-          body: binary()
+          body: binary(),
+          private: map()
         }
 
   defstruct [
