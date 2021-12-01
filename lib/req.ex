@@ -8,7 +8,9 @@ defmodule Req do
              |> String.split("<!-- MDOC !-->")
              |> Enum.fetch!(1)
 
-  @type method :: :get | :post | :put | :delete
+  @type url() :: URI.t() | String.t()
+
+  @type method() :: :get | :post | :put | :delete
 
   @doc """
   Makes a GET request.
@@ -16,7 +18,7 @@ defmodule Req do
   See `request/3` for a list of supported options.
   """
   @doc api: :high_level
-  @spec get!(String.t(), keyword()) :: Req.Response.t()
+  @spec get!(url(), keyword()) :: Req.Response.t()
   def get!(url, options \\ []) do
     request!(:get, url, options)
   end
@@ -27,7 +29,7 @@ defmodule Req do
   See `request/3` for a list of supported options.
   """
   @doc api: :high_level
-  @spec post!(String.t(), term(), keyword()) :: Req.Response.t()
+  @spec post!(url(), body :: term(), keyword()) :: Req.Response.t()
   def post!(url, body, options \\ []) do
     options = Keyword.put(options, :body, body)
     request!(:post, url, options)
@@ -39,7 +41,7 @@ defmodule Req do
   See `request/3` for a list of supported options.
   """
   @doc api: :high_level
-  @spec put!(String.t(), term(), keyword()) :: Req.Response.t()
+  @spec put!(url(), body :: term(), keyword()) :: Req.Response.t()
   def put!(url, body, options \\ []) do
     options = Keyword.put(options, :body, body)
     request!(:put, url, options)
@@ -51,7 +53,7 @@ defmodule Req do
   See `request/3` for a list of supported options.
   """
   @doc api: :high_level
-  @spec delete!(String.t(), keyword()) :: Req.Response.t()
+  @spec delete!(url(), keyword()) :: Req.Response.t()
   def delete!(url, options \\ []) do
     request!(:delete, url, options)
   end
@@ -77,7 +79,7 @@ defmodule Req do
   The `options` are merged with default options set with `default_options/1`.
   """
   @doc api: :high_level
-  @spec request(method(), String.t(), keyword()) ::
+  @spec request(method(), url(), keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
   def request(method, url, options \\ []) do
     options = Keyword.merge(default_options(), options)
@@ -94,7 +96,7 @@ defmodule Req do
   See `request/3` for more information.
   """
   @doc api: :high_level
-  @spec request!(method(), String.t(), keyword()) :: Req.Response.t()
+  @spec request!(method(), url(), keyword()) :: Req.Response.t()
   def request!(method, url, options \\ []) do
     options = Keyword.merge(default_options(), options)
 
