@@ -29,7 +29,7 @@ defmodule Req do
   See `request/3` for a list of supported options.
   """
   @doc api: :high_level
-  @spec get!(String.t(), options()) :: Req.Response.t()
+  @spec get!(String.t(), keyword()) :: Req.Response.t()
   def get!(url, options \\ []) do
     request!(:get, url, options)
   end
