@@ -8,12 +8,17 @@ defmodule Req do
              |> String.split("<!-- MDOC !-->")
              |> Enum.fetch!(1)
 
+  @type url() :: URI.t() | String.t()
+
+  @type method() :: :get | :post | :put | :delete
+
   @doc """
   Makes a GET request.
 
   See `request/3` for a list of supported options.
   """
   @doc api: :high_level
+  @spec get!(url(), keyword()) :: Req.Response.t()
   def get!(url, options \\ []) do
     request!(:get, url, options)
   end
@@ -24,6 +29,7 @@ defmodule Req do
   See `request/3` for a list of supported options.
   """
   @doc api: :high_level
+  @spec post!(url(), body :: term(), keyword()) :: Req.Response.t()
   def post!(url, body, options \\ []) do
     options = Keyword.put(options, :body, body)
     request!(:post, url, options)
@@ -35,6 +41,7 @@ defmodule Req do
   See `request/3` for a list of supported options.
   """
   @doc api: :high_level
+  @spec put!(url(), body :: term(), keyword()) :: Req.Response.t()
   def put!(url, body, options \\ []) do
     options = Keyword.put(options, :body, body)
     request!(:put, url, options)
@@ -46,6 +53,7 @@ defmodule Req do
   See `request/3` for a list of supported options.
   """
   @doc api: :high_level
+  @spec delete!(url(), keyword()) :: Req.Response.t()
   def delete!(url, options \\ []) do
     request!(:delete, url, options)
   end
@@ -71,6 +79,8 @@ defmodule Req do
   The `options` are merged with default options set with `default_options/1`.
   """
   @doc api: :high_level
+  @spec request(method(), url(), keyword()) ::
+          {:ok, Req.Response.t()} | {:error, Exception.t()}
   def request(method, url, options \\ []) do
     options = Keyword.merge(default_options(), options)
 
@@ -86,6 +96,7 @@ defmodule Req do
   See `request/3` for more information.
   """
   @doc api: :high_level
+  @spec request!(method(), url(), keyword()) :: Req.Response.t()
   def request!(method, url, options \\ []) do
     options = Keyword.merge(default_options(), options)
 
@@ -101,6 +112,7 @@ defmodule Req do
   See `default_options/1` for more information.
   """
   @doc api: :high_level
+  @spec default_options() :: keyword()
   def default_options() do
     Application.get_env(:req, :default_options, [])
   end
@@ -114,6 +126,7 @@ defmodule Req do
   Avoid setting default options in libraries as they are global.
   """
   @doc api: :high_level
+  @spec default_options(keyword()) :: :ok
   def default_options(options) do
     Application.put_env(:req, :default_options, options)
   end
