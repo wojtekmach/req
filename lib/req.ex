@@ -343,12 +343,12 @@ defmodule Req do
     apply(module, function, [arg | args])
   end
 
-  defp run_step({module, args}, arg) when is_list(args) do
-    run_step({module, :run, args}, arg)
+  defp run_step({module, options}, arg) do
+    apply(module, :run, [arg | [options]])
   end
 
   defp run_step(module, arg) when is_atom(module) do
-    run_step({module, :run, []}, arg)
+    apply(module, :run, [arg, []])
   end
 
   defp run_step(func, arg) when is_function(func, 1) do
@@ -762,11 +762,30 @@ defmodule Req do
   @doc """
   Runs the given steps.
 
+  A step is a function that takes and returns a usually updated `state`.
+  The `state` is:
+
+    * a `request` struct for request steps
+
+    * a `{request, response}` tuple for response steps
+
+    * a `{request, exception}` tuple for error steps
+
+  A step can be one of the following:
+
+    * a 1-arity function
+
+    * a `{module, function, args}` tuple - calls `apply(module, function, [state | args])`
+
+    * a `{module, options}` tuple - calls `module.run(state, options)`
+
+    * a `module` atom - calls `module.run(state, [])`
+
   ## Examples
 
       iex> inspect_host = fn request -> IO.inspect(request.url.host) ; request end
       iex> Req.get!("https://httpbin.org/status/200", steps: [inspect_host]).status
-      Outputs: httpbin.org
+      Outputs: "httpbin.org"
       iex> 200
 
   """

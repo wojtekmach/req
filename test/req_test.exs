@@ -473,6 +473,24 @@ defmodule ReqTest do
     assert Req.get!(c.url <> "/range", range: 0..10).body == "bytes=0-10"
   end
 
+  defmodule MyStep do
+    def run(request, options) do
+      send(self(), {:got, options})
+      {request, %Req.Response{status: 200, body: "ok"}}
+    end
+  end
+
+  test "run_steps/2" do
+    assert Req.get!("http:///", steps: [MyStep]).body == "ok"
+    assert_received {:got, []}
+
+    assert Req.get!("http:///", steps: [{MyStep, 42}]).body == "ok"
+    assert_received {:got, 42}
+
+    assert Req.get!("http:///", steps: [{MyStep, :run, [42]}]).body == "ok"
+    assert_received {:got, 42}
+  end
+
   ## Response steps
 
   test "decompress/2", c do
