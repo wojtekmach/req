@@ -213,74 +213,13 @@ defmodule Req do
   end
 
   @doc """
-  Make the HTTP request using `Finch`.
-
-  This is a request step but it is not documented as such because you don't
-  need to add it to your request pipeline. It is automatically added
-  by `run/1` as always the very last request step.
-
-  This function shows you that making the actual HTTP call is just another
-  request step, which means that you can write your own step that uses
-  another underlying HTTP client like `:httpc`, `:hackney`, etc.
-  """
-  @doc api: :low_level
-  def run_finch(request) do
-    finch_request =
-      Finch.build(request.method, request.url, request.headers, request.body)
-      |> maybe_put_unix_socket(request)
-
-    {finch_name, finch_options} = request.private.req_finch
-
-    case Finch.request(finch_request, finch_name, finch_options) do
-      {:ok, response} ->
-        response = %Req.Response{
-          status: response.status,
-          headers: response.headers,
-          body: response.body
-        }
-
-        {request, response}
-
-      {:error, exception} ->
-        {request, exception}
-    end
-  end
-
-  defp maybe_put_unix_socket(finch_request, %Req.Request{unix_socket: nil}) do
-    finch_request
-  end
-
-  defp maybe_put_unix_socket(finch_request, %Req.Request{unix_socket: socket}) do
-    %{finch_request | unix_socket: socket}
-  end
-
-  @doc """
   Runs a request pipeline.
 
   Returns `{:ok, response}` or `{:error, exception}`.
   """
   @doc api: :low_level
   def run(request) do
-    request
-    |> append_request_steps([&run_finch/1])
-    |> run_request()
-  end
-
-  @doc """
-  Runs a request pipeline and returns a response or raises an error.
-
-  See `run/1` for more information.
-  """
-  @doc api: :low_level
-  def run!(request) do
-    case run(request) do
-      {:ok, response} -> response
-      {:error, exception} -> raise exception
-    end
-  end
-
-  defp run_request(request) do
-    steps = request.request_steps
+    steps = request.request_steps ++ [request.adapter]
 
     Enum.reduce_while(steps, request, fn step, acc ->
       case run_step(step, acc) do
@@ -297,6 +236,19 @@ defmodule Req do
           {:halt, run_error(request, exception)}
       end
     end)
+  end
+
+  @doc """
+  Runs a request pipeline and returns a response or raises an error.
+
+  See `run/1` for more information.
+  """
+  @doc api: :low_level
+  def run!(request) do
+    case run(request) do
+      {:ok, response} -> response
+      {:error, exception} -> raise exception
+    end
   end
 
   defp run_response(request, response) do
@@ -792,6 +744,34 @@ defmodule Req do
   @doc api: :request
   def run_steps(request, steps) when is_list(steps) do
     Enum.reduce(steps, request, &run_step/2)
+  end
+
+  @doc """
+  Runs the request using `Finch`.
+
+  This is the default adapter. See `Req.Request.put_adapter/2` for more information.
+  """
+  @doc api: :request
+  def run_finch(request) do
+    finch_request =
+      Finch.build(request.method, request.url, request.headers, request.body)
+      |> Map.replace!(:unix_socket, request.unix_socket)
+
+    {finch_name, finch_options} = request.private.req_finch
+
+    case Finch.request(finch_request, finch_name, finch_options) do
+      {:ok, response} ->
+        response = %Req.Response{
+          status: response.status,
+          headers: response.headers,
+          body: response.body
+        }
+
+        {request, response}
+
+      {:error, exception} ->
+        {request, exception}
+    end
   end
 
   ## Response steps

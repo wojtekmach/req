@@ -12,6 +12,8 @@ defmodule Req.Request do
 
     * `:body` - the HTTP request body
 
+    * `:adapter` - a request step that makes the actual HTTP request
+
     * `:unix_socket` - if set, connect through the given UNIX domain socket
 
     * `:halted` - whether the request pipeline is halted. See `halt/1`
@@ -32,6 +34,7 @@ defmodule Req.Request do
     :url,
     headers: [],
     body: "",
+    adapter: {Req, :run_finch, []},
     unix_socket: nil,
     halted: false,
     request_steps: [],
@@ -39,6 +42,18 @@ defmodule Req.Request do
     error_steps: [],
     private: %{}
   ]
+
+  @doc """
+  Sets the request adapter.
+
+  Adapter is a request step that is making the actual HTTP request. It is
+  automatically executed as the very last step in the request pipeline.
+
+  The default adapter is using `Finch`.
+  """
+  def put_adapter(request, adapter) do
+    %{request | adapter: adapter}
+  end
 
   @doc """
   Gets the value for a specific private `key`.
