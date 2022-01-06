@@ -12,25 +12,25 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
   * Extensibility via request, response, and error steps
 
-  * Automatic body decompression (via `decompress/1` step)
+  * Automatic body decompression (via `Req.Steps.decompress/1` step)
 
-  * Automatic body encoding and decoding (via `encode_body/1` and `decode_body/1` steps)
+  * Automatic body encoding and decoding (via `Req.Steps.encode_body/1` and `Req.Steps.decode_body/1` steps)
 
-  * Encode params as query string (via `put_params/2` step)
+  * Encode params as query string (via `Req.Steps.put_params/2` step)
 
-  * Basic authentication (via `auth/2` step)
+  * Basic authentication (via `Req.Steps.auth/2` step)
 
-  * `.netrc` file support (via `load_netrc/2` step)
+  * `.netrc` file support (via `Req.Steps.load_netrc/2` step)
 
-  * Range requests (via `put_range/2` step)
+  * Range requests (via `Req.Steps.put_range/2` step)
 
-  * Follows redirects (via `follow_redirects/1` step)
+  * Follows redirects (via `Req.Steps.follow_redirects/1` step)
 
-  * Retries on errors (via `retry/2` step)
+  * Retries on errors (via `Req.Steps.retry/2` step)
 
-  * Basic HTTP caching (via `put_if_modified_since/2` step)
+  * Basic HTTP caching (via `Req.Steps.put_if_modified_since/2` step)
 
-  * Setting base URL (via `put_base_url/2` step)
+  * Setting base URL (via `Req.Steps.put_base_url/2` step)
 
 ## Usage
 
@@ -73,11 +73,11 @@ is equivalent to this composition of lower-level API functions and steps:
 
 ```elixir
 Req.Request.build(:get, "https://api.github.com/repos/elixir-lang/elixir")
-|> Req.put_default_steps()
+|> Req.Steps.put_default_steps()
 |> Req.Request.run!()
 ```
 
-(See `Req.Request.build/3`, `Req.put_default_steps/2`, and `Req.Request.run!/1` for more information.)
+(See `Req.Request.build/3`, `Req.Steps.put_default_steps/2`, and `Req.Request.run!/1` for more information.)
 
 We can also build more complex flows like returning a response from a request step
 or an error from a response step. We will explore those next.
