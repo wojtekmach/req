@@ -60,8 +60,6 @@ defmodule Req.MixProject do
       source_url: @source_url,
       source_ref: "v#{@version}",
       groups_for_functions: [
-        "High-level API": &(&1[:api] == :high_level),
-        "Low-level API": &(&1[:api] == :low_level),
         "Request steps": &(&1[:api] == :request),
         "Response steps": &(&1[:api] == :response),
         "Error steps": &(&1[:api] == :error)

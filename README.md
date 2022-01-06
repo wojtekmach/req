@@ -61,7 +61,7 @@ After making the actual HTTP request, we'll either get a HTTP response or an err
 The request, along with the response or error, will go through response or
 error steps, respectively.
 
-Nothing is actually executed until we run the pipeline with `Req.run/1`.
+Nothing is actually executed until we run the pipeline with `Req.Request.run/1`.
 
 The high-level API shown before:
 
@@ -72,12 +72,12 @@ Req.get!("https://api.github.com/repos/elixir-lang/elixir")
 is equivalent to this composition of lower-level API functions and steps:
 
 ```elixir
-Req.build(:get, "https://api.github.com/repos/elixir-lang/elixir")
+Req.Request.build(:get, "https://api.github.com/repos/elixir-lang/elixir")
 |> Req.put_default_steps()
-|> Req.run!()
+|> Req.Request.run!()
 ```
 
-(See `Req.build/3`, `Req.put_default_steps/2`, and `Req.run!/1` for more information.)
+(See `Req.Request.build/3`, `Req.put_default_steps/2`, and `Req.Request.run!/1` for more information.)
 
 We can also build more complex flows like returning a response from a request step
 or an error from a response step. We will explore those next.

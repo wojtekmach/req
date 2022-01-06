@@ -17,7 +17,6 @@ defmodule Req do
 
   See `request/3` for a list of supported options.
   """
-  @doc api: :high_level
   @spec get!(url(), keyword()) :: Req.Response.t()
   def get!(url, options \\ []) do
     request!(:get, url, options)
@@ -28,7 +27,6 @@ defmodule Req do
 
   See `request/3` for a list of supported options.
   """
-  @doc api: :high_level
   @spec post!(url(), body :: term(), keyword()) :: Req.Response.t()
   def post!(url, body, options \\ []) do
     options = Keyword.put(options, :body, body)
@@ -40,7 +38,6 @@ defmodule Req do
 
   See `request/3` for a list of supported options.
   """
-  @doc api: :high_level
   @spec put!(url(), body :: term(), keyword()) :: Req.Response.t()
   def put!(url, body, options \\ []) do
     options = Keyword.put(options, :body, body)
@@ -52,7 +49,6 @@ defmodule Req do
 
   See `request/3` for a list of supported options.
   """
-  @doc api: :high_level
   @spec delete!(url(), keyword()) :: Req.Response.t()
   def delete!(url, options \\ []) do
     request!(:delete, url, options)
@@ -78,16 +74,15 @@ defmodule Req do
 
   The `options` are merged with default options set with `default_options/1`.
   """
-  @doc api: :high_level
   @spec request(method(), url(), keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
   def request(method, url, options \\ []) do
     options = Keyword.merge(default_options(), options)
 
     method
-    |> build(url, options)
+    |> Req.Request.build(url, options)
     |> put_default_steps(options)
-    |> run()
+    |> Req.Request.run()
   end
 
   @doc """
@@ -95,15 +90,14 @@ defmodule Req do
 
   See `request/3` for more information.
   """
-  @doc api: :high_level
   @spec request!(method(), url(), keyword()) :: Req.Response.t()
   def request!(method, url, options \\ []) do
     options = Keyword.merge(default_options(), options)
 
     method
-    |> build(url, options)
+    |> Req.Request.build(url, options)
     |> put_default_steps(options)
-    |> run!()
+    |> Req.Request.run!()
   end
 
   @doc """
@@ -111,7 +105,6 @@ defmodule Req do
 
   See `default_options/1` for more information.
   """
-  @doc api: :high_level
   @spec default_options() :: keyword()
   def default_options() do
     Application.get_env(:req, :default_options, [])
@@ -125,194 +118,9 @@ defmodule Req do
 
   Avoid setting default options in libraries as they are global.
   """
-  @doc api: :high_level
   @spec default_options(keyword()) :: :ok
   def default_options(options) do
     Application.put_env(:req, :default_options, options)
-  end
-
-  ## Low-level API
-
-  @doc """
-  Builds a request pipeline.
-
-  ## Options
-
-    * `:header` - request headers, defaults to `[]`
-
-    * `:body` - request body, defaults to `""`
-
-    * `:finch` - Finch pool to use, defaults to `Req.Finch` which is automatically started
-      by the application. See `Finch` module documentation for more information on starting pools.
-
-    * `:finch_options` - Options passed down to Finch when making the request, defaults to `[]`.
-      See `Finch.request/3` for more information.
-
-  """
-  @doc api: :low_level
-  def build(method, url, options \\ []) do
-    %Req.Request{
-      method: method,
-      url: URI.parse(url),
-      headers: Keyword.get(options, :headers, []),
-      body: Keyword.get(options, :body, ""),
-      unix_socket: Keyword.get(options, :unix_socket),
-      private: %{
-        req_finch:
-          {Keyword.get(options, :finch, Req.Finch), Keyword.get(options, :finch_options, [])}
-      }
-    }
-  end
-
-  @doc """
-  Appends request steps.
-  """
-  @doc api: :low_level
-  def append_request_steps(request, steps) do
-    update_in(request.request_steps, &(&1 ++ steps))
-  end
-
-  @doc """
-  Prepends request steps.
-  """
-  @doc api: :low_level
-  def prepend_request_steps(request, steps) do
-    update_in(request.request_steps, &(steps ++ &1))
-  end
-
-  @doc """
-  Appends response steps.
-  """
-  @doc api: :low_level
-  def append_response_steps(request, steps) do
-    update_in(request.response_steps, &(&1 ++ steps))
-  end
-
-  @doc """
-  Prepends response steps.
-  """
-  @doc api: :low_level
-  def prepend_response_steps(request, steps) do
-    update_in(request.response_steps, &(steps ++ &1))
-  end
-
-  @doc """
-  Appends error steps.
-  """
-  @doc api: :low_level
-  def append_error_steps(request, steps) do
-    update_in(request.error_steps, &(&1 ++ steps))
-  end
-
-  @doc """
-  Prepends error steps.
-  """
-  @doc api: :low_level
-  def prepend_error_steps(request, steps) do
-    update_in(request.error_steps, &(steps ++ &1))
-  end
-
-  @doc """
-  Runs a request pipeline.
-
-  Returns `{:ok, response}` or `{:error, exception}`.
-  """
-  @doc api: :low_level
-  def run(request) do
-    steps = request.request_steps ++ [request.adapter]
-
-    Enum.reduce_while(steps, request, fn step, acc ->
-      case run_step(step, acc) do
-        %Req.Request{} = request ->
-          {:cont, request}
-
-        {%Req.Request{halted: true}, response_or_exception} ->
-          {:halt, result(response_or_exception)}
-
-        {request, %Req.Response{} = response} ->
-          {:halt, run_response(request, response)}
-
-        {request, %{__exception__: true} = exception} ->
-          {:halt, run_error(request, exception)}
-      end
-    end)
-  end
-
-  @doc """
-  Runs a request pipeline and returns a response or raises an error.
-
-  See `run/1` for more information.
-  """
-  @doc api: :low_level
-  def run!(request) do
-    case run(request) do
-      {:ok, response} -> response
-      {:error, exception} -> raise exception
-    end
-  end
-
-  defp run_response(request, response) do
-    steps = request.response_steps
-
-    {_request, response_or_exception} =
-      Enum.reduce_while(steps, {request, response}, fn step, {request, response} ->
-        case run_step(step, {request, response}) do
-          {%Req.Request{halted: true} = request, response_or_exception} ->
-            {:halt, {request, response_or_exception}}
-
-          {request, %Req.Response{} = response} ->
-            {:cont, {request, response}}
-
-          {request, %{__exception__: true} = exception} ->
-            {:halt, run_error(request, exception)}
-        end
-      end)
-
-    result(response_or_exception)
-  end
-
-  defp run_error(request, exception) do
-    steps = request.error_steps
-
-    {_request, response_or_exception} =
-      Enum.reduce_while(steps, {request, exception}, fn step, {request, exception} ->
-        case run_step(step, {request, exception}) do
-          {%Req.Request{halted: true} = request, response_or_exception} ->
-            {:halt, {request, response_or_exception}}
-
-          {request, %{__exception__: true} = exception} ->
-            {:cont, {request, exception}}
-
-          {request, %Req.Response{} = response} ->
-            {:halt, run_response(request, response)}
-        end
-      end)
-
-    result(response_or_exception)
-  end
-
-  defp run_step({module, function, args}, arg) do
-    apply(module, function, [arg | args])
-  end
-
-  defp run_step({module, options}, arg) do
-    apply(module, :run, [arg | [options]])
-  end
-
-  defp run_step(module, arg) when is_atom(module) do
-    apply(module, :run, [arg, []])
-  end
-
-  defp run_step(func, arg) when is_function(func, 1) do
-    func.(arg)
-  end
-
-  defp result(%Req.Response{} = response) do
-    {:ok, response}
-  end
-
-  defp result(%{__exception__: true} = exception) do
-    {:error, exception}
   end
 
   ## Request steps
@@ -410,9 +218,9 @@ defmodule Req do
     error_steps = maybe_steps(retry, [{Req, :retry, [retry]}])
 
     request
-    |> append_request_steps(request_steps)
-    |> append_response_steps(response_steps)
-    |> append_error_steps(error_steps)
+    |> Req.Request.append_request_steps(request_steps)
+    |> Req.Request.append_response_steps(response_steps)
+    |> Req.Request.append_error_steps(error_steps)
   end
 
   defp maybe_steps(nil, _step), do: []
@@ -682,7 +490,7 @@ defmodule Req do
 
     request
     |> do_put_if_modified_since(dir)
-    |> prepend_response_steps([&handle_cache(&1, dir)])
+    |> Req.Request.prepend_response_steps([&handle_cache(&1, dir)])
   end
 
   defp do_put_if_modified_since(request, dir) do
@@ -743,7 +551,7 @@ defmodule Req do
   """
   @doc api: :request
   def run_steps(request, steps) when is_list(steps) do
-    Enum.reduce(steps, request, &run_step/2)
+    Enum.reduce(steps, request, &Req.Request.run_step/2)
   end
 
   @doc """
@@ -952,7 +760,7 @@ defmodule Req do
         put_in(request.url, url)
       end
 
-    {_, result} = run(request)
+    {_, result} = Req.Request.run(request)
     {Req.Request.halt(request), result}
   end
 
@@ -1016,7 +824,7 @@ defmodule Req do
       Process.sleep(delay)
       request = Req.Request.put_private(request, :retry_count, retry_count + 1)
 
-      {_, result} = run(request)
+      {_, result} = Req.Request.run(request)
       {Req.Request.halt(request), result}
     else
       {request, response_or_exception}
