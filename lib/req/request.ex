@@ -1,8 +1,8 @@
 defmodule Req.Request do
-  @moduledoc """
+  @moduledoc ~S"""
   The request pipeline struct.
 
-  Fields:
+  Struct fields:
 
     * `:method` - the HTTP request method
 
@@ -27,6 +27,90 @@ defmodule Req.Request do
     * `:private` - a map reserved for libraries and frameworks to use.
       Prefix the keys with the name of your project to avoid any future
       conflicts. Only accepts `t:atom/0` keys.
+
+  ## Steps
+
+  Under the hood, Req works by passing a [`%Req.Request{}`](`Req.Request`) struct through a series of steps.
+
+  Request steps are used to refine the data that will be sent to the server.
+
+  After making the actual HTTP request, we'll either get a HTTP response or an error.
+  The request, along with the response or error, will go through response or
+  error steps, respectively.
+
+  Nothing is actually executed until we run the pipeline with `Req.Request.run/1`.
+
+  ### Request steps
+
+  A request step is a function that accepts a `request` and returns one of the following:
+
+    * A `request`
+
+    * A `{request, response_or_error}` tuple. In that case no further request steps are executed
+      and the return value goes through response or error steps
+
+  Examples:
+
+      def put_default_headers(request) do
+        update_in(request.headers, &[{"user-agent", "req"} | &1])
+      end
+
+      def read_from_cache(request) do
+        case ResponseCache.fetch(request) do
+          {:ok, response} -> {request, response}
+          :error -> request
+        end
+      end
+
+  ### Response and error steps
+
+  A response step is a function that accepts a `{request, response}` tuple and returns one of the
+  following:
+
+    * A `{request, response}` tuple
+
+    * A `{request, exception}` tuple. In that case, no further response steps are executed but the
+      exception goes through error steps
+
+  Similarly, an error step is a function that accepts a `{request, exception}` tuple and returns one
+  of the following:
+
+    * A `{request, exception}` tuple
+
+    * A `{request, response}` tuple. In that case, no further error steps are executed but the
+      response goes through response steps
+
+  Examples:
+
+      def decode({request, response}) do
+        case List.keyfind(response.headers, "content-type", 0) do
+          {_, "application/json" <> _} ->
+            {request, update_in(response.body, &Jason.decode!/1)}
+
+          _ ->
+            {request, response}
+        end
+      end
+
+      def log_error({request, exception}) do
+        Logger.error(["#{request.method} #{request.uri}: ", Exception.message(exception)])
+        {request, exception}
+      end
+
+  ### Halting
+
+  Any step can call `Req.Request.halt/1` to halt the pipeline. This will prevent any further steps
+  from being invoked.
+
+  Examples:
+
+      def circuit_breaker(request) do
+        if CircuitBreaker.open?() do
+          {Req.Request.halt(request), RuntimeError.exception("circuit breaker is open")}
+        else
+          request
+        end
+      end
   """
 
   defstruct [

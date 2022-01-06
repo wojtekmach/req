@@ -12,25 +12,26 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
   * Extensibility via request, response, and error steps
 
-  * Automatic body decompression (via `Req.Steps.decompress/1` step)
+  * Automatic body decompression (via [`decompress`](`Req.Steps.decompress/1`) step)
 
-  * Automatic body encoding and decoding (via `Req.Steps.encode_body/1` and `Req.Steps.decode_body/1` steps)
+  * Automatic body encoding and decoding (via [`encode_body`](`Req.Steps.encode_body/1`)
+    and [`decode_body`](`Req.Steps.decode_body/1`) steps)
 
-  * Encode params as query string (via `Req.Steps.put_params/2` step)
+  * Encode params as query string (via [`put_params`](`Req.Steps.put_params/2`) step)
 
-  * Basic authentication (via `Req.Steps.auth/2` step)
+  * Basic authentication (via [`auth`](`Req.Steps.auth/2`) step)
 
-  * `.netrc` file support (via `Req.Steps.load_netrc/2` step)
+  * `.netrc` file support (via [`load_netrc`](`Req.Steps.load_netrc/2`) step)
 
-  * Range requests (via `Req.Steps.put_range/2` step)
+  * Range requests (via [`put_range`](`Req.Steps.put_range/2`) step)
 
-  * Follows redirects (via `Req.Steps.follow_redirects/1` step)
+  * Follows redirects (via [`follow_redirects`](`Req.Steps.follow_redirects/1`) step)
 
-  * Retries on errors (via `Req.Steps.retry/2` step)
+  * Retries on errors (via [`retry`](`Req.Steps.retry/2`) step)
 
-  * Basic HTTP caching (via `Req.Steps.put_if_modified_since/2` step)
+  * Basic HTTP caching (via [`cache`](`Req.Steps.put_if_modified_since/2`) step)
 
-  * Setting base URL (via `Req.Steps.put_base_url/2` step)
+  * Setting base URL (via [`put_base_url`](`Req.Steps.put_base_url/2`) step)
 
 ## Usage
 
@@ -48,12 +49,16 @@ Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
 If you want to use Req in a Mix project, you can add the above
 dependency to your `mix.exs`.
 
+Example POST request:
+
+```elixir
+Req.post!("https://httpbin.org/post", {:form, comments: "hello!"}).body["form"]
+#=> %{"comments" => "hello!"}
+```
+
 ## Low-level API
 
-Under the hood, Req works by passing a request through a series of steps.
-
-The request struct, `%Req.Request{}`, initially contains data like HTTP method and
-request headers. You can also add request, response, and error steps to it.
+Under the hood, Req works by passing a [`%Req.Request{}`](`Req.Request`) struct through a series of steps.
 
 Request steps are used to refine the data that will be sent to the server.
 
@@ -80,85 +85,7 @@ Req.Request.build(:get, "https://api.github.com/repos/elixir-lang/elixir")
 (See `Req.Request.build/3`, `Req.Steps.put_default_steps/2`, and `Req.Request.run!/1` for more information.)
 
 We can also build more complex flows like returning a response from a request step
-or an error from a response step. We will explore those next.
-
-### Request steps
-
-A request step is a function that accepts a `request` and returns one of the following:
-
-  * A `request`
-
-  * A `{request, response_or_error}` tuple. In that case no further request steps are executed
-    and the return value goes through response or error steps
-
-Examples:
-
-```elixir
-def put_default_headers(request) do
-  update_in(request.headers, &[{"user-agent", "req"} | &1])
-end
-
-def read_from_cache(request) do
-  case ResponseCache.fetch(request) do
-    {:ok, response} -> {request, response}
-    :error -> request
-  end
-end
-```
-
-### Response and error steps
-
-A response step is a function that accepts a `{request, response}` tuple and returns one of the
-following:
-
-  * A `{request, response}` tuple
-
-  * A `{request, exception}` tuple. In that case, no further response steps are executed but the
-    exception goes through error steps
-
-Similarly, an error step is a function that accepts a `{request, exception}` tuple and returns one
-of the following:
-
-  * A `{request, exception}` tuple
-
-  * A `{request, response}` tuple. In that case, no further error steps are executed but the
-    response goes through response steps
-
-Examples:
-
-```elixir
-def decode({request, response}) do
-  case List.keyfind(response.headers, "content-type", 0) do
-    {_, "application/json" <> _} ->
-      {request, update_in(response.body, &Jason.decode!/1)}
-
-    _ ->
-      {request, response}
-  end
-end
-
-def log_error({request, exception}) do
-  Logger.error(["#{request.method} #{request.uri}: ", Exception.message(exception)])
-  {request, exception}
-end
-```
-
-### Halting
-
-Any step can call `Req.Request.halt/1` to halt the pipeline. This will prevent any further steps
-from being invoked.
-
-Examples:
-
-```elixir
-def circuit_breaker(request) do
-  if CircuitBreaker.open?() do
-    {Req.Request.halt(request), RuntimeError.exception("circuit breaker is open")}
-  else
-    request
-  end
-end
-```
+or an error from a response step. See `Req.Request` documentation for more information.
 
 <!-- MDOC !-->
 

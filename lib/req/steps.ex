@@ -68,7 +68,7 @@ defmodule Req.Steps do
     * `:steps` - if set, runs the `run_steps/2` step with the given steps
 
   """
-  @doc api: :request
+  @doc step: :request
   def put_default_steps(request, options \\ []) do
     request_steps =
       [
@@ -120,7 +120,7 @@ defmodule Req.Steps do
       iex> Req.get!("/status/201", options).status
       201
   """
-  @doc api: :request
+  @doc step: :request
   def put_base_url(request, base_url) when is_binary(base_url) do
     # TODO: change build/3 so that the url is parsed later so that here it is not yet parsed
 
@@ -150,7 +150,7 @@ defmodule Req.Steps do
       200
 
   """
-  @doc api: :request
+  @doc step: :request
   def auth(request, auth)
 
   def auth(request, {username, password}) when is_binary(username) and is_binary(password) do
@@ -171,7 +171,7 @@ defmodule Req.Steps do
       200
 
   """
-  @doc api: :request
+  @doc step: :request
   def load_netrc(request, path)
 
   def load_netrc(request, path) when is_binary(path) do
@@ -207,7 +207,7 @@ defmodule Req.Steps do
     * `"accept-encoding"` - `"gzip"`
 
   """
-  @doc api: :request
+  @doc step: :request
   def default_headers(request) do
     request
     |> put_new_header("user-agent", @user_agent)
@@ -229,7 +229,7 @@ defmodule Req.Steps do
       %{"user-agent" => "my_agent"}
 
   """
-  @doc api: :request
+  @doc step: :request
   def encode_headers(request) do
     headers =
       for {name, value} <- request.headers do
@@ -277,7 +277,7 @@ defmodule Req.Steps do
       %{"comments" => "hello!"}
 
   """
-  @doc api: :request
+  @doc step: :request
   def encode_body(request) do
     case request.body do
       {:form, data} ->
@@ -304,7 +304,7 @@ defmodule Req.Steps do
       %{"x" => "1", "y" => "2"}
 
   """
-  @doc api: :request
+  @doc step: :request
   def put_params(request, params) do
     encoded = URI.encode_query(params)
 
@@ -333,7 +333,7 @@ defmodule Req.Steps do
       }
 
   """
-  @doc api: :request
+  @doc step: :request
   def put_range(request, range)
 
   def put_range(request, binary) when is_binary(binary) do
@@ -366,7 +366,7 @@ defmodule Req.Steps do
       true
 
   """
-  @doc api: :request
+  @doc step: :request
   def put_if_modified_since(request, options \\ []) do
     dir = options[:dir] || :filename.basedir(:user_cache, 'req')
 
@@ -427,11 +427,11 @@ defmodule Req.Steps do
 
       iex> inspect_host = fn request -> IO.inspect(request.url.host) ; request end
       iex> Req.get!("https://httpbin.org/status/200", steps: [inspect_host]).status
-      Outputs: "httpbin.org"
+      # Outputs: "httpbin.org"
       iex> 200
 
   """
-  @doc api: :request
+  @doc step: :request
   def run_steps(request, steps) when is_list(steps) do
     Enum.reduce(steps, request, &Req.Request.run_step/2)
   end
@@ -441,7 +441,7 @@ defmodule Req.Steps do
 
   This is the default adapter. See `Req.Request.put_adapter/2` for more information.
   """
-  @doc api: :request
+  @doc step: :request
   def run_finch(request) do
     finch_request =
       Finch.build(request.method, request.url, request.headers, request.body)
@@ -485,7 +485,7 @@ defmodule Req.Steps do
       }
 
   """
-  @doc api: :response
+  @doc step: :response
   def decompress({request, %{body: ""} = response}) do
     {request, response}
   end
@@ -539,7 +539,7 @@ defmodule Req.Steps do
       }
 
   """
-  @doc api: :response
+  @doc step: :response
   def decode_body({request, %{body: ""} = response}) do
     {request, response}
   end
@@ -628,7 +628,7 @@ defmodule Req.Steps do
       200
 
   """
-  @doc api: :response
+  @doc step: :response
   def follow_redirects({request, %{status: status} = response}) when status in 301..302 do
     {_, location} = List.keyfind(response.headers, "location", 0)
     Logger.debug(["Req.follow_redirects/2: Redirecting to ", location])
@@ -691,7 +691,7 @@ defmodule Req.Steps do
       ** (Mint.TransportError) connection refused
 
   """
-  @doc api: :error
+  @doc step: :error
   def retry({request, %{status: status} = response}, _options) when status < 500 do
     {request, response}
   end

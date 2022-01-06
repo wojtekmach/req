@@ -2,8 +2,8 @@
 
 ## v0.3.0-dev
 
-  *  Change meaning of step `{mod, options}`
-  * `Req.Request.put_adapter/2`
+  * Change meaning of step `{mod, options}`
+  * Add `Req.Request.put_adapter/2`
   * Move low-level API to `Req.Request`
   * Move steps to `Req.Steps`
 

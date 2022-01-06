@@ -60,9 +60,9 @@ defmodule Req.MixProject do
       source_url: @source_url,
       source_ref: "v#{@version}",
       groups_for_functions: [
-        "Request steps": &(&1[:api] == :request),
-        "Response steps": &(&1[:api] == :response),
-        "Error steps": &(&1[:api] == :error)
+        "Request steps": &(&1[:step] == :request),
+        "Response steps": &(&1[:step] == :response),
+        "Error steps": &(&1[:step] == :error)
       ],
       extras: [
         "CHANGELOG.md"
