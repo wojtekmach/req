@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v0.3.0-dev
+
+  *  Change meaning of step `{mod, options}`
+  * `Req.Request.put_adapter/2`
+  * Move low-level API to `Req.Request`
+  * Move steps to `Req.Steps`
+
 ## v0.2.0 (2021-11-08)
 
   * Rename `normalize_headers` to `encode_headers`
