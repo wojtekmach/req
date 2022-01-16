@@ -634,13 +634,9 @@ defmodule Req.Steps do
     Logger.debug(["Req.follow_redirects/2: Redirecting to ", location])
 
     request =
-      if String.starts_with?(location, "/") do
-        url = URI.parse(location)
-        update_in(request.url, &%{&1 | path: url.path, query: url.query})
-      else
-        url = URI.parse(location)
-        put_in(request.url, url)
-      end
+      request
+      |> remove_credentials_if_untrusted(location)
+      |> put_redirect_location(location)
 
     {_, result} = Req.Request.run(request)
     {Req.Request.halt(request), result}
@@ -828,5 +824,32 @@ defmodule Req.Steps do
 
   defp parse_netrc([], nil, acc) do
     acc
+  end
+
+  defp put_redirect_location(request, location) do
+    if String.starts_with?(location, "/") do
+      url = URI.parse(location)
+      update_in(request.url, &%{&1 | path: url.path, query: url.query})
+    else
+      url = URI.parse(location)
+      put_in(request.url, url)
+    end
+  end
+
+  defp remove_credentials_if_untrusted(%{location_trusted: true} = request, _), do: request
+
+  defp remove_credentials_if_untrusted(%{url: url} = request, location) do
+    if URI.parse(location).host == url.host do
+      request
+    else
+      remove_credentials(request)
+    end
+  end
+
+  defp remove_credentials(request) do
+    headers = List.keydelete(request.headers, "authorization", 0)
+    request_steps = Enum.reject(request.request_steps, fn {_, step, _} -> step == :auth end)
+
+    struct(request, headers: headers, request_steps: request_steps)
   end
 end

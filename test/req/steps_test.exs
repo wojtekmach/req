@@ -353,6 +353,88 @@ defmodule Req.StepsTest do
            end) =~ "[debug] Req.follow_redirects/2: Redirecting to /ok?a=1"
   end
 
+  test "follow_redirects/2: auth - same host", c do
+    auth_header = {"authorization", "Basic " <> Base.encode64("foo:bar")}
+
+    Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+      location = c.url <> "/auth"
+
+      assert auth_header in conn.req_headers
+
+      conn
+      |> Plug.Conn.put_resp_header("location", location)
+      |> Plug.Conn.send_resp(302, "redirecting to #{location}")
+    end)
+
+    Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
+      assert auth_header in conn.req_headers
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    assert ExUnit.CaptureLog.capture_log(fn ->
+             assert Req.get!(c.url <> "/redirect", auth: {"foo", "bar"}).status == 200
+           end) =~ "[debug] Req.follow_redirects/2: Redirecting to #{c.url}/auth"
+  end
+
+  test "follow_redirects/2: auth - location trusted", c do
+    auth_header = {"authorization", "Basic " <> Base.encode64("foo:bar")}
+
+    Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+      location = c.url <> "/auth"
+
+      assert auth_header in conn.req_headers
+
+      conn
+      |> Plug.Conn.put_resp_header("location", location)
+      |> Plug.Conn.send_resp(302, "redirecting to #{location}")
+    end)
+
+    Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
+      assert auth_header in conn.req_headers
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    assert ExUnit.CaptureLog.capture_log(fn ->
+             assert Req.get!(c.url <> "/redirect", auth: {"foo", "bar"}).status == 200
+           end) =~ "[debug] Req.follow_redirects/2: Redirecting to #{c.url}/auth"
+  end
+
+  @tag :only
+  test "follow_redirects/2: auth - different host" do
+    adapter = fn request ->
+      case request.url.host do
+        "original" ->
+          assert List.keyfind(request.headers, "authorization", 0)
+
+          response = %Req.Response{
+            status: 301,
+            headers: [{"location", "http://untrusted"}],
+            body: "redirecting"
+          }
+
+          {request, response}
+
+        "untrusted" ->
+          refute List.keyfind(request.headers, "authorization", 0)
+
+          response = %Req.Response{
+            status: 200,
+            headers: [],
+            body: "bad things"
+          }
+
+          {request, response}
+      end
+    end
+
+    assert ExUnit.CaptureLog.capture_log(fn ->
+             assert Req.get!("http://original",
+                      steps: [adapter],
+                      auth: {"authorization", "credentials"}
+                    ).status == 200
+           end) =~ "[debug] Req.follow_redirects/2: Redirecting to http://untrusted"
+  end
+
   ## Error steps
 
   @tag :capture_log

@@ -24,6 +24,9 @@ defmodule Req.Request do
 
     * `:error_steps` - the list of error steps
 
+    * `:location_trusted` - if `false`, authorization headers are not
+      sent to different hosts on redirects. Defaults to `false`.
+
     * `:private` - a map reserved for libraries and frameworks to use.
       Prefix the keys with the name of your project to avoid any future
       conflicts. Only accepts `t:atom/0` keys.
@@ -124,7 +127,8 @@ defmodule Req.Request do
     request_steps: [],
     response_steps: [],
     error_steps: [],
-    private: %{}
+    private: %{},
+    location_trusted: false
   ]
 
   @doc """
@@ -186,7 +190,8 @@ defmodule Req.Request do
       private: %{
         req_finch:
           {Keyword.get(options, :finch, Req.Finch), Keyword.get(options, :finch_options, [])}
-      }
+      },
+      location_trusted: Keyword.get(options, :location_trusted, false)
     }
   end
 
