@@ -376,30 +376,42 @@ defmodule Req.StepsTest do
            end) =~ "[debug] Req.follow_redirects/2: Redirecting to #{c.url}/auth"
   end
 
-  test "follow_redirects/2: auth - location trusted", c do
-    auth_header = {"authorization", "Basic " <> Base.encode64("foo:bar")}
+  test "follow_redirects/2: auth - location trusted" do
+    adapter = fn request ->
+      case request.url.host do
+        "original" ->
+          assert List.keyfind(request.headers, "authorization", 0)
 
-    Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
-      location = c.url <> "/auth"
+          response = %Req.Response{
+            status: 301,
+            headers: [{"location", "http://untrusted"}],
+            body: "redirecting"
+          }
 
-      assert auth_header in conn.req_headers
+          {request, response}
 
-      conn
-      |> Plug.Conn.put_resp_header("location", location)
-      |> Plug.Conn.send_resp(302, "redirecting to #{location}")
-    end)
+        "untrusted" ->
+          assert List.keyfind(request.headers, "authorization", 0)
 
-    Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
-      assert auth_header in conn.req_headers
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
+          response = %Req.Response{
+            status: 200,
+            headers: [],
+            body: "bad things"
+          }
+
+          {request, response}
+      end
+    end
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(c.url <> "/redirect", auth: {"foo", "bar"}).status == 200
-           end) =~ "[debug] Req.follow_redirects/2: Redirecting to #{c.url}/auth"
+             assert Req.get!("http://original",
+                      steps: [adapter],
+                      auth: {"authorization", "credentials"},
+                      follow_redirects: [location_trusted: true]
+                    ).status == 200
+           end) =~ "[debug] Req.follow_redirects/2: Redirecting to http://untrusted"
   end
 
-  @tag :only
   test "follow_redirects/2: auth - different host" do
     adapter = fn request ->
       case request.url.host do
