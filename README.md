@@ -25,7 +25,7 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
   * Range requests (via [`put_range`](`Req.Steps.put_range/2`) step)
 
-  * Follows redirects (via [`follow_redirects`](`Req.Steps.follow_redirects/1`) step)
+  * Follows redirects (via [`follow_redirects`](`Req.Steps.follow_redirects/2`) step)
 
   * Retries on errors (via [`retry`](`Req.Steps.retry/2`) step)
 

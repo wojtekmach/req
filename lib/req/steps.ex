@@ -36,7 +36,7 @@ defmodule Req.Steps do
     * [`&retry(&1, options[:retry])`](`retry/2`) (if `options[:retry]` is set to
       an atom true or a options keywords list)
 
-    * `follow_redirects/1`
+    * [`&follow_redirects(&1, options[:follow_redirects])`](`follow_redirects/2`)
 
     * `decompress/1`
 
@@ -67,6 +67,9 @@ defmodule Req.Steps do
 
     * `:steps` - if set, runs the `run_steps/2` step with the given steps
 
+    * `:follow_redirects` - if set, runs the `follow_redirect/2` step with the given list
+       of options
+
   """
   @doc step: :request
   def put_default_steps(request, options \\ []) do
@@ -91,7 +94,7 @@ defmodule Req.Steps do
 
     response_steps =
       maybe_steps(retry, [{Req.Steps, :retry, [retry]}]) ++
-        [{Req.Steps, :follow_redirects, []}] ++
+        [{Req.Steps, :follow_redirects, [options[:follow_redirects]]}] ++
         maybe_steps(not raw?, [
           {Req.Steps, :decompress, []},
           {Req.Steps, :decode_body, []}
@@ -621,6 +624,12 @@ defmodule Req.Steps do
   @doc """
   Follows redirects.
 
+  ## Options
+
+    * `:location_trusted` - by default, authorization credentials are only sent
+      on redirects to the same host. If `:location_trusted` is set to `true`, credentials
+      will be sent to any host.
+
   ## Examples
 
       iex> Req.get!("http://api.github.com").status
@@ -629,24 +638,26 @@ defmodule Req.Steps do
 
   """
   @doc step: :response
-  def follow_redirects({request, %{status: status} = response}) when status in 301..302 do
+  def follow_redirects(request, options \\ [])
+
+  def follow_redirects({request, %{status: status} = response}, options)
+      when status in 301..302 do
     {_, location} = List.keyfind(response.headers, "location", 0)
     Logger.debug(["Req.follow_redirects/2: Redirecting to ", location])
 
+    location_trusted = options[:location_trusted]
+    location_url = URI.parse(location)
+
     request =
-      if String.starts_with?(location, "/") do
-        url = URI.parse(location)
-        update_in(request.url, &%{&1 | path: url.path, query: url.query})
-      else
-        url = URI.parse(location)
-        put_in(request.url, url)
-      end
+      request
+      |> remove_credentials_if_untrusted(location_trusted, location_url)
+      |> put_redirect_location(location_url)
 
     {_, result} = Req.Request.run(request)
     {Req.Request.halt(request), result}
   end
 
-  def follow_redirects(other) do
+  def follow_redirects(other, _) do
     other
   end
 
@@ -828,5 +839,30 @@ defmodule Req.Steps do
 
   defp parse_netrc([], nil, acc) do
     acc
+  end
+
+  defp put_redirect_location(request, location_url) do
+    if location_url.host do
+      put_in(request.url, location_url)
+    else
+      update_in(request.url, &%{&1 | path: location_url.path, query: location_url.query})
+    end
+  end
+
+  defp remove_credentials_if_untrusted(request, true, _), do: request
+
+  defp remove_credentials_if_untrusted(request, _, location_url) do
+    if location_url.host == request.url.host do
+      request
+    else
+      remove_credentials(request)
+    end
+  end
+
+  defp remove_credentials(request) do
+    headers = List.keydelete(request.headers, "authorization", 0)
+    request_steps = Enum.reject(request.request_steps, fn {_, step, _} -> step == :auth end)
+
+    %{request | headers: headers, request_steps: request_steps}
   end
 end
