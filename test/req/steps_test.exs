@@ -353,6 +353,24 @@ defmodule Req.StepsTest do
            end) =~ "[debug] Req.follow_redirects/2: Redirecting to /ok?a=1"
   end
 
+  test "follow_redirects/2: 301..303", c do
+    Bypass.expect(c.bypass, "POST", "/redirect", fn conn ->
+      location = c.url <> "/ok"
+
+      conn
+      |> Plug.Conn.put_resp_header("location", location)
+      |> Plug.Conn.send_resp(301, "redirecting to #{location}")
+    end)
+
+    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    assert ExUnit.CaptureLog.capture_log(fn ->
+             assert Req.post!(c.url <> "/redirect", "body").status == 200
+           end) =~ "[debug] Req.follow_redirects/2: Redirecting to #{c.url}/ok"
+  end
+
   test "follow_redirects/2: auth - same host", c do
     auth_header = {"authorization", "Basic " <> Base.encode64("foo:bar")}
 

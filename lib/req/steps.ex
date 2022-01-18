@@ -624,6 +624,13 @@ defmodule Req.Steps do
   @doc """
   Follows redirects.
 
+  The original request method may be changed to GET depending on the status code:
+
+  | Code          | Method handling    |
+  | ------------- | ------------------ |
+  | 301, 302, 303 | Changed to GET     |
+  | 307, 308      | Method not changed |
+
   ## Options
 
     * `:location_trusted` - by default, authorization credentials are only sent
@@ -641,7 +648,7 @@ defmodule Req.Steps do
   def follow_redirects(request, options \\ [])
 
   def follow_redirects({request, %{status: status} = response}, options)
-      when status in 301..302 do
+      when status in [301, 302, 303, 307, 308] do
     {_, location} = List.keyfind(response.headers, "location", 0)
     Logger.debug(["Req.follow_redirects/2: Redirecting to ", location])
 
@@ -651,6 +658,7 @@ defmodule Req.Steps do
     request =
       request
       |> remove_credentials_if_untrusted(location_trusted, location_url)
+      |> put_redirect_request_method()
       |> put_redirect_location(location_url)
 
     {_, result} = Req.Request.run(request)
@@ -847,6 +855,13 @@ defmodule Req.Steps do
     else
       update_in(request.url, &%{&1 | path: location_url.path, query: location_url.query})
     end
+  end
+
+  defp put_redirect_request_method(%Req.Request{method: :get} = request), do: request
+  defp put_redirect_request_method(request) when request.status in 307..308, do: request
+
+  defp put_redirect_request_method(request) do
+    %{request | method: :get}
   end
 
   defp remove_credentials_if_untrusted(request, true, _), do: request
