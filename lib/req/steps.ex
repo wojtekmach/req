@@ -14,7 +14,7 @@ defmodule Req.Steps do
 
     * `encode_headers/1`
 
-    * `default_headers/1`
+    * `put_default_headers/1`
 
     * `encode_body/1`
 
@@ -76,7 +76,7 @@ defmodule Req.Steps do
     request_steps =
       [
         {Req.Steps, :encode_headers, []},
-        {Req.Steps, :default_headers, []},
+        {Req.Steps, :put_default_headers, []},
         {Req.Steps, :encode_body, []}
       ] ++
         maybe_steps(options[:base_url], [{Req.Steps, :put_base_url, [options[:base_url]]}]) ++
@@ -221,7 +221,7 @@ defmodule Req.Steps do
 
   """
   @doc step: :request
-  def default_headers(request) do
+  def put_default_headers(request) do
     request
     |> put_new_header("user-agent", @user_agent)
     |> put_new_header("accept-encoding", "gzip")
