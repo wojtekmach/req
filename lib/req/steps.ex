@@ -857,12 +857,9 @@ defmodule Req.Steps do
     end
   end
 
-  defp put_redirect_request_method(%Req.Request{method: :get} = request), do: request
   defp put_redirect_request_method(request) when request.status in 307..308, do: request
 
-  defp put_redirect_request_method(request) do
-    %{request | method: :get}
-  end
+  defp put_redirect_request_method(request), do: %{request | method: :get}
 
   defp remove_credentials_if_untrusted(request, true, _), do: request
 
