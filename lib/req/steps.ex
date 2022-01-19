@@ -144,6 +144,7 @@ defmodule Req.Steps do
   `auth` can be one of:
 
     * `{username, password}` - uses Basic HTTP authentication
+    * `{:bearer, token}` - uses Bearer HTTP authentication
 
   ## Examples
 
@@ -152,9 +153,18 @@ defmodule Req.Steps do
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {"foo", "bar"}).status
       200
 
+      iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, ""}).status
+      401
+      iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, "foo"}).status
+      200
+
   """
   @doc step: :request
   def auth(request, auth)
+
+  def auth(request, {:bearer, token}) when is_binary(token) do
+    put_new_header(request, "authorization", "Bearer #{token}")
+  end
 
   def auth(request, {username, password}) when is_binary(username) and is_binary(password) do
     value = Base.encode64("#{username}:#{password}")
