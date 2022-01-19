@@ -17,7 +17,7 @@ defmodule Req.StepsTest do
     assert Req.get!("", base_url: c.url).status == 200
   end
 
-  test "auth/2", c do
+  test "auth/2: basic", c do
     Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
       expected = "Basic " <> Base.encode64("foo:bar")
 
@@ -32,6 +32,23 @@ defmodule Req.StepsTest do
 
     assert Req.get!(c.url <> "/auth", auth: {"bad", "bad"}).status == 401
     assert Req.get!(c.url <> "/auth", auth: {"foo", "bar"}).status == 200
+  end
+
+  test "auth/2: bearer", c do
+    Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
+      expected = "Bearer valid_token"
+
+      case Plug.Conn.get_req_header(conn, "authorization") do
+        [^expected] ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+
+        _ ->
+          Plug.Conn.send_resp(conn, 401, "unauthorized")
+      end
+    end)
+
+    assert Req.get!(c.url <> "/auth", auth: {:bearer, "bad_token"}).status == 401
+    assert Req.get!(c.url <> "/auth", auth: {:bearer, "valid_token"}).status == 200
   end
 
   test "encode_headers/1", c do
