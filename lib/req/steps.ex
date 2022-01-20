@@ -183,6 +183,10 @@ defmodule Req.Steps do
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", netrc: "/path/to/custom_netrc").status
       200
 
+      iex> System.put_env("NETRC", "/path/in/environment/variable")
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", netrc: :env).status
+      200
+
   """
   @doc step: :request
   def load_netrc(request, path)
@@ -195,6 +199,14 @@ defmodule Req.Steps do
       :error ->
         request
     end
+  end
+
+  def load_netrc(request, :env) do
+    path =
+      System.get_env("NETRC") ||
+        raise "could not find .netrc path, please set the NETRC environment variable"
+
+    load_netrc(request, Path.join(path, ".netrc"))
   end
 
   def load_netrc(request, true) do

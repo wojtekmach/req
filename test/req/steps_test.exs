@@ -110,13 +110,25 @@ defmodule Req.StepsTest do
 
     assert Req.get!(c.url <> "/auth", netrc: "#{c.tmp_dir}/wrong_netrc").status == 401
 
-    File.write!("#{c.tmp_dir}/correct_netrc", """
+    File.write!("#{c.tmp_dir}/.netrc", """
     machine localhost
     username foo
     password bar
     """)
 
-    assert Req.get!(c.url <> "/auth", netrc: "#{c.tmp_dir}/correct_netrc").status == 200
+    assert Req.get!(c.url <> "/auth", netrc: "#{c.tmp_dir}/.netrc").status == 200
+
+    System.put_env("NETRC", c.tmp_dir)
+
+    assert Req.get!(c.url <> "/auth", netrc: :env).status == 200
+
+    System.delete_env("NETRC")
+
+    assert_raise RuntimeError,
+                 "could not find .netrc path, please set the NETRC environment variable",
+                 fn ->
+                   Req.get!(c.url <> "/auth", netrc: :env)
+                 end
 
     File.write!("#{c.tmp_dir}/bad_netrc", """
     bad
