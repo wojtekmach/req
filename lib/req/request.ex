@@ -118,7 +118,7 @@ defmodule Req.Request do
     :url,
     headers: [],
     body: "",
-    adapter: {Req.Steps, :run_finch, []},
+    adapter: nil,
     unix_socket: nil,
     halted: false,
     request_steps: [],
@@ -131,10 +131,9 @@ defmodule Req.Request do
   @doc """
   Sets the request adapter.
 
-  Adapter is a request step that is making the actual HTTP request. It is
-  automatically executed as the very last step in the request pipeline.
+  Adapter is a request step that is making the actual HTTP request. See
+  `Req.Request.build/3` for more information.
 
-  The default adapter is using `Finch`.
   """
   def put_adapter(request, adapter) do
     %{request | adapter: adapter}
@@ -170,6 +169,10 @@ defmodule Req.Request do
 
     * `:body` - request body, defaults to `""`
 
+    * `:adapter` - adapter to use to make the actual HTTP request. Adapters are functions
+    specified like any other request step, but the adapter function is the last step
+    executed in the request pipeline. Defaults to calling `Req.Steps.run_finch/1`.
+
     * `:finch` - Finch pool to use, defaults to `Req.Finch` which is automatically started
       by the application. See `Finch` module documentation for more information on starting pools.
 
@@ -184,6 +187,7 @@ defmodule Req.Request do
       headers: Keyword.get(options, :headers, []),
       body: Keyword.get(options, :body, ""),
       unix_socket: Keyword.get(options, :unix_socket),
+      adapter: Keyword.get(options, :adapter, {Req.Steps, :run_finch, []}),
       private: %{
         req_finch:
           {Keyword.get(options, :finch, Req.Finch), Keyword.get(options, :finch_options, [])}

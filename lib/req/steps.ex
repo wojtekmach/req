@@ -452,7 +452,7 @@ defmodule Req.Steps do
   @doc """
   Runs the request using `Finch`.
 
-  This is the default adapter. See `Req.Request.put_adapter/2` for more information.
+  This is the default adapter. See `Req.Request.build/3` for more information.
   """
   @doc step: :request
   def run_finch(request) do

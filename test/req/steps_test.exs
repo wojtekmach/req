@@ -440,7 +440,7 @@ defmodule Req.StepsTest do
 
     assert ExUnit.CaptureLog.capture_log(fn ->
              assert Req.get!("http://original",
-                      steps: [adapter],
+                      adapter: adapter,
                       auth: {"authorization", "credentials"},
                       follow_redirects: [location_trusted: true]
                     ).status == 200
@@ -476,7 +476,7 @@ defmodule Req.StepsTest do
 
     assert ExUnit.CaptureLog.capture_log(fn ->
              assert Req.get!("http://original",
-                      steps: [adapter],
+                      adapter: adapter,
                       auth: {"authorization", "credentials"}
                     ).status == 200
            end) =~ "[debug] Req.follow_redirects/2: Redirecting to http://untrusted"
