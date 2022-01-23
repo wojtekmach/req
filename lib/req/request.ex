@@ -118,7 +118,7 @@ defmodule Req.Request do
     :url,
     headers: [],
     body: "",
-    adapter: nil,
+    adapter: {Req.Steps, :run_finch, []},
     unix_socket: nil,
     halted: false,
     request_steps: [],
