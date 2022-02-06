@@ -195,15 +195,18 @@ defmodule Req.Steps do
   end
 
   defp load_netrc(path) do
-    case File.read!(path) do
-      "" ->
+    case File.read(path) do
+      {:ok, ""} ->
         raise ".netrc file is empty."
 
-      contents ->
+      {:ok, contents} ->
         contents
         |> String.trim()
         |> String.split()
         |> parse_netrc()
+
+      {:error, reason} ->
+        raise "Error reading .netrc file: #{:file.format_error(reason)}"
     end
   end
 

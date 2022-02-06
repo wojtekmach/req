@@ -111,7 +111,15 @@ defmodule Req.StepsTest do
       end
     end)
 
-    assert Req.get!(c.url <> "/auth", auth: :netrc).status == 401
+    directory = System.get_env("NETRC", System.user_home!())
+
+    if File.exists?(Path.join(directory, ".netrc")) do
+      assert Req.get!(c.url <> "/auth", auth: :netrc).status == 401
+    else
+      assert_raise RuntimeError, "Error reading .netrc file: no such file or directory", fn ->
+        Req.get!(c.url <> "/auth", auth: :netrc)
+      end
+    end
 
     File.write!("#{c.tmp_dir}/custom_netrc", """
     machine localhost
