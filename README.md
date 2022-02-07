@@ -19,9 +19,7 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
   * Encode params as query string (via [`put_params`](`Req.Steps.put_params/2`) step)
 
-  * Basic authentication (via [`auth`](`Req.Steps.auth/2`) step)
-
-  * `.netrc` file support (via [`load_netrc`](`Req.Steps.load_netrc/2`) step)
+  * Basic, bearer and `.netrc` authentication (via [`auth`](`Req.Steps.auth/2`) step)
 
   * Range requests (via [`put_range`](`Req.Steps.put_range/2`) step)
 

@@ -51,6 +51,105 @@ defmodule Req.StepsTest do
     assert Req.get!(c.url <> "/auth", auth: {:bearer, "valid_token"}).status == 200
   end
 
+  @tag :tmp_dir
+  test "auth/2: :netrc", c do
+    Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
+      expected = "Basic " <> Base.encode64("foo:bar")
+
+      case Plug.Conn.get_req_header(conn, "authorization") do
+        [^expected] ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+
+        _ ->
+          Plug.Conn.send_resp(conn, 401, "unauthorized")
+      end
+    end)
+
+    old_netrc = System.get_env("NETRC")
+
+    System.put_env("NETRC", "#{c.tmp_dir}/.netrc")
+
+    File.write!("#{c.tmp_dir}/.netrc", """
+    machine localhost
+    login foo
+    password bar
+    """)
+
+    assert Req.get!(c.url <> "/auth", auth: :netrc).status == 200
+
+    System.put_env("NETRC", "#{c.tmp_dir}/tabs")
+
+    File.write!("#{c.tmp_dir}/tabs", """
+    machine localhost
+         login foo
+         password bar
+    """)
+
+    assert Req.get!(c.url <> "/auth", auth: :netrc).status == 200
+
+    System.put_env("NETRC", "#{c.tmp_dir}/single_line")
+
+    File.write!("#{c.tmp_dir}/single_line", """
+    machine otherhost
+    login meat
+    password potatoes
+    machine localhost login foo password bar
+    """)
+
+    assert Req.get!(c.url <> "/auth", auth: :netrc).status == 200
+
+    if old_netrc, do: System.put_env("NETRC", old_netrc), else: System.delete_env("NETRC")
+  end
+
+  @tag :tmp_dir
+  test "auth/2: {:netrc, path}", c do
+    Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
+      expected = "Basic " <> Base.encode64("foo:bar")
+
+      case Plug.Conn.get_req_header(conn, "authorization") do
+        [^expected] ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+
+        _ ->
+          Plug.Conn.send_resp(conn, 401, "unauthorized")
+      end
+    end)
+
+    assert_raise RuntimeError, "error reading .netrc file: no such file or directory", fn ->
+      Req.get!(c.url <> "/auth", auth: {:netrc, "non_existent_file"})
+    end
+
+    File.write!("#{c.tmp_dir}/custom_netrc", """
+    machine localhost
+    login foo
+    password bar
+    """)
+
+    assert Req.get!(c.url <> "/auth", auth: {:netrc, c.tmp_dir <> "/custom_netrc"}).status == 200
+
+    File.write!("#{c.tmp_dir}/wrong_netrc", """
+    machine localhost
+    login bad
+    password bad
+    """)
+
+    assert Req.get!(c.url <> "/auth", auth: {:netrc, "#{c.tmp_dir}/wrong_netrc"}).status == 401
+
+    File.write!("#{c.tmp_dir}/empty_netrc", "")
+
+    assert_raise RuntimeError, ".netrc file is empty", fn ->
+      Req.get!(c.url <> "/auth", auth: {:netrc, "#{c.tmp_dir}/empty_netrc"})
+    end
+
+    File.write!("#{c.tmp_dir}/bad_netrc", """
+    bad
+    """)
+
+    assert_raise RuntimeError, "error parsing .netrc file", fn ->
+      Req.get!(c.url <> "/auth", auth: {:netrc, "#{c.tmp_dir}/bad_netrc"})
+    end
+  end
+
   test "encode_headers/1", c do
     pid = self()
 
@@ -81,50 +180,6 @@ defmodule Req.StepsTest do
     assert_received {:params, %{"foo" => "bar"}}
   after
     Application.put_env(:req, :default_options, [])
-  end
-
-  @tag :tmp_dir
-  test "load_netrc/2", c do
-    Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
-      expected = "Basic " <> Base.encode64("foo:bar")
-
-      case Plug.Conn.get_req_header(conn, "authorization") do
-        [^expected] ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-
-        _ ->
-          Plug.Conn.send_resp(conn, 401, "unauthorized")
-      end
-    end)
-
-    assert Req.get!(c.url <> "/auth").status == 401
-
-    File.write!("#{c.tmp_dir}/empty_netrc", "")
-    assert Req.get!(c.url <> "/auth", netrc: "#{c.tmp_dir}/empty_netrc").status == 401
-
-    File.write!("#{c.tmp_dir}/wrong_netrc", """
-    machine localhost
-    username bad
-    password bad
-    """)
-
-    assert Req.get!(c.url <> "/auth", netrc: "#{c.tmp_dir}/wrong_netrc").status == 401
-
-    File.write!("#{c.tmp_dir}/correct_netrc", """
-    machine localhost
-    username foo
-    password bar
-    """)
-
-    assert Req.get!(c.url <> "/auth", netrc: "#{c.tmp_dir}/correct_netrc").status == 200
-
-    File.write!("#{c.tmp_dir}/bad_netrc", """
-    bad
-    """)
-
-    assert_raise RuntimeError, "parse error: \"bad\"", fn ->
-      Req.get!(c.url <> "/auth", netrc: "#{c.tmp_dir}/bad_netrc")
-    end
   end
 
   test "default_headers/1", c do

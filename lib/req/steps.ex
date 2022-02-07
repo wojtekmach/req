@@ -20,9 +20,6 @@ defmodule Req.Steps do
 
     * [`&put_base_url(&1, options[:base_url])`](`base_url/2`) (if `options[:base_url]` is set)
 
-    * [`&load_netrc(&1, options[:netrc])`](`load_netrc/2`) (if `options[:netrc]` is set
-      to an atom true for default path or a string for custom path)
-
     * [`&auth(&1, options[:auth])`](`auth/2`) (if `options[:auth]` is set)
 
     * [`&put_params(&1, options[:params])`](`put_params/2`) (if `options[:params]` is set)
@@ -51,8 +48,6 @@ defmodule Req.Steps do
 
     * `:base_url` - if set, adds the `put_base_url/2` step
 
-    * `:netrc` - if set, adds the `load_netrc/2` step
-
     * `:auth` - if set, adds the `auth/2` step
 
     * `:params` - if set, adds the `put_params/2` step
@@ -80,7 +75,6 @@ defmodule Req.Steps do
         {Req.Steps, :encode_body, []}
       ] ++
         maybe_steps(options[:base_url], [{Req.Steps, :put_base_url, [options[:base_url]]}]) ++
-        maybe_steps(options[:netrc], [{Req.Steps, :load_netrc, [options[:netrc]]}]) ++
         maybe_steps(options[:auth], [{Req.Steps, :auth, [options[:auth]]}]) ++
         maybe_steps(options[:params], [{Req.Steps, :put_params, [options[:params]]}]) ++
         maybe_steps(options[:range], [{Req.Steps, :put_range, [options[:range]]}]) ++
@@ -145,6 +139,9 @@ defmodule Req.Steps do
 
     * `{username, password}` - uses Basic HTTP authentication
     * `{:bearer, token}` - uses Bearer HTTP authentication
+    * `:netrc` - load credentials from `.netrc` at path specified in `NETRC` environment variable;
+      if `NETRC` is not set, load `.netrc` in user's home directory
+    * `{:netrc, path}` - load credentials from `path`
 
   ## Examples
 
@@ -158,6 +155,12 @@ defmodule Req.Steps do
       iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, "foo"}).status
       200
 
+      iex> System.put_env("NETRC", "./my_netrc")
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: :netrc).status
+      200
+
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:netrc, "./my_netrc"}).status
+      200
   """
   @doc step: :request
   def auth(request, auth)
@@ -171,23 +174,16 @@ defmodule Req.Steps do
     put_new_header(request, "authorization", "Basic #{value}")
   end
 
-  @doc """
-  Sets request authentication for a matching host from a netrc file.
+  def auth(request, :netrc) do
+    path = System.get_env("NETRC") || Path.join(System.user_home!(), ".netrc")
+    authenticate_with_netrc(request, path)
+  end
 
-  ## Examples
+  def auth(request, {:netrc, path}) do
+    authenticate_with_netrc(request, path)
+  end
 
-      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar").status
-      401
-      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", netrc: true).status
-      200
-      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", netrc: "/path/to/custom_netrc").status
-      200
-
-  """
-  @doc step: :request
-  def load_netrc(request, path)
-
-  def load_netrc(request, path) when is_binary(path) do
+  defp authenticate_with_netrc(request, path) when is_binary(path) do
     case Map.fetch(load_netrc(path), request.url.host) do
       {:ok, {username, password}} ->
         auth(request, {username, password})
@@ -197,16 +193,32 @@ defmodule Req.Steps do
     end
   end
 
-  def load_netrc(request, true) do
-    load_netrc(request, Path.join(System.user_home!(), ".netrc"))
+  defp load_netrc(path) do
+    case File.read(path) do
+      {:ok, ""} ->
+        raise ".netrc file is empty"
+
+      {:ok, contents} ->
+        contents
+        |> String.trim()
+        |> String.split()
+        |> parse_netrc()
+
+      {:error, reason} ->
+        raise "error reading .netrc file: #{:file.format_error(reason)}"
+    end
   end
 
-  defp load_netrc(path) do
-    path
-    |> File.read!()
-    |> String.split("\n")
-    |> parse_netrc(nil, %{})
+  defp parse_netrc(credentials), do: parse_netrc(credentials, %{})
+
+  defp parse_netrc([], acc), do: acc
+
+  defp parse_netrc([_, machine, _, login, _, password | tail], acc) do
+    acc = Map.put(acc, String.trim(machine), {String.trim(login), String.trim(password)})
+    parse_netrc(tail, acc)
   end
+
+  defp parse_netrc(_, _), do: raise("error parsing .netrc file")
 
   @user_agent "req/#{Mix.Project.config()[:version]}"
 
@@ -835,34 +847,6 @@ defmodule Req.Steps do
 
   defp format_http_datetime(datetime) do
     Calendar.strftime(datetime, "%a, %d %b %Y %H:%M:%S GMT")
-  end
-
-  defp parse_netrc(["#" <> _ | rest], current_acc, acc) do
-    parse_netrc(rest, current_acc, acc)
-  end
-
-  defp parse_netrc(["machine " <> machine | rest], _, acc) do
-    parse_netrc(rest, {machine, nil, nil}, acc)
-  end
-
-  defp parse_netrc(["username " <> username | rest], {machine, nil, nil}, acc) do
-    parse_netrc(rest, {machine, username, nil}, acc)
-  end
-
-  defp parse_netrc(["password " <> password | rest], {machine, username, nil}, acc) do
-    parse_netrc(rest, nil, Map.put(acc, machine, {username, password}))
-  end
-
-  defp parse_netrc([other | rest], current_acc, acc) do
-    if String.trim(other) == "" do
-      parse_netrc(rest, current_acc, acc)
-    else
-      raise "parse error: #{inspect(other)}"
-    end
-  end
-
-  defp parse_netrc([], nil, acc) do
-    acc
   end
 
   defp put_redirect_location(request, location_url) do
