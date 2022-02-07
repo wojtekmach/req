@@ -155,11 +155,11 @@ defmodule Req.Steps do
       iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, "foo"}).status
       200
 
-      iex> System.put_env("NETRC", "/path/in/environment/variable")
+      iex> System.put_env("NETRC", "./my_netrc")
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: :netrc).status
       200
 
-      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:netrc, "custom/.netrc"}).status
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:netrc, "./my_netrc"}).status
       200
   """
   @doc step: :request
@@ -175,8 +175,7 @@ defmodule Req.Steps do
   end
 
   def auth(request, :netrc) do
-    directory = System.get_env("NETRC", System.user_home!())
-    path = Path.join(directory, ".netrc")
+    path = System.get_env("NETRC") || Path.join(System.user_home!(), ".netrc")
     authenticate_with_netrc(request, path)
   end
 
@@ -197,7 +196,7 @@ defmodule Req.Steps do
   defp load_netrc(path) do
     case File.read(path) do
       {:ok, ""} ->
-        raise ".netrc file is empty."
+        raise ".netrc file is empty"
 
       {:ok, contents} ->
         contents
@@ -206,7 +205,7 @@ defmodule Req.Steps do
         |> parse_netrc()
 
       {:error, reason} ->
-        raise "Error reading .netrc file: #{:file.format_error(reason)}"
+        raise "error reading .netrc file: #{:file.format_error(reason)}"
     end
   end
 
@@ -219,7 +218,7 @@ defmodule Req.Steps do
     parse_netrc(tail, acc)
   end
 
-  defp parse_netrc(_, _), do: raise("Error parsing .netrc.")
+  defp parse_netrc(_, _), do: raise("error parsing .netrc file")
 
   @user_agent "req/#{Mix.Project.config()[:version]}"
 

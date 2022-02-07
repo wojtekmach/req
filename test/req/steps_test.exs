@@ -65,7 +65,9 @@ defmodule Req.StepsTest do
       end
     end)
 
-    assert Req.get!(c.url <> "/auth").status == 401
+    old_netrc = System.get_env("NETRC")
+
+    System.put_env("NETRC", "#{c.tmp_dir}/.netrc")
 
     File.write!("#{c.tmp_dir}/.netrc", """
     machine localhost
@@ -73,23 +75,25 @@ defmodule Req.StepsTest do
     password bar
     """)
 
-    old_netrc = System.get_env("NETRC")
-    System.put_env("NETRC", c.tmp_dir)
     assert Req.get!(c.url <> "/auth", auth: :netrc).status == 200
 
-    File.write!("#{c.tmp_dir}/.netrc", """
-    machine otherhost
-    login meat
-    password potatoes
-    machine localhost login foo password bar
+    System.put_env("NETRC", "#{c.tmp_dir}/tabs")
+
+    File.write!("#{c.tmp_dir}/tabs", """
+    machine localhost
+         login foo
+         password bar
     """)
 
     assert Req.get!(c.url <> "/auth", auth: :netrc).status == 200
 
-    File.write!("#{c.tmp_dir}/.netrc", """
-    machine localhost
-         login foo
-         password bar
+    System.put_env("NETRC", "#{c.tmp_dir}/single_line")
+
+    File.write!("#{c.tmp_dir}/single_line", """
+    machine otherhost
+    login meat
+    password potatoes
+    machine localhost login foo password bar
     """)
 
     assert Req.get!(c.url <> "/auth", auth: :netrc).status == 200
@@ -111,14 +115,8 @@ defmodule Req.StepsTest do
       end
     end)
 
-    directory = System.get_env("NETRC", System.user_home!())
-
-    if File.exists?(Path.join(directory, ".netrc")) do
-      assert Req.get!(c.url <> "/auth", auth: :netrc).status == 401
-    else
-      assert_raise RuntimeError, "Error reading .netrc file: no such file or directory", fn ->
-        Req.get!(c.url <> "/auth", auth: :netrc)
-      end
+    assert_raise RuntimeError, "error reading .netrc file: no such file or directory", fn ->
+      Req.get!(c.url <> "/auth", auth: {:netrc, "non_existent_file"})
     end
 
     File.write!("#{c.tmp_dir}/custom_netrc", """
@@ -139,7 +137,7 @@ defmodule Req.StepsTest do
 
     File.write!("#{c.tmp_dir}/empty_netrc", "")
 
-    assert_raise RuntimeError, ".netrc file is empty.", fn ->
+    assert_raise RuntimeError, ".netrc file is empty", fn ->
       Req.get!(c.url <> "/auth", auth: {:netrc, "#{c.tmp_dir}/empty_netrc"})
     end
 
@@ -147,7 +145,7 @@ defmodule Req.StepsTest do
     bad
     """)
 
-    assert_raise RuntimeError, "Error parsing .netrc.", fn ->
+    assert_raise RuntimeError, "error parsing .netrc file", fn ->
       Req.get!(c.url <> "/auth", auth: {:netrc, "#{c.tmp_dir}/bad_netrc"})
     end
   end
