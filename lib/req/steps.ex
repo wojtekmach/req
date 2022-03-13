@@ -453,7 +453,7 @@ defmodule Req.Steps do
       iex> inspect_host = fn request -> IO.inspect(request.url.host) ; request end
       iex> Req.get!("https://httpbin.org/status/200", steps: [inspect_host]).status
       # Outputs: "httpbin.org"
-      iex> 200
+      200
 
   """
   @doc step: :request
