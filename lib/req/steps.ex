@@ -350,24 +350,13 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> response = Req.get!("https://httpbin.org/range/100", range: 0..67)
+      iex> response = Req.get!("https://httpbin.org/range/100", range: 0..3)
       iex> response.status
       206
       iex> response.body
-      "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnop"
-      iex> [_ | headers] = response.headers  # cut {"date", ...}
-      ...> headers
-      [
-        {"content-type", "application/octet-stream"},
-        {"content-length", "68"},
-        {"connection", "keep-alive"},
-        {"server", "gunicorn/19.9.0"},
-        {"etag", "range100"},
-        {"accept-ranges", "bytes"},
-        {"content-range", "bytes 0-67/100"},
-        {"access-control-allow-origin", "*"},
-        {"access-control-allow-credentials", "true"}
-      ]
+      "abcd"
+      iex> List.keyfind(response.headers, "content-range", 0)
+      {"content-range", "bytes 0-3/100"}
   """
   @doc step: :request
   def put_range(request, range)
