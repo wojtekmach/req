@@ -1,0 +1,7 @@
+machine localhost
+    login foo
+    password bar
+
+machine httpbin.org
+    login foo
+    password bar
