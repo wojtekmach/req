@@ -155,11 +155,11 @@ defmodule Req.Steps do
       iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, "foo"}).status
       200
 
-      iex> System.put_env("NETRC", "./my_netrc")
+      iex> System.put_env("NETRC", "./test/my_netrc")
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: :netrc).status
       200
 
-      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:netrc, "./my_netrc"}).status
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:netrc, "./test/my_netrc"}).status
       200
   """
   @doc step: :request
@@ -350,13 +350,13 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> Req.get!("https://repo.hex.pm/builds/elixir/builds.txt", range: 0..67)
-      %Req.Response{
-        status: 206,
-        headers: [{"content-range", "bytes 0-67/45400"}, ...],
-        body: "master df65074a8143cebec810dfb91cafa43f19dcdbaf 2021-04-23T15:36:18Z"
-      }
-
+      iex> response = Req.get!("https://httpbin.org/range/100", range: 0..3)
+      iex> response.status
+      206
+      iex> response.body
+      "abcd"
+      iex> List.keyfind(response.headers, "content-range", 0)
+      {"content-range", "bytes 0-3/100"}
   """
   @doc step: :request
   def put_range(request, range)
@@ -384,7 +384,7 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> url = "https://hexdocs.pm/elixir/Kernel.html"
+      iex> url = "https://httpbin.org/html"
       iex> response1 = Req.get!(url, cache: true)
       iex> response2 = Req.get!(url, cache: true)
       iex> response1 == response2
@@ -497,18 +497,10 @@ defmodule Req.Steps do
   ## Examples
 
       iex> response = Req.get!("https://httpbin.org/gzip")
-      iex> response.headers
-      [
-        {"content-encoding", "gzip"},
-        {"content-type", "application/json"},
-        ...
-      ]
-      iex> response.body
-      %{
-        "gzipped" => true,
-        ...
-      }
-
+      iex> response.headers |> Enum.member?({"content-encoding", "gzip"})
+      true
+      iex> response.body["gzipped"]
+      true
   """
   @doc step: :response
   def decompress(request_response)
@@ -557,13 +549,13 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> Req.get!("https://hex.pm/api/packages/finch").body["meta"]
-      %{
-        "description" => "An HTTP client focused on performance.",
-        "licenses" => ["MIT"],
-        "links" => %{"GitHub" => "https://github.com/keathley/finch"},
-        ...
-      }
+      iex> response = Req.get!("https://httpbin.org/gzip")
+      ...> response.body["gzipped"]
+      true
+
+      iex> response = Req.get!("https://httpbin.org/json")
+      ...> response.body["slideshow"]["title"]
+      "Sample Slide Show"
 
   """
   @doc step: :response
