@@ -17,6 +17,18 @@ defmodule Req.StepsTest do
     assert Req.get!("", base_url: c.url).status == 200
   end
 
+  test "put_base_url/2: overwrites base_url", c do
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "response from bypass")
+    end)
+
+    assert %{status: 200, body: "response from bypass"} =
+             Req.get!("https://example.com", base_url: c.url)
+
+    assert %{status: 200, body: "response from bypass"} =
+             Req.get!("http://example.com", base_url: c.url)
+  end
+
   test "auth/2: basic", c do
     Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
       expected = "Basic " <> Base.encode64("foo:bar")

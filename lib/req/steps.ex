@@ -109,6 +109,8 @@ defmodule Req.Steps do
   @doc """
   Sets base URL for all requests.
 
+  Note this step would overwrite existing base_url, see examples below:
+
   ## Examples
 
       iex> options = [base_url: "https://httpbin.org"]
@@ -116,14 +118,12 @@ defmodule Req.Steps do
       200
       iex> Req.get!("/status/201", options).status
       201
+      iex> Req.get!("https://unknown-host/status/201", options).status
+      201
   """
   @doc step: :request
   def put_base_url(request, base_url) when is_binary(base_url) do
     # TODO: change build/3 so that the url is parsed later so that here it is not yet parsed
-
-    unless match?(%{scheme: nil, host: nil}, request.url) do
-      raise "put_base_url/2 expects the request url to only contain a path, got: #{URI.to_string(request.url)}"
-    end
 
     # remove when we require Elixir v1.13
     url = request.url.path || ""
