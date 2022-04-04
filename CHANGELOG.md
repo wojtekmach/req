@@ -7,6 +7,11 @@
   * Move low-level API to `Req.Request`
   * Move steps to `Req.Steps`
 
+## v0.2.1 (2021-11-24)
+
+  * Add `:private` field to Response
+  * Update Finch to 0.9.1
+
 ## v0.2.0 (2021-11-08)
 
   * Rename `normalize_headers` to `encode_headers`
