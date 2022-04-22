@@ -132,7 +132,7 @@ defmodule Req.Request do
   Sets the request adapter.
 
   Adapter is a request step that is making the actual HTTP request. See
-  `Req.Request.build/3` for more information.
+  `build/3` for more information.
 
   """
   def put_adapter(request, adapter) do
