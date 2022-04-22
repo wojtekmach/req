@@ -11,7 +11,7 @@ defmodule Req.RequestTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
-    request = Req.Request.build(:get, c.url <> "/ok")
+    request = Req.Request.new(url: c.url <> "/ok")
     assert {:ok, %{status: 200, body: "ok"}} = Req.Request.run(request)
   end
 
@@ -21,7 +21,7 @@ defmodule Req.RequestTest do
     end)
 
     request =
-      Req.Request.build(:get, c.url <> "/not-found")
+      Req.Request.new(url: c.url <> "/not-found")
       |> Req.Request.prepend_request_steps([
         fn request ->
           put_in(request.url.path, "/ok")
@@ -33,7 +33,7 @@ defmodule Req.RequestTest do
 
   test "request step returns response", c do
     request =
-      Req.Request.build(:get, c.url <> "/ok")
+      Req.Request.new(url: c.url <> "/ok")
       |> Req.Request.prepend_request_steps([
         fn request ->
           {request, %Req.Response{status: 200, body: "from cache"}}
@@ -50,7 +50,7 @@ defmodule Req.RequestTest do
 
   test "request step returns exception", c do
     request =
-      Req.Request.build(:get, c.url <> "/ok")
+      Req.Request.new(url: c.url <> "/ok")
       |> Req.Request.prepend_request_steps([
         fn request ->
           {request, RuntimeError.exception("oops")}
@@ -67,7 +67,7 @@ defmodule Req.RequestTest do
 
   test "request step halts with response", c do
     request =
-      Req.Request.build(:get, c.url <> "/ok")
+      Req.Request.new(url: c.url <> "/ok")
       |> Req.Request.prepend_request_steps([
         fn request ->
           {Req.Request.halt(request), %Req.Response{status: 200, body: "from cache"}}
@@ -86,7 +86,7 @@ defmodule Req.RequestTest do
 
   test "request step halts with exception", c do
     request =
-      Req.Request.build(:get, c.url <> "/ok")
+      Req.Request.new(url: c.url <> "/ok")
       |> Req.Request.prepend_request_steps([
         fn request ->
           {Req.Request.halt(request), RuntimeError.exception("oops")}
@@ -109,7 +109,7 @@ defmodule Req.RequestTest do
     end)
 
     request =
-      Req.Request.build(:get, c.url <> "/ok")
+      Req.Request.new(url: c.url <> "/ok")
       |> Req.Request.prepend_response_steps([
         fn {request, response} ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
@@ -125,7 +125,7 @@ defmodule Req.RequestTest do
     end)
 
     request =
-      Req.Request.build(:get, c.url <> "/ok")
+      Req.Request.new(url: c.url <> "/ok")
       |> Req.Request.prepend_response_steps([
         fn {request, response} ->
           assert response.body == "ok"
@@ -147,7 +147,7 @@ defmodule Req.RequestTest do
     end)
 
     request =
-      Req.Request.build(:get, c.url <> "/ok")
+      Req.Request.new(url: c.url <> "/ok")
       |> Req.Request.prepend_response_steps([
         fn {request, response} ->
           {Req.Request.halt(request), update_in(response.body, &(&1 <> " - updated"))}
@@ -167,7 +167,7 @@ defmodule Req.RequestTest do
     end)
 
     request =
-      Req.Request.build(:get, c.url <> "/ok")
+      Req.Request.new(url: c.url <> "/ok")
       |> Req.Request.prepend_response_steps([
         fn {request, response} ->
           assert response.body == "ok"
@@ -186,7 +186,7 @@ defmodule Req.RequestTest do
     Bypass.down(c.bypass)
 
     request =
-      Req.Request.build(:get, c.url <> "/ok")
+      Req.Request.new(url: c.url <> "/ok")
       |> Req.Request.prepend_error_steps([
         fn {request, exception} ->
           assert exception.reason == :econnrefused
@@ -201,7 +201,7 @@ defmodule Req.RequestTest do
     Bypass.down(c.bypass)
 
     request =
-      Req.Request.build(:get, c.url <> "/ok")
+      Req.Request.new(url: c.url <> "/ok")
       |> Req.Request.prepend_response_steps([
         fn {request, response} ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
@@ -222,7 +222,7 @@ defmodule Req.RequestTest do
     Bypass.down(c.bypass)
 
     request =
-      Req.Request.build(:get, c.url <> "/ok")
+      Req.Request.new(url: c.url <> "/ok")
       |> Req.Request.prepend_response_steps([
         &unreachable/1
       ])

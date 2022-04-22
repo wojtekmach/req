@@ -1,4 +1,21 @@
 defmodule Req.Request do
+  @type t() :: %Req.Request{
+          method: :get | :post | :put | :head | :delete,
+          url: URI.t(),
+          headers: [{binary(), binary()}],
+          body: binary(),
+          options: keyword(),
+          adapter: request_step(),
+          request_steps: [request_step()],
+          response_steps: [response_step()],
+          error_steps: [error_step()],
+          private: map()
+        }
+
+  @typep request_step() :: fun()
+  @typep response_step() :: fun()
+  @typep error_step() :: fun()
+
   @moduledoc ~S"""
   The request pipeline struct.
 
@@ -12,7 +29,10 @@ defmodule Req.Request do
 
     * `:body` - the HTTP request body
 
-    * `:adapter` - a request step that makes the actual HTTP request
+    * `:adapter` - a request step that makes the actual HTTP request. The adapter
+      is automatically added by Req as the very last request step. The adapter must
+      return `{request, response}` or `{request, exception}`, thus triggering the
+      response or error pipeline, respectively. Defaults to `Req.Steps.run_finch/1`.
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket
 
@@ -113,20 +133,30 @@ defmodule Req.Request do
       end
   """
 
-  defstruct [
-    :method,
-    :url,
-    headers: [],
-    body: "",
-    adapter: {Req.Steps, :run_finch, []},
-    unix_socket: nil,
-    halted: false,
-    request_steps: [],
-    response_steps: [],
-    error_steps: [],
-    private: %{},
-    location_trusted: false
-  ]
+  defstruct method: :get,
+            url: nil,
+            headers: [],
+            body: "",
+            options: %{},
+            adapter: &Req.Steps.run_finch/1,
+            unix_socket: nil,
+            halted: false,
+            request_steps: [],
+            response_steps: [],
+            error_steps: [],
+            private: %{},
+            location_trusted: false
+
+  @doc """
+  Returns a new request struct.
+  """
+  def new(options \\ []) do
+    options =
+      options
+      |> Keyword.update(:url, nil, &URI.parse/1)
+
+    struct!(__MODULE__, options)
+  end
 
   @doc """
   Sets the request adapter.
@@ -160,26 +190,7 @@ defmodule Req.Request do
     %{request | halted: true}
   end
 
-  @doc """
-  Builds a request pipeline.
-
-  ## Options
-
-    * `:headers` - request headers, defaults to `[]`
-
-    * `:body` - request body, defaults to `""`
-
-    * `:adapter` - adapter to use to make the actual HTTP request. Adapters are functions
-    specified like any other request step, but the adapter function is the last step
-    executed in the request pipeline. Defaults to calling `Req.Steps.run_finch/1`.
-
-    * `:finch` - Finch pool to use, defaults to `Req.Finch` which is automatically started
-      by the application. See `Finch` module documentation for more information on starting pools.
-
-    * `:finch_options` - Options passed down to Finch when making the request, defaults to `[]`.
-      See `Finch.request/3` for more information.
-
-  """
+  @deprecated "Use new/1 instead"
   def build(method, url, options \\ []) do
     %Req.Request{
       method: method,

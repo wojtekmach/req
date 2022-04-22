@@ -8,105 +8,6 @@ defmodule Req.Steps do
   ## Request steps
 
   @doc """
-  Adds default steps.
-
-  ## Request steps
-
-    * `encode_headers/1`
-
-    * `put_default_headers/1`
-
-    * `encode_body/1`
-
-    * [`&put_base_url(&1, options[:base_url])`](`base_url/2`) (if `options[:base_url]` is set)
-
-    * [`&auth(&1, options[:auth])`](`auth/2`) (if `options[:auth]` is set)
-
-    * [`&put_params(&1, options[:params])`](`put_params/2`) (if `options[:params]` is set)
-
-    * [`&put_range(&1, options[:range])`](`put_range/2`) (if `options[:range]` is set)
-
-    * [`&run_steps(&1, options[:steps])`](`run_steps/2`) (if `options[:steps]` is set)
-
-  ## Response steps
-
-    * [`&retry(&1, options[:retry])`](`retry/2`) (if `options[:retry]` is set to
-      an atom true or a options keywords list)
-
-    * [`&follow_redirects(&1, options[:follow_redirects])`](`follow_redirects/2`)
-
-    * `decompress/1`
-
-    * `decode_body/1`
-
-  ## Error steps
-
-    * [`&retry(&1, options[:retry])`](`retry/2`) (if `options[:retry]` is set and is a
-      keywords list or an atom `true`)
-
-  ## Options
-
-    * `:base_url` - if set, adds the `put_base_url/2` step
-
-    * `:auth` - if set, adds the `auth/2` step
-
-    * `:params` - if set, adds the `put_params/2` step
-
-    * `:range` - if set, adds the `put_range/2` step
-
-    * `:cache` - if set to `true`, adds `put_if_modified_since/2` step
-
-    * `:raw` if set to `true`, skips `decompress/1` and `decode_body/1` steps
-
-    * `:retry` - if set, adds the `retry/2` step to response and error steps
-
-    * `:steps` - if set, runs the `run_steps/2` step with the given steps
-
-    * `:follow_redirects` - if set, runs the `follow_redirect/2` step with the given list
-       of options
-
-  """
-  @doc step: :request
-  def put_default_steps(request, options \\ []) do
-    request_steps =
-      [
-        {Req.Steps, :encode_headers, []},
-        {Req.Steps, :put_default_headers, []},
-        {Req.Steps, :encode_body, []}
-      ] ++
-        maybe_steps(options[:base_url], [{Req.Steps, :put_base_url, [options[:base_url]]}]) ++
-        maybe_steps(options[:auth], [{Req.Steps, :auth, [options[:auth]]}]) ++
-        maybe_steps(options[:params], [{Req.Steps, :put_params, [options[:params]]}]) ++
-        maybe_steps(options[:range], [{Req.Steps, :put_range, [options[:range]]}]) ++
-        maybe_steps(options[:cache], [{Req.Steps, :put_if_modified_since, []}]) ++
-        maybe_steps(options[:steps], [{Req.Steps, :run_steps, [options[:steps]]}])
-
-    retry = options[:retry]
-    retry = if retry == true, do: [], else: retry
-
-    raw? = options[:raw] == true
-
-    response_steps =
-      maybe_steps(retry, [{Req.Steps, :retry, [retry]}]) ++
-        [{Req.Steps, :follow_redirects, [options[:follow_redirects]]}] ++
-        maybe_steps(not raw?, [
-          {Req.Steps, :decompress, []},
-          {Req.Steps, :decode_body, []}
-        ])
-
-    error_steps = maybe_steps(retry, [{Req.Steps, :retry, [retry]}])
-
-    request
-    |> Req.Request.append_request_steps(request_steps)
-    |> Req.Request.append_response_steps(response_steps)
-    |> Req.Request.append_error_steps(error_steps)
-  end
-
-  defp maybe_steps(nil, _step), do: []
-  defp maybe_steps(false, _step), do: []
-  defp maybe_steps(_, steps), do: steps
-
-  @doc """
   Sets base URL for all requests.
 
   ## Examples
@@ -118,18 +19,24 @@ defmodule Req.Steps do
       201
   """
   @doc step: :request
-  def put_base_url(request, base_url) when is_binary(base_url) do
-    # TODO: change build/3 so that the url is parsed later so that here it is not yet parsed
+  def put_base_url(request) do
+    case request.options.base_url do
+      nil ->
+        request
 
-    unless match?(%{scheme: nil, host: nil}, request.url) do
-      raise "put_base_url/2 expects the request url to only contain a path, got: #{URI.to_string(request.url)}"
+      base_url when is_binary(base_url) ->
+        # TODO: change build/3 so that the url is parsed later so that here it is not yet parsed
+
+        unless match?(%{scheme: nil, host: nil}, request.url) do
+          raise "put_base_url/1 expects the request url to only contain a path, got: #{URI.to_string(request.url)}"
+        end
+
+        # remove when we require Elixir v1.13
+        url = request.url.path || ""
+
+        url = URI.parse(request.options.base_url <> url)
+        %{request | url: url}
     end
-
-    # remove when we require Elixir v1.13
-    url = request.url.path || ""
-
-    url = URI.parse(base_url <> url)
-    %{request | url: url}
   end
 
   @doc """
@@ -138,9 +45,12 @@ defmodule Req.Steps do
   `auth` can be one of:
 
     * `{username, password}` - uses Basic HTTP authentication
+
     * `{:bearer, token}` - uses Bearer HTTP authentication
+
     * `:netrc` - load credentials from `.netrc` at path specified in `NETRC` environment variable;
       if `NETRC` is not set, load `.netrc` in user's home directory
+
     * `{:netrc, path}` - load credentials from `path`
 
   ## Examples
@@ -163,23 +73,29 @@ defmodule Req.Steps do
       200
   """
   @doc step: :request
-  def auth(request, auth)
+  def auth(request) do
+    auth(request, request.options.auth)
+  end
 
-  def auth(request, {:bearer, token}) when is_binary(token) do
+  defp auth(request, nil) do
+    request
+  end
+
+  defp auth(request, {:bearer, token}) when is_binary(token) do
     put_new_header(request, "authorization", "Bearer #{token}")
   end
 
-  def auth(request, {username, password}) when is_binary(username) and is_binary(password) do
+  defp auth(request, {username, password}) when is_binary(username) and is_binary(password) do
     value = Base.encode64("#{username}:#{password}")
     put_new_header(request, "authorization", "Basic #{value}")
   end
 
-  def auth(request, :netrc) do
+  defp auth(request, :netrc) do
     path = System.get_env("NETRC") || Path.join(System.user_home!(), ".netrc")
     authenticate_with_netrc(request, path)
   end
 
-  def auth(request, {:netrc, path}) do
+  defp auth(request, {:netrc, path}) do
     authenticate_with_netrc(request, path)
   end
 
@@ -253,6 +169,10 @@ defmodule Req.Steps do
       iex> Req.get!("https://httpbin.org/user-agent", headers: [user_agent: :my_agent]).body
       %{"user-agent" => "my_agent"}
 
+      iex> headers = [x_expires_at: ~N[2022-01-01 09:00:00]]
+      iex> Req.get!("https://httpbin.org/headers", headers: headers).body["headers"]["X-Expires-At"]
+      "Sat, 01 Jan 2022 09:00:00 GMT"
+
   """
   @doc step: :request
   def encode_headers(request) do
@@ -298,7 +218,7 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> Req.post!("https://httpbin.org/post", {:form, comments: "hello!"}).body["form"]
+      iex> Req.post!("https://httpbin.org/post", body: {:form, comments: "hello!"}).body["form"]
       %{"comments" => "hello!"}
 
   """
@@ -323,6 +243,10 @@ defmodule Req.Steps do
   @doc """
   Adds params to request query string.
 
+  ## Request Options
+
+    * `:params` - params to add to the request query string.
+
   ## Examples
 
       iex> Req.get!("https://httpbin.org/anything/query", params: [x: "1", y: "2"]).body["args"]
@@ -330,8 +254,12 @@ defmodule Req.Steps do
 
   """
   @doc step: :request
-  def put_params(request, params) do
-    encoded = URI.encode_query(params)
+  def put_params(request) when request.options.params == [] do
+    request
+  end
+
+  def put_params(request) do
+    encoded = URI.encode_query(request.options.params)
 
     update_in(request.url.query, fn
       nil -> encoded
@@ -342,11 +270,13 @@ defmodule Req.Steps do
   @doc """
   Sets the "Range" request header.
 
-  `range` can be one of the following:
+  ## Request Options
 
-    * a string - returned as is
+    * `:range` - can be one of the following:
 
-    * a `first..last` range - converted to `"bytes=<first>-<last>"`
+        * a string - returned as is
+
+        * a `first..last` range - converted to `"bytes=<first>-<last>"`
 
   ## Examples
 
@@ -359,14 +289,16 @@ defmodule Req.Steps do
       {"content-range", "bytes 0-3/100"}
   """
   @doc step: :request
-  def put_range(request, range)
-
-  def put_range(request, binary) when is_binary(binary) do
-    put_header(request, "range", binary)
+  def put_range(%{options: %{range: range}} = request) when is_binary(range) do
+    put_header(request, "range", range)
   end
 
-  def put_range(request, first..last) do
+  def put_range(%{options: %{range: first..last}} = request) do
     put_header(request, "range", "bytes=#{first}-#{last}")
+  end
+
+  def put_range(request) do
+    request
   end
 
   @doc """
@@ -379,12 +311,14 @@ defmodule Req.Steps do
 
   ## Options
 
+    * `:cache` - if `true`, performs caching. Defaults to `false`.
+
     * `:dir` - the directory to store the cache, defaults to `<user_cache_dir>/req`
       (see: `:filename.basedir/3`)
 
   ## Examples
 
-      iex> url = "https://httpbin.org/html"
+      iex> url = "https://elixir-lang.org"
       iex> response1 = Req.get!(url, cache: true)
       iex> response2 = Req.get!(url, cache: true)
       iex> response1 == response2
@@ -392,8 +326,12 @@ defmodule Req.Steps do
 
   """
   @doc step: :request
-  def put_if_modified_since(request, options \\ []) do
-    dir = options[:dir] || :filename.basedir(:user_cache, 'req')
+  def put_if_modified_since(request) when request.options.cache == false do
+    request
+  end
+
+  def put_if_modified_since(request) do
+    dir = request.options.cache_dir || :filename.basedir(:user_cache, 'req')
 
     request
     |> do_put_if_modified_since(dir)
@@ -427,44 +365,18 @@ defmodule Req.Steps do
   end
 
   @doc """
-  Runs the given steps.
-
-  A step is a function that takes and returns a usually updated `state`.
-  The `state` is:
-
-    * a `request` struct for request steps
-
-    * a `{request, response}` tuple for response steps
-
-    * a `{request, exception}` tuple for error steps
-
-  A step can be one of the following:
-
-    * a 1-arity function
-
-    * a `{module, function, args}` tuple - calls `apply(module, function, [state | args])`
-
-    * a `{module, options}` tuple - calls `module.run(state, options)`
-
-    * a `module` atom - calls `module.run(state, [])`
-
-  ## Examples
-
-      iex> inspect_host = fn request -> IO.inspect(request.url.host) ; request end
-      iex> Req.get!("https://httpbin.org/status/200", steps: [inspect_host]).status
-      # Outputs: "httpbin.org"
-      200
-
-  """
-  @doc step: :request
-  def run_steps(request, steps) when is_list(steps) do
-    Enum.reduce(steps, request, &Req.Request.run_step/2)
-  end
-
-  @doc """
   Runs the request using `Finch`.
 
-  This is the default adapter. See `Req.Request.build/3` for more information.
+  This is the default Req _adapter_. See `:adapter` field description in the `Req.Request` module
+  documentation for more information on adapters.
+
+  ## Request Options
+
+    * `:finch` - the name of the Finch pool. Defaults to `Req.Finch` which is automatically
+      started by Req.
+
+    * `:finch_options` - options passed down to Finch when making the request, defaults to `[]`.
+       See `Finch.request/3` for a list of available options.
   """
   @doc step: :request
   def run_finch(request) do
@@ -472,7 +384,8 @@ defmodule Req.Steps do
       Finch.build(request.method, request.url, request.headers, request.body)
       |> Map.replace!(:unix_socket, request.unix_socket)
 
-    {finch_name, finch_options} = request.private.req_finch
+    finch_name = Map.get(request.options, :finch, Req.Finch)
+    finch_options = Map.get(request.options, :finch_options, [])
 
     case Finch.request(finch_request, finch_name, finch_options) do
       {:ok, response} ->
@@ -506,6 +419,10 @@ defmodule Req.Steps do
   def decompress(request_response)
 
   def decompress({request, %{body: ""} = response}) do
+    {request, response}
+  end
+
+  def decompress({request, response}) when request.options.raw == true do
     {request, response}
   end
 
@@ -562,6 +479,10 @@ defmodule Req.Steps do
   def decode_body(request_response)
 
   def decode_body({request, %{body: ""} = response}) do
+    {request, response}
+  end
+
+  def decode_body({request, response}) when request.options.raw == true do
     {request, response}
   end
 
@@ -649,7 +570,7 @@ defmodule Req.Steps do
   | 301, 302, 303 | Changed to GET     |
   | 307, 308      | Method not changed |
 
-  ## Options
+  ## Request Options
 
     * `:location_trusted` - by default, authorization credentials are only sent
       on redirects to the same host. If `:location_trusted` is set to `true`, credentials
@@ -658,19 +579,19 @@ defmodule Req.Steps do
   ## Examples
 
       iex> Req.get!("http://api.github.com").status
-      # 23:24:11.670 [debug]  Req.follow_redirects/2: Redirecting to https://api.github.com/
+      # 23:24:11.670 [debug]  follow_redirects: redirecting to https://api.github.com/
       200
 
   """
   @doc step: :response
-  def follow_redirects(request_response, options \\ [])
+  def follow_redirects(request_response)
 
-  def follow_redirects({request, %{status: status} = response}, options)
+  def follow_redirects({request, %{status: status} = response})
       when status in [301, 302, 303, 307, 308] do
     {_, location} = List.keyfind(response.headers, "location", 0)
-    Logger.debug(["Req.follow_redirects/2: Redirecting to ", location])
+    Logger.debug(["follow_redirects: redirecting to ", location])
 
-    location_trusted = options[:location_trusted]
+    location_trusted = request.options.location_trusted
     location_url = URI.parse(location)
 
     request =
@@ -683,8 +604,36 @@ defmodule Req.Steps do
     {Req.Request.halt(request), result}
   end
 
-  def follow_redirects(other, _) do
+  def follow_redirects(other) do
     other
+  end
+
+  defp put_redirect_location(request, location_url) do
+    if location_url.host do
+      put_in(request.url, location_url)
+    else
+      update_in(request.url, &%{&1 | path: location_url.path, query: location_url.query})
+    end
+  end
+
+  defp put_redirect_request_method(request) when request.status in 307..308, do: request
+
+  defp put_redirect_request_method(request), do: %{request | method: :get}
+
+  defp remove_credentials_if_untrusted(request, true, _), do: request
+
+  defp remove_credentials_if_untrusted(request, _, location_url) do
+    if location_url.host == request.url.host do
+      request
+    else
+      remove_credentials(request)
+    end
+  end
+
+  defp remove_credentials(request) do
+    headers = List.keydelete(request.headers, "authorization", 0)
+    request = put_in(request.options.auth, nil)
+    %{request | headers: headers}
   end
 
   ## Error steps
@@ -699,9 +648,11 @@ defmodule Req.Steps do
 
     * an exception
 
-  ## Options
+  ## Request Options
 
-    * `:delay` - sleep this number of milliseconds before making another attempt, defaults
+    * `:retry` - if `false`, disables automatic retries. Defaults to `true`.
+
+    * `:request_delay` - sleep this number of milliseconds before making another attempt, defaults
       to `2000`
 
     * `:max_retries` - maximum number of retry attempts, defaults to `2` (for a total of `3`
@@ -711,39 +662,39 @@ defmodule Req.Steps do
 
   With default options:
 
-      iex> Req.get!("https://httpbin.org/status/500,200", retry: true).status
-      # 19:02:08.463 [error] Req.retry/3: Got response with status 500. Will retry in 2000ms, 2 attempts left
-      # 19:02:10.710 [error] Req.retry/3: Got response with status 500. Will retry in 2000ms, 1 attempt left
+      iex> Req.get!("https://httpbin.org/status/500,200").status
+      # 19:02:08.463 [error] retry: got response with status 500, will retry in 2000ms, 2 attempts left
+      # 19:02:10.710 [error] retry: got response with status 500, will retry in 2000ms, 1 attempt left
       200
 
   With custom options:
 
-      iex> Req.get!("http://localhost:9999", retry: [delay: 100, max_retries: 3])
-      # 17:00:38.371 [error] Req.retry/3: Got exception. Will retry in 100ms, 3 attempts left
+      iex> Req.get!("http://localhost:9999", retry_delay: 100, max_retries: 3)
+      # 17:00:38.371 [error] retry: got exception, will retry in 100ms, 3 attempts left
       # 17:00:38.371 [error] ** (Mint.TransportError) connection refused
-      # 17:00:38.473 [error] Req.retry/3: Got exception. Will retry in 100ms, 2 attempts left
+      # 17:00:38.473 [error] retry: got exception, will retry in 100ms, 2 attempts left
       # 17:00:38.473 [error] ** (Mint.TransportError) connection refused
-      # 17:00:38.575 [error] Req.retry/3: Got exception. Will retry in 100ms, 1 attempt left
+      # 17:00:38.575 [error] retry: got exception, will retry in 100ms, 1 attempt left
       # 17:00:38.575 [error] ** (Mint.TransportError) connection refused
       ** (Mint.TransportError) connection refused
 
   """
   @doc step: :error
-  def retry(request_response_or_error, options)
+  def retry(request_response_or_error)
 
-  def retry({request, %{status: status} = response}, _options) when status < 500 do
+  def retry({request, %Req.Response{} = response}) when response.status < 500 do
     {request, response}
   end
 
-  def retry({request, response_or_exception}, options) when is_list(options) do
-    delay = Keyword.get(options, :delay, 2000)
-    max_retries = Keyword.get(options, :max_retries, 2)
-    retry_count = Req.Request.get_private(request, :retry_count, 0)
+  def retry({request, response_or_exception}) do
+    delay = request.options.retry_delay
+    max_retries = request.options.max_retries
+    retry_count = Req.Request.get_private(request, :req_retry_count, 0)
 
     if retry_count < max_retries do
       log_retry(response_or_exception, retry_count, max_retries, delay)
       Process.sleep(delay)
-      request = Req.Request.put_private(request, :retry_count, retry_count + 1)
+      request = Req.Request.put_private(request, :req_retry_count, retry_count + 1)
 
       {_, result} = Req.Request.run(request)
       {Req.Request.halt(request), result}
@@ -759,12 +710,12 @@ defmodule Req.Steps do
         n -> "#{n} attempts"
       end
 
-    message = ["Will retry in #{delay}ms, ", retries_left, " left"]
+    message = ["will retry in #{delay}ms, ", retries_left, " left"]
 
     case response_or_exception do
       %{__exception__: true} = exception ->
         Logger.error([
-          "Req.retry/3: Got exception. ",
+          "retry: got exception, ",
           message
         ])
 
@@ -774,7 +725,7 @@ defmodule Req.Steps do
         ])
 
       response ->
-        Logger.error(["Req.retry/3: Got response with status #{response.status}. ", message])
+        Logger.error(["retry: got response with status #{response.status}, ", message])
     end
   end
 
@@ -839,34 +790,5 @@ defmodule Req.Steps do
 
   defp format_http_datetime(datetime) do
     Calendar.strftime(datetime, "%a, %d %b %Y %H:%M:%S GMT")
-  end
-
-  defp put_redirect_location(request, location_url) do
-    if location_url.host do
-      put_in(request.url, location_url)
-    else
-      update_in(request.url, &%{&1 | path: location_url.path, query: location_url.query})
-    end
-  end
-
-  defp put_redirect_request_method(request) when request.status in 307..308, do: request
-
-  defp put_redirect_request_method(request), do: %{request | method: :get}
-
-  defp remove_credentials_if_untrusted(request, true, _), do: request
-
-  defp remove_credentials_if_untrusted(request, _, location_url) do
-    if location_url.host == request.url.host do
-      request
-    else
-      remove_credentials(request)
-    end
-  end
-
-  defp remove_credentials(request) do
-    headers = List.keydelete(request.headers, "authorization", 0)
-    request_steps = Enum.reject(request.request_steps, fn {_, step, _} -> step == :auth end)
-
-    %{request | headers: headers, request_steps: request_steps}
   end
 end
