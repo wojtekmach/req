@@ -1,25 +1,19 @@
 defmodule Req.Request do
-  @type t() :: %Req.Request{
-          method: :get | :post | :put | :head | :delete,
-          url: URI.t(),
-          headers: [{binary(), binary()}],
-          body: binary(),
-          options: keyword(),
-          adapter: request_step(),
-          request_steps: [request_step()],
-          response_steps: [response_step()],
-          error_steps: [error_step()],
-          private: map()
-        }
-
-  @typep request_step() :: fun()
-  @typep response_step() :: fun()
-  @typep error_step() :: fun()
-
   @moduledoc ~S"""
-  The request pipeline struct.
+  The low-level API and the request struct.
 
-  Struct fields:
+  Req is composed of three main pieces:
+
+    * `Req` - the high-level API
+
+    * `Req.Request` - the low-level API and the request struct (you're here!)
+
+    * `Req.Steps` - the collection of built-in steps
+
+  The low-level API, the request struct and the associated functions, is the foundation of Req's
+  extensibility.
+
+  ## The request struct
 
     * `:method` - the HTTP request method
 
@@ -133,6 +127,23 @@ defmodule Req.Request do
       end
   """
 
+  @type t() :: %Req.Request{
+          method: :get | :post | :put | :head | :delete,
+          url: URI.t(),
+          headers: [{binary(), binary()}],
+          body: binary(),
+          options: keyword(),
+          adapter: request_step(),
+          request_steps: [request_step()],
+          response_steps: [response_step()],
+          error_steps: [error_step()],
+          private: map()
+        }
+
+  @typep request_step() :: fun()
+  @typep response_step() :: fun()
+  @typep error_step() :: fun()
+
   defstruct method: :get,
             url: nil,
             headers: [],
@@ -146,17 +157,6 @@ defmodule Req.Request do
             error_steps: [],
             private: %{},
             location_trusted: false
-
-  @doc """
-  Returns a new request struct.
-  """
-  def new(options \\ []) do
-    options =
-      options
-      |> Keyword.update(:url, nil, &URI.parse/1)
-
-    struct!(__MODULE__, options)
-  end
 
   @doc """
   Sets the request adapter.
@@ -190,6 +190,7 @@ defmodule Req.Request do
     %{request | halted: true}
   end
 
+  @doc false
   @deprecated "Use new/1 instead"
   def build(method, url, options \\ []) do
     %Req.Request{

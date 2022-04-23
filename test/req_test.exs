@@ -1,6 +1,11 @@
 defmodule ReqTest do
   use ExUnit.Case, async: true
 
+  doctest Req,
+    only: [
+      new: 1
+    ]
+
   setup do
     bypass = Bypass.open()
     [bypass: bypass, url: "http://localhost:#{bypass.port}"]

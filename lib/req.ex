@@ -1,10 +1,37 @@
 defmodule Req do
   @external_resource "README.md"
 
-  @moduledoc "README.md"
-             |> File.read!()
-             |> String.split("<!-- MDOC !-->")
-             |> Enum.fetch!(1)
+  @moduledoc """
+  The high-level API.
+
+  Req is composed of three main pieces:
+
+    * `Req` - the high-level API (you're here!)
+
+    * `Req.Request` - the low-level API and the request struct
+
+    * `Req.Steps` - the collection of built-in steps
+
+  The high-level API is what most users of Req will use most of the time.
+
+  ## Examples
+
+  Making a GET request with `Req.get!/1`:
+
+      iex> Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
+      "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+
+  Same, but by explicitly building request struct first:
+
+      iex> req = Req.new(base_url: "https://api.github.com")
+      iex> Req.get!(req, url: "/repos/elixir-lang/elixir").body["description"]
+      "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+
+  Making a POST request with `Req.post!/2`:
+
+      iex> Req.post!("https://httpbin.org/post", body: {:form, comments: "hello!"}).body["form"]
+      %{"comments" => "hello!"}
+  """
 
   @type url() :: URI.t() | String.t()
 
@@ -13,7 +40,17 @@ defmodule Req do
   @doc """
   Returns a new request struct with default steps.
 
-  See `request/1` for a list of available options.
+  See `request/1` for a list of available options. See `Req.Request` module documentation
+  for more information on the underlying request struct.
+
+  ## Examples
+
+      iex> req = Req.new(url: "https://elixir-lang.org")
+      iex> req.method
+      :get
+      iex> URI.to_string(req.url)
+      "https://elixir-lang.org"
+
   """
   @spec new(options :: keyword()) :: Req.Request.t()
   def new(options \\ []) do
@@ -224,15 +261,14 @@ defmodule Req do
   Additional URL options:
 
     * `:base_url` - if set, the URL is prepended with this base URL (via
-      [`put_base_url`](`Req.Steps.put_base_url/1`) step).  Defaults to `nil`.
+      [`put_base_url`](`Req.Steps.put_base_url/1`) step).
 
-    * `:params` - appends parameters to the request query string (via
-      [`put_params`](`Req.Steps.put_params/1`) step). Defaults to `[]`.
+    * `:params` - if set, appends parameters to the request query string (via
+      [`put_params`](`Req.Steps.put_params/1`) step).
 
   Authentication options:
 
-    * `:auth` - if present, sets request authentication (. Defaults to `nil`. See
-      [`auth`](`Req.Steps.auth/1`) step.
+    * `:auth` - sets request authentication (via [`auth`](`Req.Steps.auth/1`) step).
 
   Response body options:
 

@@ -1,6 +1,14 @@
 defmodule Req.Steps do
   @moduledoc """
-  A collection of built-in steps.
+  The collection of built-in steps.
+
+  Req is composed of three main pieces:
+
+    * `Req` - the high-level API
+
+    * `Req.Request` - the low-level API and the request struct
+
+    * `Req.Steps` - the collection of built-in steps (you're here!)
   """
 
   require Logger
