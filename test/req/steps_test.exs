@@ -13,8 +13,16 @@ defmodule Req.StepsTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
-    assert Req.get!("/", base_url: c.url).status == 200
-    assert Req.get!("", base_url: c.url).status == 200
+    assert Req.get!("/", base_url: c.url).body == "ok"
+    assert Req.get!("", base_url: c.url).body == "ok"
+  end
+
+  test "put_base_url/1: with absolute url", c do
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    assert Req.get!(c.url, base_url: "ignored").body == "ok"
   end
 
   test "auth/1: basic", c do

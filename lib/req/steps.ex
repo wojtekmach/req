@@ -18,9 +18,11 @@ defmodule Req.Steps do
   @doc """
   Sets base URL for all requests.
 
+
   ## Request Options:
 
-    * `:base_url` - the base URL
+    * `:base_url` - if set, the request URL is prepended with this base URL.
+      If request URL contains a scheme, base URL is ignored.
 
   ## Examples
 
@@ -29,22 +31,21 @@ defmodule Req.Steps do
       200
       iex> Req.get!(req, url: "/status/201").status
       201
+
   """
   @doc step: :request
   def put_base_url(request)
 
   def put_base_url(%{options: %{base_url: base_url}} = request) do
-    # TODO: change build/3 so that the url is parsed later so that here it is not yet parsed
+    if request.url.scheme do
+      request
+    else
+      # remove when we require Elixir v1.13
+      url = request.url.path || ""
 
-    unless match?(%{scheme: nil, host: nil}, request.url) do
-      raise "put_base_url/1 expects the request url to only contain a path, got: #{URI.to_string(request.url)}"
+      url = URI.parse(base_url <> url)
+      %{request | url: url}
     end
-
-    # remove when we require Elixir v1.13
-    url = request.url.path || ""
-
-    url = URI.parse(base_url <> url)
-    %{request | url: url}
   end
 
   def put_base_url(request) do
