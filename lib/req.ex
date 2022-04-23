@@ -10,29 +10,6 @@ defmodule Req do
 
   @type method() :: :get | :post | :put | :delete
 
-  @default_options %{
-    # request steps
-    auth: nil,
-    base_url: nil,
-    cache: nil,
-    cache_dir: nil,
-    params: [],
-    range: nil,
-    finch: Req.Finch,
-    pool_timeout: 5000,
-    receive_timeout: 15000,
-
-    # response steps
-    follow_redirects: true,
-    location_trusted: false,
-    raw: false,
-
-    # error steps
-    max_retries: 2,
-    retry: true,
-    retry_delay: 2000
-  }
-
   @doc """
   Returns a new request struct with default steps.
 
@@ -45,7 +22,7 @@ defmodule Req do
     {url, options} = Keyword.pop(options, :url, nil)
     {headers, options} = Keyword.pop(options, :headers, [])
     {body, options} = Keyword.pop(options, :body, "")
-    options = Map.merge(@default_options, Map.new(options))
+    options = Map.new(options)
 
     %Req.Request{
       adapter: adapter,

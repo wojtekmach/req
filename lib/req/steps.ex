@@ -23,24 +23,24 @@ defmodule Req.Steps do
       201
   """
   @doc step: :request
-  def put_base_url(request) do
-    case request.options.base_url do
-      nil ->
-        request
+  def put_base_url(request)
 
-      base_url when is_binary(base_url) ->
-        # TODO: change build/3 so that the url is parsed later so that here it is not yet parsed
+  def put_base_url(%{options: %{base_url: base_url}} = request) do
+    # TODO: change build/3 so that the url is parsed later so that here it is not yet parsed
 
-        unless match?(%{scheme: nil, host: nil}, request.url) do
-          raise "put_base_url/1 expects the request url to only contain a path, got: #{URI.to_string(request.url)}"
-        end
-
-        # remove when we require Elixir v1.13
-        url = request.url.path || ""
-
-        url = URI.parse(request.options.base_url <> url)
-        %{request | url: url}
+    unless match?(%{scheme: nil, host: nil}, request.url) do
+      raise "put_base_url/1 expects the request url to only contain a path, got: #{URI.to_string(request.url)}"
     end
+
+    # remove when we require Elixir v1.13
+    url = request.url.path || ""
+
+    url = URI.parse(base_url <> url)
+    %{request | url: url}
+  end
+
+  def put_base_url(request) do
+    request
   end
 
   @doc """
@@ -78,7 +78,7 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def auth(request) do
-    auth(request, request.options.auth)
+    auth(request, Map.get(request.options, :auth))
   end
 
   defp auth(request, nil) do
@@ -249,21 +249,25 @@ defmodule Req.Steps do
 
   ## Request Options
 
-    * `:params` - params to add to the request query string.
+    * `:params` - params to add to the request query string. Defaults to `[]`.
 
   ## Examples
 
-      iex> Req.get!("https://httpbin.org/anything/query", params: [x: "1", y: "2"]).body["args"]
+      iex> Req.get!("https://httpbin.org/anything/query", params: [x: 1, y: 2]).body["args"]
       %{"x" => "1", "y" => "2"}
 
   """
   @doc step: :request
-  def put_params(request) when request.options.params == [] do
+  def put_params(request) do
+    put_params(request, Map.get(request.options, :params, []))
+  end
+
+  def put_params(request, []) do
     request
   end
 
-  def put_params(request) do
-    encoded = URI.encode_query(request.options.params)
+  def put_params(request, params) do
+    encoded = URI.encode_query(params)
 
     update_in(request.url.query, fn
       nil -> encoded
@@ -317,7 +321,7 @@ defmodule Req.Steps do
 
     * `:cache` - if `true`, performs caching. Defaults to `false`.
 
-    * `:dir` - the directory to store the cache, defaults to `<user_cache_dir>/req`
+    * `:cache_dir` - the directory to store the cache, defaults to `<user_cache_dir>/req`
       (see: `:filename.basedir/3`)
 
   ## Examples
@@ -330,16 +334,16 @@ defmodule Req.Steps do
 
   """
   @doc step: :request
-  def put_if_modified_since(request) when request.options.cache == false do
-    request
-  end
-
   def put_if_modified_since(request) do
-    dir = request.options.cache_dir || :filename.basedir(:user_cache, 'req')
+    if request.options[:cache] do
+      dir = Map.get(request.options, :cache_dir) || :filename.basedir(:user_cache, 'req')
 
-    request
-    |> do_put_if_modified_since(dir)
-    |> Req.Request.prepend_response_steps([&handle_cache(&1, dir)])
+      request
+      |> do_put_if_modified_since(dir)
+      |> Req.Request.prepend_response_steps([&handle_cache(&1, dir)])
+    else
+      request
+    end
   end
 
   defp do_put_if_modified_since(request, dir) do
@@ -595,7 +599,7 @@ defmodule Req.Steps do
     {_, location} = List.keyfind(response.headers, "location", 0)
     Logger.debug(["follow_redirects: redirecting to ", location])
 
-    location_trusted = request.options.location_trusted
+    location_trusted = Map.get(request.options, :location_trusted)
     location_url = URI.parse(location)
 
     request =
@@ -636,7 +640,7 @@ defmodule Req.Steps do
 
   defp remove_credentials(request) do
     headers = List.keydelete(request.headers, "authorization", 0)
-    request = put_in(request.options.auth, nil)
+    request = update_in(request.options, &Map.delete(&1, :auth))
     %{request | headers: headers}
   end
 
@@ -691,8 +695,8 @@ defmodule Req.Steps do
   end
 
   def retry({request, response_or_exception}) do
-    delay = request.options.retry_delay
-    max_retries = request.options.max_retries
+    delay = Map.get(request.options, :retry_delay, 2000)
+    max_retries = Map.get(request.options, :max_retries, 2)
     retry_count = Req.Request.get_private(request, :req_retry_count, 0)
 
     if retry_count < max_retries do
