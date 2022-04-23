@@ -56,7 +56,7 @@ defmodule Req.MixProject do
 
   defp docs do
     [
-      main: "Req",
+      main: "readme",
       source_url: @source_url,
       source_ref: "v#{@version}",
       groups_for_functions: [
@@ -65,6 +65,7 @@ defmodule Req.MixProject do
         "Error steps": &(&1[:step] == :error)
       ],
       extras: [
+        "README.md",
         "CHANGELOG.md"
       ]
     ]

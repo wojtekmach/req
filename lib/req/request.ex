@@ -1,8 +1,21 @@
 defmodule Req.Request do
   @moduledoc ~S"""
-  The request pipeline struct.
+  The low-level API and the request struct.
 
-  Struct fields:
+  Req is composed of three main pieces:
+
+    * `Req` - the high-level API
+
+    * `Req.Request` - the low-level API and the request struct (you're here!)
+
+    * `Req.Steps` - the collection of built-in steps
+
+  The low-level API and the request struct is the foundation of Req's extensibility. Virtually all
+  of the functionality is broken down into individual pieces - steps. Req works by running the
+  request struct through these steps. You can easily reuse or rearrange built-in steps or write new
+  ones.
+
+  ## The request struct
 
     * `:method` - the HTTP request method
 
@@ -11,12 +24,6 @@ defmodule Req.Request do
     * `:headers` - the HTTP request headers
 
     * `:body` - the HTTP request body
-
-    * `:adapter` - a request step that makes the actual HTTP request
-
-    * `:unix_socket` - if set, connect through the given UNIX domain socket
-
-    * `:halted` - whether the request pipeline is halted. See `halt/1`
 
     * `:request_steps` - the list of request steps
 
@@ -28,9 +35,18 @@ defmodule Req.Request do
       Prefix the keys with the name of your project to avoid any future
       conflicts. Only accepts `t:atom/0` keys.
 
+    * `:halted` - whether the request pipeline is halted. See `halt/1`
+
+    * `:adapter` - a request step that makes the actual HTTP request. The adapter
+      is automatically added by Req as the very last request step. The adapter must
+      return `{request, response}` or `{request, exception}`, thus triggering the
+      response or error pipeline, respectively. Defaults to `Req.Steps.run_finch/1`.
+
+    * `:unix_socket` - if set, connect through the given UNIX domain socket
+
   ## Steps
 
-  Under the hood, Req works by passing a [`%Req.Request{}`](`Req.Request`) struct through a series of steps.
+  Req has three types of steps: request, response, and error.
 
   Request steps are used to refine the data that will be sent to the server.
 
@@ -113,20 +129,36 @@ defmodule Req.Request do
       end
   """
 
-  defstruct [
-    :method,
-    :url,
-    headers: [],
-    body: "",
-    adapter: {Req.Steps, :run_finch, []},
-    unix_socket: nil,
-    halted: false,
-    request_steps: [],
-    response_steps: [],
-    error_steps: [],
-    private: %{},
-    location_trusted: false
-  ]
+  @type t() :: %Req.Request{
+          method: :get | :post | :put | :head | :delete,
+          url: URI.t(),
+          headers: [{binary(), binary()}],
+          body: binary(),
+          options: keyword(),
+          adapter: request_step(),
+          request_steps: [request_step()],
+          response_steps: [response_step()],
+          error_steps: [error_step()],
+          private: map()
+        }
+
+  @typep request_step() :: fun()
+  @typep response_step() :: fun()
+  @typep error_step() :: fun()
+
+  defstruct method: :get,
+            url: nil,
+            headers: [],
+            body: "",
+            options: %{},
+            adapter: &Req.Steps.run_finch/1,
+            unix_socket: nil,
+            halted: false,
+            request_steps: [],
+            response_steps: [],
+            error_steps: [],
+            private: %{},
+            location_trusted: false
 
   @doc """
   Sets the request adapter.
@@ -160,26 +192,8 @@ defmodule Req.Request do
     %{request | halted: true}
   end
 
-  @doc """
-  Builds a request pipeline.
-
-  ## Options
-
-    * `:headers` - request headers, defaults to `[]`
-
-    * `:body` - request body, defaults to `""`
-
-    * `:adapter` - adapter to use to make the actual HTTP request. Adapters are functions
-    specified like any other request step, but the adapter function is the last step
-    executed in the request pipeline. Defaults to calling `Req.Steps.run_finch/1`.
-
-    * `:finch` - Finch pool to use, defaults to `Req.Finch` which is automatically started
-      by the application. See `Finch` module documentation for more information on starting pools.
-
-    * `:finch_options` - Options passed down to Finch when making the request, defaults to `[]`.
-      See `Finch.request/3` for more information.
-
-  """
+  @doc false
+  @deprecated "Use new/1 instead"
   def build(method, url, options \\ []) do
     %Req.Request{
       method: method,

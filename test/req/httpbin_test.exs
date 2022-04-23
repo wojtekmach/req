@@ -15,14 +15,14 @@ defmodule Req.HttpbinTest do
 
   doctest Req.Steps,
     only: [
-      auth: 2,
-      put_base_url: 2,
+      auth: 1,
+      put_base_url: 1,
       encode_headers: 1,
       encode_body: 1,
-      put_params: 2,
-      put_range: 2,
-      run_steps: 2,
-      put_if_modified_since: 2,
+      put_params: 1,
+      put_range: 1,
+      # run_steps: 1,
+      put_if_modified_since: 1,
       decompress: 1,
       decode_body: 1
     ]
