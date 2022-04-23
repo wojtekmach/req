@@ -334,15 +334,15 @@ defmodule Req do
   def request(request, options) do
     options = Keyword.merge(default_options(), options)
 
-      {request_options, options} = Keyword.split(options, [:method, :url, :headers, :body])
+    {request_options, options} = Keyword.split(options, [:method, :url, :headers, :body])
 
-      request =
-        Map.merge(request, Map.new(request_options), fn
-            :url, _, url -> URI.parse(url)
-            # TODO: merge headers
-            :headers, _, headers -> headers
-            _, _, value -> value
-        end)
+    request =
+      Map.merge(request, Map.new(request_options), fn
+        :url, _, url -> URI.parse(url)
+        # TODO: merge headers
+        :headers, _, headers -> headers
+        _, _, value -> value
+      end)
 
     request = update_in(request.options, &Map.merge(&1, Map.new(options)))
     Req.Request.run(request)
