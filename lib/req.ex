@@ -280,8 +280,6 @@ defmodule Req do
 
     * `:follow_redirects` - if set to `false`, disables automatic response redirects. Defaults to `true`.
 
-    * `:max_redirects` - the maximum number of redirects. Defaults to `3`.
-
   Caching options ([`put_if_modified_since`](`Req.Steps.put_if_modified_since/1`) step):
 
     * `:cache` - if `true`, performs caching. Defaults to `false`.
