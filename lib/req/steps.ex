@@ -10,12 +10,16 @@ defmodule Req.Steps do
   @doc """
   Sets base URL for all requests.
 
+  ## Request Options:
+
+    * `:base_url` - the base URL
+
   ## Examples
 
-      iex> options = [base_url: "https://httpbin.org"]
-      iex> Req.get!("/status/200", options).status
+      iex> req = Req.new(base_url: "https://httpbin.org")
+      iex> Req.get!(req, "/status/200").status
       200
-      iex> Req.get!("/status/201", options).status
+      iex> Req.get!(req, "/status/201").status
       201
   """
   @doc step: :request

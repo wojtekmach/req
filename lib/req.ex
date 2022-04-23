@@ -83,8 +83,16 @@ defmodule Req do
 
   ## Examples
 
+  With URL:
+
       iex> Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
       "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+
+  With request struct:
+
+      iex> req = Req.new(base_url: "https://api.github.com")
+      iex> Req.get!(req, url: "/repos/elixir-lang/elixir").status
+      200
 
   """
   @spec get!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
@@ -105,9 +113,16 @@ defmodule Req do
 
   ## Examples
 
-      iex> Req.post!("https://httpbin.org/post", body: {:form, foo: "hello!"}).body["form"]
-      #=> %{"comments" => "hello!"}
+  With URL:
 
+      iex> Req.post!("https://httpbin.org/post", body: {:form, comments: "hello!"}).body["form"]
+      %{"comments" => "hello!"}
+
+  With request struct:
+
+      iex> req = Req.new(url: "https://httpbin.org/post")
+      iex> Req.post!(req, body: {:form, comments: "hello!"}).body["form"]
+      %{"comments" => "hello!"}
   """
   @spec post!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
   def post!(url_or_request, options \\ [])
@@ -142,7 +157,15 @@ defmodule Req do
 
   ## Examples
 
+  With URL:
+
       iex> Req.put!("https://httpbin.org/anything", body: "the body").body |> Map.take(["data", "method"])
+      %{"data" => "the body", "method" => "PUT"}
+
+  With request struct:
+
+      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> Req.put!(req, body: "the body").body |> Map.take(["data", "method"])
       %{"data" => "the body", "method" => "PUT"}
 
   """
@@ -185,42 +208,80 @@ defmodule Req do
   @doc """
   Makes an HTTP request.
 
+  `request/1` and `request/2` functions give three ways of making requests:
+
+    1. With a list of options, for example:
+
+       ```
+       Req.request(url: url)
+       ```
+
+    2. With a request struct, for example:
+
+       ```
+       Req.new(url: url) |> Req.request()
+       ```
+
+    3. With a request struct and more options, for example:
+
+       ```
+       Req.new(base_url: base_url) |> Req.request(url: url)
+       ```
+
+  This function as well as all the other ones in this module accept the same set of options described below.
+
   ## Options
+
+  Basic request options:
 
     * `:method` - the request method, defaults to `:get`.
 
     * `:url` - the request URL.
 
-    * `:headers` - the request headers. The headers are automatically encoded using the `Req.Steps.encode_headers/1` step.
+    * `:headers` - the request headers. The headers are automatically encoded using the
+      [`encode_headers`](`Req.Steps.encode_headers/1`) step.
 
-    * `:body` - the request body. The body is automatically encoded using the `Req.Steps.encode_body/1` step.
+    * `:body` - the request body. The body is automatically encoded using the
+      [`encode_body`](`Req.Steps.encode_body/1`) step.
 
-    * `:base_url` - if set, the URL is prepended with this base URL. Defaults to `nil`.
-      See `Req.Steps.put_base_url/1` for more information.
+  Additional URL options:
 
-    * `:params` - appends parameters to the request query string. Defaults to `[]`.
-      See `Req.Steps.put_params/1` for more information.
+    * `:base_url` - if set, the URL is prepended with this base URL (via
+      [`put_base_url`](`Req.Steps.put_base_url/1`) step).  Defaults to `nil`.
 
-    * `:raw` - if set to `true`, disables automatic body decompression (`Req.Steps.decompress/1`) and
-      and decoding (`Req.Steps.decode_body/1`). Defaults to `false`.
+    * `:params` - appends parameters to the request query string (via
+      [`put_params`](`Req.Steps.put_params/1`) step). Defaults to `[]`.
 
-    * `:adapter` - adapter to use to make the actual HTTP request. See `:adapter` field description
-      in the `Req.Request` module documentation for more information. Defaults to calling `Req.Steps.run_finch/1`.
+  Authentication options:
 
-  `put_if_modified_since/1` options:
+    * `:auth` - if present, sets request authentication (. Defaults to `nil`. See
+      [`auth`](`Req.Steps.auth/1`) step.
 
-    * `:cache` - if `true`, performs caching. Defaults to `false`.
+  Response body options:
 
-    * `:dir` - the directory to store the cache, defaults to `<user_cache_dir>/req`
-      (see: `:filename.basedir/3`)
+    * `:raw` - if set to `true`, disables automatic body decompression
+      ([`decompress`](`Req.Steps.decompress/1`) step) and and decoding
+      ([`decode_body`](`Req.Steps.decode_body/1`) step). Defaults to `false`.
 
-  `follow_redirects/1` options:
+  Response redirect options ([`follow_redirects`](`Req.Steps.follow_redirects/1`) step):
 
     * `:follow_redirects` - if set to `false`, disables automatic response redirects. Defaults to `true`.
 
     * `:max_redirects` - the maximum number of redirects. Defaults to `3`.
 
-  `run_finch/1` options:
+  Caching options ([`put_if_modified_since`](`Req.Steps.put_if_modified_since/1`) step):
+
+    * `:cache` - if `true`, performs caching. Defaults to `false`.
+
+    * `:cache_dir` - the directory to store the cache, defaults to `<user_cache_dir>/req`
+      (see: `:filename.basedir/3`)
+
+  Request adapter:
+
+    * `:adapter` - adapter to use to make the actual HTTP request. See `:adapter` field description
+      in the `Req.Request` module documentation for more information. Defaults to calling [`run_finch`](`Req.Steps.run_finch/1`).
+
+  Finch options ([`run_finch`](`Req.Steps.run_finch/1`) step)
 
     * `:finch` - the `Finch` pool to use. Defaults to `Req.Finch` which is automatically started by `Req`.
 
@@ -229,15 +290,27 @@ defmodule Req do
 
   ## Examples
 
+  With options keywords list:
+
       iex> {:ok, response} = Req.request(url: "https://api.github.com/repos/elixir-lang/elixir")
+      iex> response.status
+      200
       iex> response.body
       "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
 
+  With request struct:
+
       iex> req = Req.new(url: "https://api.github.com/repos/elixir-lang/elixir")
-      iex> {:ok, %Req.Response{}} = Req.request(req)
+      iex> {:ok, response} = Req.request(req)
+      iex> response.status
+      200
+
+  With request struct and options:
 
       iex> req = Req.new(base_url: "https://api.github.com")
-      iex> {:ok, %Req.Response{}} = Req.request(req, url: "/repos/elixir-lang/elixir")
+      iex> {:ok, response} = Req.request(req, url: "/repos/elixir-lang/elixir")
+      iex> response.status
+      200
   """
   @spec request(Req.Request.t() | keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
@@ -252,7 +325,9 @@ defmodule Req do
   end
 
   @doc """
-  Makes an HTTP request.
+  akes an HTTP request.
+
+  See `request/1` for more information.
   """
   @spec request(Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
@@ -298,6 +373,11 @@ defmodule Req do
   Makes an HTTP request and returns a response or raises an error.
 
   See `request/1` for more information.
+
+  ## Examples
+
+      iex> Req.request!(url: "https://api.github.com/repos/elixir-lang/elixir").status
+      200
   """
   @spec request!(Req.Request.t() | keyword()) :: Req.Response.t()
   def request!(request_or_options) do
@@ -311,6 +391,12 @@ defmodule Req do
   Makes an HTTP request and returns a response or raises an error.
 
   See `request/1` for more information.
+
+  ## Examples
+
+      iex> Req.new(base_url: "https://api.github.com")
+      iex> Req.request!(req, url: "/repos/elixir-lang/elixir").status
+      200
   """
   @spec request!(Req.Request.t(), options :: keyword()) :: Req.Response.t()
   def request!(request, options) do

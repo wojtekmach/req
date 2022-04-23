@@ -10,7 +10,9 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
 ## Features
 
-  * Extensibility via request, response, and error steps
+  * A easy to use high-level API: `Req.request/1`, `Req.get!/2`, `Req.post!/2`, etc.
+
+  * Extensibility via request, response, and error steps.
 
   * Automatic body decompression (via [`decompress`](`Req.Steps.decompress/1`) step)
 
@@ -19,7 +21,7 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
   * Encode params as query string (via [`put_params`](`Req.Steps.put_params/1`) step)
 
-  * Basic, bearer and `.netrc` authentication (via [`auth`](`Req.Steps.auth/1`) step)
+  * Basic, bearer, and `.netrc` authentication (via [`auth`](`Req.Steps.auth/1`) step)
 
   * Range requests (via [`put_range`](`Req.Steps.put_range/1`) step)
 
