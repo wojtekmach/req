@@ -191,7 +191,7 @@ defmodule Req.Request do
   end
 
   @doc false
-  @deprecated "Use new/1 instead"
+  @deprecated "Manually build struct instead"
   def build(method, url, options \\ []) do
     %Req.Request{
       method: method,

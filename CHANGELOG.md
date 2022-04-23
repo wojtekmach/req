@@ -2,10 +2,47 @@
 
 ## v0.3.0-dev
 
-  * Change meaning of step `{mod, options}`
-  * Add `Req.Request.put_adapter/2`
+Major changes:
+
+  * Add high-level functional API: `Req.new(...) |> Req.request(...)`, `Req.new(...) |>
+    Req.get!(...)`, etc.
+
+  * Add `Req.Request.options` field that steps can read from. Also, make
+    all steps be arity 1.
+
+    When using "High-level" API, we now run all steps by default. (The
+    steps, by looking at request.options, can decide to be no-op.)
+
+  * Add `Req.Request.adapter` field
+
   * Move low-level API to `Req.Request`
-  * Move steps to `Req.Steps`
+
+  * Move built-in steps to `Req.Steps`
+
+  * Remove `put_default_steps` step
+
+  * Remove `run_steps` step
+
+  * Remove `Req.Request.unix_socket` field. Add option on `run_finch` step with the same name
+    instead.
+
+Step changes:
+
+  * `put_base_url`: Ignore base URL if given URL contains scheme
+
+Deprecations:
+
+  * Deprecate calling `Req.post!(url, body)` in favour of `Req.post(url, body: body)`. Same for `Req.put!`.
+
+  * Deprecate setting `retry: [delay: delay, max_retries: max_retries]`
+    in favour of `retry_delay: delay, max_retries: max_retries`.
+
+  * Deprecate setting `follow_redirects: [location_trusted: trusted]`
+    in favour of `location_trusted: trusted`.
+
+  * Deprecate setting `cache: [dir: dir]` in favour of `cache_dir: dir`.
+
+  * `Req.Request`: Deprecate `build/3` in favour of manually building the struct.
 
 ## v0.2.1 (2021-11-24)
 
