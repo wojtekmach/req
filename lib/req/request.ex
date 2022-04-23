@@ -150,7 +150,6 @@ defmodule Req.Request do
             body: "",
             options: %{},
             adapter: &Req.Steps.run_finch/1,
-            unix_socket: nil,
             halted: false,
             request_steps: [],
             response_steps: [],
@@ -198,7 +197,6 @@ defmodule Req.Request do
       url: URI.parse(url),
       headers: Keyword.get(options, :headers, []),
       body: Keyword.get(options, :body, ""),
-      unix_socket: Keyword.get(options, :unix_socket),
       adapter: Keyword.get(options, :adapter, {Req.Steps, :run_finch, []}),
       private: %{
         req_finch:
