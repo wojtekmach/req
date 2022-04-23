@@ -334,26 +334,15 @@ defmodule Req do
   def request(request, options) do
     options = Keyword.merge(default_options(), options)
 
-    {request, options} =
-      Enum.reduce([:method, :url, :headers, :body], {request, options}, fn option,
-                                                                           {request, options} ->
-        case Keyword.fetch(options, option) do
-          {:ok, value} ->
-            value =
-              if option == :url do
-                URI.parse(value)
-              else
-                value
-              end
+      {request_options, options} = Keyword.split(options, [:method, :url, :headers, :body])
 
+      request =
+        Map.merge(request, Map.new(request_options), fn
+            :url, _, url -> URI.parse(url)
             # TODO: merge headers
-
-            {%{request | option => value}, Keyword.delete(options, option)}
-
-          :error ->
-            {request, options}
-        end
-      end)
+            :headers, _, headers -> headers
+            _, _, value -> value
+        end)
 
     request = update_in(request.options, &Map.merge(&1, Map.new(options)))
     Req.Request.run(request)
