@@ -270,11 +270,11 @@ defmodule Req.Steps do
     put_params(request, Map.get(request.options, :params, []))
   end
 
-  def put_params(request, []) do
+  defp put_params(request, []) do
     request
   end
 
-  def put_params(request, params) do
+  defp put_params(request, params) do
     encoded = URI.encode_query(params)
 
     update_in(request.url.query, fn

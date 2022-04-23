@@ -10,8 +10,10 @@ defmodule Req.Request do
 
     * `Req.Steps` - the collection of built-in steps
 
-  The low-level API, the request struct and the associated functions, is the foundation of Req's
-  extensibility.
+  The low-level API and the request struct is the foundation of Req's extensibility. Virtually all
+  of the functionality is broken down into individual pieces - steps. Req works by running the
+  request struct through these steps. You can easily reuse or rearrange built-in steps or write new
+  ones.
 
   ## The request struct
 
@@ -23,15 +25,6 @@ defmodule Req.Request do
 
     * `:body` - the HTTP request body
 
-    * `:adapter` - a request step that makes the actual HTTP request. The adapter
-      is automatically added by Req as the very last request step. The adapter must
-      return `{request, response}` or `{request, exception}`, thus triggering the
-      response or error pipeline, respectively. Defaults to `Req.Steps.run_finch/1`.
-
-    * `:unix_socket` - if set, connect through the given UNIX domain socket
-
-    * `:halted` - whether the request pipeline is halted. See `halt/1`
-
     * `:request_steps` - the list of request steps
 
     * `:response_steps` - the list of response steps
@@ -42,9 +35,18 @@ defmodule Req.Request do
       Prefix the keys with the name of your project to avoid any future
       conflicts. Only accepts `t:atom/0` keys.
 
+    * `:halted` - whether the request pipeline is halted. See `halt/1`
+
+    * `:adapter` - a request step that makes the actual HTTP request. The adapter
+      is automatically added by Req as the very last request step. The adapter must
+      return `{request, response}` or `{request, exception}`, thus triggering the
+      response or error pipeline, respectively. Defaults to `Req.Steps.run_finch/1`.
+
+    * `:unix_socket` - if set, connect through the given UNIX domain socket
+
   ## Steps
 
-  Under the hood, Req works by passing a [`%Req.Request{}`](`Req.Request`) struct through a series of steps.
+  Req has three types of steps: request, response, and error.
 
   Request steps are used to refine the data that will be sent to the server.
 

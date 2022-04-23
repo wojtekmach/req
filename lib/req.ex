@@ -38,7 +38,7 @@ defmodule Req do
   @type method() :: :get | :post | :put | :delete
 
   @doc """
-  Returns a new request struct with default steps.
+  Returns a new request struct with built-in steps.
 
   See `request/1` for a list of available options. See `Req.Request` module documentation
   for more information on the underlying request struct.

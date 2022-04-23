@@ -10,7 +10,7 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
 ## Features
 
-  * A easy to use high-level API: `Req.request/1`, `Req.get!/2`, `Req.post!/2`, etc.
+  * An easy to use high-level API: `Req`, `Req.request/1`, `Req.get!/2`, `Req.post!/2`, etc.
 
   * Extensibility via request, response, and error steps.
 
@@ -64,9 +64,13 @@ Req.get!(req, url: "/repos/elixir-mint/mint").body["description"]
 See [`Req.request/1`](https://hexdocs.pm/req/Req.html#request/1) for more information on available
 options.
 
-## Low-level API
+## How Req Works
 
-Under the hood, Req works by passing a [`%Req.Request{}`](`Req.Request`) struct through a series of steps.
+Virtually all of Req's functionality is broken down into individual pieces - steps. Req works by
+running the request struct through these steps. You can easily reuse or rearrange built-in steps
+or write new ones.
+
+There are three types of steps: request, response, and error.
 
 Request steps are used to refine the data that will be sent to the server.
 
