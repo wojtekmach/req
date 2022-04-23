@@ -76,7 +76,8 @@ defmodule Req do
         &Req.Steps.auth/1,
         &Req.Steps.put_params/1,
         &Req.Steps.put_range/1,
-        &Req.Steps.put_if_modified_since/1
+        &Req.Steps.put_if_modified_since/1,
+        &Req.Steps.put_plug/1
       ],
       response_steps: [
         &Req.Steps.retry/1,
@@ -287,10 +288,12 @@ defmodule Req do
     * `:cache_dir` - the directory to store the cache, defaults to `<user_cache_dir>/req`
       (see: `:filename.basedir/3`)
 
-  Request adapter:
+  Request adapters:
 
     * `:adapter` - adapter to use to make the actual HTTP request. See `:adapter` field description
       in the `Req.Request` module documentation for more information. Defaults to calling [`run_finch`](`Req.Steps.run_finch/1`).
+
+    * `:plug` - if set, calls the given Plug instead of making an HTTP request over the network (via [`put_plug`](`Req.Steps.put_plug/1`) step).
 
   Finch options ([`run_finch`](`Req.Steps.run_finch/1`) step)
 

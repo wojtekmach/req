@@ -158,17 +158,6 @@ defmodule Req.Request do
             location_trusted: false
 
   @doc """
-  Sets the request adapter.
-
-  Adapter is a request step that is making the actual HTTP request. See
-  `build/3` for more information.
-
-  """
-  def put_adapter(request, adapter) do
-    %{request | adapter: adapter}
-  end
-
-  @doc """
   Gets the value for a specific private `key`.
   """
   def get_private(request, key, default \\ nil) when is_atom(key) do
@@ -196,12 +185,7 @@ defmodule Req.Request do
       method: method,
       url: URI.parse(url),
       headers: Keyword.get(options, :headers, []),
-      body: Keyword.get(options, :body, ""),
-      adapter: Keyword.get(options, :adapter, {Req.Steps, :run_finch, []}),
-      private: %{
-        req_finch:
-          {Keyword.get(options, :finch, Req.Finch), Keyword.get(options, :finch_options, [])}
-      }
+      body: Keyword.get(options, :body, "")
     }
   end
 
@@ -253,23 +237,37 @@ defmodule Req.Request do
   Returns `{:ok, response}` or `{:error, exception}`.
   """
   def run(request) do
-    steps = request.request_steps ++ [request.adapter]
+    run_request(request.request_steps, request)
+  end
 
-    Enum.reduce_while(steps, request, fn step, acc ->
-      case run_step(step, acc) do
-        %Req.Request{} = request ->
-          {:cont, request}
+  defp run_request([step | steps], request) do
+    case run_step(step, request) do
+      %Req.Request{} = request ->
+        run_request(steps, request)
 
-        {%Req.Request{halted: true}, response_or_exception} ->
-          {:halt, result(response_or_exception)}
+      {%Req.Request{halted: true}, response_or_exception} ->
+        result(response_or_exception)
 
-        {request, %Req.Response{} = response} ->
-          {:halt, run_response(request, response)}
+      {request, %Req.Response{} = response} ->
+        run_response(request, response)
 
-        {request, %{__exception__: true} = exception} ->
-          {:halt, run_error(request, exception)}
-      end
-    end)
+      {request, %{__exception__: true} = exception} ->
+        run_error(request, exception)
+    end
+  end
+
+  defp run_request([], request) do
+    case run_step(request.adapter, request) do
+      {request, %Req.Response{} = response} ->
+        run_response(request, response)
+
+      {request, %{__exception__: true} = exception} ->
+        run_error(request, exception)
+
+      other ->
+        raise "expected adapter to return {request, response} or {request, exception}, " <>
+                "got: #{inspect(other)}"
+    end
   end
 
   @doc """

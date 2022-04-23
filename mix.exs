@@ -19,7 +19,8 @@ defmodule Req.MixProject do
       ],
       xref: [
         exclude: [
-          NimbleCSV.RFC4180
+          NimbleCSV.RFC4180,
+          Plug.Test
         ]
       ]
     ]
@@ -49,6 +50,7 @@ defmodule Req.MixProject do
       {:mime, "~> 1.6 or ~> 2.0"},
       {:jason, "~> 1.0"},
       {:nimble_csv, "~> 1.0", optional: true},
+      {:plug, "~> 1.0", optional: true},
       {:bypass, "~> 2.1", only: :test},
       {:ex_doc, ">= 0.0.0", only: :docs}
     ]

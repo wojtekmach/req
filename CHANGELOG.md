@@ -30,6 +30,8 @@ Step changes:
 
   * `put_base_url`: Ignore base URL if given URL contains scheme
 
+  * New step: `run_plug`
+
 Deprecations:
 
   * Deprecate calling `Req.post!(url, body)` in favour of `Req.post(url, body: body)`. Same for `Req.put!`.

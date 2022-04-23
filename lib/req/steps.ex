@@ -433,6 +433,58 @@ defmodule Req.Steps do
     end
   end
 
+  @doc """
+  Runs the request against a plug instead of over the network.
+
+  ## Request Options:
+
+    * `:plug` - if set, the plug to run the request against.
+
+  ## Examples
+
+  Let's run the request against `Plug.Static` pointed to the Req's source code and
+  fetch the README:
+
+      iex> resp = Req.get!("http:///README.md", plug: {Plug.Static, at: "/", from: "."})
+      iex> resp.body =~ "Req is an HTTP client"
+      true
+  """
+  @doc step: :request
+  def put_plug(request) do
+    if request.options[:plug] do
+      %{request | adapter: &Req.Steps.__run_plug__/1}
+    else
+      request
+    end
+  end
+
+  def __run_plug__(request) do
+    {plug, plug_options} =
+      case Map.fetch(request.options, :plug) do
+        {:ok, module} when is_atom(module) ->
+          {module, []}
+
+        {:ok, {module, options}} when is_atom(module) ->
+          {module, options}
+
+        :error ->
+          raise "run_plug/1 requires :plug option to be set"
+      end
+
+    conn =
+      Plug.Test.conn(request.method, request.url, request.body)
+      |> Map.replace!(:req_headers, request.headers)
+      |> plug.call(plug.init(plug_options))
+
+    response = %Req.Response{
+      status: conn.status,
+      headers: conn.resp_headers,
+      body: conn.resp_body
+    }
+
+    {request, response}
+  end
+
   ## Response steps
 
   @doc """

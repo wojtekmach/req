@@ -256,6 +256,38 @@ defmodule Req.StepsTest do
   #   assert_received {:got, 42}
   # end
 
+  defmodule MyPlug do
+    def init(options), do: options
+
+    def call(conn, options) do
+      {:ok, body, conn} = Plug.Conn.read_body(conn, [])
+
+      map = %{
+        conn: Map.take(conn, [:host, :request_path]),
+        body: body,
+        options: options
+      }
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(map))
+    end
+  end
+
+  test "put_plug" do
+    assert Req.get!("https://foo/bar", body: "yo", plug: MyPlug).body == %{
+             "conn" => %{
+               "host" => "foo",
+               "request_path" => "/bar"
+             },
+             "body" => "yo",
+             "options" => []
+           }
+
+    resp = Req.get!("http:///README.md", plug: {Plug.Static, at: "/", from: "."})
+    assert resp.body =~ "Req is an HTTP client"
+  end
+
   ## Response steps
 
   test "decompress/1", c do

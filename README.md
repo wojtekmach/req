@@ -4,8 +4,6 @@
 
 [Docs](https://hexdocs.pm/req)
 
-<!-- MDOC !-->
-
 Req is an HTTP client with a focus on ease of use and composability, built on top of [Finch](https://github.com/keathley/finch).
 
 ## Features
@@ -32,6 +30,8 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
   * Basic HTTP caching (via [`cache`](`Req.Steps.put_if_modified_since/1`) step)
 
   * Setting base URL (via [`put_base_url`](`Req.Steps.put_base_url/1`) step)
+
+  * Running against a plug (via [`put_plug`](`Req.Steps.put_plug/1`) step)
 
 ## Usage
 
@@ -108,8 +108,6 @@ Req.Request.new(method: :get, url: "https://api.github.com/repos/elixir-lang/eli
 
 We can also build more complex flows like returning a response from a request step
 or an error from a response step. See `Req.Request` documentation for more information.
-
-<!-- MDOC !-->
 
 ## Acknowledgments
 
