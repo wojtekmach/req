@@ -1,7 +1,7 @@
-defmodule Req.HttpbinTest do
+defmodule Req.IntegrationTest do
   use ExUnit.Case
 
-  @moduletag :httpbin
+  @moduletag :integration
 
   setup do
     original_gl = Process.group_leader()
@@ -21,7 +21,6 @@ defmodule Req.HttpbinTest do
       encode_body: 1,
       put_params: 1,
       put_range: 1,
-      # run_steps: 1,
       put_if_modified_since: 1,
       decompress: 1,
       decode_body: 1

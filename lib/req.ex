@@ -260,7 +260,7 @@ defmodule Req do
 
   Additional URL options:
 
-    * `:base_url` - if set, the URL is prepended with this base URL (via
+    * `:base_url` - if set, the request URL is prepended with this base URL (via
       [`put_base_url`](`Req.Steps.put_base_url/1`) step).
 
     * `:params` - if set, appends parameters to the request query string (via
@@ -308,7 +308,7 @@ defmodule Req do
       iex> {:ok, response} = Req.request(url: "https://api.github.com/repos/elixir-lang/elixir")
       iex> response.status
       200
-      iex> response.body
+      iex> response.body["description"]
       "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
 
   With request struct:
@@ -396,7 +396,7 @@ defmodule Req do
 
   ## Examples
 
-      iex> Req.new(base_url: "https://api.github.com")
+      iex> req = Req.new(base_url: "https://api.github.com")
       iex> Req.request!(req, url: "/repos/elixir-lang/elixir").status
       200
   """
