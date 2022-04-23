@@ -42,8 +42,6 @@ defmodule Req.Request do
       return `{request, response}` or `{request, exception}`, thus triggering the
       response or error pipeline, respectively. Defaults to `Req.Steps.run_finch/1`.
 
-    * `:unix_socket` - if set, connect through the given UNIX domain socket
-
   ## Steps
 
   Req has three types of steps: request, response, and error.

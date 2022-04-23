@@ -394,12 +394,26 @@ defmodule Req.Steps do
 
     * `:finch_options` - options passed down to Finch when making the request, defaults to `[]`.
        See `Finch.request/3` for a list of available options.
+
+    * `:unix_socket` - if set, connect through the given UNIX domain socket
+
+  ## Examples
+
+  Custom `:receive_timeout`:
+
+      Req.get!(url: url, finch_options: [receive_timeout: 1000])
+
+  Connecting through UNIX socket:
+
+      iex> Req.get!("http:///v1.41/_ping", unix_socket: "/var/run/docker.sock").body
+      "OK"
+
   """
   @doc step: :request
   def run_finch(request) do
     finch_request =
       Finch.build(request.method, request.url, request.headers, request.body)
-      |> Map.replace!(:unix_socket, request.unix_socket)
+      |> Map.replace!(:unix_socket, request.options[:unix_socket])
 
     finch_name = Map.get(request.options, :finch, Req.Finch)
     finch_options = Map.get(request.options, :finch_options, [])
