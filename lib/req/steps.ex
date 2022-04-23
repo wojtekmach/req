@@ -17,9 +17,9 @@ defmodule Req.Steps do
   ## Examples
 
       iex> req = Req.new(base_url: "https://httpbin.org")
-      iex> Req.get!(req, "/status/200").status
+      iex> Req.get!(req, url: "/status/200").status
       200
-      iex> Req.get!(req, "/status/201").status
+      iex> Req.get!(req, url: "/status/201").status
       201
   """
   @doc step: :request
