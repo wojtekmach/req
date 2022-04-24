@@ -627,6 +627,21 @@ defmodule Req.StepsTest do
     refute_received _
   end
 
+  test "retry: disabled", c do
+    pid = self()
+
+    Bypass.expect(c.bypass, "GET", "/retry", fn conn ->
+      send(pid, :ping)
+      Plug.Conn.send_resp(conn, 500, "oops")
+    end)
+
+    request = Req.new(url: c.url <> "/retry", retry: false)
+
+    assert Req.get!(request).status == 500
+    assert_received :ping
+    refute_received _
+  end
+
   @tag :tmp_dir
   test "cache", c do
     pid = self()

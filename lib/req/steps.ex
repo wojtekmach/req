@@ -769,6 +769,10 @@ defmodule Req.Steps do
     {request, response}
   end
 
+  def retry({request, response_or_exception}) when request.options.retry == false do
+    {request, response_or_exception}
+  end
+
   def retry({request, response_or_exception}) do
     delay = Map.get(request.options, :retry_delay, 2000)
     max_retries = Map.get(request.options, :max_retries, 2)
