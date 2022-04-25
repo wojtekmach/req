@@ -70,7 +70,8 @@ defmodule Req do
       options: options,
       request_steps: [
         &Req.Steps.encode_headers/1,
-        &Req.Steps.put_default_headers/1,
+        &Req.Steps.put_default_user_agent/1,
+        &Req.Steps.compressed/1,
         &Req.Steps.encode_body/1,
         &Req.Steps.put_base_url/1,
         &Req.Steps.auth/1,

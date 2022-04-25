@@ -23,6 +23,8 @@ Major changes:
 
   * Remove `run_steps` step
 
+  * Remove `put_default_headers` step
+
   * Remove `Req.Request.unix_socket` field. Add option on `run_finch` step with the same name
     instead.
 
@@ -31,6 +33,10 @@ Step changes:
   * `put_base_url`: Ignore base URL if given URL contains scheme
 
   * New step: `run_plug`
+
+  * New step: `put_default_user_agent` (replaces part of removed `put_default_headers`)
+
+  * New step: `compressed` (replaces part of removed `put_default_headers`)
 
 Deprecations:
 

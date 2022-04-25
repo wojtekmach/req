@@ -152,20 +152,64 @@ defmodule Req.Steps do
   @user_agent "req/#{Mix.Project.config()[:version]}"
 
   @doc """
-  Adds common request headers.
+  Sets the user-agent header.
 
-  Currently the following headers are added:
+  ## Examples
 
-    * `"user-agent"` - `#{inspect(@user_agent)}`
+      iex> Req.get!("https://httpbin.org/user-agent").body
+      %{"user-agent" => "#{@user_agent}"}
+  """
+  @doc step: :request
+  def put_default_user_agent(request) do
+    put_new_header(request, "user-agent", @user_agent)
+  end
 
-    * `"accept-encoding"` - `"gzip"`
+  @default_accept_encoding "gzip, deflate"
+
+  @doc """
+  Asks the server to return compressed response.
+
+  ## Request Options
+
+    * `:compressed` - if set to `true`, sets the `accept-encoding` header with compression
+      algorithms that Req supports out of the box: `#{inspect(@default_accept_encoding)}`. Defaults
+      to `true`.
+
+  ## Examples
+
+  Req automatically decompresses response body (`decompress/1` step) so let's disable that by
+  passing `raw: true`.
+
+  By default, we ask the server to send compressed response. Let's look at the headers and the raw
+  body. Notice the body starts with `<<31, 139>>` (`<<0x1F, 0x8B>>`), the "magic bytes" for gzip:
+
+      iex> response = Req.get!("https://elixir-lang.org", raw: true)
+      iex> response.headers |> List.keyfind("content-encoding", 0)
+      {"content-encoding", "gzip"}
+      iex> response.body |> binary_part(0, 2)
+      <<31, 139>>
+
+  Now, let's pass `compressed: false` and notice the raw body was not compressed:
+
+      iex> response = Req.get!("https://elixir-lang.org", raw: true, compressed: false)
+      iex> response.headers |> List.keyfind("content-encoding", 0)
+      nil
+      iex> response.body |> binary_part(0, 15)
+      "<!DOCTYPE html>"
 
   """
   @doc step: :request
-  def put_default_headers(request) do
-    request
-    |> put_new_header("user-agent", @user_agent)
-    |> put_new_header("accept-encoding", "gzip")
+  def compressed(request) do
+    case Map.fetch(request.options, :compressed) do
+      :error ->
+        put_new_header(request, "accept-encoding", @default_accept_encoding)
+
+      {:ok, true} ->
+        put_new_header(request, "accept-encoding", @default_accept_encoding)
+
+      {:ok, false} ->
+        request
+    end
   end
 
   @doc """

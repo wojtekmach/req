@@ -12,7 +12,7 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
   * Extensibility via request, response, and error steps.
 
-  * Automatic body decompression (via [`decompress`](`Req.Steps.decompress/1`) step)
+  * Automatic body decompression (via [`compressed`](`Req.Steps.compressed/1`) and [`decompress`](`Req.Steps.decompress/1`) step)
 
   * Automatic body encoding and decoding (via [`encode_body`](`Req.Steps.encode_body/1`)
     and [`decode_body`](`Req.Steps.decode_body/1`) steps)

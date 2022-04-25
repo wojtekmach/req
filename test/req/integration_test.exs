@@ -16,8 +16,10 @@ defmodule Req.IntegrationTest do
   doctest Req.Steps,
     only: [
       auth: 1,
-      put_base_url: 1,
       encode_headers: 1,
+      put_default_user_agent: 1,
+      compressed: 1,
+      put_base_url: 1,
       encode_body: 1,
       put_params: 1,
       put_range: 1,
