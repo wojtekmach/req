@@ -534,6 +534,16 @@ defmodule Req.Steps do
     raise("unsupported decompression algorithm: #{inspect(algorithm)}")
   end
 
+  defmacrop nimble_csv_loaded? do
+    if Code.ensure_loaded?(NimbleCSV) do
+      true
+    else
+      quote do
+        Code.ensure_loaded?(NimbleCSV)
+      end
+    end
+  end
+
   @doc """
   Decodes response body based on the detected format.
 
@@ -590,7 +600,7 @@ defmodule Req.Steps do
         {request, put_in(response.body, files)}
 
       "csv" ->
-        if Code.ensure_loaded?(NimbleCSV) do
+        if nimble_csv_loaded?() do
           options = [skip_headers: false]
           {request, update_in(response.body, &NimbleCSV.RFC4180.parse_string(&1, options))}
         else
