@@ -283,6 +283,35 @@ defmodule Req.StepsTest do
     assert Req.get!(c.url).body == "foo"
   end
 
+  @tag :tmp_dir
+  test "output/1: path (compressed)", c do
+    Bypass.expect_once(c.bypass, "GET", "/save_to_path", fn conn ->
+      conn
+      |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
+      |> Plug.Conn.send_resp(200, :zlib.gzip("to be filed"))
+    end)
+
+    response = Req.get!(c.url <> "/save_to_path", output: c.tmp_dir <> "/saved.txt")
+    assert response.body == ""
+    assert File.read!(c.tmp_dir <> "/saved.txt") == "to be filed"
+  end
+
+  @tag :tmp_dir
+  test "output/1: :remote_name (not compressed)", c do
+    Bypass.expect_once(c.bypass, "GET", "/directory/save_this.txt", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "to be filed")
+    end)
+
+    cwd = File.cwd!()
+    on_exit(fn -> File.cd!(cwd) end)
+    File.cd!(c.tmp_dir)
+
+    response = Req.get!(c.url <> "/directory/save_this.txt", output: :remote_name)
+
+    assert response.body == ""
+    assert File.read!(c.tmp_dir <> "/save_this.txt") == "to be filed"
+  end
+
   test "decode_body/1: json", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       conn

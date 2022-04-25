@@ -611,6 +611,40 @@ defmodule Req.Steps do
   end
 
   @doc """
+  Writes the response body to a file.
+
+  This step runs after the ([`decompress`](`Req.Steps.decompress/1`) step) and before
+  the ([`decode_body`](`Req.Steps.decode_body/1`) step). After the output file is written,
+  the response body is set to `""`.
+
+  ## Examples
+
+      # Saves file to specified path
+      Req.get!("https://elixir-lang.org/index.html", output: "elixir_home.html")
+
+      # Saves file to current working directory with same name as remote file
+      Req.get!("https://elixir-lang.org/index.html", output: :remote_name)
+  """
+  @doc step: :response
+  def output({request, response}) do
+    output({request, response}, Map.get(request.options, :output))
+  end
+
+  def output(request_response, nil) do
+    request_response
+  end
+
+  def output({request, response}, :remote_name) do
+    path = Path.basename(request.url.path)
+    output({request, response}, path)
+  end
+
+  def output({request, response}, path) do
+    File.write!(path, response.body)
+    {request, %{response | body: ""}}
+  end
+
+  @doc """
   Decodes response body based on the detected format.
 
   Supported formats:
