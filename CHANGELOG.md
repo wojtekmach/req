@@ -32,6 +32,9 @@ Step changes:
 
   * `put_base_url`: Ignore base URL if given URL contains scheme
 
+  * `run_finch`: Add `:http1` and `:http2` options that pick appropriate default pool started by
+    Req
+
   * New step: `run_plug`
 
   * New step: `put_default_user_agent` (replaces part of removed `put_default_headers`)
