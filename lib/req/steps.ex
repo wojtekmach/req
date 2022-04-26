@@ -503,22 +503,10 @@ defmodule Req.Steps do
   end
 
   def __run_plug__(request) do
-    {plug, plug_options} =
-      case Map.fetch(request.options, :plug) do
-        {:ok, module} when is_atom(module) ->
-          {module, []}
-
-        {:ok, {module, options}} when is_atom(module) ->
-          {module, options}
-
-        :error ->
-          raise "run_plug/1 requires :plug option to be set"
-      end
-
     conn =
       Plug.Test.conn(request.method, request.url, request.body)
       |> Map.replace!(:req_headers, request.headers)
-      |> plug.call(plug.init(plug_options))
+      |> call_plug(request.options.plug)
 
     response = %Req.Response{
       status: conn.status,
@@ -527,6 +515,18 @@ defmodule Req.Steps do
     }
 
     {request, response}
+  end
+
+  defp call_plug(conn, plug) when is_atom(plug) do
+    plug.call(conn, [])
+  end
+
+  defp call_plug(conn, {plug, options}) when is_atom(plug) do
+    plug.call(conn, plug.init(options))
+  end
+
+  defp call_plug(conn, plug) when is_function(plug, 1) do
+    plug.(conn)
   end
 
   ## Response steps

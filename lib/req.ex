@@ -56,8 +56,8 @@ defmodule Req do
   def new(options \\ []) do
     {adapter, options} = Keyword.pop(options, :adapter, &Req.Steps.run_finch/1)
     {method, options} = Keyword.pop(options, :method, :get)
-    {url, options} = Keyword.pop(options, :url, nil)
     {headers, options} = Keyword.pop(options, :headers, [])
+    {url, options} = Keyword.pop(options, :url, "")
     {body, options} = Keyword.pop(options, :body, "")
     options = Map.new(options)
 
