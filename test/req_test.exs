@@ -52,17 +52,4 @@ defmodule ReqTest do
       assert Req.delete!(c.url <> "/json").body == %{"a" => 1}
     end
   end
-
-  test "raw mode", c do
-    raw = :zlib.gzip(Jason.encode_to_iodata!(%{"a" => 1}))
-
-    Bypass.expect(c.bypass, "GET", "/json+gzip", fn conn ->
-      conn
-      |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
-      |> Plug.Conn.put_resp_content_type("application/json")
-      |> Plug.Conn.send_resp(200, raw)
-    end)
-
-    assert Req.get!(c.url <> "/json+gzip", raw: true).body == raw
-  end
 end

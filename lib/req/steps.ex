@@ -658,16 +658,17 @@ defmodule Req.Steps do
 
   defp format(request, response) do
     with {_, content_type} <- List.keyfind(response.headers, "content-type", 0) do
-      case extensions(content_type, request) do
+      # remove ` || ` when we require Elixir v1.13
+      path = request.url.path || ""
+
+      case extensions(content_type, path) do
         [ext | _] -> ext
         [] -> nil
       end
     end
   end
 
-  defp extensions("application/octet-stream", request) do
-    path = request.url.path
-
+  defp extensions("application/octet-stream", path) do
     if tgz?(path) do
       ["tgz"]
     else
@@ -675,9 +676,7 @@ defmodule Req.Steps do
     end
   end
 
-  defp extensions("application/" <> subtype, request) when subtype in ~w(gzip x-gzip) do
-    path = request.url.path
-
+  defp extensions("application/" <> subtype, path) when subtype in ~w(gzip x-gzip) do
     if tgz?(path) do
       ["tgz"]
     else
@@ -685,7 +684,7 @@ defmodule Req.Steps do
     end
   end
 
-  defp extensions(content_type, _request) do
+  defp extensions(content_type, _path) do
     MIME.extensions(content_type)
   end
 
