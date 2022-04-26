@@ -433,8 +433,7 @@ defmodule Req.Steps do
 
   ## Request Options
 
-    * `:finch` - the name of the Finch pool. Defaults to `Req.Finch` which is automatically
-      started by Req.
+    * `:finch` - the name of the Finch pool. Defaults to pool automatically started by Req.
 
     * `:finch_options` - options passed down to Finch when making the request, defaults to `[]`.
        See `Finch.request/3` for a list of available options.

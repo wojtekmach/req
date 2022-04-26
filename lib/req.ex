@@ -298,7 +298,7 @@ defmodule Req do
 
   Finch options ([`run_finch`](`Req.Steps.run_finch/1`) step)
 
-    * `:finch` - the `Finch` pool to use. Defaults to `Req.Finch` which is automatically started by `Req`.
+    * `:finch` - the `Finch` pool to use. Defaults to pool automatically started by `Req`.
 
     * `:finch_options` - options passed down to Finch when making the request, defaults to `[]`.
        See `Finch.request/3` for a list of available options.
