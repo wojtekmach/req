@@ -254,6 +254,35 @@ defmodule Req do
   end
 
   @doc """
+  Makes a PATCH request.
+
+  See `request/1` for a list of supported options.
+
+  ## Examples
+
+  With URL:
+
+      iex> Req.patch!("https://httpbin.org/anything", body: "hello!").body["data"]
+      "hello!"
+
+  With request struct:
+
+      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> Req.patch!(req, body: "hello!").body["data"]
+      "hello!"
+  """
+  @spec patch!(url(), options :: keyword()) :: Req.Response.t()
+  def patch!(url_or_request, options \\ [])
+
+  def patch!(%Req.Request{} = request, options) do
+    request!(%{request | method: :patch}, options)
+  end
+
+  def patch!(url, options) do
+    request!([method: :patch, url: url] ++ options)
+  end
+
+  @doc """
   Makes a DELETE request.
 
   See `request/1` for a list of supported options.
