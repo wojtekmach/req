@@ -136,8 +136,8 @@ defmodule Req do
       iex> Req.post!("https://httpbin.org/anything", form: [x: 1]).body["form"]
       %{"x" => "1"}
 
-      iex> Req.post!("https://httpbin.org/anything", json: %{x: 1}).body["json"]
-      %{"x" => 1}
+      iex> Req.post!("https://httpbin.org/anything", json: %{x: 2}).body["json"]
+      %{"x" => 2}
 
   With request struct:
 

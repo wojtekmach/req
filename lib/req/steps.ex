@@ -507,8 +507,21 @@ defmodule Req.Steps do
 
   ## Examples
 
-  Let's run the request against `Plug.Static` pointed to the Req's source code and
-  fetch the README:
+  This step is particularly useful to test plugs:
+
+      defmodule Echo do
+        def call(conn, _) do
+          "/" <> path = conn.request_path
+          Plug.Conn.send_resp(conn, 200, path)
+        end
+      end
+
+      test "echo" do
+        assert Req.get!("http:///hello", plug: Echo).body == "hello"
+      end
+
+  Here's another example, let's run the request against `Plug.Static` pointed to the Req's source
+  code and fetch the README:
 
       iex> resp = Req.get!("http:///README.md", plug: {Plug.Static, at: "/", from: "."})
       iex> resp.body =~ "Req is an HTTP client"

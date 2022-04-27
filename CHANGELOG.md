@@ -2,6 +2,49 @@
 
 ## v0.3.0-dev
 
+Req v0.3.0 brings redesigned API, new steps, and improvements to existing steps.
+
+The new API allows building a request struct with all the built-in steps. It can be then piped
+to functions like `Req.get!/2`:
+
+```elixir
+iex> req = Req.new(base_url: "https://api.github.com")
+
+iex> req |> Req.get!(url: "/repos/sneako/finch") |> then(& &1.body["description"])
+"Elixir HTTP client, focused on performance"
+
+iex> req |> Req.get(url: "/repos/elixir-mint/mint") |> then(& &1.body["description"])
+"Functional HTTP client for Elixir with support for HTTP/1 and HTTP/2."
+```
+
+Setting body and encoding it to form/JSON is now done through `:body/:form/:json` options:
+
+```elixir
+iex> Req.post!("https://httpbin.org/anything", body: "hello!").body["data"]
+"hello!"
+
+iex> req = Req.new(url: "https://httpbin.org/anything")
+iex> Req.post!(req, form: [x: 1]).body["form"]
+%{"x" => "1"}
+iex> Req.post!(req, json: %{x: 2}).body["form"]
+%{"x" => 2}
+```
+
+Req can now be used to easily test plugs using the `:plug` option:
+
+```elixir
+defmodule Echo do
+  def call(conn, _) do
+    "/" <> path = conn.request_path
+    Plug.Conn.send_resp(conn, 200, path)
+  end
+end
+
+test "echo" do
+  assert Req.get!("http:///hello", plug: Echo).body == "hello"
+end
+```
+
 Major changes:
 
   * Add high-level functional API: `Req.new(...) |> Req.request(...)`, `Req.new(...) |>
@@ -13,11 +56,13 @@ Major changes:
     When using "High-level" API, we now run all steps by default. (The
     steps, by looking at request.options, can decide to be no-op.)
 
-  * Add `Req.Request.adapter` field
-
   * Move low-level API to `Req.Request`
 
   * Move built-in steps to `Req.Steps`
+
+  * Add `Req.patch!/2`
+
+  * Add `Req.Request.adapter` field
 
   * Remove `put_default_steps` step
 
@@ -35,15 +80,23 @@ Step changes:
   * `run_finch`: Add `:http1` and `:http2` options that pick appropriate default pool started by
     Req
 
+  * `encode_headers`: Add `:form` and `:json` options (previously used as `{:form, data}` and
+    `{:json, data}`)
+
   * New step: `run_plug`
 
   * New step: `put_default_user_agent` (replaces part of removed `put_default_headers`)
 
   * New step: `compressed` (replaces part of removed `put_default_headers`)
 
+  * New step: `output`
+
 Deprecations:
 
-  * Deprecate calling `Req.post!(url, body)` in favour of `Req.post(url, body: body)`. Same for `Req.put!`.
+  * Deprecate calling `Req.post!(url, body)` in favour of `Req.post!(url, body: body)`.
+    Also, deprecate `Req.post!(url, {:form, data})` in favour of `Req.post!(url, form: data)`.
+    and `Req.post!(url, {:json, data})` in favour of `Req.post!(url, json: data)`. Same for
+    `Req.put!/2`.
 
   * Deprecate setting `retry: [delay: delay, max_retries: max_retries]`
     in favour of `retry_delay: delay, max_retries: max_retries`.
