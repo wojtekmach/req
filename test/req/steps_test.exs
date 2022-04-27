@@ -207,7 +207,7 @@ defmodule Req.StepsTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
-    assert Req.post!(c.url, body: {:json, %{a: 1}}).body == "ok"
+    assert Req.post!(c.url, json: %{a: 1}).body == "ok"
   end
 
   test "encode_body/1: form", c do
@@ -217,7 +217,7 @@ defmodule Req.StepsTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
-    assert Req.post!(c.url, body: {:form, a: 1}).body == "ok"
+    assert Req.post!(c.url, form: [a: 1]).body == "ok"
   end
 
   test "put_params/1", c do

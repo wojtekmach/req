@@ -130,14 +130,20 @@ defmodule Req do
 
   With URL:
 
-      iex> Req.post!("https://httpbin.org/post", body: {:form, comments: "hello!"}).body["form"]
-      %{"comments" => "hello!"}
+      iex> Req.post!("https://httpbin.org/anything", body: "hello!").body["data"]
+      "hello!"
+
+      iex> Req.post!("https://httpbin.org/anything", form: [x: 1]).body["form"]
+      %{"x" => "1"}
+
+      iex> Req.post!("https://httpbin.org/anything", json: %{x: 1}).body["json"]
+      %{"x" => 1}
 
   With request struct:
 
-      iex> req = Req.new(url: "https://httpbin.org/post")
-      iex> Req.post!(req, body: {:form, comments: "hello!"}).body["form"]
-      %{"comments" => "hello!"}
+      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> Req.post!(req, body: "hello!").body["data"]
+      "hello!"
   """
   @spec post!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
   def post!(url_or_request, options \\ [])
@@ -150,19 +156,57 @@ defmodule Req do
     if Keyword.keyword?(options) do
       request!([method: :post, url: URI.parse(url)] ++ options)
     else
-      IO.warn("Req.post!(url, body) is deprecated in favour of Req.post!(url, body: body)")
-      request!(method: :post, url: URI.parse(url), body: options)
+      case options do
+        {:form, data} ->
+          IO.warn(
+            "Req.post!(url, {:form, data}) is deprecated in favour of " <>
+              "Req.post!(url, form: data)"
+          )
+
+          request!(method: :post, url: URI.parse(url), form: data)
+
+        {:json, data} ->
+          IO.warn(
+            "Req.post!(url, {:json, data}) is deprecated in favour of " <>
+              "Req.post!(url, json: data)"
+          )
+
+          request!(method: :post, url: URI.parse(url), json: data)
+
+        data ->
+          IO.warn("Req.post!(url, body) is deprecated in favour of Req.post!(url, body: body)")
+          request!(method: :post, url: URI.parse(url), body: data)
+      end
     end
   end
 
   @doc false
   def post!(url, body, options) do
-    IO.warn(
-      "Req.post!(url, body, options) is deprecated in favour of " <>
-        "Req.post!(url, [body: body] ++ options)"
-    )
+    case body do
+      {:form, data} ->
+        IO.warn(
+          "Req.post!(url, {:form, data}, options) is deprecated in favour of " <>
+            "Req.post!(url, [form: data] ++ options)"
+        )
 
-    request!([method: :post, url: URI.parse(url), body: body] ++ options)
+        request!([method: :post, url: URI.parse(url), form: data] ++ options)
+
+      {:json, data} ->
+        IO.warn(
+          "Req.post!(url, {:json, data}) is deprecated in favour of " <>
+            "Req.post!(url, [json: data] ++ options)"
+        )
+
+        request!([method: :post, url: URI.parse(url), json: data] ++ options)
+
+      data ->
+        IO.warn(
+          "Req.post!(url, body) is deprecated in favour of " <>
+            "Req.post!(url, [body: body] ++ options)"
+        )
+
+        request!([method: :post, url: URI.parse(url), body: data] ++ options)
+    end
   end
 
   @doc """
@@ -174,15 +218,14 @@ defmodule Req do
 
   With URL:
 
-      iex> Req.put!("https://httpbin.org/anything", body: "the body").body |> Map.take(["data", "method"])
-      %{"data" => "the body", "method" => "PUT"}
+      iex> Req.put!("https://httpbin.org/anything", body: "hello!").body["data"]
+      "hello!"
 
   With request struct:
 
       iex> req = Req.new(url: "https://httpbin.org/anything")
-      iex> Req.put!(req, body: "the body").body |> Map.take(["data", "method"])
-      %{"data" => "the body", "method" => "PUT"}
-
+      iex> Req.put!(req, body: "hello!").body["data"]
+      "hello!"
   """
   @spec put!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
   def put!(url_or_request, options \\ [])
@@ -214,9 +257,28 @@ defmodule Req do
   Makes a DELETE request.
 
   See `request/1` for a list of supported options.
+
+  ## Examples
+
+  With URL:
+
+      iex> Req.delete!("https://httpbin.org/anything").body["method"]
+      "DELETE"
+
+  With request struct:
+
+      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> Req.delete!(req).body["method"]
+      "DELETE"
   """
   @spec delete!(url(), options :: keyword()) :: Req.Response.t()
-  def delete!(url, options \\ []) do
+  def delete!(url_or_request, options \\ [])
+
+  def delete!(%Req.Request{} = request, options) do
+    request!(%{request | method: :delete}, options)
+  end
+
+  def delete!(url, options) do
     request!([method: :delete, url: url] ++ options)
   end
 

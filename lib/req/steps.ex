@@ -263,36 +263,35 @@ defmodule Req.Steps do
   end
 
   @doc """
-  Encodes the request body based on its shape.
+  Encodes the request body.
 
-  If body is of the following shape, it's encoded and its `content-type` set
-  accordingly. Otherwise it's unchanged.
+  ## Request Options
 
-  | Shape           | Encoder                     | Content-Type                          |
-  | --------------- | --------------------------- | ------------------------------------- |
-  | `{:form, data}` | `URI.encode_query/1`        | `"application/x-www-form-urlencoded"` |
-  | `{:json, data}` | `Jason.encode_to_iodata!/1` | `"application/json"`                  |
+    * `:form` - if set, encodes the request body as form data (using `URI.encode_query/1`).
+
+    * `:json` - if set, encodes the request body as JSON (using `Jason.encode_to_iodata!/1`).
 
   ## Examples
 
-      iex> Req.post!("https://httpbin.org/post", body: {:form, comments: "hello!"}).body["form"]
-      %{"comments" => "hello!"}
+      iex> Req.post!("https://httpbin.org/anything", form: [x: 1]).body["form"]
+      %{"x" => "1"}
+
+      iex> Req.post!("https://httpbin.org/post", json: %{x: 2}).body["json"]
+      %{"x" => 2}
 
   """
   @doc step: :request
   def encode_body(request) do
-    case request.body do
-      {:form, data} ->
-        request
-        |> Map.put(:body, URI.encode_query(data))
+    cond do
+      data = request.options[:form] ->
+        %{request | body: URI.encode_query(data)}
         |> put_new_header("content-type", "application/x-www-form-urlencoded")
 
-      {:json, data} ->
-        request
-        |> Map.put(:body, Jason.encode_to_iodata!(data))
+      data = request.options[:json] ->
+        %{request | body: Jason.encode_to_iodata!(data)}
         |> put_new_header("content-type", "application/json")
 
-      _other ->
+      true ->
         request
     end
   end
