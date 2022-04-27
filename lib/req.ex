@@ -84,6 +84,7 @@ defmodule Req do
         &Req.Steps.retry/1,
         &Req.Steps.follow_redirects/1,
         &Req.Steps.decompress/1,
+        &Req.Steps.output/1,
         &Req.Steps.decode_body/1
       ],
       error_steps: [
@@ -275,8 +276,13 @@ defmodule Req do
   Response body options:
 
     * `:raw` - if set to `true`, disables automatic body decompression
-      ([`decompress`](`Req.Steps.decompress/1`) step) and and decoding
+      ([`decompress`](`Req.Steps.decompress/1`) step) and decoding
       ([`decode_body`](`Req.Steps.decode_body/1`) step). Defaults to `false`.
+
+    * `:output` - if set, writes the response body to a file (via
+      [`output`](`Req.Steps.output/1`)). Can be set to a string path or an atom `:remote_name` which
+      would use the remote name as the filename in the current working directory. Once the file is
+      written, the response body is replaced with `""`.
 
   Response redirect options ([`follow_redirects`](`Req.Steps.follow_redirects/1`) step):
 
