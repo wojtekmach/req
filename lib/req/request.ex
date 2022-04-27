@@ -128,11 +128,11 @@ defmodule Req.Request do
   """
 
   @type t() :: %Req.Request{
-          method: :get | :post | :put | :head | :delete,
+          method: atom(),
           url: URI.t(),
           headers: [{binary(), binary()}],
-          body: binary(),
-          options: keyword(),
+          body: iodata(),
+          options: map(),
           adapter: request_step(),
           request_steps: [request_step()],
           response_steps: [response_step()],
@@ -145,7 +145,7 @@ defmodule Req.Request do
   @typep error_step() :: fun()
 
   defstruct method: :get,
-            url: nil,
+            url: "",
             headers: [],
             body: "",
             options: %{},
