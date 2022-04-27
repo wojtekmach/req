@@ -111,7 +111,7 @@ Req.get!("https://api.github.com/repos/elixir-lang/elixir")
 is equivalent to this composition of lower-level API functions and steps:
 
 ```elixir
-Req.Request.new(method: :get, url: "https://api.github.com/repos/elixir-lang/elixir")
+%Req.Request{method: :get, url: "https://api.github.com/repos/elixir-lang/elixir"}
 |> Req.Request.append_request_steps([
   &Req.Steps.encode_headers/1,
   &Req.Steps.put_default_headers/1,
