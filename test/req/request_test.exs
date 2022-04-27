@@ -1,6 +1,8 @@
 defmodule Req.RequestTest do
   use ExUnit.Case, async: true
 
+  doctest Req.Request, only: [prepare: 1]
+
   setup do
     bypass = Bypass.open()
     [bypass: bypass, url: "http://localhost:#{bypass.port}"]
@@ -29,6 +31,35 @@ defmodule Req.RequestTest do
       ])
 
     assert {:ok, %{status: 200, body: "ok"}} = Req.Request.run(request)
+  end
+
+  test "prepare/1: options", c do
+    Bypass.expect_once(c.bypass, "GET", "/", fn conn ->
+      assert {"authorization", "Basic " <> Base.encode64("foo:bar")} in conn.req_headers
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    response =
+      [method: :get, base_url: c.url, auth: {"foo", "bar"}]
+      |> Req.Request.prepare()
+      |> Req.Request.run!()
+
+    assert response.status == 200
+  end
+
+  test "prepare/1: struct", c do
+    Bypass.expect_once(c.bypass, "GET", "/", fn conn ->
+      assert {"authorization", "Basic " <> Base.encode64("foo:bar")} in conn.req_headers
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    response =
+      [method: :get, base_url: c.url, auth: {"foo", "bar"}]
+      |> Req.new()
+      |> Req.Request.prepare()
+      |> Req.Request.run!()
+
+    assert response.status == 200
   end
 
   test "request step returns response", c do
