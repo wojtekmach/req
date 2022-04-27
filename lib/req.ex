@@ -35,8 +35,6 @@ defmodule Req do
 
   @type url() :: URI.t() | String.t()
 
-  @type method() :: :get | :post | :put | :delete
-
   @doc """
   Returns a new request struct with built-in steps.
 
