@@ -6,6 +6,8 @@
 
 Req is an HTTP client with a focus on ease of use and composability, built on top of [Finch](https://github.com/keathley/finch).
 
+(**Note**: This is the README for the current main branch. See [README for Req v0.2.2](https://github.com/wojtekmach/req/tree/v0.2.2#readme))
+
 ## Features
 
   * An easy to use high-level API: [`Req`][req], [`Req.request/1`][req.request], [`Req.get!/2`][req.get!], [`Req.post!/2`][req.post!], etc.
