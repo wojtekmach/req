@@ -37,10 +37,8 @@ defmodule Req.Request do
 
     * `:halted` - whether the request pipeline is halted. See `halt/1`
 
-    * `:adapter` - a request step that makes the actual HTTP request. The adapter
-      is automatically added by Req as the very last request step. The adapter must
-      return `{request, response}` or `{request, exception}`, thus triggering the
-      response or error pipeline, respectively. Defaults to `Req.Steps.run_finch/1`.
+    * `:adapter` - a request step that makes the actual HTTP request. Defaults to
+      `Req.Steps.run_finch/1`. See "Adapter" section below for more information.
 
   ## Steps
 
@@ -125,6 +123,37 @@ defmodule Req.Request do
           request
         end
       end
+
+  ## Adapter
+
+  As noted in the "Request steps" section above, a request step might return `{request, response}`
+  or `{request, exception}`, thus invoking either response or error steps next. This is exactly how
+  Req makes the underlying HTTP call, by invoking a request step that follows this contract.
+
+  The default adapter is using Finch via the `Req.Steps.run_finch/1` step.
+
+  Here is naive Hackney-based implementation of an adapter and how it can be used:
+
+      hackney = fn request ->
+        case :hackney.request(
+               request.method,
+               URI.to_string(request.url),
+               request.headers,
+               request.body,
+               [:with_body]
+             ) do
+          {:ok, status, headers, body} ->
+            headers = for {name, value} <- headers, do: {String.downcase(name), value}
+            response = %Req.Response{status: status, headers: headers, body: body}
+            {request, response}
+
+          {:error, reason} ->
+            {request, RuntimeError.exception(inspect(reason))}
+        end
+      end
+
+      Req.get!("https://api.github.com/repos/elixir-lang/elixir", adapter: hackney).body["description"]
+      #=> "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
   """
 
   @type t() :: %Req.Request{

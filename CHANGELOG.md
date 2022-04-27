@@ -45,6 +45,40 @@ test "echo" do
 end
 ```
 
+While Req always used Finch as the underlying HTTP client, it was designed from the day one to
+easily swap it out. Req works by taking a request struct through a series of steps and it allows
+you to build complex flows like returning a response from a request step (thus going through
+response steps next) or returning a request from a response step (thus going through request
+steps next). That's exactly how Req used Finch all along! It was simply a step that returns either
+response or an error and thus invokes response/error steps next. The only special thing about this
+step is that always must be the _last_ request step. Making it so has now been easier with the new
+`:adapter` option.
+
+Here's a naive Hackney-based adapter and how we can use it:
+
+```elixir
+hackney = fn request ->
+  case :hackney.request(
+         request.method,
+         URI.to_string(request.url),
+         request.headers,
+         request.body,
+         [:with_body]
+       ) do
+    {:ok, status, headers, body} ->
+      headers = for {name, value} <- headers, do: {String.downcase(name), value}
+      response = %Req.Response{status: status, headers: headers, body: body}
+      {request, response}
+
+    {:error, reason} ->
+      {request, RuntimeError.exception(inspect(reason))}
+  end
+end
+
+Req.get!("https://api.github.com/repos/elixir-lang/elixir", adapter: hackney).body["description"]
+#=> "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+```
+
 Major changes:
 
   * Add high-level functional API: `Req.new(...) |> Req.request(...)`, `Req.new(...) |>

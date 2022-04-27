@@ -8,30 +8,50 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
 ## Features
 
-  * An easy to use high-level API: `Req`, `Req.request/1`, `Req.get!/2`, `Req.post!/2`, etc.
+  * An easy to use high-level API: [`Req`][req], [`Req.request/1`][req.request], [`Req.get!/2`][req.get!], [`Req.post!/2`][req.post!], etc.
 
   * Extensibility via request, response, and error steps.
 
-  * Automatic body decompression (via [`compressed`](`Req.Steps.compressed/1`) and [`decompress`](`Req.Steps.decompress/1`) step)
+  * Automatic body decompression (via [`compressed`][compressed] and [`decompress`][decompress] step)
 
-  * Automatic body encoding and decoding (via [`encode_body`](`Req.Steps.encode_body/1`)
-    and [`decode_body`](`Req.Steps.decode_body/1`) steps)
+  * Automatic body encoding and decoding (via [`encode_body`][encode_body]
+    and [`decode_body`][decode_body] steps)
 
-  * Encode params as query string (via [`put_params`](`Req.Steps.put_params/1`) step)
+  * Encode params as query string (via [`put_params`][put_params] step)
 
-  * Basic, bearer, and `.netrc` authentication (via [`auth`](`Req.Steps.auth/1`) step)
+  * Basic, bearer, and `.netrc` authentication (via [`auth`][auth] step)
 
-  * Range requests (via [`put_range`](`Req.Steps.put_range/1`) step)
+  * Range requests (via [`put_range`][put_range]) step)
 
-  * Follows redirects (via [`follow_redirects`](`Req.Steps.follow_redirects/1`) step)
+  * Follows redirects (via [`follow_redirects`][follow_redirects] step)
 
-  * Retries on errors (via [`retry`](`Req.Steps.retry/1`) step)
+  * Retries on errors (via [`retry`][retry] step)
 
-  * Basic HTTP caching (via [`cache`](`Req.Steps.put_if_modified_since/1`) step)
+  * Basic HTTP caching (via [`put_if_modified_since`][put_if_modified_since] step)
 
-  * Setting base URL (via [`put_base_url`](`Req.Steps.put_base_url/1`) step)
+  * Setting base URL (via [`put_base_url`][put_base_url] step)
 
-  * Running against a plug (via [`put_plug`](`Req.Steps.put_plug/1`) step)
+  * Running against a plug (via [`put_plug`][put_plug] step)
+
+  * Pluggable adapters (see ["Adapter" section in `Req.Request` module][adapter] documentation)
+
+[req]: https://hexdocs.pm/req/Req.html
+[req.request]: https://hexdocs.pm/req/Req.html#request/1
+[req.get!]: https://hexdocs.pm/req/Req.html#get!/2
+[req.post!]: https://hexdocs.pm/req/Req.html#post!/2
+[compressed]: https://hexdocs.pm/req/Req.Steps.html#compressed/1
+[decompress]: https://hexdocs.pm/req/Req.Steps.html#decompress/1
+[encode_body]: https://hexdocs.pm/req/Req.Steps.html#encode_body/1
+[decode_body]: https://hexdocs.pm/req/Req.Steps.html#decode_body/1
+[put_params]: https://hexdocs.pm/req/Req.Steps.html#put_params/1
+[auth]: https://hexdocs.pm/req/Req.Steps.html#auth/1
+[put_range]: https://hexdocs.pm/req/Req.Steps.html#put_range/1
+[follow_redirects]: https://hexdocs.pm/req/Req.Steps.html#follow_redirects/1
+[retry]: https://hexdocs.pm/req/Req.Steps.html#retry/1
+[put_if_modified_since]: https://hexdocs.pm/req/Req.Steps.html#put_if_modified_since/1
+[put_base_url]: https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
+[put_plug]: https://hexdocs.pm/req/Req.Steps.html#put_plug/1
+[adapter]: https://hexdocs.pm/req/Req.Request.html#module-adapter
 
 ## Usage
 
