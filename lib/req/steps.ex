@@ -613,17 +613,25 @@ defmodule Req.Steps do
   @doc """
   Writes the response body to a file.
 
-  This step runs after the ([`decompress`](`Req.Steps.decompress/1`) step) and before
-  the ([`decode_body`](`Req.Steps.decode_body/1`) step). After the output file is written,
-  the response body is set to `""`.
+  After the output file is written, the response body is set to `""`.
+
+  ## Request Options
+
+    * `:output` - if set, writes the response body to a file. Can be one of:
+
+      * `path` - writes to the given path
+
+      * `:remote_name` - uses the remote name as the filename in the current working directory
 
   ## Examples
 
-      # Saves file to specified path
-      Req.get!("https://elixir-lang.org/index.html", output: "elixir_home.html")
+      iex> Req.get!("https://elixir-lang.org/index.html", output: "/tmp/elixir_home.html")
+      iex> File.exists?("/tmp/elixir_home.html")
+      true
 
-      # Saves file to current working directory with same name as remote file
-      Req.get!("https://elixir-lang.org/index.html", output: :remote_name)
+      iex> Req.get!("https://elixir-lang.org/blog/index.html", output: :remote_name)
+      iex> File.exists?("index.html")
+      true
   """
   @doc step: :response
   def output({request, response}) do
@@ -635,8 +643,12 @@ defmodule Req.Steps do
   end
 
   def output({request, response}, :remote_name) do
-    path = Path.basename(request.url.path)
+    path = Path.basename(request.url.path || "")
     output({request, response}, path)
+  end
+
+  def output(_request_response, "") do
+    raise "cannot write to file \"\""
   end
 
   def output({request, response}, path) do

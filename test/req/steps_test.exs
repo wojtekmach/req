@@ -296,20 +296,26 @@ defmodule Req.StepsTest do
     assert File.read!(c.tmp_dir <> "/saved.txt") == "to be filed"
   end
 
-  @tag :tmp_dir
   test "output/1: :remote_name (not compressed)", c do
     Bypass.expect_once(c.bypass, "GET", "/directory/save_this.txt", fn conn ->
       Plug.Conn.send_resp(conn, 200, "to be filed")
     end)
 
-    cwd = File.cwd!()
-    on_exit(fn -> File.cd!(cwd) end)
-    File.cd!(c.tmp_dir)
-
     response = Req.get!(c.url <> "/directory/save_this.txt", output: :remote_name)
-
     assert response.body == ""
-    assert File.read!(c.tmp_dir <> "/save_this.txt") == "to be filed"
+    assert File.read!("save_this.txt") == "to be filed"
+  after
+    File.rm("save_this.txt")
+  end
+
+  test "output/1: empty filename", c do
+    Bypass.expect_once(c.bypass, "GET", "", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "body contents")
+    end)
+
+    assert_raise RuntimeError, "cannot write to file \"\"", fn ->
+      Req.get!(c.url, output: :remote_name)
+    end
   end
 
   test "decode_body/1: json", c do
