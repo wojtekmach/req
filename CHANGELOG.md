@@ -114,7 +114,7 @@ Step changes:
   * `run_finch`: Add `:http1` and `:http2` options that pick appropriate default pool started by
     Req
 
-  * `encode_headers`: Add `:form` and `:json` options (previously used as `{:form, data}` and
+  * `encode_body`: Add `:form` and `:json` options (previously used as `{:form, data}` and
     `{:json, data}`)
 
   * New step: `run_plug`
