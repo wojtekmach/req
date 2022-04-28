@@ -183,8 +183,7 @@ defmodule Req.Request do
             request_steps: [],
             response_steps: [],
             error_steps: [],
-            private: %{},
-            location_trusted: false
+            private: %{}
 
   @doc """
   Gets the value for a specific private `key`.
