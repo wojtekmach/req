@@ -271,7 +271,7 @@ defmodule Req do
       iex> Req.patch!(req, body: "hello!").body["data"]
       "hello!"
   """
-  @spec patch!(url(), options :: keyword()) :: Req.Response.t()
+  @spec patch!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
   def patch!(url_or_request, options \\ [])
 
   def patch!(%Req.Request{} = request, options) do
@@ -300,7 +300,7 @@ defmodule Req do
       iex> Req.delete!(req).body["method"]
       "DELETE"
   """
-  @spec delete!(url(), options :: keyword()) :: Req.Response.t()
+  @spec delete!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
   def delete!(url_or_request, options \\ [])
 
   def delete!(%Req.Request{} = request, options) do
