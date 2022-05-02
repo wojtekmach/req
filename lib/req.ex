@@ -422,8 +422,7 @@ defmodule Req do
       iex> response.status
       200
   """
-  @spec request(Req.Request.t() | keyword()) ::
-          {:ok, Req.Response.t()} | {:error, Exception.t()}
+  @spec request(Req.Request.t() | keyword()) :: {:ok, Req.Response.t()} | {:error, Exception.t()}
   def request(request_or_options)
 
   def request(%Req.Request{} = request) do
