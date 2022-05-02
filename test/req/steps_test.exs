@@ -599,6 +599,21 @@ defmodule Req.StepsTest do
            end) =~ "[debug] follow_redirects: redirecting to http://untrusted"
   end
 
+  test "follow_redirects/1: skip params", c do
+    Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+      redirect(conn, 302, c.url <> "/ok")
+    end)
+
+    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+      assert conn.query_string == ""
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    # assert ExUnit.CaptureLog.capture_log(fn ->
+    assert Req.get!(c.url <> "/redirect", params: [a: 1]).status == 200
+    # end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
+  end
+
   defp redirect(conn, status, url) do
     conn
     |> Plug.Conn.put_resp_header("location", url)

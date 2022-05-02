@@ -762,6 +762,7 @@ defmodule Req.Steps do
 
     request =
       request
+      |> remove_params()
       |> remove_credentials_if_untrusted(location_trusted, location_url)
       |> put_redirect_request_method()
       |> put_redirect_location(location_url)
@@ -800,6 +801,10 @@ defmodule Req.Steps do
     headers = List.keydelete(request.headers, "authorization", 0)
     request = update_in(request.options, &Map.delete(&1, :auth))
     %{request | headers: headers}
+  end
+
+  defp remove_params(request) do
+    request = update_in(request.options, &Map.delete(&1, :params))
   end
 
   ## Error steps
