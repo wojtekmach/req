@@ -29,7 +29,7 @@ defmodule Req do
 
   Making a POST request with `Req.post!/2`:
 
-      iex> Req.post!("https://httpbin.org/post", body: {:form, comments: "hello!"}).body["form"]
+      iex> Req.post!("https://httpbin.org/post", form: [comments: "hello!"]).body["form"]
       %{"comments" => "hello!"}
   """
 
