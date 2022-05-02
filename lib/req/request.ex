@@ -260,6 +260,43 @@ defmodule Req.Request do
   end
 
   @doc """
+  Runs the request steps in the request pipeline but does not execute them.
+
+  Accepts a `Req.Request` struct, or the same keyword list of options accepted
+  by `Req.new/1`.
+
+  Returns a `Req.Request` struct with all of its steps executed.
+
+  ## Examples
+
+      iex> prepared = Req.Request.prepare(method: :get, base_url: "http://www.example.com", params: [x: 1])
+      iex> prepared.url.host
+      "www.example.com"
+      iex> prepared.url.query
+      "x=1"
+  """
+  def prepare(options) when is_list(options) do
+    options
+    |> Req.new()
+    |> prepare()
+  end
+
+  def prepare(%Req.Request{request_steps: []} = request) do
+    request
+  end
+
+  def prepare(%{request_steps: [step | steps]} = request) do
+    case run_step(step, request) do
+      %Req.Request{} = request ->
+        request = %{request | request_steps: steps}
+        prepare(request)
+
+      {_request, %{__exception__: true} = exception} ->
+        raise exception
+    end
+  end
+
+  @doc """
   Runs a request pipeline.
 
   Returns `{:ok, response}` or `{:error, exception}`.
