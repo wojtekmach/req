@@ -456,11 +456,7 @@ defmodule Req.StepsTest do
 
   test "follow_redirects/1: absolute", c do
     Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
-      location = c.url <> "/ok"
-
-      conn
-      |> Plug.Conn.put_resp_header("location", location)
-      |> Plug.Conn.send_resp(302, "redirecting to #{location}")
+      redirect(conn, 302, c.url <> "/ok")
     end)
 
     Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
@@ -480,9 +476,7 @@ defmodule Req.StepsTest do
           string -> "/ok?" <> string
         end
 
-      conn
-      |> Plug.Conn.put_resp_header("location", location)
-      |> Plug.Conn.send_resp(302, "redirecting to #{location}")
+      redirect(conn, 302, location)
     end)
 
     Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
@@ -504,11 +498,7 @@ defmodule Req.StepsTest do
 
   test "follow_redirects/1: 301..303", c do
     Bypass.expect(c.bypass, "POST", "/redirect", fn conn ->
-      location = c.url <> "/ok"
-
-      conn
-      |> Plug.Conn.put_resp_header("location", location)
-      |> Plug.Conn.send_resp(301, "redirecting to #{location}")
+      redirect(conn, 301, c.url <> "/ok")
     end)
 
     Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
@@ -524,13 +514,8 @@ defmodule Req.StepsTest do
     auth_header = {"authorization", "Basic " <> Base.encode64("foo:bar")}
 
     Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
-      location = c.url <> "/auth"
-
       assert auth_header in conn.req_headers
-
-      conn
-      |> Plug.Conn.put_resp_header("location", location)
-      |> Plug.Conn.send_resp(302, "redirecting to #{location}")
+      redirect(conn, 302, c.url <> "/auth")
     end)
 
     Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
@@ -612,6 +597,12 @@ defmodule Req.StepsTest do
                       auth: {"authorization", "credentials"}
                     ).status == 200
            end) =~ "[debug] follow_redirects: redirecting to http://untrusted"
+  end
+
+  defp redirect(conn, status, url) do
+    conn
+    |> Plug.Conn.put_resp_header("location", url)
+    |> Plug.Conn.send_resp(status, "redirecting to #{url}")
   end
 
   ## Error steps
