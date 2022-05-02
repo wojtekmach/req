@@ -64,11 +64,10 @@ defmodule Req do
       adapter: adapter,
       method: method,
       url: url && URI.parse(url),
-      headers: headers,
+      headers: encode_headers(headers),
       body: body,
       options: options,
       request_steps: [
-        &Req.Steps.encode_headers/1,
         &Req.Steps.put_default_user_agent/1,
         &Req.Steps.compressed/1,
         &Req.Steps.encode_body/1,
@@ -345,8 +344,16 @@ defmodule Req do
 
     * `:url` - the request URL.
 
-    * `:headers` - the request headers. The headers are automatically encoded using the
-      [`encode_headers`](`Req.Steps.encode_headers/1`) step.
+    * `:headers` - the request headers.
+
+      The headers are automatically encoded with these rules:
+
+        * atom header names are turned into strings, replacing `-` with `_`. For example,
+          `:user_agent` becomes `"user-agent"`. String header names are left as is.
+        * if a header value is a `NaiveDateTime` or `DateTime`, it is encoded as "HTTP date". Otherwise,
+          the header value is encoded with `String.Chars.to_string/1`.
+
+      if you set `:headers` options both in `Req.new/1` and `request/2`, the header lists are merged.
 
     * `:body` - the request body. The body is automatically encoded using the
       [`encode_body`](`Req.Steps.encode_body/1`) step.
@@ -444,12 +451,23 @@ defmodule Req do
   def request(request, options) do
     {request_options, options} = Keyword.split(options, [:method, :url, :headers, :body])
 
+    request_options =
+      if request_options[:headers] do
+        update_in(request_options[:headers], &encode_headers/1)
+      else
+        request_options
+      end
+
     request =
       Map.merge(request, Map.new(request_options), fn
-        :url, _, url -> URI.parse(url)
-        # TODO: merge headers
-        :headers, _, headers -> headers
-        _, _, value -> value
+        :url, _, url ->
+          URI.parse(url)
+
+        :headers, old, new ->
+          old ++ new
+
+        _, _, value ->
+          value
       end)
 
     request = update_in(request.options, &Map.merge(&1, Map.new(options)))
@@ -531,5 +549,32 @@ defmodule Req do
   @spec default_options(keyword()) :: :ok
   def default_options(options) do
     Application.put_env(:req, :default_options, options)
+  end
+
+  defp encode_headers(headers) do
+    for {name, value} <- headers do
+      name =
+        case name do
+          atom when is_atom(atom) ->
+            atom |> Atom.to_string() |> String.replace("_", "-")
+
+          binary when is_binary(binary) ->
+            binary
+        end
+
+      value =
+        case value do
+          %NaiveDateTime{} = naive_datetime ->
+            Req.Steps.format_http_datetime(naive_datetime)
+
+          %DateTime{} = datetime ->
+            datetime |> DateTime.shift_zone!("Etc/UTC") |> Req.Steps.format_http_datetime()
+
+          _ ->
+            String.Chars.to_string(value)
+        end
+
+      {name, value}
+    end
   end
 end

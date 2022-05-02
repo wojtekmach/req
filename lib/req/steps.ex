@@ -213,56 +213,6 @@ defmodule Req.Steps do
   end
 
   @doc """
-  Encodes request headers.
-
-  Turns atom header names into strings, replacing `-` with `_`. For example, `:user_agent` becomes
-  `"user-agent"`. Non-atom header names are kept as is.
-
-  If a header value is a `NaiveDateTime` or `DateTime`, it is encoded as "HTTP date". Otherwise,
-  the header value is encoded with `String.Chars.to_string/1`.
-
-  ## Examples
-
-      iex> Req.get!("https://httpbin.org/user-agent", headers: [user_agent: :my_agent]).body
-      %{"user-agent" => "my_agent"}
-
-      iex> headers = [x_expires_at: ~N[2022-01-01 09:00:00]]
-      iex> Req.get!("https://httpbin.org/headers", headers: headers).body["headers"]["X-Expires-At"]
-      "Sat, 01 Jan 2022 09:00:00 GMT"
-
-  """
-  @doc step: :request
-  def encode_headers(request) do
-    headers =
-      for {name, value} <- request.headers do
-        name =
-          case name do
-            atom when is_atom(atom) ->
-              atom |> Atom.to_string() |> String.replace("_", "-")
-
-            binary when is_binary(binary) ->
-              binary
-          end
-
-        value =
-          case value do
-            %NaiveDateTime{} = naive_datetime ->
-              format_http_datetime(naive_datetime)
-
-            %DateTime{} = datetime ->
-              datetime |> DateTime.shift_zone!("Etc/UTC") |> format_http_datetime()
-
-            _ ->
-              String.Chars.to_string(value)
-          end
-
-        {name, value}
-      end
-
-    %{request | headers: headers}
-  end
-
-  @doc """
   Encodes the request body.
 
   ## Request Options
@@ -1008,7 +958,8 @@ defmodule Req.Steps do
     request.url.host <> "-" <> hash
   end
 
-  defp format_http_datetime(datetime) do
+  @doc false
+  def format_http_datetime(datetime) do
     Calendar.strftime(datetime, "%a, %d %b %Y %H:%M:%S GMT")
   end
 end

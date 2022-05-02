@@ -161,21 +161,6 @@ defmodule Req.StepsTest do
     end
   end
 
-  test "encode_headers/1", c do
-    pid = self()
-
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      send(pid, {:headers, conn.req_headers})
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
-
-    Req.get!(c.url, headers: [x_a: 1, x_b: ~U[2021-01-01 09:00:00Z]])
-
-    assert_receive {:headers, headers}
-    assert Map.new(headers)["x-a"] == "1"
-    assert Map.new(headers)["x-b"] == "Fri, 01 Jan 2021 09:00:00 GMT"
-  end
-
   test "default options", c do
     pid = self()
 

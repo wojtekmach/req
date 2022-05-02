@@ -104,6 +104,8 @@ Major changes:
 
   * Remove `put_default_headers` step
 
+  * Remove `encode_headers` step. The headers are now encoded in `Req.new/1` and `Req.request/2`
+
   * Remove `Req.Request.unix_socket` field. Add option on `run_finch` step with the same name
     instead.
 

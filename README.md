@@ -113,8 +113,7 @@ is equivalent to this composition of lower-level API functions and steps:
 ```elixir
 %Req.Request{method: :get, url: "https://api.github.com/repos/elixir-lang/elixir"}
 |> Req.Request.append_request_steps([
-  &Req.Steps.encode_headers/1,
-  &Req.Steps.put_default_headers/1,
+  &Req.Steps.put_default_user_agent/1,
   # ...
 ])
 |> Req.Request.append_response_steps([

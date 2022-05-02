@@ -11,41 +11,28 @@ defmodule ReqTest do
     [bypass: bypass, url: "http://localhost:#{bypass.port}"]
   end
 
-  test "get!/2", c do
+  test "headers", c do
+    pid = self()
+
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      conn
-      |> Plug.Conn.put_resp_content_type("application/json")
-      |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(%{"a" => 1}))
-    end)
-
-    assert Req.get!(c.url).body == %{"a" => 1}
-  end
-
-  test "post!/2", c do
-    Bypass.expect(c.bypass, "POST", "/", fn conn ->
-      conn
-      |> Plug.Conn.put_resp_content_type("application/json")
-      |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(%{"a" => 1}))
-    end)
-
-    assert Req.post!(c.url, json: %{foo: "bar"}).body == %{"a" => 1}
-  end
-
-  test "put!/2", c do
-    Bypass.expect(c.bypass, "PUT", "/", fn conn ->
-      conn
-      |> Plug.Conn.put_resp_content_type("application/json")
-      |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(%{"a" => 1}))
-    end)
-
-    assert Req.put!(c.url, json: %{foo: "bar"}).body == %{"a" => 1}
-  end
-
-  test "delete!/2", c do
-    Bypass.expect(c.bypass, "DELETE", "/", fn conn ->
+      headers = Enum.filter(conn.req_headers, fn {name, _} -> String.starts_with?(name, "x-") end)
+      send(pid, {:headers, headers})
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
-    assert Req.delete!(c.url).body == "ok"
+    Req.get!(c.url, headers: [x_a: 1, x_b: ~U[2021-01-01 09:00:00Z]])
+    assert_receive {:headers, headers}
+    assert headers == [{"x-a", "1"}, {"x-b", "Fri, 01 Jan 2021 09:00:00 GMT"}]
+
+    req = Req.new(headers: [x_a: 1, x_a: 2])
+    assert req.headers == [{"x-a", "1"}, {"x-a", "2"}]
+    Req.get!(req, url: c.url)
+    assert_receive {:headers, headers}
+    assert headers == [{"x-a", "1, 2"}]
+
+    req = Req.new(headers: [x_a: 1])
+    Req.get!(req, url: c.url, headers: [x_a: 2])
+    assert_receive {:headers, headers}
+    assert headers == [{"x-a", "1, 2"}]
   end
 end
