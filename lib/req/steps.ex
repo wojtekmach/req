@@ -804,7 +804,7 @@ defmodule Req.Steps do
   end
 
   defp remove_params(request) do
-    request = update_in(request.options, &Map.delete(&1, :params))
+    update_in(request.options, &Map.delete(&1, :params))
   end
 
   ## Error steps
