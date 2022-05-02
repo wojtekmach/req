@@ -52,6 +52,7 @@ defmodule Req do
   """
   @spec new(options :: keyword()) :: Req.Request.t()
   def new(options \\ []) do
+    options = Keyword.merge(default_options(), options)
     {adapter, options} = Keyword.pop(options, :adapter, &Req.Steps.run_finch/1)
     {method, options} = Keyword.pop(options, :method, :get)
     {headers, options} = Keyword.pop(options, :headers, [])
@@ -247,7 +248,7 @@ defmodule Req do
   def put!(%URI{} = url, {type, _} = body, options) when type in [:form, :json] do
     IO.warn(
       "Req.put!(url, {:#{type}, #{type}}, options) is deprecated in favour of " <>
-        "Req.put!(url, [body: {:#{type}, #{type}}] ++ options)"
+        "Req.put!(url, [#{type}: #{type}] ++ options)"
     )
 
     request!([method: :put, url: url, body: body] ++ options)
@@ -441,8 +442,6 @@ defmodule Req do
   @spec request(Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
   def request(request, options) do
-    options = Keyword.merge(default_options(), options)
-
     {request_options, options} = Keyword.split(options, [:method, :url, :headers, :body])
 
     request =
@@ -517,9 +516,17 @@ defmodule Req do
   @doc """
   Sets default options.
 
-  The default options are used by `request/1`, `get!/2`, and similar functions.
+  Sets default options for `Req.new/1`.
 
   Avoid setting default options in libraries as they are global.
+
+  ## Examples
+
+      iex> Req.default_options(base_url: "https://httpbin.org")
+      iex> Req.get!("/statuses/201").status
+      201
+      iex> Req.new() |> Req.get!(url: "/statuses/201").status
+      201
   """
   @spec default_options(keyword()) :: :ok
   def default_options(options) do
