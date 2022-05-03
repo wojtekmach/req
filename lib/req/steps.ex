@@ -736,11 +736,15 @@ defmodule Req.Steps do
   | 301, 302, 303 | Changed to GET     |
   | 307, 308      | Method not changed |
 
+  If we reach the maxium number of redirects, we will raise an exception.
+
   ## Request Options
 
     * `:location_trusted` - by default, authorization credentials are only sent
       on redirects to the same host. If `:location_trusted` is set to `true`, credentials
       will be sent to any host.
+
+    * `:max_redirects` - the maximum number of redirects, defaults to `10`.
 
   ## Examples
 
@@ -754,25 +758,38 @@ defmodule Req.Steps do
 
   def follow_redirects({request, %{status: status} = response})
       when status in [301, 302, 303, 307, 308] do
+    max_redirects = Map.get(request.options, :max_redirects, 10)
+    redirect_count = Req.Request.get_private(request, :req_redirect_count, 0)
+
+    if redirect_count < max_redirects do
+      request =
+        request
+        |> build_redirect_request(response)
+        |> Req.Request.put_private(:req_redirect_count, redirect_count + 1)
+
+      {_, result} = Req.Request.run(request)
+      {request, result}
+    else
+      raise "too many redirects (#{max_redirects})"
+    end
+  end
+
+  def follow_redirects(other) do
+    other
+  end
+
+  defp build_redirect_request(request, response) do
     {_, location} = List.keyfind(response.headers, "location", 0)
     Logger.debug(["follow_redirects: redirecting to ", location])
 
     location_trusted = Map.get(request.options, :location_trusted)
     location_url = URI.parse(location)
 
-    request =
-      request
-      |> remove_params()
-      |> remove_credentials_if_untrusted(location_trusted, location_url)
-      |> put_redirect_request_method()
-      |> put_redirect_location(location_url)
-
-    {_, result} = Req.Request.run(request)
-    {Req.Request.halt(request), result}
-  end
-
-  def follow_redirects(other) do
-    other
+    request
+    |> remove_params()
+    |> remove_credentials_if_untrusted(location_trusted, location_url)
+    |> put_redirect_request_method()
+    |> put_redirect_location(location_url)
   end
 
   defp put_redirect_location(request, location_url) do
