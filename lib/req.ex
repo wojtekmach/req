@@ -346,14 +346,17 @@ defmodule Req do
 
     * `:headers` - the request headers.
 
-      The headers are automatically encoded with these rules:
+      The headers are automatically encoded using these rules:
 
         * atom header names are turned into strings, replacing `-` with `_`. For example,
-          `:user_agent` becomes `"user-agent"`. String header names are left as is.
-        * if a header value is a `NaiveDateTime` or `DateTime`, it is encoded as "HTTP date". Otherwise,
+          `:user_agent` becomes `"user-agent"`
+
+        * string header names are left as is
+
+        * `NaiveDateTime` and `DateTime` header values are encoded as "HTTP date". Otherwise,
           the header value is encoded with `String.Chars.to_string/1`.
 
-      if you set `:headers` options both in `Req.new/1` and `request/2`, the header lists are merged.
+      If you set `:headers` options both in `Req.new/1` and `request/2`, the header lists are merged.
 
     * `:body` - the request body. The body is automatically encoded using the
       [`encode_body`](`Req.Steps.encode_body/1`) step.
