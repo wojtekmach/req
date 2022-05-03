@@ -68,25 +68,25 @@ defmodule Req do
       body: body,
       options: options,
       request_steps: [
-        &Req.Steps.put_default_user_agent/1,
-        &Req.Steps.compressed/1,
-        &Req.Steps.encode_body/1,
-        &Req.Steps.put_base_url/1,
-        &Req.Steps.auth/1,
-        &Req.Steps.put_params/1,
-        &Req.Steps.put_range/1,
-        &Req.Steps.cache/1,
-        &Req.Steps.put_plug/1
+        put_default_user_agent: &Req.Steps.put_default_user_agent/1,
+        compressed: &Req.Steps.compressed/1,
+        encode_body: &Req.Steps.encode_body/1,
+        put_base_url: &Req.Steps.put_base_url/1,
+        auth: &Req.Steps.auth/1,
+        put_params: &Req.Steps.put_params/1,
+        put_range: &Req.Steps.put_range/1,
+        cache: &Req.Steps.cache/1,
+        put_plug: &Req.Steps.put_plug/1
       ],
       response_steps: [
-        &Req.Steps.retry/1,
-        &Req.Steps.follow_redirects/1,
-        &Req.Steps.decompress/1,
-        &Req.Steps.output/1,
-        &Req.Steps.decode_body/1
+        retry: &Req.Steps.retry/1,
+        follow_redirects: &Req.Steps.follow_redirects/1,
+        decompress: &Req.Steps.decompress/1,
+        output: &Req.Steps.output/1,
+        decode_body: &Req.Steps.decode_body/1
       ],
       error_steps: [
-        &Req.Steps.retry/1
+        retry: &Req.Steps.retry/1
       ]
     }
   end

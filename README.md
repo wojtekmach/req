@@ -113,15 +113,15 @@ is equivalent to this composition of lower-level API functions and steps:
 ```elixir
 %Req.Request{method: :get, url: "https://api.github.com/repos/elixir-lang/elixir"}
 |> Req.Request.append_request_steps([
-  &Req.Steps.put_default_user_agent/1,
+  put_default_user_agent: &Req.Steps.put_default_user_agent/1,
   # ...
 ])
 |> Req.Request.append_response_steps([
-  &Req.Steps.retry/1,
-  &Req.Steps.follow_redirects/1,
+  retry: &Req.Steps.retry/1,
+  follow_redirects: &Req.Steps.follow_redirects/1,
   # ...
 |> Req.Request.append_error_steps([
-  &Req.Steps.retry/1,
+  retry: &Req.Steps.retry/1,
   # ...
 ])
 |> Req.Request.run!()

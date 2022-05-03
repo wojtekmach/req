@@ -51,7 +51,7 @@ you to build complex flows like returning a response from a request step (thus g
 response steps next) or returning a request from a response step (thus going through request
 steps next). That's exactly how Req used Finch all along! It was simply a step that returns either
 response or an error and thus invokes response/error steps next. The only special thing about this
-step is that always must be the _last_ request step. Making it so has now been easier with the new
+step is that always must be the _last_ request step. Making it so is now easier with the new
 `:adapter` option.
 
 Here's a naive Hackney-based adapter and how we can use it:
@@ -93,6 +93,8 @@ Major changes:
   * Move low-level API to `Req.Request`
 
   * Move built-in steps to `Req.Steps`
+
+  * Add step names
 
   * Add `Req.patch!/2`
 

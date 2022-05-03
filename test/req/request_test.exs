@@ -22,11 +22,11 @@ defmodule Req.RequestTest do
 
     request =
       new(url: c.url <> "/not-found")
-      |> Req.Request.prepend_request_steps([
-        fn request ->
+      |> Req.Request.prepend_request_steps(
+        foo: fn request ->
           put_in(request.url.path, "/ok")
         end
-      ])
+      )
 
     assert {:ok, %{status: 200, body: "ok"}} = Req.Request.run(request)
   end
@@ -50,16 +50,16 @@ defmodule Req.RequestTest do
   test "request step returns response", c do
     request =
       new(url: c.url <> "/ok")
-      |> Req.Request.prepend_request_steps([
-        fn request ->
+      |> Req.Request.prepend_request_steps(
+        foo: fn request ->
           {request, %Req.Response{status: 200, body: "from cache"}}
         end
-      ])
-      |> Req.Request.prepend_response_steps([
-        fn {request, response} ->
+      )
+      |> Req.Request.prepend_response_steps(
+        foo: fn {request, response} ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
         end
-      ])
+      )
 
     assert {:ok, %{status: 200, body: "from cache - updated"}} = Req.Request.run(request)
   end
@@ -67,16 +67,16 @@ defmodule Req.RequestTest do
   test "request step returns exception", c do
     request =
       new(url: c.url <> "/ok")
-      |> Req.Request.prepend_request_steps([
-        fn request ->
+      |> Req.Request.prepend_request_steps(
+        foo: fn request ->
           {request, RuntimeError.exception("oops")}
         end
-      ])
-      |> Req.Request.prepend_error_steps([
-        fn {request, exception} ->
+      )
+      |> Req.Request.prepend_error_steps(
+        foo: fn {request, exception} ->
           {request, update_in(exception.message, &(&1 <> " - updated"))}
         end
-      ])
+      )
 
     assert {:error, %RuntimeError{message: "oops - updated"}} = Req.Request.run(request)
   end
@@ -84,18 +84,14 @@ defmodule Req.RequestTest do
   test "request step halts with response", c do
     request =
       new(url: c.url <> "/ok")
-      |> Req.Request.prepend_request_steps([
-        fn request ->
+      |> Req.Request.prepend_request_steps(
+        foo: fn request ->
           {Req.Request.halt(request), %Req.Response{status: 200, body: "from cache"}}
         end,
-        &unreachable/1
-      ])
-      |> Req.Request.prepend_response_steps([
-        &unreachable/1
-      ])
-      |> Req.Request.prepend_error_steps([
-        &unreachable/1
-      ])
+        bar: &unreachable/1
+      )
+      |> Req.Request.prepend_response_steps(foo: &unreachable/1)
+      |> Req.Request.prepend_error_steps(foo: &unreachable/1)
 
     assert {:ok, %{status: 200, body: "from cache"}} = Req.Request.run(request)
   end
@@ -103,18 +99,14 @@ defmodule Req.RequestTest do
   test "request step halts with exception", c do
     request =
       new(url: c.url <> "/ok")
-      |> Req.Request.prepend_request_steps([
-        fn request ->
+      |> Req.Request.prepend_request_steps(
+        foo: fn request ->
           {Req.Request.halt(request), RuntimeError.exception("oops")}
         end,
-        &unreachable/1
-      ])
-      |> Req.Request.prepend_response_steps([
-        &unreachable/1
-      ])
-      |> Req.Request.prepend_error_steps([
-        &unreachable/1
-      ])
+        bar: &unreachable/1
+      )
+      |> Req.Request.prepend_response_steps(foo: &unreachable/1)
+      |> Req.Request.prepend_error_steps(foo: &unreachable/1)
 
     assert {:error, %RuntimeError{message: "oops"}} = Req.Request.run(request)
   end
@@ -126,11 +118,11 @@ defmodule Req.RequestTest do
 
     request =
       new(url: c.url <> "/ok")
-      |> Req.Request.prepend_response_steps([
-        fn {request, response} ->
+      |> Req.Request.prepend_response_steps(
+        foo: fn {request, response} ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
         end
-      ])
+      )
 
     assert {:ok, %{status: 200, body: "ok - updated"}} = Req.Request.run(request)
   end
@@ -142,17 +134,17 @@ defmodule Req.RequestTest do
 
     request =
       new(url: c.url <> "/ok")
-      |> Req.Request.prepend_response_steps([
-        fn {request, response} ->
+      |> Req.Request.prepend_response_steps(
+        foo: fn {request, response} ->
           assert response.body == "ok"
           {request, RuntimeError.exception("oops")}
         end
-      ])
-      |> Req.Request.prepend_error_steps([
-        fn {request, exception} ->
+      )
+      |> Req.Request.prepend_error_steps(
+        foo: fn {request, exception} ->
           {request, update_in(exception.message, &(&1 <> " - updated"))}
         end
-      ])
+      )
 
     assert {:error, %RuntimeError{message: "oops - updated"}} = Req.Request.run(request)
   end
@@ -164,15 +156,13 @@ defmodule Req.RequestTest do
 
     request =
       new(url: c.url <> "/ok")
-      |> Req.Request.prepend_response_steps([
-        fn {request, response} ->
+      |> Req.Request.prepend_response_steps(
+        foo: fn {request, response} ->
           {Req.Request.halt(request), update_in(response.body, &(&1 <> " - updated"))}
         end,
-        &unreachable/1
-      ])
-      |> Req.Request.prepend_error_steps([
-        &unreachable/1
-      ])
+        bar: &unreachable/1
+      )
+      |> Req.Request.prepend_error_steps(foo: &unreachable/1)
 
     assert {:ok, %{status: 200, body: "ok - updated"}} = Req.Request.run(request)
   end
@@ -184,16 +174,14 @@ defmodule Req.RequestTest do
 
     request =
       new(url: c.url <> "/ok")
-      |> Req.Request.prepend_response_steps([
-        fn {request, response} ->
+      |> Req.Request.prepend_response_steps(
+        foo: fn {request, response} ->
           assert response.body == "ok"
           {Req.Request.halt(request), RuntimeError.exception("oops")}
         end,
-        &unreachable/1
-      ])
-      |> Req.Request.prepend_error_steps([
-        &unreachable/1
-      ])
+        bar: &unreachable/1
+      )
+      |> Req.Request.prepend_error_steps(foo: &unreachable/1)
 
     assert {:error, %RuntimeError{message: "oops"}} = Req.Request.run(request)
   end
@@ -203,12 +191,12 @@ defmodule Req.RequestTest do
 
     request =
       new(url: c.url <> "/ok")
-      |> Req.Request.prepend_error_steps([
-        fn {request, exception} ->
+      |> Req.Request.prepend_error_steps(
+        foo: fn {request, exception} ->
           assert exception.reason == :econnrefused
           {request, RuntimeError.exception("oops")}
         end
-      ])
+      )
 
     assert {:error, %RuntimeError{message: "oops"}} = Req.Request.run(request)
   end
@@ -218,18 +206,18 @@ defmodule Req.RequestTest do
 
     request =
       new(url: c.url <> "/ok")
-      |> Req.Request.prepend_response_steps([
-        fn {request, response} ->
+      |> Req.Request.prepend_response_steps(
+        foo: fn {request, response} ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
         end
-      ])
-      |> Req.Request.prepend_error_steps([
-        fn {request, exception} ->
+      )
+      |> Req.Request.prepend_error_steps(
+        foo: fn {request, exception} ->
           assert exception.reason == :econnrefused
           {request, %Req.Response{status: 200, body: "ok"}}
         end,
-        &unreachable/1
-      ])
+        bar: &unreachable/1
+      )
 
     assert {:ok, %{status: 200, body: "ok - updated"}} = Req.Request.run(request)
   end
@@ -239,16 +227,14 @@ defmodule Req.RequestTest do
 
     request =
       new(url: c.url <> "/ok")
-      |> Req.Request.prepend_response_steps([
-        &unreachable/1
-      ])
-      |> Req.Request.prepend_error_steps([
-        fn {request, exception} ->
+      |> Req.Request.prepend_response_steps(foo: &unreachable/1)
+      |> Req.Request.prepend_error_steps(
+        foo: fn {request, exception} ->
           assert exception.reason == :econnrefused
           {Req.Request.halt(request), %Req.Response{status: 200, body: "ok"}}
         end,
-        &unreachable/1
-      ])
+        bar: &unreachable/1
+      )
 
     assert {:ok, %{status: 200, body: "ok"}} = Req.Request.run(request)
   end

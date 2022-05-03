@@ -614,11 +614,11 @@ defmodule Req.StepsTest do
 
     request =
       Req.new(url: c.url, retry_delay: 10)
-      |> Req.Request.prepend_response_steps([
-        fn {request, response} ->
+      |> Req.Request.prepend_response_steps(
+        foo: fn {request, response} ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
         end
-      ])
+      )
 
     assert Req.get!(request).body == "ok - updated"
     assert Agent.get(:counter, & &1) == 3
@@ -635,11 +635,11 @@ defmodule Req.StepsTest do
 
     request =
       Req.new(url: c.url, retry_delay: 10)
-      |> Req.Request.prepend_response_steps([
-        fn {request, response} ->
+      |> Req.Request.prepend_response_steps(
+        foo: fn {request, response} ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
         end
-      ])
+      )
 
     assert Req.get!(request).body == "oops - updated"
     assert_received :ping

@@ -163,9 +163,9 @@ defmodule Req.Request do
           body: iodata(),
           options: map(),
           adapter: request_step(),
-          request_steps: [request_step()],
-          response_steps: [response_step()],
-          error_steps: [error_step()],
+          request_steps: [{name :: atom(), request_step()}],
+          response_steps: [{name :: atom(), response_step()}],
+          error_steps: [{name :: atom(), error_step()}],
           private: map()
         }
 
@@ -219,6 +219,13 @@ defmodule Req.Request do
 
   @doc """
   Appends request steps.
+
+  ## Examples
+
+      iex> Req.Request.append_request_steps(request,
+      ...>   noop: fn request -> request end,
+      ...>   inspect: &IO.inspect/1
+      ...> )
   """
   def append_request_steps(request, steps) do
     update_in(request.request_steps, &(&1 ++ steps))
@@ -226,6 +233,13 @@ defmodule Req.Request do
 
   @doc """
   Prepends request steps.
+
+  ## Examples
+
+      iex> Req.Request.prepend_request_steps(request,
+      ...>   noop: fn request -> request end,
+      ...>   inspect: &IO.inspect/1
+      ...> )
   """
   def prepend_request_steps(request, steps) do
     update_in(request.request_steps, &(steps ++ &1))
@@ -233,6 +247,13 @@ defmodule Req.Request do
 
   @doc """
   Appends response steps.
+
+  ## Examples
+
+      iex> Req.Request.append_request_steps(request,
+      ...>   noop: fn {request, response} -> {request, response} end,
+      ...>   inspect: &IO.inspect/1
+      ...> )
   """
   def append_response_steps(request, steps) do
     update_in(request.response_steps, &(&1 ++ steps))
@@ -240,6 +261,13 @@ defmodule Req.Request do
 
   @doc """
   Prepends response steps.
+
+  ## Examples
+
+      iex> Req.Request.prepend_request_steps(request,
+      ...>   noop: fn {request, response} -> {request, response} end,
+      ...>   inspect: &IO.inspect/1
+      ...> )
   """
   def prepend_response_steps(request, steps) do
     update_in(request.response_steps, &(steps ++ &1))
@@ -247,6 +275,13 @@ defmodule Req.Request do
 
   @doc """
   Appends error steps.
+
+  ## Examples
+
+      iex> Req.Request.append_error_steps(request,
+      ...>   noop: fn {request, exception} -> {request, exception} end,
+      ...>   inspect: &IO.inspect/1
+      ...> )
   """
   def append_error_steps(request, steps) do
     update_in(request.error_steps, &(&1 ++ steps))
@@ -254,6 +289,13 @@ defmodule Req.Request do
 
   @doc """
   Prepends error steps.
+
+  ## Examples
+
+      iex> Req.Request.prepend_error_steps(request,
+      ...>   noop: fn {request, exception} -> {request, exception} end,
+      ...>   inspect: &IO.inspect/1
+      ...> )
   """
   def prepend_error_steps(request, steps) do
     update_in(request.error_steps, &(steps ++ &1))
@@ -301,7 +343,7 @@ defmodule Req.Request do
   end
 
   defp run_request([], request) do
-    case run_step(request.adapter, request) do
+    case run_step({:adapter, request.adapter}, request) do
       {request, %Req.Response{} = response} ->
         run_response(request, response)
 
@@ -366,23 +408,8 @@ defmodule Req.Request do
     result(response_or_exception)
   end
 
-  @doc false
-  def run_step(step, state)
-
-  def run_step({module, function, args}, state) do
-    apply(module, function, [state | args])
-  end
-
-  def run_step({module, options}, state) do
-    apply(module, :run, [state | [options]])
-  end
-
-  def run_step(module, state) when is_atom(module) do
-    apply(module, :run, [state, []])
-  end
-
-  def run_step(func, state) when is_function(func, 1) do
-    func.(state)
+  defp run_step({name, step}, state) when is_atom(name) and is_function(step, 1) do
+    step.(state)
   end
 
   defp result(%Req.Response{} = response) do

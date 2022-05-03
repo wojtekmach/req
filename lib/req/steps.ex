@@ -342,7 +342,7 @@ defmodule Req.Steps do
 
       request
       |> put_if_modified_since(dir)
-      |> Req.Request.prepend_response_steps([&handle_cache(&1, dir)])
+      |> Req.Request.prepend_response_steps(handle_cache: &handle_cache(&1, dir))
     else
       request
     end
