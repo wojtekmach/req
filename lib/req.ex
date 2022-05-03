@@ -75,7 +75,7 @@ defmodule Req do
         &Req.Steps.auth/1,
         &Req.Steps.put_params/1,
         &Req.Steps.put_range/1,
-        &Req.Steps.put_if_modified_since/1,
+        &Req.Steps.cache/1,
         &Req.Steps.put_plug/1
       ],
       response_steps: [
@@ -388,9 +388,9 @@ defmodule Req do
 
     * `:follow_redirects` - if set to `false`, disables automatic response redirects. Defaults to `true`.
 
-  Caching options ([`put_if_modified_since`](`Req.Steps.put_if_modified_since/1`) step):
+  Caching options ([`cache`](`Req.Steps.cache/1`) step):
 
-    * `:cache` - if `true`, performs caching. Defaults to `false`.
+    * `:cache` - if `true`, performs HTTP caching. Defaults to `false`.
 
     * `:cache_dir` - the directory to store the cache, defaults to `<user_cache_dir>/req`
       (see: `:filename.basedir/3`)

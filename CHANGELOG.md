@@ -98,6 +98,8 @@ Major changes:
 
   * Add `Req.Request.adapter` field
 
+  * Rename `put_if_modified_since` step to `cache`
+
   * Remove `put_default_steps` step
 
   * Remove `run_steps` step

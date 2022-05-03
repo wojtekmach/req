@@ -29,7 +29,7 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
   * Retries on errors (via [`retry`][retry] step)
 
-  * Basic HTTP caching (via [`put_if_modified_since`][put_if_modified_since] step)
+  * Basic HTTP caching (via [`cache`][cache] step)
 
   * Setting base URL (via [`put_base_url`][put_base_url] step)
 
@@ -50,7 +50,7 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 [put_range]: https://hexdocs.pm/req/Req.Steps.html#put_range/1
 [follow_redirects]: https://hexdocs.pm/req/Req.Steps.html#follow_redirects/1
 [retry]: https://hexdocs.pm/req/Req.Steps.html#retry/1
-[put_if_modified_since]: https://hexdocs.pm/req/Req.Steps.html#put_if_modified_since/1
+[cache]: https://hexdocs.pm/req/Req.Steps.html#cache/1
 [put_base_url]: https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
 [put_plug]: https://hexdocs.pm/req/Req.Steps.html#put_plug/1
 [adapter]: https://hexdocs.pm/req/Req.Request.html#module-adapter

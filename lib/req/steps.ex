@@ -312,7 +312,7 @@ defmodule Req.Steps do
   end
 
   @doc """
-  Handles HTTP cache using `if-modified-since` header.
+  Performs HTTP caching using `if-modified-since` header.
 
   Only successful (200 OK) responses are cached.
 
@@ -336,19 +336,19 @@ defmodule Req.Steps do
 
   """
   @doc step: :request
-  def put_if_modified_since(request) do
+  def cache(request) do
     if request.options[:cache] do
       dir = Map.get(request.options, :cache_dir) || :filename.basedir(:user_cache, 'req')
 
       request
-      |> do_put_if_modified_since(dir)
+      |> put_if_modified_since(dir)
       |> Req.Request.prepend_response_steps([&handle_cache(&1, dir)])
     else
       request
     end
   end
 
-  defp do_put_if_modified_since(request, dir) do
+  defp put_if_modified_since(request, dir) do
     case File.stat(cache_path(dir, request)) do
       {:ok, stat} ->
         datetime = stat.mtime |> NaiveDateTime.from_erl!() |> format_http_datetime()
