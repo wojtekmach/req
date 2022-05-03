@@ -956,11 +956,14 @@ defmodule Req.Steps do
   end
 
   defp cache_key(request) do
-    hash =
-      :crypto.hash(:sha256, :erlang.term_to_binary(request.url))
-      |> Base.encode16(case: :lower)
-
-    request.url.host <> "-" <> hash
+    Enum.join(
+      [
+        request.url.host,
+        Atom.to_string(request.method),
+        :crypto.hash(:sha256, :erlang.term_to_binary(request.url)) |> Base.encode16(case: :lower)
+      ],
+      "-"
+    )
   end
 
   @doc false

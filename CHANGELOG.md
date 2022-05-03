@@ -121,6 +121,8 @@ Step changes:
   * `encode_body`: Add `:form` and `:json` options (previously used as `{:form, data}` and
     `{:json, data}`)
 
+  * `cache`: Include request method in cache key
+
   * New step: `run_plug`
 
   * New step: `put_default_user_agent` (replaces part of removed `put_default_headers`)
