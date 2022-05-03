@@ -29,37 +29,18 @@ defmodule Req.StepsTest do
     assert Req.get!(c.url, base_url: "ignored").body == "ok"
   end
 
-  test "auth/1: basic", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      expected = "Basic " <> Base.encode64("foo:bar")
+  test "auth/1: basic" do
+    req = Req.new(auth: {"foo", "bar"}) |> Req.Request.prepare()
 
-      case Plug.Conn.get_req_header(conn, "authorization") do
-        [^expected] ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-
-        _ ->
-          Plug.Conn.send_resp(conn, 401, "unauthorized")
-      end
-    end)
-
-    assert Req.get!(c.url, auth: {"foo", "bar"}).status == 200
+    assert List.keyfind(req.headers, "authorization", 0) ==
+             {"authorization", "Basic #{Base.encode64("foo:bar")}"}
   end
 
-  test "auth/1: bearer", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      expected = "Bearer valid_token"
+  test "auth/1: bearer" do
+    req = Req.new(auth: {:bearer, "abcd"}) |> Req.Request.prepare()
 
-      case Plug.Conn.get_req_header(conn, "authorization") do
-        [^expected] ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-
-        _ ->
-          Plug.Conn.send_resp(conn, 401, "unauthorized")
-      end
-    end)
-
-    assert Req.get!(c.url, auth: {:bearer, "bad_token"}).status == 401
-    assert Req.get!(c.url, auth: {:bearer, "valid_token"}).status == 200
+    assert List.keyfind(req.headers, "authorization", 0) ==
+             {"authorization", "Bearer abcd"}
   end
 
   @tag :tmp_dir
@@ -185,43 +166,40 @@ defmodule Req.StepsTest do
     assert "req/" <> _ = Req.get!(c.url).body
   end
 
-  test "encode_body/1: json", c do
-    Bypass.expect(c.bypass, "POST", "/", fn conn ->
-      conn = Plug.Parsers.call(conn, Plug.Parsers.init(parsers: [{:json, json_decoder: Jason}]))
-      assert conn.body_params == %{"a" => 1}
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
-
-    assert Req.post!(c.url, json: %{a: 1}).body == "ok"
+  test "encode_body/1: json" do
+    req = Req.new(json: %{a: 1}) |> Req.Request.prepare()
+    assert req.body |> IO.iodata_to_binary() == ~s|{"a":1}|
   end
 
-  test "encode_body/1: form", c do
-    Bypass.expect(c.bypass, "POST", "/", fn conn ->
-      conn = Plug.Parsers.call(conn, Plug.Parsers.init(parsers: [:urlencoded]))
-      assert conn.body_params == %{"a" => "1"}
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
+  test "encode_body/1: form" do
+    req = Req.new(form: [a: 1]) |> Req.Request.prepare()
+    assert req.body == "a=1"
 
-    assert Req.post!(c.url, form: [a: 1]).body == "ok"
+    req = Req.new(form: %{a: 1}) |> Req.Request.prepare()
+    assert req.body == "a=1"
   end
 
-  test "put_params/1", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      Plug.Conn.send_resp(conn, 200, conn.query_string)
-    end)
+  test "put_params/1" do
+    req = Req.new(url: "http://foo", params: [x: 1, y: 2]) |> Req.Request.prepare()
+    assert URI.to_string(req.url) == "http://foo?x=1&y=2"
 
-    assert Req.get!(c.url, params: [x: 1, y: 2]).body == "x=1&y=2"
-    assert Req.get!(c.url <> "/?x=1", params: [y: 2, z: 3]).body == "x=1&y=2&z=3"
+    req = Req.new(url: "http://foo", params: [x: 1, x: 2]) |> Req.Request.prepare()
+    assert URI.to_string(req.url) == "http://foo?x=1&x=2"
+
+    req = Req.new(url: "http://foo?x=1", params: [x: 1, y: 2]) |> Req.Request.prepare()
+    assert URI.to_string(req.url) == "http://foo?x=1&x=1&y=2"
   end
 
-  test "put_range/1", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      [range] = Plug.Conn.get_req_header(conn, "range")
-      Plug.Conn.send_resp(conn, 206, range)
-    end)
+  test "put_range/1" do
+    req = Req.new(range: "bytes=0-10") |> Req.Request.prepare()
 
-    assert Req.get!(c.url, range: "bytes=0-10").body == "bytes=0-10"
-    assert Req.get!(c.url, range: 0..10).body == "bytes=0-10"
+    assert List.keyfind(req.headers, "range", 0) ==
+             {"range", "bytes=0-10"}
+
+    req = Req.new(range: 0..20) |> Req.Request.prepare()
+
+    assert List.keyfind(req.headers, "range", 0) ==
+             {"range", "bytes=0-20"}
   end
 
   defmodule MyPlug do
