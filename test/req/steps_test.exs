@@ -587,9 +587,9 @@ defmodule Req.StepsTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
-    # assert ExUnit.CaptureLog.capture_log(fn ->
-    assert Req.get!(c.url <> "/redirect", params: [a: 1]).status == 200
-    # end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
+    assert ExUnit.CaptureLog.capture_log(fn ->
+             assert Req.get!(c.url <> "/redirect", params: [a: 1]).status == 200
+           end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
   end
 
   defp redirect(conn, status, url) do
