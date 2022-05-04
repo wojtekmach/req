@@ -190,6 +190,20 @@ defmodule Req.StepsTest do
     assert URI.to_string(req.url) == "http://foo?x=1&x=1&y=2"
   end
 
+  test "big_query/1" do
+    options = [
+      url: "https://bigquery.api/queries",
+      big_query: "SELECT * FROM iris",
+      dataset: "req",
+      project_id: "leafy-tenure-347719"
+    ]
+
+    req = Req.new(options) |> Req.Request.prepare()
+
+    assert req.body ==
+             "{\"defaultDataset\":{\"datasetId\":\"req\",\"projectId\":\"leafy-tenure-347719\"},\"query\":\"SELECT * FROM iris\"}"
+  end
+
   test "put_range/1" do
     req = Req.new(range: "bytes=0-10") |> Req.Request.prepare()
 

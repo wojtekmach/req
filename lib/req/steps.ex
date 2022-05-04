@@ -278,6 +278,45 @@ defmodule Req.Steps do
   end
 
   @doc """
+  Sets the json format for Google's BigQuery API request body.
+
+  ## Request Options
+
+    * `:big_query` - sets the query to be sent to Google's BigQuery API
+
+    * `:dataset` - sets the Google's BigQuery dataset
+
+    * `:project_id` - sets the Google's Console API project id.
+
+  ## Examples
+
+      iex> Req.new(url: "https://bigquery.api/queries", big_query: "SELECT * FROM iris", dataset: "my-dataset", project_id: "my-project-id").body
+      {\"defaultDataset\":{\"datasetId\":\"my-dataset\",\"projectId\":\"my-project-id\"},\"query\":\"SELECT * FROM iris\"}
+
+  """
+  @doc step: :request
+  def big_query(request) do
+    with {:ok, query} <- Map.fetch(request.options, :big_query),
+         {:ok, dataset} <- Map.fetch(request.options, :dataset),
+         {:ok, project_id} <- Map.fetch(request.options, :project_id) do
+      body = %{
+        "query" => query,
+        "defaultDataset" => %{
+          "datasetId" => dataset,
+          "projectId" => project_id
+        }
+      }
+
+      update_in(request.body, fn _ ->
+        Jason.encode!(body)
+      end)
+    else
+      :error ->
+        request
+    end
+  end
+
+  @doc """
   Sets the "Range" request header.
 
   ## Request Options

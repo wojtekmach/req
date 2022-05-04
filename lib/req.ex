@@ -76,7 +76,8 @@ defmodule Req do
         put_params: &Req.Steps.put_params/1,
         put_range: &Req.Steps.put_range/1,
         cache: &Req.Steps.cache/1,
-        put_plug: &Req.Steps.put_plug/1
+        put_plug: &Req.Steps.put_plug/1,
+        big_query: &Req.Steps.big_query/1
       ],
       response_steps: [
         retry: &Req.Steps.retry/1,
