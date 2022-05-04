@@ -613,7 +613,7 @@ defmodule Req.StepsTest do
     end)
 
     request =
-      Req.new(url: c.url, retry_delay: 10)
+      Req.new(url: c.url, retry_delay: 1)
       |> Req.Request.prepend_response_steps(
         foo: fn {request, response} ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
@@ -634,7 +634,7 @@ defmodule Req.StepsTest do
     end)
 
     request =
-      Req.new(url: c.url, retry_delay: 10)
+      Req.new(url: c.url, retry_delay: 1)
       |> Req.Request.prepend_response_steps(
         foo: fn {request, response} ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
@@ -648,7 +648,25 @@ defmodule Req.StepsTest do
     refute_received _
   end
 
-  test "retry: disabled", c do
+  @tag :capture_log
+  test "retry: always", c do
+    pid = self()
+
+    Bypass.expect(c.bypass, "POST", "/", fn conn ->
+      send(pid, :ping)
+      Plug.Conn.send_resp(conn, 500, "oops")
+    end)
+
+    request = Req.new(url: c.url, retry: true, retry_delay: 1)
+
+    assert Req.post!(request).status == 500
+    assert_received :ping
+    assert_received :ping
+    assert_received :ping
+    refute_received _
+  end
+
+  test "retry: never", c do
     pid = self()
 
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
@@ -659,6 +677,29 @@ defmodule Req.StepsTest do
     request = Req.new(url: c.url, retry: false)
 
     assert Req.get!(request).status == 500
+    assert_received :ping
+    refute_received _
+  end
+
+  @tag :capture_log
+  test "retry: custom function", c do
+    pid = self()
+
+    Bypass.expect(c.bypass, "POST", "/", fn conn ->
+      send(pid, :ping)
+      Plug.Conn.send_resp(conn, 500, "oops")
+    end)
+
+    fun = fn response ->
+      assert response.status == 500
+      true
+    end
+
+    request = Req.new(url: c.url, retry: fun, retry_delay: 1)
+
+    assert Req.post!(request).status == 500
+    assert_received :ping
+    assert_received :ping
     assert_received :ping
     refute_received _
   end

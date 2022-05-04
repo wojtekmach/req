@@ -391,6 +391,17 @@ defmodule Req do
 
     * `:follow_redirects` - if set to `false`, disables automatic response redirects. Defaults to `true`.
 
+  Retry options ([`retry`](`Req.Steps.retry/1`) step):
+
+    * `:retry` - if `false`, don't retry. By default, we automatically retry GET/HEAD requests on
+      HTTP 408/5xx responses or exceptions.
+
+    * `:retry_delay` - sleep this number of milliseconds before making another attempt, defaults
+      to `2000`
+
+    * `:max_retries` - maximum number of retry attempts, defaults to `2` (for a total of `3`
+      requests to the server, including the initial one.)
+
   Caching options ([`cache`](`Req.Steps.cache/1`) step):
 
     * `:cache` - if `true`, performs HTTP caching. Defaults to `false`.

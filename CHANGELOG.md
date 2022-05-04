@@ -125,6 +125,11 @@ Step changes:
 
   * `cache`: Include request method in cache key
 
+  * `retry`: The `:retry` option can now be set to `:safe` (default) to only retry GET/HEAD
+    requests on HTTP 408/5xx responses or exceptions, `true` to always retry, `false` to never
+    `retry`, and `fun` - a 1-arity function that accepts either a `Req.Response` or an exception
+    struct and returns boolean whether to retry
+
   * New step: `run_plug`
 
   * New step: `put_default_user_agent` (replaces part of removed `put_default_headers`)

@@ -812,18 +812,22 @@ defmodule Req.Steps do
   @doc """
   Retries a request in face of errors.
 
-  This function can be used as either or both response and error step. It retries a request that
-  resulted in:
-
-    * a response with status 5xx
-
-    * an exception
+  This function can be used as either or both response and error step.
 
   ## Request Options
 
-    * `:retry` - if `false`, disables automatic retries. Defaults to `true`.
+    * `:retry` - can be one of the following:
 
-    * `:request_delay` - sleep this number of milliseconds before making another attempt, defaults
+        * `:safe` (default) - retry GET/HEAD requests on HTTP 408/5xx responses or exceptions
+
+        * `true` - always retry
+
+        * `false` - never retry
+
+        * `fun` - a 1-arity function that accepts either a `Req.Response` or an exception struct
+          and returns boolean whether to retry
+
+    * `:retry_delay` - sleep this number of milliseconds before making another attempt, defaults
       to `2000`
 
     * `:max_retries` - maximum number of retry attempts, defaults to `2` (for a total of `3`
@@ -853,15 +857,40 @@ defmodule Req.Steps do
   @doc step: :error
   def retry(request_response_or_error)
 
-  def retry({request, %Req.Response{} = response}) when response.status < 500 do
-    {request, response}
-  end
-
-  def retry({request, response_or_exception}) when request.options.retry == false do
-    {request, response_or_exception}
-  end
-
   def retry({request, response_or_exception}) do
+    case Map.get(request.options, :retry, :safe) do
+      :safe ->
+        if request.method in [:get, :head] do
+          case response_or_exception do
+            %Req.Response{status: status} when status == 408 or status in 500..599 ->
+              retry(request, response_or_exception)
+
+            %Req.Response{} ->
+              {request, response_or_exception}
+
+            %{__exception__: true} ->
+              retry(request, response_or_exception)
+          end
+        else
+          {request, response_or_exception}
+        end
+
+      true ->
+        retry(request, response_or_exception)
+
+      false ->
+        {request, response_or_exception}
+
+      fun when is_function(fun) ->
+        if fun.(response_or_exception) do
+          retry(request, response_or_exception)
+        else
+          {request, response_or_exception}
+        end
+    end
+  end
+
+  defp retry(request, response_or_exception) do
     delay = Map.get(request.options, :retry_delay, 2000)
     max_retries = Map.get(request.options, :max_retries, 2)
     retry_count = Req.Request.get_private(request, :req_retry_count, 0)
