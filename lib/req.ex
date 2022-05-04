@@ -604,6 +604,7 @@ defmodule Req do
     end
   end
 
+  # Plugins support is experimental, undocumented, and likely won't make the new release.
   defp run_plugins([plugin | rest], request) when is_atom(plugin) do
     run_plugins(rest, plugin.run(request))
   end
