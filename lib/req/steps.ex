@@ -762,6 +762,10 @@ defmodule Req.Steps do
   @doc step: :response
   def follow_redirects(request_response)
 
+  def follow_redirects({request, response}) when request.options.follow_redirects == false do
+    {request, response}
+  end
+
   def follow_redirects({request, %{status: status} = response})
       when status in [301, 302, 303, 307, 308] do
     max_redirects = Map.get(request.options, :max_redirects, 10)
