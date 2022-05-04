@@ -778,7 +778,7 @@ defmodule Req.Steps do
         |> Req.Request.put_private(:req_redirect_count, redirect_count + 1)
 
       {_, result} = Req.Request.run(request)
-      {request, result}
+      {Req.Request.halt(request), result}
     else
       raise "too many redirects (#{max_redirects})"
     end
