@@ -375,6 +375,26 @@ defmodule Req.Steps do
   end
 
   @doc """
+  Compresses the request body.
+
+  ## Request options
+
+    * `:compress_request` - compresses the request body using `gzip` compression and sets the
+    `"Content-Encoding: gzip"` header. Defaults to `false`.
+
+  """
+  @doc step: :request
+  def compress_request(request) do
+    if request.options[:compress_request] do
+      request
+      |> Map.put(:body, :zlib.gzip(request.body))
+      |> put_header("content-encoding", "gzip")
+    else
+      request
+    end
+  end
+
+  @doc """
   Runs the request using `Finch`.
 
   This is the default Req _adapter_. See `:adapter` field description in the `Req.Request` module

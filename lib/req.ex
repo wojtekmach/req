@@ -76,7 +76,8 @@ defmodule Req do
         put_params: &Req.Steps.put_params/1,
         put_range: &Req.Steps.put_range/1,
         cache: &Req.Steps.cache/1,
-        put_plug: &Req.Steps.put_plug/1
+        put_plug: &Req.Steps.put_plug/1,
+        compress_request: &Req.Steps.compress_request/1
       ],
       response_steps: [
         retry: &Req.Steps.retry/1,
@@ -360,6 +361,9 @@ defmodule Req do
 
     * `:body` - the request body. The body is automatically encoded using the
       [`encode_body`](`Req.Steps.encode_body/1`) step.
+
+    * `:compress_request` - compresses the request body via the
+      [`compress_request`](`Req.Steps.compress_request/1`) step.
 
   Additional URL options:
 
