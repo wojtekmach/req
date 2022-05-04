@@ -58,9 +58,10 @@ defmodule Req do
     {headers, options} = Keyword.pop(options, :headers, [])
     {url, options} = Keyword.pop(options, :url, "")
     {body, options} = Keyword.pop(options, :body, "")
+    {plugins, options} = Keyword.pop(options, :plugins, [])
     options = Map.new(options)
 
-    %Req.Request{
+    request = %Req.Request{
       adapter: adapter,
       method: method,
       url: url && URI.parse(url),
@@ -89,6 +90,8 @@ defmodule Req do
         retry: &Req.Steps.retry/1
       ]
     }
+
+    run_plugins(plugins, request)
   end
 
   @doc """
@@ -452,6 +455,8 @@ defmodule Req do
   @spec request(Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
   def request(request, options) do
+    {plugins, options} = Keyword.pop(options, :plugins, [])
+
     {request_options, options} = Keyword.split(options, [:method, :url, :headers, :body])
 
     request_options =
@@ -474,6 +479,7 @@ defmodule Req do
       end)
 
     request = update_in(request.options, &Map.merge(&1, Map.new(options)))
+    request = run_plugins(plugins, request)
     Req.Request.run(request)
   end
 
@@ -579,5 +585,13 @@ defmodule Req do
 
       {name, value}
     end
+  end
+
+  defp run_plugins([plugin | rest], request) when is_atom(plugin) do
+    run_plugins(rest, plugin.run(request))
+  end
+
+  defp run_plugins([], request) do
+    request
   end
 end
