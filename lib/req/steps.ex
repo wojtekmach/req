@@ -736,8 +736,6 @@ defmodule Req.Steps do
   | 301, 302, 303 | Changed to GET     |
   | 307, 308      | Method not changed |
 
-  If we reach the maxium number of redirects, we will raise an exception.
-
   ## Request Options
 
     * `:location_trusted` - by default, authorization credentials are only sent
@@ -745,12 +743,20 @@ defmodule Req.Steps do
       will be sent to any host.
 
     * `:max_redirects` - the maximum number of redirects, defaults to `10`.
+      If the limit is reached, an erorr is raised.
+
 
   ## Examples
 
       iex> Req.get!("http://api.github.com").status
       # 23:24:11.670 [debug]  follow_redirects: redirecting to https://api.github.com/
       200
+
+      iex> Req.get!("https://httpbin.org/redirect/4", max_redirects: 3)
+      # 23:07:59.570 [debug] follow_redirects: redirecting to /relative-redirect/3
+      # 23:08:00.068 [debug] follow_redirects: redirecting to /relative-redirect/2
+      # 23:08:00.206 [debug] follow_redirects: redirecting to /relative-redirect/1
+      ** (RuntimeError) too many redirects (3)
 
   """
   @doc step: :response
