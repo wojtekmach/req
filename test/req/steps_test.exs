@@ -592,6 +592,30 @@ defmodule Req.StepsTest do
            end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
   end
 
+  test "follow_redirects/1: max redirects", c do
+    pid = self()
+
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      send(pid, :ping)
+      redirect(conn, 302, c.url)
+    end)
+
+    captured_log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        assert_raise RuntimeError, "too many redirects (3)", fn ->
+          Req.get!(c.url, max_redirects: 3)
+        end
+      end)
+
+    assert_receive :ping
+    assert_receive :ping
+    assert_receive :ping
+    assert_receive :ping
+    refute_receive _
+
+    assert captured_log =~ "follow_redirects: redirecting to " <> c.url
+  end
+
   defp redirect(conn, status, url) do
     conn
     |> Plug.Conn.put_resp_header("location", url)

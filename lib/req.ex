@@ -391,6 +391,12 @@ defmodule Req do
 
     * `:follow_redirects` - if set to `false`, disables automatic response redirects. Defaults to `true`.
 
+    * `:location_trusted` - by default, authorization credentials are only sent
+      on redirects to the same host. If `:location_trusted` is set to `true`, credentials
+      will be sent to any host.
+
+    * `:max_redirects` - the maximum number of redirects, defaults to `10`.
+
   Retry options ([`retry`](`Req.Steps.retry/1`) step):
 
     * `:retry` - if `false`, don't retry. By default, we automatically retry GET/HEAD requests on
