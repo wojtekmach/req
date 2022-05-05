@@ -35,6 +35,8 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
   * Running against a plug (via [`put_plug`][put_plug] step)
 
+  * Request compression (via [`compress_body`][compress_body] step)
+
   * Pluggable adapters (see ["Adapter" section in `Req.Request` module][adapter] documentation)
 
 [req]: https://hexdocs.pm/req/Req.html
@@ -53,6 +55,7 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 [cache]: https://hexdocs.pm/req/Req.Steps.html#cache/1
 [put_base_url]: https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
 [put_plug]: https://hexdocs.pm/req/Req.Steps.html#put_plug/1
+[compress_body]: https://hexdocs.pm/req/Req.Steps.html#compress_body/1
 [adapter]: https://hexdocs.pm/req/Req.Request.html#module-adapter
 
 ## Usage

@@ -377,17 +377,17 @@ defmodule Req.Steps do
   @doc """
   Compresses the request body.
 
-  ## Request options
+  ## Request Options
 
-    * `:compress_request` - compresses the request body using `gzip` compression and sets the
+    * `:compress_body` - compresses the request body using `gzip` compression and sets the
     `"Content-Encoding: gzip"` header. Defaults to `false`.
 
   """
   @doc step: :request
-  def compress_request(request) do
-    if request.options[:compress_request] do
+  def compress_body(request) do
+    if request.options[:compress_body] do
       request
-      |> Map.put(:body, :zlib.gzip(request.body))
+      |> Map.update!(:body, &:zlib.gzip/1)
       |> put_header("content-encoding", "gzip")
     else
       request
