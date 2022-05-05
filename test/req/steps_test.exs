@@ -234,6 +234,15 @@ defmodule Req.StepsTest do
     assert resp.body =~ "Req is an HTTP client"
   end
 
+  test "compress_body/1" do
+    req = Req.new(method: :post, json: %{a: 1}) |> Req.Request.prepare()
+    assert Jason.decode!(req.body) == %{"a" => 1}
+
+    req = Req.new(method: :post, json: %{a: 1}, compress_body: true) |> Req.Request.prepare()
+    assert :zlib.gunzip(req.body) |> Jason.decode!() == %{"a" => 1}
+    assert List.keyfind(req.headers, "content-encoding", 0) == {"content-encoding", "gzip"}
+  end
+
   ## Response steps
 
   test "decompress/1", c do
