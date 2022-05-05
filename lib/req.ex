@@ -83,7 +83,7 @@ defmodule Req do
       response_steps: [
         retry: &Req.Steps.retry/1,
         follow_redirects: &Req.Steps.follow_redirects/1,
-        decompress: &Req.Steps.decompress/1,
+        decompress_body: &Req.Steps.decompress_body/1,
         output: &Req.Steps.output/1,
         decode_body: &Req.Steps.decode_body/1
       ],
@@ -388,7 +388,7 @@ defmodule Req do
   Response body options:
 
     * `:raw` - if set to `true`, disables automatic body decompression
-      ([`decompress`](`Req.Steps.decompress/1`) step) and decoding
+      ([`decompress_body`](`Req.Steps.decompress_body/1`) step) and decoding
       ([`decode_body`](`Req.Steps.decode_body/1`) step). Defaults to `false`.
 
     * `:output` - if set, writes the response body to a file (via

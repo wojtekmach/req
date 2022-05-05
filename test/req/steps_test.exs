@@ -245,7 +245,7 @@ defmodule Req.StepsTest do
 
   ## Response steps
 
-  test "decompress/1", c do
+  test "decompress_body/1", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       conn
       |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")

@@ -32,7 +32,7 @@ defmodule Req.IntegrationTest do
       put_params: 1,
       put_range: 1,
       cache: 1,
-      decompress: 1,
+      decompress_body: 1,
       decode_body: 1
     ]
 end

@@ -102,6 +102,8 @@ Major changes:
 
   * Rename `put_if_modified_since` step to `cache`
 
+  * Rename `decompress` step to `decompress_body`
+
   * Remove `put_default_steps` step
 
   * Remove `run_steps` step
@@ -135,6 +137,8 @@ Step changes:
   * New step: `put_default_user_agent` (replaces part of removed `put_default_headers`)
 
   * New step: `compressed` (replaces part of removed `put_default_headers`)
+
+  * New step: `compress_body`
 
   * New step: `output`
 

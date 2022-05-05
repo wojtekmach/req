@@ -177,7 +177,7 @@ defmodule Req.Steps do
 
   ## Examples
 
-  Req automatically decompresses response body (`decompress/1` step) so let's disable that by
+  Req automatically decompresses response body (`decompress_body/1` step) so let's disable that by
   passing `raw: true`.
 
   By default, we ask the server to send compressed response. Let's look at the headers and the raw
@@ -547,17 +547,17 @@ defmodule Req.Steps do
       true
   """
   @doc step: :response
-  def decompress(request_response)
+  def decompress_body(request_response)
 
-  def decompress({request, %{body: ""} = response}) do
+  def decompress_body({request, %{body: ""} = response}) do
     {request, response}
   end
 
-  def decompress({request, response}) when request.options.raw == true do
+  def decompress_body({request, response}) when request.options.raw == true do
     {request, response}
   end
 
-  def decompress({request, response}) do
+  def decompress_body({request, response}) do
     compression_algorithms = get_content_encoding_header(response.headers)
     {request, update_in(response.body, &decompress_body(&1, compression_algorithms))}
   end

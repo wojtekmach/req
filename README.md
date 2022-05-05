@@ -14,7 +14,7 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
   * Extensibility via request, response, and error steps
 
-  * Request body compression and automatic response body decompression (via [`compress_body`][compress_body], [`compressed`][compressed], and [`decompress`][decompress] steps)
+  * Request body compression and automatic response body decompression (via [`compress_body`][compress_body], [`compressed`][compressed], and [`decompress_body`][decompress_body] steps)
 
   * Request body encoding and automatic response body decoding (via [`encode_body`][encode_body]
     and [`decode_body`][decode_body] steps)
@@ -42,7 +42,7 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 [req.get!]: https://hexdocs.pm/req/Req.html#get!/2
 [req.post!]: https://hexdocs.pm/req/Req.html#post!/2
 [compressed]: https://hexdocs.pm/req/Req.Steps.html#compressed/1
-[decompress]: https://hexdocs.pm/req/Req.Steps.html#decompress/1
+[decompress_body]: https://hexdocs.pm/req/Req.Steps.html#decompress_body/1
 [encode_body]: https://hexdocs.pm/req/Req.Steps.html#encode_body/1
 [decode_body]: https://hexdocs.pm/req/Req.Steps.html#decode_body/1
 [put_params]: https://hexdocs.pm/req/Req.Steps.html#put_params/1
