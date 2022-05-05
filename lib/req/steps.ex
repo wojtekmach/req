@@ -379,7 +379,7 @@ defmodule Req.Steps do
 
   ## Request Options
 
-    * `:compress_body` - compresses the request body using `gzip` compression and sets the
+    * `:compress_body` - compresses the request body using gzip and sets the
     `"Content-Encoding: gzip"` header. Defaults to `false`.
 
   """

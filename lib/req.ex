@@ -363,7 +363,7 @@ defmodule Req do
       [`encode_body`](`Req.Steps.encode_body/1`) step.
 
     * `:compress_body` - compresses the request body via the
-      [`compress_body`](`Req.Steps.body/1`) step.
+      [`compress_body`](`Req.Steps.compress_body/1`) step.
 
   Additional URL options:
 
