@@ -14,9 +14,9 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
   * Extensibility via request, response, and error steps.
 
-  * Automatic body decompression (via [`compressed`][compressed] and [`decompress`][decompress] step)
+  * Request body compression and automatic response body decompression ([`compress_body`][compress_body],  [`compressed`][compressed], and [`decompress`][decompress] step)
 
-  * Automatic body encoding and decoding (via [`encode_body`][encode_body]
+  * Request body encoding and automatic response body decoding (via [`encode_body`][encode_body]
     and [`decode_body`][decode_body] steps)
 
   * Encode params as query string (via [`put_params`][put_params] step)
@@ -34,8 +34,6 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
   * Setting base URL (via [`put_base_url`][put_base_url] step)
 
   * Running against a plug (via [`put_plug`][put_plug] step)
-
-  * Request compression (via [`compress_body`][compress_body] step)
 
   * Pluggable adapters (see ["Adapter" section in `Req.Request` module][adapter] documentation)
 
