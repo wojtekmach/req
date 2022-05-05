@@ -471,9 +471,7 @@ defmodule Req do
   """
   @spec request(Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
-  def request(request, options) do
-    {plugins, options} = Keyword.pop(options, :plugins, [])
-
+  def request(request, options) when is_list(options) do
     {request_options, options} = Keyword.split(options, [:method, :url, :headers, :body])
 
     request_options =
@@ -495,6 +493,7 @@ defmodule Req do
           value
       end)
 
+    {plugins, options} = Keyword.pop(options, :plugins, [])
     request = update_in(request.options, &Map.merge(&1, Map.new(options)))
     request = run_plugins(plugins, request)
     Req.Request.run(request)
