@@ -10,11 +10,11 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 
 ## Features
 
-  * An easy to use high-level API: [`Req`][req], [`Req.request/1`][req.request], [`Req.get!/2`][req.get!], [`Req.post!/2`][req.post!], etc.
+  * An easy to use high-level API: [`Req`][req], [`Req.request/1`][req.request], [`Req.get!/2`][req.get!], [`Req.post!/2`][req.post!], etc
 
-  * Extensibility via request, response, and error steps.
+  * Extensibility via request, response, and error steps
 
-  * Request body compression and automatic response body decompression ([`compress_body`][compress_body],  [`compressed`][compressed], and [`decompress`][decompress] step)
+  * Request body compression and automatic response body decompression (via [`compress_body`][compress_body], [`compressed`][compressed], and [`decompress`][decompress] steps)
 
   * Request body encoding and automatic response body decoding (via [`encode_body`][encode_body]
     and [`decode_body`][decode_body] steps)

@@ -362,11 +362,7 @@ defmodule Req do
 
       If you set `:headers` options both in `Req.new/1` and `request/2`, the header lists are merged.
 
-    * `:body` - the request body. The body is automatically encoded using the
-      [`encode_body`](`Req.Steps.encode_body/1`) step.
-
-    * `:compress_body` - compresses the request body via the
-      [`compress_body`](`Req.Steps.compress_body/1`) step.
+    * `:body` - the request body.
 
   Additional URL options:
 
@@ -379,6 +375,15 @@ defmodule Req do
   Authentication options:
 
     * `:auth` - sets request authentication (via [`auth`](`Req.Steps.auth/1`) step).
+
+  Request body options:
+
+    * `:form` - if set, encodes the request body as form data ([`encode_body`](`Req.Steps.encode_body/1`) step).
+
+    * `:json` - if set, encodes the request body as JSON ([`encode_body`](`Req.Steps.encode_body/1`) step).
+
+    * `:compress_body` - if set to `true`, compresses the request body using gzip (via [`compress_body`](`Req.Steps.compress_body/1`) step).
+      Defaults to `false`.
 
   Response body options:
 
