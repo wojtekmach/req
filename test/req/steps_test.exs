@@ -690,7 +690,7 @@ defmodule Req.StepsTest do
       Plug.Conn.send_resp(conn, 500, "oops")
     end)
 
-    request = Req.new(url: c.url, retry: true, retry_delay: 1)
+    request = Req.new(url: c.url, retry: :always, retry_delay: 1)
 
     assert Req.post!(request).status == 500
     assert_received :ping
@@ -707,7 +707,7 @@ defmodule Req.StepsTest do
       Plug.Conn.send_resp(conn, 500, "oops")
     end)
 
-    request = Req.new(url: c.url, retry: false)
+    request = Req.new(url: c.url, retry: :never)
 
     assert Req.get!(request).status == 500
     assert_received :ping

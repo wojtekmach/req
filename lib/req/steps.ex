@@ -867,9 +867,9 @@ defmodule Req.Steps do
 
         * `:safe` (default) - retry GET/HEAD requests on HTTP 408/5xx responses or exceptions
 
-        * `true` - always retry
+        * `:always` - always retry
 
-        * `false` - never retry
+        * `:never` - never retry
 
         * `fun` - a 1-arity function that accepts either a `Req.Response` or an exception struct
           and returns boolean whether to retry
@@ -922,10 +922,10 @@ defmodule Req.Steps do
           {request, response_or_exception}
         end
 
-      true ->
+      :always ->
         retry(request, response_or_exception)
 
-      false ->
+      :never ->
         {request, response_or_exception}
 
       fun when is_function(fun) ->
@@ -934,6 +934,11 @@ defmodule Req.Steps do
         else
           {request, response_or_exception}
         end
+
+      other ->
+        raise ArgumentError,
+              "expected :retry to be :safe, :always, :never or a 1-arity function, " <>
+                "got: #{inspect(other)}"
     end
   end
 
