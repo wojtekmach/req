@@ -132,7 +132,17 @@ defmodule Req.Request do
 
   The default adapter is using Finch via the `Req.Steps.run_finch/1` step.
 
-  Here is naive Hackney-based implementation of an adapter and how it can be used:
+  Here is a mock adapter that always returns a successful response:
+
+      adapter = fn request ->
+        response = %Req.Response{status: 200, body: "it works!"}
+        {request, response}
+      end
+
+      Req.request!(url: "http://example").body
+      #=> "it works!"
+
+  And here is a naive Hackney-based implementation:
 
       hackney = fn request ->
         case :hackney.request(
@@ -153,7 +163,7 @@ defmodule Req.Request do
       end
 
       Req.get!("https://api.github.com/repos/elixir-lang/elixir", adapter: hackney).body["description"]
-      #=> "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+      "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
   """
 
   @type t() :: %Req.Request{

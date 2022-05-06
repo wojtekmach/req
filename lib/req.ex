@@ -438,6 +438,12 @@ defmodule Req do
     * `:finch_options` - options passed down to Finch when making the request, defaults to `[]`.
        See `Finch.request/3` for a list of available options.
 
+    * `:http1` - if `true`, uses an HTTP/1 pool automatically started by Req.
+
+    * `:http2` - if `true`, uses an HTTP/2 pool automatically started by Req.
+
+    * `:unix_socket` - if set, connect through the given UNIX domain socket
+
   ## Examples
 
   With options keywords list:
@@ -461,6 +467,17 @@ defmodule Req do
       iex> {:ok, response} = Req.request(req, url: "/repos/elixir-lang/elixir")
       iex> response.status
       200
+
+  With mock adapter:
+
+      iex> adapter = fn request ->
+      ...>   response = %Req.Response{status: 200, body: "it works!"}
+      ...>   {request, response}
+      ...> end
+      iex>
+      iex> {:ok, response} = Req.request(url: "http://example")
+      iex> response.body
+      "it works!"
   """
   @spec request(Req.Request.t() | keyword()) :: {:ok, Req.Response.t()} | {:error, Exception.t()}
   def request(request_or_options)

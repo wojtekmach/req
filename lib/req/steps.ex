@@ -397,7 +397,7 @@ defmodule Req.Steps do
   @doc """
   Runs the request using `Finch`.
 
-  This is the default Req _adapter_. See `:adapter` field description in the `Req.Request` module
+  This is the default Req _adapter_. See "Adapter" section in the `Req.Request` module
   documentation for more information on adapters.
 
   ## Request Options
@@ -406,12 +406,12 @@ defmodule Req.Steps do
       Req. The default pool uses HTTP/1 although that may change in the future.
       This option takes precedence over `:http1` and `:http2` options mentioned below.
 
-    * `:http1` - if `true`, uses an HTTP/2 pool automatically started by Req.
-
-    * `:http2` - if `true`, uses an HTTP/2 pool automatically started by Req.
-
     * `:finch_options` - options passed down to Finch when making the request, defaults to `[]`.
        See `Finch.request/3` for a list of available options.
+
+    * `:http1` - if `true`, uses an HTTP/1 pool automatically started by Req.
+
+    * `:http2` - if `true`, uses an HTTP/2 pool automatically started by Req.
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket
 
@@ -419,7 +419,7 @@ defmodule Req.Steps do
 
   Custom `:receive_timeout`:
 
-      Req.get!(url: url, finch_options: [receive_timeout: 1000])
+      iex> Req.get!(url: url, finch_options: [receive_timeout: 1000])
 
   Connecting through UNIX socket:
 
