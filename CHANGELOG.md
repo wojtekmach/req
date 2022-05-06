@@ -135,6 +135,10 @@ Step changes:
 
   * `cache`: Include request method in cache key
 
+  * `follow_redirects`: Change method to GET on 301..303 redirects
+
+  * `follow_redirects`: Don't send auth headers on redirect to different host
+
   * `retry`: The `:retry` option can now be set to `:safe` (default) to only retry GET/HEAD
     requests on HTTP 408/5xx responses or exceptions, `true` to always retry, `false` to never
     `retry`, and `fun` - a 1-arity function that accepts either a `Req.Response` or an exception
@@ -159,9 +163,6 @@ Deprecations:
 
   * Deprecate setting `retry: [delay: delay, max_retries: max_retries]`
     in favour of `retry_delay: delay, max_retries: max_retries`.
-
-  * Deprecate setting `follow_redirects: [location_trusted: trusted]`
-    in favour of `location_trusted: trusted`.
 
   * Deprecate setting `cache: [dir: dir]` in favour of `cache_dir: dir`.
 
