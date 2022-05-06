@@ -82,6 +82,7 @@ defmodule Req do
       ],
       response_steps: [
         retry: &Req.Steps.retry/1,
+        handle_http_errors: &Req.Steps.handle_http_errors/1,
         follow_redirects: &Req.Steps.follow_redirects/1,
         decompress_body: &Req.Steps.decompress_body/1,
         output: &Req.Steps.output/1,

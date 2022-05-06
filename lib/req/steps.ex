@@ -854,6 +854,45 @@ defmodule Req.Steps do
     update_in(request.options, &Map.delete(&1, :params))
   end
 
+  @doc """
+  Handles HTTP 4xx/5xx error responses.
+
+  ## Request Options
+
+    * `:http_errors` - how to handle HTTP 4xx/5xx error responses. Can be one of the following:
+
+      * `:return` (default) - return the response
+
+      * `:raise` - raise an error
+
+  ## Examples
+
+      iex> Req.get!("https://httpbin.org/status/404").status
+      404
+
+      iex> Req.get!("https://httpbin.org/status/404", http_errors: :raise)
+      ** (RuntimeError) The requested URL returned error: 404
+      Response body: ""
+  """
+  def handle_http_errors(request_response)
+
+  def handle_http_errors({request, response}) when response.status >= 400 do
+    case Map.get(request.options, :http_errors, :return) do
+      :return ->
+        {request, response}
+
+      :raise ->
+        raise """
+        The requested URL returned error: #{response.status}
+        Response body: #{inspect(response.body)}\
+        """
+    end
+  end
+
+  def handle_http_errors({request, response}) do
+    {request, response}
+  end
+
   ## Error steps
 
   @doc """

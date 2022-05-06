@@ -4,6 +4,8 @@
 
 Req v0.3.0 brings redesigned API, new steps, and improvements to existing steps.
 
+### New API
+
 The new API allows building a request struct with all the built-in steps. It can be then piped
 to functions like `Req.get!/2`:
 
@@ -30,6 +32,8 @@ iex> Req.post!(req, json: %{x: 2}).body["form"]
 %{"x" => 2}
 ```
 
+### Plug Integration
+
 Req can now be used to easily test plugs using the `:plug` option:
 
 ```elixir
@@ -44,6 +48,8 @@ test "echo" do
   assert Req.get!("http:///hello", plug: Echo).body == "hello"
 end
 ```
+
+### Request Adapters
 
 While Req always used Finch as the underlying HTTP client, it was designed from the day one to
 easily swap it out. This is now even easier with an `:adapter` option.
@@ -87,7 +93,7 @@ Req.get!("https://api.github.com/repos/elixir-lang/elixir", adapter: hackney).bo
 
 See "Adapter" seciton in `Req.Request` module documentation for more information.
 
-Major changes:
+### Major changes
 
   * Add high-level functional API: `Req.new(...) |> Req.request(...)`, `Req.new(...) |>
     Req.get!(...)`, etc.
@@ -123,7 +129,7 @@ Major changes:
   * Remove `Req.Request.unix_socket` field. Add option on `run_finch` step with the same name
     instead.
 
-Step changes:
+### Step changes
 
   * `put_base_url`: Ignore base URL if given URL contains scheme
 
@@ -154,7 +160,9 @@ Step changes:
 
   * New step: `output`
 
-Deprecations:
+  * New step: `handle_http_errors`
+
+### Deprecations
 
   * Deprecate calling `Req.post!(url, body)` in favour of `Req.post!(url, body: body)`.
     Also, deprecate `Req.post!(url, {:form, data})` in favour of `Req.post!(url, form: data)`.
