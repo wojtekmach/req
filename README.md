@@ -52,7 +52,7 @@ Req is an HTTP client with a focus on ease of use and composability, built on to
 [put_range]: https://hexdocs.pm/req/Req.Steps.html#put_range/1
 [follow_redirects]: https://hexdocs.pm/req/Req.Steps.html#follow_redirects/1
 [retry]: https://hexdocs.pm/req/Req.Steps.html#retry/1
-[raise_http_errors]: https://hexdocs.pm/req/Req.Steps.html#raise_http_errors/1
+[handle_http_errors]: https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
 [cache]: https://hexdocs.pm/req/Req.Steps.html#cache/1
 [put_base_url]: https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
 [put_plug]: https://hexdocs.pm/req/Req.Steps.html#put_plug/1
