@@ -759,8 +759,8 @@ defmodule Req.Steps do
   ## Request Options
 
     * `:location_trusted` - by default, authorization credentials are only sent
-      on redirects to the same host. If `:location_trusted` is set to `true`, credentials
-      will be sent to any host.
+      on redirects with the same host, scheme and port. If `:location_trusted` is set
+      to `true`, credentials will be sent to any host.
 
     * `:max_redirects` - the maximum number of redirects, defaults to `10`.
       If the limit is reached, an erorr is raised.
@@ -837,7 +837,8 @@ defmodule Req.Steps do
   defp remove_credentials_if_untrusted(request, true, _), do: request
 
   defp remove_credentials_if_untrusted(request, _, location_url) do
-    if location_url.host == request.url.host do
+    if {location_url.host, location_url.scheme, location_url.port} ==
+         {request.url.host, request.url.scheme, request.url.port} do
       request
     else
       remove_credentials(request)
