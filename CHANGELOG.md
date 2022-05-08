@@ -143,7 +143,8 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
 
   * `follow_redirects`: Change method to GET on 301..303 redirects
 
-  * `follow_redirects`: Don't send auth headers on redirect to different host
+  * `follow_redirects`: Don't send auth headers on redirect to different scheme/host/port
+    unless `location_trusted: true` is set
 
   * `retry`: The `:retry` option can now be set to `:safe` (default) to only retry GET/HEAD
     requests on HTTP 408/5xx responses or exceptions, `:always` to always retry, `:never` to never
