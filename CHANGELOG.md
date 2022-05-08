@@ -179,6 +179,10 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
 
   * `Req.Request`: Deprecate `build/3` in favour of manually building the struct.
 
+## v0.2.2 (2022-04-04)
+
+   * Relax Finch version requirement
+
 ## v0.2.1 (2021-11-24)
 
   * Add `:private` field to Response
