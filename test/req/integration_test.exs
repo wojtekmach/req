@@ -16,6 +16,7 @@ defmodule Req.IntegrationTest do
   doctest Req,
     only: [
       get!: 2,
+      head!: 2,
       post!: 2,
       put!: 2,
       patch!: 2,

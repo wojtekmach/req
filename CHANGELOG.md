@@ -110,6 +110,8 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
 
   * Add step names
 
+  * Add `Req.head!/2`
+
   * Add `Req.patch!/2`
 
   * Add `Req.Request.adapter` field

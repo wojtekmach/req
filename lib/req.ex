@@ -127,6 +127,36 @@ defmodule Req do
   end
 
   @doc """
+  Makes a HEAD request.
+
+  See `request/1` for a list of supported options.
+
+  ## Examples
+
+  With URL:
+
+      iex> Req.head!("https://httpbin.org/status/201").status
+      201
+
+  With request struct:
+
+      iex> req = Req.new(base_url: "https://httpbin.org")
+      iex> Req.head!(req, url: "/status/201").status
+      201
+
+  """
+  @spec head!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  def head!(url_or_request, options \\ [])
+
+  def head!(%Req.Request{} = request, options) do
+    request!(%{request | method: :head}, options)
+  end
+
+  def head!(url, options) do
+    request!([method: :head, url: URI.parse(url)] ++ options)
+  end
+
+  @doc """
   Makes a POST request.
 
   See `request/1` for a list of supported options.
