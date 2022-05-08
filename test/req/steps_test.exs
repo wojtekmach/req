@@ -552,38 +552,36 @@ defmodule Req.StepsTest do
   end
 
   test "follow_redirects/2: auth - different host" do
-    adapter = fn request ->
-      case request.url.host do
-        "original" ->
-          assert List.keyfind(request.headers, "authorization", 0)
-
-          response = %Req.Response{
-            status: 301,
-            headers: [{"location", "http://untrusted"}],
-            body: "redirecting"
-          }
-
-          {request, response}
-
-        "untrusted" ->
-          refute List.keyfind(request.headers, "authorization", 0)
-
-          response = %Req.Response{
-            status: 200,
-            headers: [],
-            body: "bad things"
-          }
-
-          {request, response}
-      end
-    end
+    adapter = untrusted_redirect_adapter(:host, "trusted", "untrusted")
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!("http://original",
+             assert Req.get!("http://trusted",
                       adapter: adapter,
                       auth: {"authorization", "credentials"}
                     ).status == 200
            end) =~ "[debug] follow_redirects: redirecting to http://untrusted"
+  end
+
+  test "follow_redirects/2: auth - different port" do
+    adapter = untrusted_redirect_adapter(:port, 12345, 23456)
+
+    assert ExUnit.CaptureLog.capture_log(fn ->
+             assert Req.get!("http://trusted:12345",
+                      adapter: adapter,
+                      auth: {"authorization", "credentials"}
+                    ).status == 200
+           end) =~ "[debug] follow_redirects: redirecting to http://trusted:23456"
+  end
+
+  test "follow_redirects/2: auth - different scheme" do
+    adapter = untrusted_redirect_adapter(:scheme, "http", "https")
+
+    assert ExUnit.CaptureLog.capture_log(fn ->
+             assert Req.get!("http://trusted",
+                      adapter: adapter,
+                      auth: {"authorization", "credentials"}
+                    ).status == 200
+           end) =~ "[debug] follow_redirects: redirecting to https://trusted"
   end
 
   test "follow_redirects/1: skip params", c do
@@ -629,6 +627,39 @@ defmodule Req.StepsTest do
     conn
     |> Plug.Conn.put_resp_header("location", url)
     |> Plug.Conn.send_resp(status, "redirecting to #{url}")
+  end
+
+  defp untrusted_redirect_adapter(component, original_value, updated_value) do
+    fn request ->
+      case Map.get(request.url, component) do
+        ^original_value ->
+          assert List.keyfind(request.headers, "authorization", 0)
+
+          new_url =
+            request.url
+            |> Map.put(component, updated_value)
+            |> to_string()
+
+          response = %Req.Response{
+            status: 301,
+            headers: [{"location", new_url}],
+            body: "redirecting"
+          }
+
+          {request, response}
+
+        ^updated_value ->
+          refute List.keyfind(request.headers, "authorization", 0)
+
+          response = %Req.Response{
+            status: 200,
+            headers: [],
+            body: "bad things"
+          }
+
+          {request, response}
+      end
+    end
   end
 
   ## Error steps
