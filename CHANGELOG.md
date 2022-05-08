@@ -155,7 +155,7 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
 
   * New step: `run_plug`
 
-  * New step: `put_default_user_agent` (replaces part of removed `put_default_headers`)
+  * New step: `put_user_agent` (replaces part of removed `put_default_headers`)
 
   * New step: `compressed` (replaces part of removed `put_default_headers`)
 

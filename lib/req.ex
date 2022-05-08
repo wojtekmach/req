@@ -69,7 +69,7 @@ defmodule Req do
       body: body,
       options: options,
       request_steps: [
-        put_default_user_agent: &Req.Steps.put_default_user_agent/1,
+        put_user_agent: &Req.Steps.put_user_agent/1,
         compressed: &Req.Steps.compressed/1,
         encode_body: &Req.Steps.encode_body/1,
         put_base_url: &Req.Steps.put_base_url/1,

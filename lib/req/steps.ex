@@ -154,14 +154,22 @@ defmodule Req.Steps do
   @doc """
   Sets the user-agent header.
 
+  ## Request Options
+
+    * `:user_agent` - sets the `user-agent` header. Defaults to `"#{@user_agent}"`.
+
   ## Examples
 
       iex> Req.get!("https://httpbin.org/user-agent").body
       %{"user-agent" => "#{@user_agent}"}
+
+      iex> Req.get!("https://httpbin.org/user-agent", user_agent: "foo").body
+      %{"user-agent" => "foo"}
   """
   @doc step: :request
-  def put_default_user_agent(request) do
-    put_new_header(request, "user-agent", @user_agent)
+  def put_user_agent(request) do
+    user_agent = Map.get(request.options, :user_agent, @user_agent)
+    put_new_header(request, "user-agent", user_agent)
   end
 
   @default_accept_encoding "gzip, deflate"
