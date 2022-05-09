@@ -29,7 +29,7 @@ Req is a batteries-included HTTP client for Elixir.
 
   * Retries on errors (via [`retry`][retry] step)
 
-  * Raise on 4xx/5xx errors (via [`handle_http_errors`](handle_http_errors) step)
+  * Raise on 4xx/5xx errors (via [`handle_http_errors`][handle_http_errors] step)
 
   * Basic HTTP caching (via [`cache`][cache] step)
 
@@ -37,7 +37,8 @@ Req is a batteries-included HTTP client for Elixir.
 
   * Running against a plug (via [`put_plug`][put_plug] step)
 
-  * Pluggable adapters (see ["Adapter" section in `Req.Request` module][adapter] documentation)
+  * Pluggable adapters (see ["Adapter" section in `Req.Request` module][adapter] documentation).
+    By default uses [Finch][finch] (via [`run_finch`][run_finch] step)
 
 [req]: https://hexdocs.pm/req/Req.html
 [req.request]: https://hexdocs.pm/req/Req.html#request/1
@@ -58,6 +59,8 @@ Req is a batteries-included HTTP client for Elixir.
 [put_plug]: https://hexdocs.pm/req/Req.Steps.html#put_plug/1
 [compress_body]: https://hexdocs.pm/req/Req.Steps.html#compress_body/1
 [adapter]: https://hexdocs.pm/req/Req.Request.html#module-adapter
+[run_finch]: https://hexdocs.pm/req/Req.Steps.html#run_finch/1
+[finch]: https://github.com/sneako/finch
 
 ## Usage
 
