@@ -499,23 +499,34 @@ defmodule Req.Steps do
         assert Req.get!("http:///hello", plug: Echo).body == "hello"
       end
 
-  Here's another example, let's run the request against `Plug.Static` pointed to the Req's source
+  Here is the same example but with plug as an anonymous function:
+
+      test "echo" do
+        echo = fn conn ->
+          "/" <> path = conn.request_path
+          Plug.Conn.send_resp(conn, 200, path)
+        end
+
+        assert Req.get!("http:///hello", plug: echo).body == "hello"
+      end
+
+  Here is another example, let's run the request against `Plug.Static` pointed to the Req's source
   code and fetch the README:
 
       iex> resp = Req.get!("http:///README.md", plug: {Plug.Static, at: "/", from: "."})
-      iex> resp.body =~ "Req is an HTTP client"
+      iex> resp.body =~ "Req is a batteries-included HTTP client for Elixir."
       true
   """
   @doc step: :request
   def put_plug(request) do
     if request.options[:plug] do
-      %{request | adapter: &Req.Steps.__run_plug__/1}
+      %{request | adapter: &run_plug/1}
     else
       request
     end
   end
 
-  def __run_plug__(request) do
+  defp run_plug(request) do
     conn =
       Plug.Test.conn(request.method, request.url, request.body)
       |> Map.replace!(:req_headers, request.headers)

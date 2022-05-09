@@ -32,6 +32,7 @@ defmodule Req.IntegrationTest do
       encode_body: 1,
       put_params: 1,
       put_range: 1,
+      put_plug: 1,
       cache: 1,
       decompress_body: 1,
       decode_body: 1,

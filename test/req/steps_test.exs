@@ -220,20 +220,6 @@ defmodule Req.StepsTest do
     end
   end
 
-  test "put_plug" do
-    assert Req.get!("https://foo/bar", body: "yo", plug: MyPlug).body == %{
-             "conn" => %{
-               "host" => "foo",
-               "request_path" => "/bar"
-             },
-             "body" => "yo",
-             "options" => []
-           }
-
-    resp = Req.get!("http:///README.md", plug: {Plug.Static, at: "/", from: "."})
-    assert resp.body =~ "Req is a batteries-included HTTP client for Elixir."
-  end
-
   test "compress_body/1" do
     req = Req.new(method: :post, json: %{a: 1}) |> Req.Request.prepare()
     assert Jason.decode!(req.body) == %{"a" => 1}
