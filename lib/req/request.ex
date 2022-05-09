@@ -71,7 +71,7 @@ defmodule Req.Request do
     * `:halted` - whether the request pipeline is halted. See `halt/1`
 
     * `:adapter` - a request step that makes the actual HTTP request. Defaults to
-      `Req.Steps.run_finch/1`. See "Adapter" section below for more information.
+      `Req.Steps.run_finch/1`. See ["Adapter"](#module-adapter) section below for more information.
 
   ## Steps
 
@@ -159,9 +159,9 @@ defmodule Req.Request do
 
   ## Adapter
 
-  As noted in the "Request steps" section above, a request step might return `{request, response}`
-  or `{request, exception}`, thus invoking either response or error steps next. This is exactly how
-  Req makes the underlying HTTP call, by invoking a request step that follows this contract.
+  As noted in the ["Request steps"](#module-request-steps) section, a request step besides returning the request,
+  might also return `{request, response}` or `{request, exception}`, thus invoking either response or error steps next.
+  This is exactly how Req makes the underlying HTTP call, by invoking a request step that follows this contract.
 
   The default adapter is using Finch via the `Req.Steps.run_finch/1` step.
 
@@ -172,7 +172,7 @@ defmodule Req.Request do
         {request, response}
       end
 
-      Req.request!(url: "http://example").body
+      Req.request!(url: "http://example", adapter: adapter).body
       #=> "it works!"
 
   And here is a naive Hackney-based implementation:

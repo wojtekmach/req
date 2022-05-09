@@ -97,8 +97,28 @@ Req.get!(req, url: "/repos/elixir-mint/mint").body["description"]
 See [`Req.request/1`](https://hexdocs.pm/req/Req.html#request/1) for more information on available
 options.
 
-Also see the [`Req.Request`](https://hexdocs.pm/req/Req.Request.html) module documentation for
-more information on Req internals.
+Virtually all of Req's features are broken down into individual pieces - steps. Req works by running
+the request struct through these steps. You can easily reuse or rearrange built-in steps or write new
+ones. Importantly, steps are just regular functions. Here is another example where we append a request
+step that inspects the URL just before requesting it:
+
+```elixir
+req =
+  Req.new(base_url: "https://api.github.com")
+  |> Req.Request.append_request_steps(
+    debug_url: fn request ->
+      IO.inspect(URI.to_string(request.url))
+      request
+    end
+  )
+
+Req.get!(req, url: "/repos/wojtekmach/req").body["description"]
+# Outputs: "https://api.github.com/repos/wojtekmach/req"
+#=> "Req is a batteries-included HTTP client for Elixir."
+```
+
+See [`Req.Request`](https://hexdocs.pm/req/Req.Request.html) module documentation for
+more information on low-level API and the request struct.
 
 ## Acknowledgments
 

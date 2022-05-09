@@ -19,7 +19,7 @@ defmodule Req.Steps do
   Sets base URL for all requests.
 
 
-  ## Request Options:
+  ## Request Options
 
     * `:base_url` - if set, the request URL is prepended with this base URL.
       If request URL contains a scheme, base URL is ignored.
@@ -480,7 +480,7 @@ defmodule Req.Steps do
   @doc """
   Runs the request against a plug instead of over the network.
 
-  ## Request Options:
+  ## Request Options
 
     * `:plug` - if set, the plug to run the request against.
 
