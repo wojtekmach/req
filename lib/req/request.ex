@@ -205,6 +205,7 @@ defmodule Req.Request do
           headers: [{binary(), binary()}],
           body: iodata(),
           options: map(),
+          registered_options: [atom()],
           adapter: request_step(),
           request_steps: [{name :: atom(), request_step()}],
           response_steps: [{name :: atom(), response_step()}],
@@ -221,6 +222,7 @@ defmodule Req.Request do
             headers: [],
             body: "",
             options: %{},
+            registered_options: [],
             adapter: &Req.Steps.run_finch/1,
             halted: false,
             request_steps: [],
@@ -361,12 +363,70 @@ defmodule Req.Request do
   end
 
   @doc """
+  Registers an option to be used by a custom step.
+
+  Req ensures that all used options were previously registered which helps
+  finding accidentally mistyped option names. If you're adding custom steps
+  that are accepting options, call this function to register them.
+
+  ## Examples
+
+      iex> req = Req.new(bas_url: "https://httpbin.org")
+      iex> Req.get!(req, url: "/status/201").status
+      ** (ArgumentError) unknown option :bas_url. Did you mean :base_url?
+
+      iex> req =
+      ...>   Req.new(base_url: "https://httpbin.org")
+      ...>   |> Req.Request.register_option(:foo)
+      ...>
+      iex> Req.get!(req, url: "/status/201", foo: :bar).status
+      201
+  """
+  def register_option(%Req.Request{} = request, option) when is_atom(option) do
+    if option in request.registered_options do
+      raise "option #{inspect(option)} is already registered"
+    else
+      update_in(request.registered_options, &[option | &1])
+    end
+  end
+
+  @doc """
   Runs a request pipeline.
 
   Returns `{:ok, response}` or `{:error, exception}`.
   """
   def run(request) do
+    validate_options(Enum.to_list(request.options), MapSet.new(request.registered_options))
     run_request(request.request_steps, request)
+  end
+
+  defp validate_options([{name, _value} | rest], registered) do
+    if name in registered do
+      validate_options(rest, registered)
+    else
+      case did_you_mean(Atom.to_string(name), registered) do
+        {similar, score} when score > 0.8 ->
+          raise ArgumentError, "unknown option #{inspect(name)}. Did you mean :#{similar}?"
+
+        _ ->
+          raise ArgumentError, "unknown option #{inspect(name)}"
+      end
+    end
+  end
+
+  defp validate_options([], _registered) do
+    :ok
+  end
+
+  defp did_you_mean(option, registered) do
+    registered
+    |> Enum.map(&to_string/1)
+    |> Enum.reduce({nil, 0}, &max_similar(&1, option, &2))
+  end
+
+  defp max_similar(option, registered, {_, current} = best) do
+    score = String.jaro_distance(option, registered)
+    if score < current, do: best, else: {option, score}
   end
 
   defp run_request([step | steps], request) do

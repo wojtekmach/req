@@ -90,6 +90,40 @@ defmodule Req do
       ],
       error_steps: [
         retry: &Req.Steps.retry/1
+      ],
+      registered_options: [
+        :method,
+        :url,
+        :headers,
+        :body,
+        :user_agent,
+        :compressed,
+        :range,
+        :http_errors,
+        :base_url,
+        :params,
+        :auth,
+        :form,
+        :json,
+        :compress_body,
+        :compressed,
+        :raw,
+        :output,
+        :follow_redirects,
+        :location_trusted,
+        :max_redirects,
+        :retry,
+        :retry_delay,
+        :max_retries,
+        :cache,
+        :cache_dir,
+        :plug,
+        :adapter,
+        :finch,
+        :finch_options,
+        :http1,
+        :http2,
+        :unix_socket
       ]
     }
 
@@ -417,6 +451,9 @@ defmodule Req do
       Defaults to `false`.
 
   Response body options:
+
+    * `:compressed` - if set to `true`, asks the server to return compressed response.
+      (via [`compressed`](`Req.Steps.compressed/1`) step). Defaults to `true`.
 
     * `:raw` - if set to `true`, disables automatic body decompression
       ([`decompress_body`](`Req.Steps.decompress_body/1`) step) and decoding

@@ -116,6 +116,8 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
 
   * Add `Req.Request.adapter` field
 
+  * Add `Req.Request.register_option/2`
+
   * Rename `put_if_modified_since` step to `cache`
 
   * Rename `decompress` step to `decompress_body`

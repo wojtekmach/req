@@ -1,5 +1,6 @@
 defmodule Req.RequestTest do
   use ExUnit.Case, async: true
+  doctest Req.Request, only: [register_option: 2]
 
   setup do
     bypass = Bypass.open()
