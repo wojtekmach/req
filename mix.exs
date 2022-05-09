@@ -55,6 +55,7 @@ defmodule Req.MixProject do
       {:jason, "~> 1.0"},
       {:nimble_csv, "~> 1.0", optional: true},
       {:plug, "~> 1.0", optional: true},
+      {:brotli, "~> 0.3.1", optional: true},
       {:bypass, "~> 2.1", only: :test},
       {:ex_doc, ">= 0.0.0", only: :docs}
     ]

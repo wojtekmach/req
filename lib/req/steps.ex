@@ -173,6 +173,7 @@ defmodule Req.Steps do
   end
 
   @default_accept_encoding "gzip, deflate"
+  @optional_encoding_packages [brotli: "br"]
 
   @doc """
   Asks the server to return compressed response.
@@ -180,8 +181,9 @@ defmodule Req.Steps do
   ## Request Options
 
     * `:compressed` - if set to `true`, sets the `accept-encoding` header with compression
-      algorithms that Req supports out of the box: `#{inspect(@default_accept_encoding)}`. Defaults
-      to `true`.
+      algorithms that Req supports out of the box: `#{inspect(@default_accept_encoding)}`. This
+      step will also include algorithms Req supports optionally if their dependencies are
+      installed. Defaults to `true`.
 
   ## Examples
 
@@ -197,6 +199,14 @@ defmodule Req.Steps do
       iex> response.body |> binary_part(0, 2)
       <<31, 139>>
 
+  If the [`:brotli`](https://hexdocs.pm/brotli/) package is installed, Brotli compression will also be requested:
+
+      iex> Code.ensure_loaded?(:brotli)
+      true
+      iex> response = Req.get!("https://httpbin.org/brotli")
+      iex> response.headers |> List.keyfind("content-encoding", 0)
+      {"content-encoding", "br"}
+
   Now, let's pass `compressed: false` and notice the raw body was not compressed:
 
       iex> response = Req.get!("https://elixir-lang.org", raw: true, compressed: false)
@@ -204,20 +214,29 @@ defmodule Req.Steps do
       nil
       iex> response.body |> binary_part(0, 15)
       "<!DOCTYPE html>"
-
   """
   @doc step: :request
   def compressed(request) do
     case Map.fetch(request.options, :compressed) do
       :error ->
-        put_new_header(request, "accept-encoding", @default_accept_encoding)
+        put_new_header(request, "accept-encoding", supported_accept_encoding())
 
       {:ok, true} ->
-        put_new_header(request, "accept-encoding", @default_accept_encoding)
+        put_new_header(request, "accept-encoding", supported_accept_encoding())
 
       {:ok, false} ->
         request
     end
+  end
+
+  defp optional_accept_encoding do
+    @optional_encoding_packages
+    |> Enum.filter(fn {package, _name} -> Code.ensure_loaded?(package) end)
+    |> Enum.map_join(", ", fn {_package, name} -> name end)
+  end
+
+  defp supported_accept_encoding do
+    optional_accept_encoding() <> ", " <> @default_accept_encoding
   end
 
   @doc """
@@ -558,6 +577,14 @@ defmodule Req.Steps do
   @doc """
   Decompresses the response body based on the `content-encoding` header.
 
+  Supported formats:
+
+  | Header        | Decompression Algorithm                         |
+  | ------------- | ------------------------------------------------|
+  | gzip, x-gzip  | `:zlib.gunzip/1`                                |
+  | zip           | `:zlib.unzip/1`                                 |
+  | br            | `:brotli.decode/1` (if `:brotli` is installed) |
+
   ## Examples
 
       iex> response = Req.get!("https://httpbin.org/gzip")
@@ -592,6 +619,15 @@ defmodule Req.Steps do
 
   defp decompress_with_algorithm("deflate", body) do
     :zlib.unzip(body)
+  end
+
+  defp decompress_with_algorithm("br", body) do
+    if Code.ensure_loaded?(:brotli) do
+      {:ok, decompressed} = :brotli.decode(body)
+      decompressed
+    else
+      raise("`:brotli` decompression library not loaded")
+    end
   end
 
   defp decompress_with_algorithm("identity", body) do

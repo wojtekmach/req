@@ -228,6 +228,8 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
 
   * `put_base_url`: Ignore base URL if given URL contains scheme
 
+  * `decompress_body` (formerly `decompress`): Optionally supports Brotli compression
+
   * `run_finch`: Add `:http1` and `:http2` options that pick appropriate default pool started by
     Req
 

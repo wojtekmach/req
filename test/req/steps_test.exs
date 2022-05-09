@@ -213,11 +213,23 @@ defmodule Req.StepsTest do
 
   ## Response steps
 
-  test "decompress_body/1", c do
+  test "decompress_body/1 - gzip", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       conn
       |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
       |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
+    end)
+
+    assert Req.get!(c.url).body == "foo"
+  end
+
+  test "decompress_body/1 - brotli", c do
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      {:ok, body} = :brotli.encode("foo")
+
+      conn
+      |> Plug.Conn.put_resp_header("content-encoding", "br")
+      |> Plug.Conn.send_resp(200, body)
     end)
 
     assert Req.get!(c.url).body == "foo"
