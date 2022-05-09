@@ -4,7 +4,7 @@
 
 [Docs](https://hexdocs.pm/req)
 
-Req is an HTTP client with a focus on ease of use and composability, built on top of [Finch](https://github.com/keathley/finch).
+Req is a batteries-included HTTP client for Elixir.
 
 (**Note**: This is the README for the current main branch. See [README for Req v0.2.2](https://github.com/wojtekmach/req/tree/v0.2.2#readme))
 
