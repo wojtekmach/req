@@ -231,7 +231,7 @@ defmodule Req.StepsTest do
            }
 
     resp = Req.get!("http:///README.md", plug: {Plug.Static, at: "/", from: "."})
-    assert resp.body =~ "Req is an HTTP client"
+    assert resp.body =~ "Req is a batteries-included HTTP client for Elixir."
   end
 
   test "compress_body/1" do
