@@ -205,7 +205,7 @@ defmodule Req.Request do
           headers: [{binary(), binary()}],
           body: iodata(),
           options: map(),
-          registered_options: [atom()],
+          registered_options: MapSet.t(),
           adapter: request_step(),
           request_steps: [{name :: atom(), request_step()}],
           response_steps: [{name :: atom(), response_step()}],
@@ -222,7 +222,7 @@ defmodule Req.Request do
             headers: [],
             body: "",
             options: %{},
-            registered_options: [],
+            registered_options: MapSet.new(),
             adapter: &Req.Steps.run_finch/1,
             halted: false,
             request_steps: [],
@@ -386,7 +386,7 @@ defmodule Req.Request do
     if option in request.registered_options do
       raise "option #{inspect(option)} is already registered"
     else
-      update_in(request.registered_options, &[option | &1])
+      update_in(request.registered_options, &MapSet.put(&1, option))
     end
   end
 
@@ -396,8 +396,18 @@ defmodule Req.Request do
   Returns `{:ok, response}` or `{:error, exception}`.
   """
   def run(request) do
-    validate_options(Enum.to_list(request.options), MapSet.new(request.registered_options))
+    validate_options(request)
     run_request(request.request_steps, request)
+  end
+
+  defp validate_options(request) do
+    registered =
+      MapSet.union(
+        request.registered_options,
+        MapSet.new([:method, :url, :headers, :body, :adapter])
+      )
+
+    validate_options(Enum.to_list(request.options), registered)
   end
 
   defp validate_options([{name, _value} | rest], registered) do
