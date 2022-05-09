@@ -15,7 +15,40 @@ defmodule Req.Request do
   request struct through these steps. You can easily reuse or rearrange built-in steps or write new
   ones.
 
-  ## The request struct
+  ## The Low-level API
+
+  Most Req users would use it like this:
+
+      Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
+      #=> "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+
+  Here is the equivalent using the low-level API:
+
+      url = "https://api.github.com/repos/elixir-lang/elixir"
+
+      req =
+        %Req.Request{method: :get, url: url}
+        |> Req.Request.append_request_steps(
+          put_user_agent: &Req.Steps.put_user_agent/1,
+          # ...
+        )
+        |> Req.Request.append_response_steps(
+          # ...
+          decompress_body: &Req.Steps.decompress_body/1,
+          decode_body: &Req.Steps.decode_body/1,
+          # ...
+        )
+        |> Req.Request.append_error_steps(
+          retry: &Req.Steps.retry/1,
+          # ...
+        )
+
+      Req.Request.run!(req).body["description"]
+      #=> "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+
+  By putting the request pipeline yourself you have precise control of exactly what is running and in what order.
+
+  ## The Request Struct
 
     * `:method` - the HTTP request method
 

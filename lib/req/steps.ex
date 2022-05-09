@@ -405,7 +405,8 @@ defmodule Req.Steps do
   @doc """
   Runs the request using `Finch`.
 
-  This is the default Req _adapter_. See "Adapter" section in the `Req.Request` module
+  This is the default Req _adapter_. See
+  ["Adapter" section in the `Req.Request`](Req.Request.html#module-adapter) module
   documentation for more information on adapters.
 
   ## Request Options

@@ -10,7 +10,7 @@ Req is a batteries-included HTTP client for Elixir.
 
 ## Features
 
-  * An easy to use high-level API: [`Req`][req], [`Req.request/1`][req.request], [`Req.get!/2`][req.get!], [`Req.post!/2`][req.post!], etc
+  * An easy to use high-level API in [`Req`][req] module: [`request/1`][req.request], [`request!/1`][req.request!], [`get!/2`][req.get!], [`head!/2`][req.head!], [`post!/2`][req.post!], [`put!/2`][req.put!], [`patch!/2`][req.patch!], and [`delete!/2`][req.delete!]
 
   * Extensibility via request, response, and error steps
 
@@ -37,13 +37,17 @@ Req is a batteries-included HTTP client for Elixir.
 
   * Running against a plug (via [`put_plug`][put_plug] step)
 
-  * Pluggable adapters (see ["Adapter" section in `Req.Request` module][adapter] documentation).
-    By default uses [Finch][finch] (via [`run_finch`][run_finch] step)
+  * Pluggable adapters. By default, Req uses [Finch][finch] (via [`run_finch`][run_finch] step).
 
 [req]: https://hexdocs.pm/req/Req.html
 [req.request]: https://hexdocs.pm/req/Req.html#request/1
+[req.request!]: https://hexdocs.pm/req/Req.html#request!/1
 [req.get!]: https://hexdocs.pm/req/Req.html#get!/2
+[req.head!]: https://hexdocs.pm/req/Req.html#head!/2
 [req.post!]: https://hexdocs.pm/req/Req.html#post!/2
+[req.put!]: https://hexdocs.pm/req/Req.html#put!/2
+[req.patch!]: https://hexdocs.pm/req/Req.html#patch!/2
+[req.delete!]: https://hexdocs.pm/req/Req.html#delete!/2
 [compressed]: https://hexdocs.pm/req/Req.Steps.html#compressed/1
 [decompress_body]: https://hexdocs.pm/req/Req.Steps.html#decompress_body/1
 [encode_body]: https://hexdocs.pm/req/Req.Steps.html#encode_body/1
@@ -93,49 +97,8 @@ Req.get!(req, url: "/repos/elixir-mint/mint").body["description"]
 See [`Req.request/1`](https://hexdocs.pm/req/Req.html#request/1) for more information on available
 options.
 
-## How Req Works
-
-Virtually all of Req's functionality is broken down into individual pieces - steps. Req works by
-running the request struct through these steps. You can easily reuse or rearrange built-in steps
-or write new ones.
-
-There are three types of steps: request, response, and error.
-
-Request steps are used to refine the data that will be sent to the server.
-
-After making the actual HTTP request, we'll either get a HTTP response or an error.
-The request, along with the response or error, will go through response or
-error steps, respectively.
-
-Nothing is actually executed until we run the pipeline with `Req.Request.run/1`.
-
-The high-level API shown before:
-
-```elixir
-Req.get!("https://api.github.com/repos/elixir-lang/elixir")
-```
-
-is equivalent to this composition of lower-level API functions and steps:
-
-```elixir
-%Req.Request{method: :get, url: "https://api.github.com/repos/elixir-lang/elixir"}
-|> Req.Request.append_request_steps([
-  put_user_agent: &Req.Steps.put_user_agent/1,
-  # ...
-])
-|> Req.Request.append_response_steps([
-  retry: &Req.Steps.retry/1,
-  follow_redirects: &Req.Steps.follow_redirects/1,
-  # ...
-|> Req.Request.append_error_steps([
-  retry: &Req.Steps.retry/1,
-  # ...
-])
-|> Req.Request.run!()
-```
-
-We can also build more complex flows like returning a response from a request step
-or an error from a response step. See `Req.Request` documentation for more information.
+Also see the [`Req.Request`](https://hexdocs.pm/req/Req.Request.html) module documentation for
+more information on Req internals.
 
 ## Acknowledgments
 
