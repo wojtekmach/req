@@ -32,6 +32,97 @@ iex> Req.post!(req, json: %{x: 2}).body["form"]
 %{"x" => 2}
 ```
 
+### Improved Error Handling
+
+Req now validate option names ensuring users didn't accidentally mistyped them.
+If that happened, it will try to give a helpful error message. Here are some examples:
+
+```elixir
+Req.request!(urll: "https://httpbin.org")
+** (ArgumentError) unknown option :urll. Did you mean :url?
+
+Req.new(bas_url: "https://httpbin.org")
+** (ArgumentError) unknown option :bas_url. Did you mean :base_url?
+```
+
+Req also has a new option to handle HTTP errors (4xx/5xx). By default it will continue to
+return the error responses:
+
+```elixir
+Req.get!("https://httpbin.org/status/404")
+#=> %Req.Response{status: 404, ...}
+```
+
+but users can now pass `http_errors: :raise` to raise an exception instead:
+
+```elixir
+Req.get!("https://httpbin.org/status/404", http_errors: :raise)
+** (RuntimeError) The requested URL returned error: 404
+Response body: ""
+```
+
+This is especially useful in one-off scripts where we only really care about the
+"happy path" but would still like to get a good error message when something
+unexpected happened.
+
+### Plugins
+
+Thanks to the new API, it is now even easier to re-use steps. Developers
+can package them up into plugins. Here are some examples:
+
+The new API allows more easily re-using steps and developers can take this
+even further by packaging up the steps as plugins. Here are some examples:
+
+  * [`req_s3`](https://github.com/wojtekmach/req_s3)
+  * [`req_github_oauth`](https://github.com/wojtekmach/req_github_oauth)
+
+And here's how they can be used:
+
+```elixir
+Mix.install([
+  {:req, github: "wojtekmach/req"},
+  {:req_s3, github: "wojtekmach/req_s3"},
+  {:req_github_oauth, github: "wojtekmach/req_github_oauth"}
+])
+
+req =
+  Req.new(http_errors: :raise)
+  |> ReqS3.attach()
+  |> ReqGitHubOAuth.attach()
+
+Req.get!(req, url: "s3://ossci-datasets").body
+#=>
+# [
+#   "mnist/",
+#   "mnist/t10k-images-idx3-ubyte.gz",
+#   "mnist/t10k-labels-idx1-ubyte.gz",
+#   "mnist/train-images-idx3-ubyte.gz",
+#   "mnist/train-labels-idx1-ubyte.gz"
+# ]
+
+Req.get!(req, url: "https://api.github.com/user").body["login"]
+# Outputs:
+# paste this user code:
+#
+#   6C44-30A8
+#
+# at:
+#
+#   https://github.com/login/device
+#
+# open browser window? [Yn]
+# 15:22:28.350 [info] response: authorization_pending
+# 15:22:33.519 [info] response: authorization_pending
+# 15:22:38.678 [info] response: authorization_pending
+#=> "wojtekmach"
+
+Req.get!(req, url: "https://api.github.com/user").body["login"]
+#=> "wojtekmach"
+```
+
+Notice both plugins can be attached to the same request struct
+which makes it really easy to explore different endpoints.
+
 ### Plug Integration
 
 Req can now be used to easily test plugs using the `:plug` option:
