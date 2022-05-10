@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/wojtekmach/req/actions/workflows/ci.yml/badge.svg)](https://github.com/wojtekmach/req/actions/workflows/ci.yml)
 
-[Docs](https://hexdocs.pm/req)
+[Docs](https://wojtekmach.pl/docs/req)
 
 Req is a batteries-included HTTP client for Elixir.
 
@@ -39,31 +39,31 @@ Req is a batteries-included HTTP client for Elixir.
 
   * Pluggable adapters. By default, Req uses [Finch][finch] (via [`run_finch`][run_finch] step).
 
-[req]: https://hexdocs.pm/req/Req.html
-[req.request]: https://hexdocs.pm/req/Req.html#request/1
-[req.request!]: https://hexdocs.pm/req/Req.html#request!/1
-[req.get!]: https://hexdocs.pm/req/Req.html#get!/2
-[req.head!]: https://hexdocs.pm/req/Req.html#head!/2
-[req.post!]: https://hexdocs.pm/req/Req.html#post!/2
-[req.put!]: https://hexdocs.pm/req/Req.html#put!/2
-[req.patch!]: https://hexdocs.pm/req/Req.html#patch!/2
-[req.delete!]: https://hexdocs.pm/req/Req.html#delete!/2
-[compressed]: https://hexdocs.pm/req/Req.Steps.html#compressed/1
-[decompress_body]: https://hexdocs.pm/req/Req.Steps.html#decompress_body/1
-[encode_body]: https://hexdocs.pm/req/Req.Steps.html#encode_body/1
-[decode_body]: https://hexdocs.pm/req/Req.Steps.html#decode_body/1
-[put_params]: https://hexdocs.pm/req/Req.Steps.html#put_params/1
-[auth]: https://hexdocs.pm/req/Req.Steps.html#auth/1
-[put_range]: https://hexdocs.pm/req/Req.Steps.html#put_range/1
-[follow_redirects]: https://hexdocs.pm/req/Req.Steps.html#follow_redirects/1
-[retry]: https://hexdocs.pm/req/Req.Steps.html#retry/1
-[handle_http_errors]: https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
-[cache]: https://hexdocs.pm/req/Req.Steps.html#cache/1
-[put_base_url]: https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
-[put_plug]: https://hexdocs.pm/req/Req.Steps.html#put_plug/1
-[compress_body]: https://hexdocs.pm/req/Req.Steps.html#compress_body/1
-[adapter]: https://hexdocs.pm/req/Req.Request.html#module-adapter
-[run_finch]: https://hexdocs.pm/req/Req.Steps.html#run_finch/1
+[req]: https://wojtekmach.pl/docs/req/Req.html
+[req.request]: https://wojtekmach.pl/docs/req/Req.html#request/1
+[req.request!]: https://wojtekmach.pl/docs/req/Req.html#request!/1
+[req.get!]: https://wojtekmach.pl/docs/req/Req.html#get!/2
+[req.head!]: https://wojtekmach.pl/docs/req/Req.html#head!/2
+[req.post!]: https://wojtekmach.pl/docs/req/Req.html#post!/2
+[req.put!]: https://wojtekmach.pl/docs/req/Req.html#put!/2
+[req.patch!]: https://wojtekmach.pl/docs/req/Req.html#patch!/2
+[req.delete!]: https://wojtekmach.pl/docs/req/Req.html#delete!/2
+[compressed]: https://wojtekmach.pl/docs/req/Req.Steps.html#compressed/1
+[decompress_body]: https://wojtekmach.pl/docs/req/Req.Steps.html#decompress_body/1
+[encode_body]: https://wojtekmach.pl/docs/req/Req.Steps.html#encode_body/1
+[decode_body]: https://wojtekmach.pl/docs/req/Req.Steps.html#decode_body/1
+[put_params]: https://wojtekmach.pl/docs/req/Req.Steps.html#put_params/1
+[auth]: https://wojtekmach.pl/docs/req/Req.Steps.html#auth/1
+[put_range]: https://wojtekmach.pl/docs/req/Req.Steps.html#put_range/1
+[follow_redirects]: https://wojtekmach.pl/docs/req/Req.Steps.html#follow_redirects/1
+[retry]: https://wojtekmach.pl/docs/req/Req.Steps.html#retry/1
+[handle_http_errors]: https://wojtekmach.pl/docs/req/Req.Steps.html#handle_http_errors/1
+[cache]: https://wojtekmach.pl/docs/req/Req.Steps.html#cache/1
+[put_base_url]: https://wojtekmach.pl/docs/req/Req.Steps.html#put_base_url/1
+[put_plug]: https://wojtekmach.pl/docs/req/Req.Steps.html#put_plug/1
+[compress_body]: https://wojtekmach.pl/docs/req/Req.Steps.html#compress_body/1
+[adapter]: https://wojtekmach.pl/docs/req/Req.Request.html#module-adapter
+[run_finch]: https://wojtekmach.pl/docs/req/Req.Steps.html#run_finch/1
 [finch]: https://github.com/sneako/finch
 
 ## Usage
