@@ -153,7 +153,7 @@ adapter = fn request ->
   {request, response}
 end
 
-Req.request!(url: "http://example").body
+Req.request!(url: "http://example", adapter: adapter).body
 #=> "it works!"
 ```
 
