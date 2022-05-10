@@ -671,6 +671,11 @@ defmodule Req.Steps do
   | zip    | `:zip.unzip/2`                                                   |
   | csv    | `NimbleCSV.RFC4180.parse_string/2` (if `NimbleCSV` is installed) |
 
+  ## Request Options
+
+    * `:decode_body` - if set to `false`, disables automatic response body decoding.
+      Defaults to `true`
+
   ## Examples
 
       iex> response = Req.get!("https://httpbin.org/gzip")
@@ -694,36 +699,47 @@ defmodule Req.Steps do
   end
 
   def decode_body({request, response}) do
-    case format(request, response) do
-      "json" ->
-        {request, update_in(response.body, &Jason.decode!/1)}
-
-      "gz" ->
-        {request, update_in(response.body, &:zlib.gunzip/1)}
-
-      "tar" ->
-        {:ok, files} = :erl_tar.extract({:binary, response.body}, [:memory])
-        {request, put_in(response.body, files)}
-
-      "tgz" ->
-        {:ok, files} = :erl_tar.extract({:binary, response.body}, [:memory, :compressed])
-        {request, put_in(response.body, files)}
-
-      "zip" ->
-        {:ok, files} = :zip.extract(response.body, [:memory])
-        {request, put_in(response.body, files)}
-
-      "csv" ->
-        if nimble_csv_loaded?() do
-          options = [skip_headers: false]
-          {request, update_in(response.body, &NimbleCSV.RFC4180.parse_string(&1, options))}
-        else
-          {request, response}
-        end
-
-      _ ->
-        {request, response}
+    if Map.get(request.options, :output) do
+      {request, response}
+    else
+      decode_body({request, response}, format(request, response))
     end
+  end
+
+  defp decode_body({request, response}, "json") do
+    {request, update_in(response.body, &Jason.decode!/1)}
+  end
+
+  defp decode_body({request, response}, "gz") do
+    {request, update_in(response.body, &:zlib.gunzip/1)}
+  end
+
+  defp decode_body({request, response}, "tar") do
+    {:ok, files} = :erl_tar.extract({:binary, response.body}, [:memory])
+    {request, put_in(response.body, files)}
+  end
+
+  defp decode_body({request, response}, "tgz") do
+    {:ok, files} = :erl_tar.extract({:binary, response.body}, [:memory, :compressed])
+    {request, put_in(response.body, files)}
+  end
+
+  defp decode_body({request, response}, "zip") do
+    {:ok, files} = :zip.extract(response.body, [:memory])
+    {request, put_in(response.body, files)}
+  end
+
+  defp decode_body({request, response}, "csv") do
+    if nimble_csv_loaded?() do
+      options = [skip_headers: false]
+      {request, update_in(response.body, &NimbleCSV.RFC4180.parse_string(&1, options))}
+    else
+      {request, response}
+    end
+  end
+
+  defp decode_body({request, response}, _) do
+    {request, response}
   end
 
   defp format(request, response) do

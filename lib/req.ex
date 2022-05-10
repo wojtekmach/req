@@ -82,11 +82,11 @@ defmodule Req do
       ],
       response_steps: [
         retry: &Req.Steps.retry/1,
-        handle_http_errors: &Req.Steps.handle_http_errors/1,
         follow_redirects: &Req.Steps.follow_redirects/1,
         decompress_body: &Req.Steps.decompress_body/1,
-        output: &Req.Steps.output/1,
-        decode_body: &Req.Steps.decode_body/1
+        decode_body: &Req.Steps.decode_body/1,
+        handle_http_errors: &Req.Steps.handle_http_errors/1,
+        output: &Req.Steps.output/1
       ],
       error_steps: [
         retry: &Req.Steps.retry/1
@@ -105,6 +105,7 @@ defmodule Req do
           :compress_body,
           :compressed,
           :raw,
+          :decode_body,
           :output,
           :follow_redirects,
           :location_trusted,
@@ -454,6 +455,9 @@ defmodule Req do
     * `:raw` - if set to `true`, disables automatic body decompression
       ([`decompress_body`](`Req.Steps.decompress_body/1`) step) and decoding
       ([`decode_body`](`Req.Steps.decode_body/1`) step). Defaults to `false`.
+
+    * `:decode_body` - if set to `false`, disables automatic response body decoding.
+      Decodes to `true`.
 
     * `:output` - if set, writes the response body to a file (via
       [`output`](`Req.Steps.output/1`) step). Can be set to a string path or an atom

@@ -145,6 +145,8 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
 
   * `cache`: Include request method in cache key
 
+  * `decode_body`: Support `decode_body: false` option to disable automatic body decoding
+
   * `follow_redirects`: Change method to GET on 301..303 redirects
 
   * `follow_redirects`: Don't send auth headers on redirect to different scheme/host/port
