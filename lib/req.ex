@@ -59,7 +59,6 @@ defmodule Req do
     {url, options} = Keyword.pop(options, :url, "")
     {body, options} = Keyword.pop(options, :body, "")
     {plugins, options} = Keyword.pop(options, :plugins, [])
-    options = Map.new(options)
 
     request = %Req.Request{
       adapter: adapter,
@@ -67,7 +66,7 @@ defmodule Req do
       url: url && URI.parse(url),
       headers: encode_headers(headers),
       body: body,
-      options: options,
+      options: Map.new(options),
       request_steps: [
         put_user_agent: &Req.Steps.put_user_agent/1,
         compressed: &Req.Steps.compressed/1,
@@ -124,6 +123,7 @@ defmodule Req do
         ])
     }
 
+    validate_options(options, request)
     run_plugins(plugins, request)
   end
 
@@ -572,6 +572,7 @@ defmodule Req do
           {:ok, Req.Response.t()} | {:error, Exception.t()}
   def request(request, options) when is_list(options) do
     {request_options, options} = Keyword.split(options, [:method, :url, :headers, :body])
+    validate_options(options, request)
 
     request_options =
       if request_options[:headers] do
@@ -717,5 +718,44 @@ defmodule Req do
 
   defp run_plugins([], request) do
     request
+  end
+
+  defp validate_options(options, %Req.Request{} = request) do
+    registered =
+      MapSet.union(
+        request.registered_options,
+        MapSet.new([:method, :url, :headers, :body, :adapter])
+      )
+
+    validate_options(options, registered)
+  end
+
+  defp validate_options([{name, _value} | rest], registered) do
+    if name in registered do
+      validate_options(rest, registered)
+    else
+      case did_you_mean(Atom.to_string(name), registered) do
+        {similar, score} when score > 0.8 ->
+          raise ArgumentError, "unknown option #{inspect(name)}. Did you mean :#{similar}?"
+
+        _ ->
+          raise ArgumentError, "unknown option #{inspect(name)}"
+      end
+    end
+  end
+
+  defp validate_options([], _registered) do
+    :ok
+  end
+
+  defp did_you_mean(option, registered) do
+    registered
+    |> Enum.map(&to_string/1)
+    |> Enum.reduce({nil, 0}, &max_similar(&1, option, &2))
+  end
+
+  defp max_similar(option, registered, {_, current} = best) do
+    score = String.jaro_distance(option, registered)
+    if score < current, do: best, else: {option, score}
   end
 end

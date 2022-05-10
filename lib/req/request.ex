@@ -371,8 +371,10 @@ defmodule Req.Request do
 
   ## Examples
 
-      iex> req = Req.new(bas_url: "https://httpbin.org")
-      iex> Req.get!(req, url: "/status/201").status
+      iex> Req.request!(urll: "https://httpbin.org")
+      ** (ArgumentError) unknown option :urll. Did you mean :url?
+
+      iex> Req.new(bas_url: "https://httpbin.org")
       ** (ArgumentError) unknown option :bas_url. Did you mean :base_url?
 
       iex> req =
@@ -396,47 +398,7 @@ defmodule Req.Request do
   Returns `{:ok, response}` or `{:error, exception}`.
   """
   def run(request) do
-    validate_options(request)
     run_request(request.request_steps, request)
-  end
-
-  defp validate_options(request) do
-    registered =
-      MapSet.union(
-        request.registered_options,
-        MapSet.new([:method, :url, :headers, :body, :adapter])
-      )
-
-    validate_options(Enum.to_list(request.options), registered)
-  end
-
-  defp validate_options([{name, _value} | rest], registered) do
-    if name in registered do
-      validate_options(rest, registered)
-    else
-      case did_you_mean(Atom.to_string(name), registered) do
-        {similar, score} when score > 0.8 ->
-          raise ArgumentError, "unknown option #{inspect(name)}. Did you mean :#{similar}?"
-
-        _ ->
-          raise ArgumentError, "unknown option #{inspect(name)}"
-      end
-    end
-  end
-
-  defp validate_options([], _registered) do
-    :ok
-  end
-
-  defp did_you_mean(option, registered) do
-    registered
-    |> Enum.map(&to_string/1)
-    |> Enum.reduce({nil, 0}, &max_similar(&1, option, &2))
-  end
-
-  defp max_similar(option, registered, {_, current} = best) do
-    score = String.jaro_distance(option, registered)
-    if score < current, do: best, else: {option, score}
   end
 
   defp run_request([step | steps], request) do
