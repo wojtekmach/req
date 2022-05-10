@@ -915,6 +915,7 @@ defmodule Req.Steps do
       ** (RuntimeError) The requested URL returned error: 404
       Response body: ""
   """
+  @doc step: :response
   def handle_http_errors(request_response)
 
   def handle_http_errors({request, response}) when response.status >= 400 do
