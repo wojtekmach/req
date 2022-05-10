@@ -457,16 +457,15 @@ defmodule Req do
       ([`decode_body`](`Req.Steps.decode_body/1`) step). Defaults to `false`.
 
     * `:decode_body` - if set to `false`, disables automatic response body decoding.
-      Decodes to `true`.
+      Defaults to `true`.
 
     * `:output` - if set, writes the response body to a file (via
       [`output`](`Req.Steps.output/1`) step). Can be set to a string path or an atom
       `:remote_name` which would use the remote name as the filename in the current working
       directory. Once the file is written, the response body is replaced with `""`.
 
-      Setting `:output` also sets the `decode_body: false` option (used by
-      [`decode_body`](`Req.Steps.decode_body/1`) step) to prevent decoding the response before
-      writing it to the file.
+      Setting `:output` also sets the `decode_body: false` option to prevent decoding the
+      response before writing it to the file.
 
   Response redirect options ([`follow_redirects`](`Req.Steps.follow_redirects/1`) step):
 
@@ -596,6 +595,14 @@ defmodule Req do
     {plugins, options} = Keyword.pop(options, :plugins, [])
     request = update_in(request.options, &Map.merge(&1, Map.new(options)))
     request = run_plugins(plugins, request)
+
+    request =
+      if request.options[:output] do
+        update_in(request.options, &Map.put(&1, :decode_body, false))
+      else
+        request
+      end
+
     Req.Request.run(request)
   end
 

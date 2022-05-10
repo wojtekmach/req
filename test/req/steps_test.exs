@@ -202,24 +202,6 @@ defmodule Req.StepsTest do
              {"range", "bytes=0-20"}
   end
 
-  defmodule MyPlug do
-    def init(options), do: options
-
-    def call(conn, options) do
-      {:ok, body, conn} = Plug.Conn.read_body(conn, [])
-
-      map = %{
-        conn: Map.take(conn, [:host, :request_path]),
-        body: body,
-        options: options
-      }
-
-      conn
-      |> Plug.Conn.put_resp_content_type("application/json")
-      |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(map))
-    end
-  end
-
   test "compress_body/1" do
     req = Req.new(method: :post, json: %{a: 1}) |> Req.Request.prepare()
     assert Jason.decode!(req.body) == %{"a" => 1}
@@ -243,27 +225,39 @@ defmodule Req.StepsTest do
 
   @tag :tmp_dir
   test "output/1: path (compressed)", c do
-    Bypass.expect_once(c.bypass, "GET", "/save_to_path", fn conn ->
+    Bypass.expect_once(c.bypass, "GET", "/foo.txt", fn conn ->
       conn
-      |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
-      |> Plug.Conn.send_resp(200, :zlib.gzip("to be filed"))
+      |> Plug.Conn.put_resp_header("content-encoding", "gzip")
+      |> Plug.Conn.send_resp(200, :zlib.gzip("bar"))
     end)
 
-    response = Req.get!(c.url <> "/save_to_path", output: c.tmp_dir <> "/saved.txt")
+    response = Req.get!(c.url <> "/foo.txt", output: c.tmp_dir <> "/foo.txt")
     assert response.body == ""
-    assert File.read!(c.tmp_dir <> "/saved.txt") == "to be filed"
+    assert File.read!(c.tmp_dir <> "/foo.txt") == "bar"
   end
 
-  test "output/1: :remote_name (not compressed)", c do
-    Bypass.expect_once(c.bypass, "GET", "/directory/save_this.txt", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "to be filed")
+  test "output/1: :remote_name", c do
+    Bypass.expect_once(c.bypass, "GET", "/directory/does/not/matter/foo.txt", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "bar")
     end)
 
-    response = Req.get!(c.url <> "/directory/save_this.txt", output: :remote_name)
+    response = Req.get!(c.url <> "/directory/does/not/matter/foo.txt", output: :remote_name)
     assert response.body == ""
-    assert File.read!("save_this.txt") == "to be filed"
+    assert File.read!("foo.txt") == "bar"
   after
-    File.rm("save_this.txt")
+    File.rm("foo.txt")
+  end
+
+  test "output/1: disables decoding", c do
+    Bypass.expect_once(c.bypass, "GET", "/foo.json", fn conn ->
+      json(conn, 200, %{a: 1})
+    end)
+
+    response = Req.get!(c.url <> "/foo.json", output: :remote_name)
+    assert response.body == ""
+    assert File.read!("foo.json") == ~s|{"a":1}|
+  after
+    File.rm("foo.json")
   end
 
   test "output/1: empty filename", c do
@@ -278,9 +272,7 @@ defmodule Req.StepsTest do
 
   test "decode_body/1: json", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      conn
-      |> Plug.Conn.put_resp_content_type("application/json")
-      |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(%{"a" => 1}))
+      json(conn, 200, %{a: 1})
     end)
 
     assert Req.get!(c.url).body == %{"a" => 1}
@@ -289,9 +281,7 @@ defmodule Req.StepsTest do
   @tag :tmp_dir
   test "decode_body/1: with output", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      conn
-      |> Plug.Conn.put_resp_content_type("application/json")
-      |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(%{"a" => 1}))
+      json(conn, 200, %{a: 1})
     end)
 
     assert Req.get!(c.url, output: c.tmp_dir <> "/a.json").body == ""
@@ -814,8 +804,7 @@ defmodule Req.StepsTest do
 
           conn
           |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
-          |> Plug.Conn.put_resp_content_type("application/json")
-          |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(%{"a" => 1}))
+          |> json(200, %{a: 1})
 
         _ ->
           send(pid, :cache_hit)
@@ -887,5 +876,11 @@ defmodule Req.StepsTest do
     refute log =~ "3 attempts left"
     assert log =~ "2 attempts left"
     assert log =~ "1 attempt left"
+  end
+
+  defp json(conn, status, data) do
+    conn
+    |> Plug.Conn.put_resp_content_type("application/json")
+    |> Plug.Conn.send_resp(status, Jason.encode_to_iodata!(data))
   end
 end

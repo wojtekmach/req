@@ -625,10 +625,6 @@ defmodule Req.Steps do
 
         * `:remote_name` - uses the remote name as the filename in the current working directory
 
-      Setting `:output` also sets the `decode_body: false` option (used by
-      [`decode_body`](`decode_body/1`) step) to prevent decoding the response before writing it
-      to the file.
-
   ## Examples
 
       iex> Req.get!("https://elixir-lang.org/index.html", output: "/tmp/elixir_home.html")
@@ -659,7 +655,6 @@ defmodule Req.Steps do
 
   defp output({request, response}, path) do
     File.write!(path, response.body)
-    request = update_in(request.options, &Map.put(&1, :decode_body, false))
     response = %{response | body: ""}
     {request, response}
   end
@@ -679,7 +674,8 @@ defmodule Req.Steps do
 
   ## Request Options
 
-    * `:decode_body` 
+    * `:decode_body` - if set to `false`, disables automatic response body decoding.
+      Defaults to `true`.
 
   ## Examples
 
@@ -703,12 +699,12 @@ defmodule Req.Steps do
     {request, response}
   end
 
+  def decode_body({request, response}) when request.options.decode_body == false do
+    {request, response}
+  end
+
   def decode_body({request, response}) do
-    if Map.get(request.options, :output) do
-      {request, response}
-    else
-      decode_body({request, response}, format(request, response))
-    end
+    decode_body({request, response}, format(request, response))
   end
 
   defp decode_body({request, response}, "json") do
