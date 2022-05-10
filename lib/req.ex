@@ -464,6 +464,10 @@ defmodule Req do
       `:remote_name` which would use the remote name as the filename in the current working
       directory. Once the file is written, the response body is replaced with `""`.
 
+      Setting `:output` also sets the `decode_body: false` option (used by
+      [`decode_body`](`Req.Steps.decode_body/1`) step) to prevent decoding the response before
+      writing it to the file.
+
   Response redirect options ([`follow_redirects`](`Req.Steps.follow_redirects/1`) step):
 
     * `:follow_redirects` - if set to `false`, disables automatic response redirects. Defaults to `true`.

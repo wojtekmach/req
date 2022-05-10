@@ -621,9 +621,13 @@ defmodule Req.Steps do
 
     * `:output` - if set, writes the response body to a file. Can be one of:
 
-      * `path` - writes to the given path
+        * `path` - writes to the given path
 
-      * `:remote_name` - uses the remote name as the filename in the current working directory
+        * `:remote_name` - uses the remote name as the filename in the current working directory
+
+      Setting `:output` also sets the `decode_body: false` option (used by
+      [`decode_body`](`decode_body/1`) step) to prevent decoding the response before writing it
+      to the file.
 
   ## Examples
 
@@ -640,22 +644,24 @@ defmodule Req.Steps do
     output({request, response}, Map.get(request.options, :output))
   end
 
-  def output(request_response, nil) do
+  defp output(request_response, nil) do
     request_response
   end
 
-  def output({request, response}, :remote_name) do
+  defp output({request, response}, :remote_name) do
     path = Path.basename(request.url.path || "")
     output({request, response}, path)
   end
 
-  def output(_request_response, "") do
+  defp output(_request_response, "") do
     raise "cannot write to file \"\""
   end
 
-  def output({request, response}, path) do
+  defp output({request, response}, path) do
     File.write!(path, response.body)
-    {request, %{response | body: ""}}
+    request = update_in(request.options, &Map.put(&1, :decode_body, false))
+    response = %{response | body: ""}
+    {request, response}
   end
 
   @doc """
@@ -673,8 +679,7 @@ defmodule Req.Steps do
 
   ## Request Options
 
-    * `:decode_body` - if set to `false`, disables automatic response body decoding.
-      Defaults to `true`
+    * `:decode_body` 
 
   ## Examples
 
@@ -793,6 +798,9 @@ defmodule Req.Steps do
   | 307, 308      | Method not changed |
 
   ## Request Options
+
+    * `:follow_redirects` - if set to `false`, disables automatic response redirects.
+      Defaults to `true`.
 
     * `:location_trusted` - by default, authorization credentials are only sent
       on redirects with the same host, scheme and port. If `:location_trusted` is set

@@ -286,6 +286,18 @@ defmodule Req.StepsTest do
     assert Req.get!(c.url).body == %{"a" => 1}
   end
 
+  @tag :tmp_dir
+  test "decode_body/1: with output", c do
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.send_resp(200, Jason.encode_to_iodata!(%{"a" => 1}))
+    end)
+
+    assert Req.get!(c.url, output: c.tmp_dir <> "/a.json").body == ""
+    assert File.read!(c.tmp_dir <> "/a.json") == ~s|{"a":1}|
+  end
+
   test "decode_body/1: gzip", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       conn
