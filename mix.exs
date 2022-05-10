@@ -13,7 +13,11 @@ defmodule Req.MixProject do
       deps: deps(),
       package: package(),
       docs: docs(),
+      aliases: [
+        "test.all": ["test --include integration"]
+      ],
       preferred_cli_env: [
+        "test.all": :test,
         docs: :docs,
         "hex.publish": :docs
       ],
