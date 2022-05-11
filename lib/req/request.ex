@@ -61,6 +61,13 @@ defmodule Req.Request do
 
     * `:body` - the HTTP request body
 
+    * `:options` - the options to be used by steps
+
+    * `:halted` - whether the request pipeline is halted. See `halt/1`
+
+    * `:adapter` - a request step that makes the actual HTTP request. Defaults to
+      `Req.Steps.run_finch/1`. See ["Adapter"](#module-adapter) section below for more information.
+
     * `:request_steps` - the list of request steps
 
     * `:response_steps` - the list of response steps
@@ -70,11 +77,6 @@ defmodule Req.Request do
     * `:private` - a map reserved for libraries and frameworks to use.
       Prefix the keys with the name of your project to avoid any future
       conflicts. Only accepts `t:atom/0` keys.
-
-    * `:halted` - whether the request pipeline is halted. See `halt/1`
-
-    * `:adapter` - a request step that makes the actual HTTP request. Defaults to
-      `Req.Steps.run_finch/1`. See ["Adapter"](#module-adapter) section below for more information.
 
   ## Steps
 
@@ -295,7 +297,7 @@ defmodule Req.Request do
           headers: [{binary(), binary()}],
           body: iodata(),
           options: map(),
-          registered_options: MapSet.t(),
+          halted: boolean(),
           adapter: request_step(),
           request_steps: [{name :: atom(), request_step()}],
           response_steps: [{name :: atom(), response_step()}],
@@ -312,13 +314,13 @@ defmodule Req.Request do
             headers: [],
             body: "",
             options: %{},
-            registered_options: MapSet.new(),
-            adapter: &Req.Steps.run_finch/1,
             halted: false,
+            adapter: &Req.Steps.run_finch/1,
             request_steps: [],
             response_steps: [],
             error_steps: [],
-            private: %{}
+            private: %{},
+            registered_options: MapSet.new()
 
   @doc """
   Gets the value for a specific private `key`.
@@ -492,6 +494,13 @@ defmodule Req.Request do
   """
   def register_options(%Req.Request{} = request, options) when is_list(options) do
     update_in(request.registered_options, &MapSet.union(&1, MapSet.new(options)))
+  end
+
+  @doc """
+  Returns registered option names.
+  """
+  def registered_options(%Req.Request{} = request) do
+    request.registered_options
   end
 
   @doc """
