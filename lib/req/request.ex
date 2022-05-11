@@ -487,42 +487,14 @@ defmodule Req.Request do
       iex> Req.Request.put_header(req, "accept", "application/json").headers
       [{"accept", "application/json"}]
 
-      iex> req = Req.new()
-      iex> req = Req.Request.halt(req)
-      iex> Req.Request.put_header(req, "Accept", "application/json")
-      ** (RuntimeError) put_header: request is already halted
-
-      iex> req = Req.new()
-      iex> Req.Request.put_header(req, "Accept", "application/json")
-      ** (RuntimeError) put_header: header key is not lowercase: "Accept"
-
   """
   @spec put_header(t(), binary(), binary()) :: t()
   def put_header(request, key, value)
 
-  def put_header(%Req.Request{halted: true}, _key, _value) do
-    raise "put_header: request is already halted"
-  end
-
   def put_header(%Req.Request{headers: headers} = request, key, value)
       when is_binary(key) and is_binary(value) do
-    ensure_lowercase_header_key!(key)
     %{request | headers: List.keystore(headers, key, 0, {key, value})}
   end
-
-  defp ensure_lowercase_header_key!(key) do
-    unless valid_header_key?(key) do
-      raise "put_header: header key is not lowercase: " <> inspect(key)
-    end
-
-    :ok
-  end
-
-  # Any string containing an UPPERCASE char is not valid.
-  defp valid_header_key?(<<h, _::binary>>) when h in ?A..?Z, do: false
-  defp valid_header_key?(<<_, t::binary>>), do: valid_header_key?(t)
-  defp valid_header_key?(<<>>), do: true
-  defp valid_header_key?(_), do: false
 
   @doc false
   @spec put_new_header(t(), binary(), binary()) :: t()
