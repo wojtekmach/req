@@ -207,6 +207,8 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
 
   * Add `Req.Request.adapter` field
 
+  * Add `Req.Request.merge_options/2`
+
   * Add `Req.Request.register_options/2`
 
   * Rename `put_if_modified_since` step to `cache`

@@ -123,7 +123,7 @@ defmodule Req do
         ])
     }
 
-    validate_options(options, request)
+    Req.Request.validate_options(request, options)
     run_plugins(plugins, request)
   end
 
@@ -572,7 +572,7 @@ defmodule Req do
           {:ok, Req.Response.t()} | {:error, Exception.t()}
   def request(request, options) when is_list(options) do
     {request_options, options} = Keyword.split(options, [:method, :url, :headers, :body])
-    validate_options(options, request)
+    Req.Request.validate_options(request, options)
 
     request_options =
       if request_options[:headers] do
@@ -718,44 +718,5 @@ defmodule Req do
 
   defp run_plugins([], request) do
     request
-  end
-
-  defp validate_options(options, %Req.Request{} = request) do
-    registered =
-      MapSet.union(
-        request.registered_options,
-        MapSet.new([:method, :url, :headers, :body, :adapter])
-      )
-
-    validate_options(options, registered)
-  end
-
-  defp validate_options([{name, _value} | rest], registered) do
-    if name in registered do
-      validate_options(rest, registered)
-    else
-      case did_you_mean(Atom.to_string(name), registered) do
-        {similar, score} when score > 0.8 ->
-          raise ArgumentError, "unknown option #{inspect(name)}. Did you mean :#{similar}?"
-
-        _ ->
-          raise ArgumentError, "unknown option #{inspect(name)}"
-      end
-    end
-  end
-
-  defp validate_options([], _registered) do
-    :ok
-  end
-
-  defp did_you_mean(option, registered) do
-    registered
-    |> Enum.map(&to_string/1)
-    |> Enum.reduce({nil, 0}, &max_similar(&1, option, &2))
-  end
-
-  defp max_similar(option, registered, {_, current} = best) do
-    score = String.jaro_distance(option, registered)
-    if score < current, do: best, else: {option, score}
   end
 end

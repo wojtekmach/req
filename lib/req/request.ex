@@ -363,6 +363,22 @@ defmodule Req.Request do
   end
 
   @doc """
+  Merges given options into the request.
+
+  ## Examples
+
+      iex> req = Req.new(auth: {"alice", "secret"}, http_errors: :raise)
+      iex> req = Req.Request.merge_options(req, auth: {:bearer, "abcd"}, base_url: "https://example.com")
+      iex> req.options
+      %{auth: {:bearer, "abcd"}, base_url: "https://example.com", http_errors: :raise}
+  """
+  @spec merge_options(t(), keyword()) :: t()
+  def merge_options(%Req.Request{} = request, options) when is_list(options) do
+    validate_options(request, options)
+    update_in(request.options, &Map.merge(&1, Map.new(options)))
+  end
+
+  @doc """
   Registers options to be used by a custom steps.
 
   Req ensures that all used options were previously registered which helps
@@ -489,5 +505,45 @@ defmodule Req.Request do
 
   defp result(%{__exception__: true} = exception) do
     {:error, exception}
+  end
+
+  @doc false
+  def validate_options(%Req.Request{} = request, options) do
+    registered =
+      MapSet.union(
+        request.registered_options,
+        MapSet.new([:method, :url, :headers, :body, :adapter])
+      )
+
+    do_validate_options(options, registered)
+  end
+
+  defp do_validate_options([{name, _value} | rest], registered) do
+    if name in registered do
+      do_validate_options(rest, registered)
+    else
+      case did_you_mean(Atom.to_string(name), registered) do
+        {similar, score} when score > 0.8 ->
+          raise ArgumentError, "unknown option #{inspect(name)}. Did you mean :#{similar}?"
+
+        _ ->
+          raise ArgumentError, "unknown option #{inspect(name)}"
+      end
+    end
+  end
+
+  defp do_validate_options([], _registered) do
+    :ok
+  end
+
+  defp did_you_mean(option, registered) do
+    registered
+    |> Enum.map(&to_string/1)
+    |> Enum.reduce({nil, 0}, &max_similar(&1, option, &2))
+  end
+
+  defp max_similar(option, registered, {_, current} = best) do
+    score = String.jaro_distance(option, registered)
+    if score < current, do: best, else: {option, score}
   end
 end
