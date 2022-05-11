@@ -363,7 +363,7 @@ defmodule Req.Request do
   end
 
   @doc """
-  Registers an option to be used by a custom step.
+  Registers options to be used by a custom steps.
 
   Req ensures that all used options were previously registered which helps
   finding accidentally mistyped option names. If you're adding custom steps
@@ -379,17 +379,13 @@ defmodule Req.Request do
 
       iex> req =
       ...>   Req.new(base_url: "https://httpbin.org")
-      ...>   |> Req.Request.register_option(:foo)
+      ...>   |> Req.Request.register_options([:foo])
       ...>
       iex> Req.get!(req, url: "/status/201", foo: :bar).status
       201
   """
-  def register_option(%Req.Request{} = request, option) when is_atom(option) do
-    if option in request.registered_options do
-      raise "option #{inspect(option)} is already registered"
-    else
-      update_in(request.registered_options, &MapSet.put(&1, option))
-    end
+  def register_options(%Req.Request{} = request, options) when is_list(options) do
+    update_in(request.registered_options, &MapSet.union(&1, MapSet.new(options)))
   end
 
   @doc """
