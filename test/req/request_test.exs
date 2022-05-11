@@ -43,7 +43,7 @@ defmodule Req.RequestTest do
 
     assert [
              {"authorization", ^authorization},
-             {"accept-encoding", "gzip, deflate"},
+             {"accept-encoding", "br, gzip, deflate"},
              {"user-agent", "req/" <> _}
            ] = request.headers
   end
