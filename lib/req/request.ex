@@ -267,10 +267,10 @@ defmodule Req.Request do
 
   ## Examples
 
-      iex> Req.Request.append_request_steps(request,
-      ...>   noop: fn request -> request end,
-      ...>   inspect: &IO.inspect/1
-      ...> )
+      Req.Request.append_request_steps(request,
+        noop: fn request -> request end,
+        inspect: &IO.inspect/1
+      )
   """
   def append_request_steps(request, steps) do
     update_in(request.request_steps, &(&1 ++ steps))
@@ -281,10 +281,10 @@ defmodule Req.Request do
 
   ## Examples
 
-      iex> Req.Request.prepend_request_steps(request,
-      ...>   noop: fn request -> request end,
-      ...>   inspect: &IO.inspect/1
-      ...> )
+      Req.Request.prepend_request_steps(request,
+        noop: fn request -> request end,
+        inspect: &IO.inspect/1
+      )
   """
   def prepend_request_steps(request, steps) do
     update_in(request.request_steps, &(steps ++ &1))
@@ -295,10 +295,10 @@ defmodule Req.Request do
 
   ## Examples
 
-      iex> Req.Request.append_request_steps(request,
-      ...>   noop: fn {request, response} -> {request, response} end,
-      ...>   inspect: &IO.inspect/1
-      ...> )
+      Req.Request.append_request_steps(request,
+        noop: fn {request, response} -> {request, response} end,
+        inspect: &IO.inspect/1
+      )
   """
   def append_response_steps(request, steps) do
     update_in(request.response_steps, &(&1 ++ steps))
@@ -309,10 +309,10 @@ defmodule Req.Request do
 
   ## Examples
 
-      iex> Req.Request.prepend_request_steps(request,
-      ...>   noop: fn {request, response} -> {request, response} end,
-      ...>   inspect: &IO.inspect/1
-      ...> )
+      Req.Request.prepend_request_steps(request,
+        noop: fn {request, response} -> {request, response} end,
+        inspect: &IO.inspect/1
+      )
   """
   def prepend_response_steps(request, steps) do
     update_in(request.response_steps, &(steps ++ &1))
@@ -323,10 +323,10 @@ defmodule Req.Request do
 
   ## Examples
 
-      iex> Req.Request.append_error_steps(request,
-      ...>   noop: fn {request, exception} -> {request, exception} end,
-      ...>   inspect: &IO.inspect/1
-      ...> )
+      Req.Request.append_error_steps(request,
+        noop: fn {request, exception} -> {request, exception} end,
+        inspect: &IO.inspect/1
+      )
   """
   def append_error_steps(request, steps) do
     update_in(request.error_steps, &(&1 ++ steps))
@@ -337,10 +337,10 @@ defmodule Req.Request do
 
   ## Examples
 
-      iex> Req.Request.prepend_error_steps(request,
-      ...>   noop: fn {request, exception} -> {request, exception} end,
-      ...>   inspect: &IO.inspect/1
-      ...> )
+      Req.Request.prepend_error_steps(request,
+        noop: fn {request, exception} -> {request, exception} end,
+        inspect: &IO.inspect/1
+      )
   """
   def prepend_error_steps(request, steps) do
     update_in(request.error_steps, &(steps ++ &1))
