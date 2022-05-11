@@ -15,6 +15,9 @@ defmodule Req.Request do
   request struct through these steps. You can easily reuse or rearrange built-in steps or write new
   ones.
 
+  To make using custom steps by others even easier, they can be packaged up into plugins.
+  See ["Wriging Plugins"](#module-writing-plugins) section for more information.
+
   ## The Low-level API
 
   Most Req users would use it like this:
@@ -156,6 +159,93 @@ defmodule Req.Request do
           request
         end
       end
+
+  ## Writing Plugins
+
+  Custom steps can be packaged into plugins so that they are even easier to use by others.
+
+  Here's an example plugin:
+
+      defmodule PrintHeaders do
+        @doc \"""
+        Prints request and response headers.
+
+        ## Request Options
+
+          * `:print_headers` - if `true`, prints the headers. Defaults to `false`.
+        \"""
+        def attach(%Req.Request{} = request, options \\ []) do
+          request
+          |> Req.Request.register_options([:print_headers])
+          |> Req.Request.merge_options(options)
+          |> Req.Request.append_request_steps(print_headers: &print_request_headers/1)
+          |> Req.Request.prepend_response_steps(print_headers: &print_response_headers/1)
+        end
+
+        defp print_request_headers(request) do
+          if request.options[:print_headers] do
+            print_headers("> ", request.headers)
+          end
+
+          request
+        end
+
+        defp print_response_headers({request, response}) do
+          if request.options[:print_headers] do
+            print_headers("< ", response.headers)
+          end
+
+          {request, response}
+        end
+
+        defp print_headers(prefix, headers) do
+          for {name, value} <- headers do
+            IO.puts([prefix, name, ": ", value])
+          end
+        end
+      end
+
+  And here is how we can use it:
+
+      req = Req.new() |> PrintHeaders.attach()
+
+      Req.get!(req, url: "https://httpbin.org/json").status
+      200
+
+      Req.get!(req, url: "https://httpbin.org/json", print_headers: true).status
+      # Outputs:
+      # > accept-encoding: br, gzip, deflate
+      # > user-agent: req/0.3.0-dev
+      # < date: Wed, 11 May 2022 11:10:47 GMT
+      # < content-type: application/json
+      # ...
+      200
+
+      req = Req.new() |> PrintHeaders.attach(print_headers: true)
+      Req.get!(req, url: "https://httpbin.org/json").status
+      # Outputs:
+      # > accept-encoding: br, gzip, deflate
+      # ...
+      200
+
+  As you can see a plugin is simply a module. While this is not enforced, the plugin should follow
+  these conventions:
+
+    * It should export an `attach/1` function that takes and returns the request struct
+
+    * The attach functions mostly just adds steps and it is the steps that do the actual work
+
+    * A user should be able to attach your plugin alongside other plugins. For this reason,
+      plugin functionality should usually only happen on a specific "trigger": on a specific
+      option, on a specific URL scheme or host, etc. This is especially important for plugins
+      that perform authentication; you don't want to accidentally expose a token from service A
+      when a user makes request to service B.
+
+    * If your plugin supports custom options, register them with `Req.Request.register_options/2`
+
+    * Sometimes it is useful to pass options when attaching the plugin. For that, export an
+      `attach/2` function and call `Req.Request.merge_options/2`. Remember to first register
+      options before merging!
 
   ## Adapter
 

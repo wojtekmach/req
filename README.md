@@ -124,7 +124,7 @@ Here are some examples:
   * [`req_github_oauth`](https://github.com/wojtekmach/req_github_oauth)
 
 See [`Req.Request`](https://hexdocs.pm/req/Req.Request.html) module documentation for
-more information on low-level API and the request struct.
+more information on low-level API, request struct, and developing plugins.
 
 ## Acknowledgments
 

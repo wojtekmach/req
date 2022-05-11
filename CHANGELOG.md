@@ -67,11 +67,10 @@ unexpected happened.
 
 ### Plugins
 
-Thanks to the new API, it is now even easier to re-use steps. Developers
-can package them up into plugins. Here are some examples:
+From the very beginning, Req could be extended with custom steps. To make using such custom steps
+by others even easier, they can be packaged up into plugins.
 
-The new API allows more easily re-using steps and developers can take this
-even further by packaging up the steps as plugins. Here are some examples:
+Here are some examples:
 
   * [`req_s3`](https://github.com/wojtekmach/req_s3)
   * [`req_github_oauth`](https://github.com/wojtekmach/req_github_oauth)
@@ -122,6 +121,9 @@ Req.get!(req, url: "https://api.github.com/user").body["login"]
 
 Notice both plugins can be attached to the same request struct
 which makes it really easy to explore different endpoints.
+
+See ["Writing Plugins" section in `Req.Request` module documentation](https://wojtekmach.pl/docs/req/Req.Request.html#module-writing-plugins)
+for more information.
 
 ### Plug Integration
 
