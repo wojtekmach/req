@@ -645,4 +645,43 @@ defmodule Req.Request do
     score = String.jaro_distance(option, registered)
     if score < current, do: best, else: {option, score}
   end
+
+  defimpl Inspect do
+    import Inspect.Algebra
+
+    def inspect(request, opts) do
+      open = color("%Req.Request{", :map, opts)
+      sep = color(",", :map, opts)
+      close = color("}", :map, opts)
+
+      list = [
+        method: request.method,
+        url: request.url,
+        headers: request.headers,
+        body: request.body,
+        options: request.options,
+        halted: request.halted,
+        adapter: request.adapter,
+        request_steps: request.request_steps,
+        response_steps: request.response_steps,
+        error_steps: request.error_steps,
+        private: request.private
+      ]
+
+      fun = fn
+        {:url, value}, opts ->
+          key = color("url:", :atom, opts)
+
+          doc =
+            concat(["URI.parse(", color("\"" <> URI.to_string(value) <> "\"", :string, opts), ")"])
+
+          concat(key, concat(" ", doc))
+
+        {key, value}, opts ->
+          Inspect.List.keyword({key, value}, opts)
+      end
+
+      container_doc(open, list, close, opts, fun, separator: sep, break: :strict)
+    end
+  end
 end
