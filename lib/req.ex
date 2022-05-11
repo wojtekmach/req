@@ -422,6 +422,10 @@ defmodule Req do
         * `NaiveDateTime` and `DateTime` header values are encoded as "HTTP date". Otherwise,
           the header value is encoded with `String.Chars.to_string/1`.
 
+        * Because header keys are case-insensitive in both HTTP/1.1 and HTTP/2,
+          it is recommended for header keys to be in lowercase, to avoid sending
+          duplicate keys in a request.
+
       If you set `:headers` options both in `Req.new/1` and `request/2`, the header lists are merged.
 
     * `:body` - the request body.

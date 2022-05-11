@@ -471,6 +471,60 @@ defmodule Req.Request do
   end
 
   @doc """
+  Adds a new request header (`key`) if not present, otherwise replaces the
+  previous value of that header with `value`.
+
+  Because header keys are case-insensitive in both HTTP/1.1 and HTTP/2,
+  it is recommended for header keys to be in lowercase, to avoid sending
+  duplicate keys in a request.
+
+  Additionally, requests with mixed-case headers served over HTTP/2 are not
+  considered valid by common clients, resulting in dropped requests.
+
+  ## Examples
+
+      iex> req = Req.new()
+      iex> Req.Request.put_header(req, "accept", "application/json").headers
+      [{"accept", "application/json"}]
+
+      iex> req = Req.new()
+      iex> req = Req.Request.halt(req)
+      iex> Req.Request.put_header(req, "Accept", "application/json")
+      ** (RuntimeError) put_header: request is already halted
+
+      iex> req = Req.new()
+      iex> Req.Request.put_header(req, "Accept", "application/json")
+      ** (RuntimeError) put_header: header key is not lowercase: "Accept"
+
+  """
+  @spec put_header(t(), binary(), binary()) :: t()
+  def put_header(request, key, value)
+
+  def put_header(%Req.Request{halted: true}, _key, _value) do
+    raise "put_header: request is already halted"
+  end
+
+  def put_header(%Req.Request{headers: headers} = request, key, value)
+      when is_binary(key) and is_binary(value) do
+    ensure_lowercase_header_key!(key)
+    %{request | headers: List.keystore(headers, key, 0, {key, value})}
+  end
+
+  defp ensure_lowercase_header_key!(key) do
+    unless valid_header_key?(key) do
+      raise "put_header: header key is not lowercase: " <> inspect(key)
+    end
+
+    :ok
+  end
+
+  # Any string containing an UPPERCASE char is not valid.
+  defp valid_header_key?(<<h, _::binary>>) when h in ?A..?Z, do: false
+  defp valid_header_key?(<<_, t::binary>>), do: valid_header_key?(t)
+  defp valid_header_key?(<<>>), do: true
+  defp valid_header_key?(_), do: false
+
+  @doc """
   Registers options to be used by a custom steps.
 
   Req ensures that all used options were previously registered which helps
