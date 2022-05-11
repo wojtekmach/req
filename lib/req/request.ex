@@ -489,8 +489,6 @@ defmodule Req.Request do
 
   """
   @spec put_header(t(), binary(), binary()) :: t()
-  def put_header(request, key, value)
-
   def put_header(%Req.Request{headers: headers} = request, key, value)
       when is_binary(key) and is_binary(value) do
     %{request | headers: List.keystore(headers, key, 0, {key, value})}
@@ -498,8 +496,6 @@ defmodule Req.Request do
 
   @doc false
   @spec put_new_header(t(), binary(), binary()) :: t()
-  def put_new_header(request, key, value)
-
   def put_new_header(%Req.Request{headers: headers} = request, key, value)
       when is_binary(key) and is_binary(value) do
     if Enum.any?(headers, &(String.downcase(elem(&1, 0)) == key)) do
