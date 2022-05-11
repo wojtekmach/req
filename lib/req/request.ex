@@ -471,6 +471,41 @@ defmodule Req.Request do
   end
 
   @doc """
+  Adds a new request header (`key`) if not present, otherwise replaces the
+  previous value of that header with `value`.
+
+  Because header keys are case-insensitive in both HTTP/1.1 and HTTP/2,
+  it is recommended for header keys to be in lowercase, to avoid sending
+  duplicate keys in a request.
+
+  Additionally, requests with mixed-case headers served over HTTP/2 are not
+  considered valid by common clients, resulting in dropped requests.
+
+  ## Examples
+
+      iex> req = Req.new()
+      iex> Req.Request.put_header(req, "accept", "application/json").headers
+      [{"accept", "application/json"}]
+
+  """
+  @spec put_header(t(), binary(), binary()) :: t()
+  def put_header(%Req.Request{headers: headers} = request, key, value)
+      when is_binary(key) and is_binary(value) do
+    %{request | headers: List.keystore(headers, key, 0, {key, value})}
+  end
+
+  @doc false
+  @spec put_new_header(t(), binary(), binary()) :: t()
+  def put_new_header(%Req.Request{headers: headers} = request, key, value)
+      when is_binary(key) and is_binary(value) do
+    if Enum.any?(headers, &(String.downcase(elem(&1, 0)) == key)) do
+      request
+    else
+      put_header(request, key, value)
+    end
+  end
+
+  @doc """
   Registers options to be used by a custom steps.
 
   Req ensures that all used options were previously registered which helps

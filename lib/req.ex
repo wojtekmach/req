@@ -417,7 +417,9 @@ defmodule Req do
         * atom header names are turned into strings, replacing `-` with `_`. For example,
           `:user_agent` becomes `"user-agent"`
 
-        * string header names are left as is
+        * string header names are left as is. Because header keys are case-insensitive
+          in both HTTP/1.1 and HTTP/2, it is recommended for header keys to be in
+          lowercase, to avoid sending duplicate keys in a request.
 
         * `NaiveDateTime` and `DateTime` header values are encoded as "HTTP date". Otherwise,
           the header value is encoded with `String.Chars.to_string/1`.

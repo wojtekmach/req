@@ -95,12 +95,12 @@ defmodule Req.Steps do
   end
 
   defp auth(request, {:bearer, token}) when is_binary(token) do
-    put_new_header(request, "authorization", "Bearer #{token}")
+    Req.Request.put_new_header(request, "authorization", "Bearer #{token}")
   end
 
   defp auth(request, {username, password}) when is_binary(username) and is_binary(password) do
     value = Base.encode64("#{username}:#{password}")
-    put_new_header(request, "authorization", "Basic #{value}")
+    Req.Request.put_new_header(request, "authorization", "Basic #{value}")
   end
 
   defp auth(request, :netrc) do
@@ -169,7 +169,7 @@ defmodule Req.Steps do
   @doc step: :request
   def put_user_agent(request) do
     user_agent = Map.get(request.options, :user_agent, @user_agent)
-    put_new_header(request, "user-agent", user_agent)
+    Req.Request.put_new_header(request, "user-agent", user_agent)
   end
 
   @doc """
@@ -227,10 +227,10 @@ defmodule Req.Steps do
   def compressed(request) do
     case Map.fetch(request.options, :compressed) do
       :error ->
-        put_new_header(request, "accept-encoding", supported_accept_encoding())
+        Req.Request.put_new_header(request, "accept-encoding", supported_accept_encoding())
 
       {:ok, true} ->
-        put_new_header(request, "accept-encoding", supported_accept_encoding())
+        Req.Request.put_new_header(request, "accept-encoding", supported_accept_encoding())
 
       {:ok, false} ->
         request
@@ -276,11 +276,11 @@ defmodule Req.Steps do
     cond do
       data = request.options[:form] ->
         %{request | body: URI.encode_query(data)}
-        |> put_new_header("content-type", "application/x-www-form-urlencoded")
+        |> Req.Request.put_new_header("content-type", "application/x-www-form-urlencoded")
 
       data = request.options[:json] ->
         %{request | body: Jason.encode_to_iodata!(data)}
-        |> put_new_header("content-type", "application/json")
+        |> Req.Request.put_new_header("content-type", "application/json")
 
       true ->
         request
@@ -341,11 +341,11 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def put_range(%{options: %{range: range}} = request) when is_binary(range) do
-    put_header(request, "range", range)
+    Req.Request.put_header(request, "range", range)
   end
 
   def put_range(%{options: %{range: first..last}} = request) do
-    put_header(request, "range", "bytes=#{first}-#{last}")
+    Req.Request.put_header(request, "range", "bytes=#{first}-#{last}")
   end
 
   def put_range(request) do
@@ -393,7 +393,7 @@ defmodule Req.Steps do
     case File.stat(cache_path(dir, request)) do
       {:ok, stat} ->
         datetime = stat.mtime |> NaiveDateTime.from_erl!() |> format_http_datetime()
-        put_new_header(request, "if-modified-since", datetime)
+        Req.Request.put_new_header(request, "if-modified-since", datetime)
 
       _ ->
         request
@@ -429,7 +429,7 @@ defmodule Req.Steps do
     if request.options[:compress_body] do
       request
       |> Map.update!(:body, &:zlib.gzip/1)
-      |> put_header("content-encoding", "gzip")
+      |> Req.Request.put_header("content-encoding", "gzip")
     else
       request
     end
@@ -1133,18 +1133,6 @@ defmodule Req.Steps do
   end
 
   ## Utilities
-
-  defp put_new_header(struct, name, value) do
-    if Enum.any?(struct.headers, fn {key, _} -> String.downcase(key) == name end) do
-      struct
-    else
-      put_header(struct, name, value)
-    end
-  end
-
-  defp put_header(struct, name, value) do
-    update_in(struct.headers, &[{name, value} | &1])
-  end
 
   defp get_content_encoding_header(headers) do
     if value = get_header(headers, "content-encoding") do
