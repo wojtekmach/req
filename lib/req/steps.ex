@@ -761,6 +761,10 @@ defmodule Req.Steps do
     {request, response}
   end
 
+  def decode_body({request, response}) when not is_binary(response.body) do
+    {request, response}
+  end
+
   def decode_body({request, response}) when request.options.raw == true do
     {request, response}
   end
