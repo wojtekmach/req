@@ -579,11 +579,11 @@ defmodule Req.Steps do
 
   Supported formats:
 
-  | Header        | Decompression Algorithm                         |
+  | Value         | Decompression Algorithm                         |
   | ------------- | ------------------------------------------------|
   | gzip, x-gzip  | `:zlib.gunzip/1`                                |
   | zip           | `:zlib.unzip/1`                                 |
-  | br            | `:brotli.decode/1` (if `:brotli` is installed) |
+  | br            | `:brotli.decode/1` (if `:brotli` is installed)  |
 
   ## Examples
 
