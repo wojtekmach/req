@@ -72,7 +72,7 @@ The easiest way to use Req is with [`Mix.install/2`](https://hexdocs.pm/mix/Mix.
 
 ```elixir
 Mix.install([
-  {:req, "~> 0.3.0"}
+  {:req, github: "wojtekmach/req"}
 ])
 
 Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
@@ -117,7 +117,7 @@ Req.get!(req, url: "/repos/wojtekmach/req").body["description"]
 #=> "Req is a batteries-included HTTP client for Elixir."
 ```
 
-In order to use custom steps as easily as possible, developers can package them up into plugins.
+Custom steps can be packaged into plugins so that they are even easier to use by others.
 Here are some examples:
 
   * [`req_s3`](https://github.com/wojtekmach/req_s3)
