@@ -73,6 +73,7 @@ by others even easier, they can be packaged up into plugins.
 Here are some examples:
 
   * [`req_s3`](https://github.com/wojtekmach/req_s3)
+  * [`req_hex`](https://github.com/wojtekmach/req_hex)
   * [`req_github_oauth`](https://github.com/wojtekmach/req_github_oauth)
 
 And here's how they can be used:
@@ -81,13 +82,16 @@ And here's how they can be used:
 Mix.install([
   {:req, github: "wojtekmach/req"},
   {:req_s3, github: "wojtekmach/req_s3"},
+  {:req_hex, github: "wojtekmach/req_hex"},
   {:req_github_oauth, github: "wojtekmach/req_github_oauth"}
 ])
 
+
 req =
-  Req.new(http_errors: :raise)
+  (Req.new(http_errors: :raise)
   |> ReqS3.attach()
-  |> ReqGitHubOAuth.attach()
+  |> ReqHex.attach()
+  |> ReqGitHubOAuth.attach())
 
 Req.get!(req, url: "s3://ossci-datasets").body
 #=>
@@ -98,6 +102,9 @@ Req.get!(req, url: "s3://ossci-datasets").body
 #   "mnist/train-images-idx3-ubyte.gz",
 #   "mnist/train-labels-idx1-ubyte.gz"
 # ]
+
+Req.get!(req, url: "https://repo.hex.pm/tarballs/req-0.1.0.tar").body["metadata.config"]["links"]
+#=> %{"GitHub" => "https://github.com/wojtekmach/req"}
 
 Req.get!(req, url: "https://api.github.com/user").body["login"]
 # Outputs:
@@ -119,8 +126,8 @@ Req.get!(req, url: "https://api.github.com/user").body["login"]
 #=> "wojtekmach"
 ```
 
-Notice both plugins can be attached to the same request struct
-which makes it really easy to explore different endpoints.
+Notice all plugins can be attached to the same request struct which makes it really easy to
+explore different endpoints.
 
 See ["Writing Plugins" section in `Req.Request` module documentation](https://wojtekmach.pl/docs/req/Req.Request.html#module-writing-plugins)
 for more information.

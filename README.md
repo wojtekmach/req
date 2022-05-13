@@ -121,6 +121,7 @@ Custom steps can be packaged into plugins so that they are even easier to use by
 Here are some examples:
 
   * [`req_s3`](https://github.com/wojtekmach/req_s3)
+  * [`req_hex`](https://github.com/wojtekmach/req_hex)
   * [`req_github_oauth`](https://github.com/wojtekmach/req_github_oauth)
 
 See [`Req.Request`](https://hexdocs.pm/req/Req.Request.html) module documentation for
