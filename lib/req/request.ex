@@ -343,17 +343,6 @@ defmodule Req.Request do
     %{request | halted: true}
   end
 
-  @doc false
-  @deprecated "Manually build struct instead"
-  def build(method, url, options \\ []) do
-    %Req.Request{
-      method: method,
-      url: URI.parse(url),
-      headers: Keyword.get(options, :headers, []),
-      body: Keyword.get(options, :body, "")
-    }
-  end
-
   @doc """
   Appends request steps.
 

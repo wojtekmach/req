@@ -721,4 +721,15 @@ defmodule Req do
   defp run_plugins([], request) do
     request
   end
+
+  @doc false
+  @deprecated "Manually build Req.Request struct instead"
+  def build(method, url, options \\ []) do
+    %Req.Request{
+      method: method,
+      url: URI.parse(url),
+      headers: Keyword.get(options, :headers, []),
+      body: Keyword.get(options, :body, "")
+    }
+  end
 end

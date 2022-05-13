@@ -278,7 +278,7 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
 
   * Deprecate setting `cache: [dir: dir]` in favour of `cache_dir: dir`.
 
-  * `Req.Request`: Deprecate `build/3` in favour of manually building the struct.
+  * Deprecate Req.build/3 in favour of manually building the struct.
 
 ## v0.2.2 (2022-04-04)
 
