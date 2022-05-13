@@ -380,17 +380,18 @@ defmodule Req.Steps do
   def cache(request) do
     if request.options[:cache] do
       dir = Map.get(request.options, :cache_dir) || :filename.basedir(:user_cache, 'req')
+      cache_path = cache_path(dir, request)
 
       request
-      |> put_if_modified_since(dir)
-      |> Req.Request.prepend_response_steps(handle_cache: &handle_cache(&1, dir))
+      |> put_if_modified_since(cache_path)
+      |> Req.Request.prepend_response_steps(handle_cache: &handle_cache(&1, cache_path))
     else
       request
     end
   end
 
-  defp put_if_modified_since(request, dir) do
-    case File.stat(cache_path(dir, request)) do
+  defp put_if_modified_since(request, cache_path) do
+    case File.stat(cache_path) do
       {:ok, stat} ->
         datetime = stat.mtime |> NaiveDateTime.from_erl!() |> format_http_datetime()
         Req.Request.put_new_header(request, "if-modified-since", datetime)
@@ -400,14 +401,14 @@ defmodule Req.Steps do
     end
   end
 
-  defp handle_cache({request, response}, dir) do
+  defp handle_cache({request, response}, cache_path) do
     cond do
       response.status == 200 ->
-        write_cache(dir, request, response)
+        write_cache(cache_path, response)
         {request, response}
 
       response.status == 304 ->
-        response = load_cache(dir, request)
+        response = load_cache(cache_path)
         {request, response}
 
       true ->
@@ -1161,29 +1162,27 @@ defmodule Req.Steps do
   end
 
   defp cache_path(cache_dir, request) do
-    Path.join(cache_dir, cache_key(request))
+    cache_key =
+      Enum.join(
+        [
+          request.url.host,
+          Atom.to_string(request.method),
+          :crypto.hash(:sha256, :erlang.term_to_binary(request.url))
+          |> Base.encode16(case: :lower)
+        ],
+        "-"
+      )
+
+    Path.join(cache_dir, cache_key)
   end
 
-  defp write_cache(cache_dir, request, response) do
-    path = cache_path(cache_dir, request)
+  defp write_cache(path, response) do
     File.mkdir_p!(Path.dirname(path))
     File.write!(path, :erlang.term_to_binary(response))
   end
 
-  defp load_cache(cache_dir, request) do
-    path = cache_path(cache_dir, request)
+  defp load_cache(path) do
     path |> File.read!() |> :erlang.binary_to_term()
-  end
-
-  defp cache_key(request) do
-    Enum.join(
-      [
-        request.url.host,
-        Atom.to_string(request.method),
-        :crypto.hash(:sha256, :erlang.term_to_binary(request.url)) |> Base.encode16(case: :lower)
-      ],
-      "-"
-    )
   end
 
   @doc false
