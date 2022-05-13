@@ -460,6 +460,20 @@ defmodule Req.Request do
   end
 
   @doc """
+  Returns the values of the header specified by `key`.
+
+  ## Examples
+
+      iex> req = Req.new(headers: [{"accept", "application/json"}])
+      iex> Req.Request.get_header(req, "accept")
+      ["application/json"]
+
+  """
+  def get_header(%Req.Request{} = request, key) when is_binary(key) do
+    for {^key, value} <- request.headers, do: value
+  end
+
+  @doc """
   Adds a new request header (`key`) if not present, otherwise replaces the
   previous value of that header with `value`.
 
