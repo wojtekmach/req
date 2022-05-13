@@ -213,6 +213,12 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
 
   * Add `Req.Request.register_options/2`
 
+  * Add `Req.Request.put_header/3`
+
+  * Add `Req.Request.get_header/2`
+
+  * Add `Req.Response.get_header/2`
+
   * Rename `put_if_modified_since` step to `cache`
 
   * Rename `decompress` step to `decompress_body`
