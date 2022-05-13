@@ -42,4 +42,16 @@ defmodule Req.Response do
   def put_private(response, key, value) when is_atom(key) do
     put_in(response.private[key], value)
   end
+
+  @doc """
+  Returns the values of the header specified by `key`.
+
+  ## Examples
+
+      iex> Req.Response.get_header(response, "content-type")
+      ["application/json"]
+  """
+  def get_header(%Req.Response{} = response, key) when is_binary(key) do
+    for {^key, value} <- response.headers, do: value
+  end
 end
