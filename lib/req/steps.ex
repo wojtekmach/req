@@ -561,8 +561,10 @@ defmodule Req.Steps do
   end
 
   defp run_plug(request) do
+    body = IO.iodata_to_binary(request.body)
+
     conn =
-      Plug.Test.conn(request.method, request.url, request.body)
+      Plug.Test.conn(request.method, request.url, body)
       |> Map.replace!(:req_headers, request.headers)
       |> call_plug(request.options.plug)
 

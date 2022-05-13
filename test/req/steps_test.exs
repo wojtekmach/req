@@ -854,6 +854,16 @@ defmodule Req.StepsTest do
     refute_received _
   end
 
+  test "put_plug/1" do
+    plug = fn conn ->
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      assert body == ~s|{"a":1}|
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end
+
+    assert Req.request!(plug: plug, json: %{a: 1}).body == "ok"
+  end
+
   test "run_finch/1: pool timeout", c do
     Bypass.stub(c.bypass, "GET", "/", fn conn ->
       Plug.Conn.send_resp(conn, 200, "ok")
