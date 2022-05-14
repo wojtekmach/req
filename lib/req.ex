@@ -117,7 +117,6 @@ defmodule Req do
           :plug,
           :finch,
           :finch_options,
-          :http1,
           :http2,
           :unix_socket
         ])
@@ -512,8 +511,6 @@ defmodule Req do
 
     * `:finch_options` - options passed down to Finch when making the request, defaults to `[]`.
        See `Finch.request/3` for a list of available options.
-
-    * `:http1` - if `true`, uses an HTTP/1 pool automatically started by Req.
 
     * `:http2` - if `true`, uses an HTTP/2 pool automatically started by Req.
 

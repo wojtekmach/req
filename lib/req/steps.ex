@@ -447,12 +447,10 @@ defmodule Req.Steps do
 
     * `:finch` - the name of the Finch pool. Defaults to a pool automatically started by
       Req. The default pool uses HTTP/1 although that may change in the future.
-      This option takes precedence over `:http1` and `:http2` options mentioned below.
+      This option takes precedence over `:http2` option mentioned below.
 
     * `:finch_options` - options passed down to Finch when making the request, defaults to `[]`.
        See `Finch.request/3` for a list of available options.
-
-    * `:http1` - if `true`, uses an HTTP/1 pool automatically started by Req.
 
     * `:http2` - if `true`, uses an HTTP/2 pool automatically started by Req.
 
@@ -483,9 +481,6 @@ defmodule Req.Steps do
 
         :error ->
           cond do
-            request.options[:http1] && request.options[:http2] ->
-              raise "cannot set both :http1 and :http2 option"
-
             request.options[:http2] ->
               Req.FinchHTTP2
 

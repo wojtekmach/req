@@ -245,7 +245,7 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
 
   * `put_base_url`: Ignore base URL if given URL contains scheme
 
-  * `run_finch`: Add `:http1` and `:http2` options that pick appropriate default pool started by
+  * `run_finch`: Add `:http2` option that picks appropriate default pool started by
     Req
 
   * `encode_body`: Add `:form` and `:json` options (previously used as `{:form, data}` and
