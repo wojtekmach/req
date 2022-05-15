@@ -469,6 +469,7 @@ defmodule Req.Request do
       ["application/json"]
 
   """
+  @spec get_header(t(), binary()) :: [binary()]
   def get_header(%Req.Request{} = request, key) when is_binary(key) do
     for {^key, value} <- request.headers, do: value
   end
@@ -492,9 +493,9 @@ defmodule Req.Request do
 
   """
   @spec put_header(t(), binary(), binary()) :: t()
-  def put_header(%Req.Request{headers: headers} = request, key, value)
+  def put_header(%Req.Request{} = request, key, value)
       when is_binary(key) and is_binary(value) do
-    %{request | headers: List.keystore(headers, key, 0, {key, value})}
+    %{request | headers: List.keystore(request.headers, key, 0, {key, value})}
   end
 
   @doc false

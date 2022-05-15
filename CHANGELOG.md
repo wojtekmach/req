@@ -226,6 +226,8 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
 
   * Add `Req.Response.get_header/2`
 
+  * Add `Req.Response.put_header/3`
+
   * Rename `put_if_modified_since` step to `cache`
 
   * Rename `decompress` step to `decompress_body`

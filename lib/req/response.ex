@@ -51,7 +51,24 @@ defmodule Req.Response do
       iex> Req.Response.get_header(response, "content-type")
       ["application/json"]
   """
+  @spec get_header(t(), binary()) :: [binary()]
   def get_header(%Req.Response{} = response, key) when is_binary(key) do
     for {^key, value} <- response.headers, do: value
+  end
+
+  @doc """
+  Adds a new response header (`key`) if not present, otherwise replaces the
+  previous value of that header with `value`.
+
+  ## Examples
+
+      iex> Req.Response.put_header(response, "content-type", "application/json").headers
+      [{"content-type", "application/json"}]
+
+  """
+  @spec put_header(t(), binary(), binary()) :: t()
+  def put_header(%Req.Response{} = response, key, value)
+      when is_binary(key) and is_binary(value) do
+    %{response | headers: List.keystore(response.headers, key, 0, {key, value})}
   end
 end
