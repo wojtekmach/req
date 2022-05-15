@@ -61,7 +61,8 @@ defmodule Req.Request do
 
     * `:body` - the HTTP request body
 
-    * `:options` - the options to be used by steps
+    * `:options` - the options to be used by steps. See ["Options"](#module-options) section below
+      for more information.
 
     * `:halted` - whether the request pipeline is halted. See `halt/1`
 
@@ -149,7 +150,7 @@ defmodule Req.Request do
 
   ### Halting
 
-  Any step can call `Req.Request.halt/1` to halt the pipeline. This will prevent any further steps
+  Any step can call `halt/1` to halt the pipeline. This will prevent any further steps
   from being invoked.
 
   Examples:
@@ -243,10 +244,10 @@ defmodule Req.Request do
       that perform authentication; you don't want to accidentally expose a token from service A
       when a user makes request to service B.
 
-    * If your plugin supports custom options, register them with `Req.Request.register_options/2`
+    * If your plugin supports custom options, register them with `register_options/2`
 
     * Sometimes it is useful to pass options when attaching the plugin. For that, export an
-      `attach/2` function and call `Req.Request.merge_options/2`. Remember to first register
+      `attach/2` function and call `merge_options/2`. Remember to first register
       options before merging!
 
   ## Adapter
@@ -297,6 +298,7 @@ defmodule Req.Request do
           headers: [{binary(), binary()}],
           body: iodata(),
           options: map(),
+          registered_options: MapSet.t(),
           halted: boolean(),
           adapter: request_step(),
           request_steps: [{name :: atom(), request_step()}],
@@ -536,13 +538,6 @@ defmodule Req.Request do
   end
 
   @doc """
-  Returns registered option names.
-  """
-  def registered_options(%Req.Request{} = request) do
-    request.registered_options
-  end
-
-  @doc """
   Runs a request pipeline.
 
   Returns `{:ok, response}` or `{:error, exception}`.
@@ -699,6 +694,7 @@ defmodule Req.Request do
         headers: request.headers,
         body: request.body,
         options: request.options,
+        registered_options: request.registered_options,
         halted: request.halted,
         adapter: request.adapter,
         request_steps: request.request_steps,
