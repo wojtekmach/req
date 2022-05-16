@@ -72,6 +72,7 @@ by others even easier, they can be packaged up into plugins.
 
 Here are some examples:
 
+  * [`req_easyhtml`](https://github.com/wojtekmach/req_easyhtml)
   * [`req_s3`](https://github.com/wojtekmach/req_s3)
   * [`req_hex`](https://github.com/wojtekmach/req_hex)
   * [`req_github_oauth`](https://github.com/wojtekmach/req_github_oauth)
@@ -81,17 +82,24 @@ And here's how they can be used:
 ```elixir
 Mix.install([
   {:req, github: "wojtekmach/req"},
+  {:req_easyhtml, github: "wojtekmach/req_easyhtml"},
   {:req_s3, github: "wojtekmach/req_s3"},
   {:req_hex, github: "wojtekmach/req_hex"},
   {:req_github_oauth, github: "wojtekmach/req_github_oauth"}
 ])
 
-
 req =
   (Req.new(http_errors: :raise)
+  |> ReqEasyHTML.attach()
   |> ReqS3.attach()
   |> ReqHex.attach()
   |> ReqGitHubOAuth.attach())
+
+Req.get!(req, url: "https://elixir-lang.org").body[".entry-summary h5"]
+#=>
+# #EasyHTML[<h5>
+#    Elixir is a dynamic, functional language for building scalable and maintainable applications.
+#  </h5>]
 
 Req.get!(req, url: "s3://ossci-datasets").body
 #=>

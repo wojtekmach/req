@@ -120,9 +120,67 @@ Req.get!(req, url: "/repos/wojtekmach/req").body["description"]
 Custom steps can be packaged into plugins so that they are even easier to use by others.
 Here are some examples:
 
+  * [`req_easyhtml`](https://github.com/wojtekmach/req_easyhtml)
   * [`req_s3`](https://github.com/wojtekmach/req_s3)
   * [`req_hex`](https://github.com/wojtekmach/req_hex)
   * [`req_github_oauth`](https://github.com/wojtekmach/req_github_oauth)
+
+And here is how they can be used:
+
+```elixir
+Mix.install([
+  {:req, github: "wojtekmach/req"},
+  {:req_easyhtml, github: "wojtekmach/req_easyhtml"},
+  {:req_s3, github: "wojtekmach/req_s3"},
+  {:req_hex, github: "wojtekmach/req_hex"},
+  {:req_github_oauth, github: "wojtekmach/req_github_oauth"}
+])
+
+req =
+  (Req.new(http_errors: :raise)
+  |> ReqEasyHTML.attach()
+  |> ReqS3.attach()
+  |> ReqHex.attach()
+  |> ReqGitHubOAuth.attach())
+
+Req.get!(req, url: "https://elixir-lang.org").body[".entry-summary h5"]
+#=>
+# #EasyHTML[<h5>
+#    Elixir is a dynamic, functional language for building scalable and maintainable applications.
+#  </h5>]
+
+Req.get!(req, url: "s3://ossci-datasets").body
+#=>
+# [
+#   "mnist/",
+#   "mnist/t10k-images-idx3-ubyte.gz",
+#   "mnist/t10k-labels-idx1-ubyte.gz",
+#   "mnist/train-images-idx3-ubyte.gz",
+#   "mnist/train-labels-idx1-ubyte.gz"
+# ]
+
+Req.get!(req, url: "https://repo.hex.pm/tarballs/req-0.1.0.tar").body["metadata.config"]["links"]
+#=> %{"GitHub" => "https://github.com/wojtekmach/req"}
+
+Req.get!(req, url: "https://api.github.com/user").body["login"]
+# Outputs:
+# paste this user code:
+#
+#   6C44-30A8
+#
+# at:
+#
+#   https://github.com/login/device
+#
+# open browser window? [Yn]
+# 15:22:28.350 [info] response: authorization_pending
+# 15:22:33.519 [info] response: authorization_pending
+# 15:22:38.678 [info] response: authorization_pending
+#=> "wojtekmach"
+
+Req.get!(req, url: "https://api.github.com/user").body["login"]
+#=> "wojtekmach"
+```
 
 See [`Req.Request`](https://hexdocs.pm/req/Req.Request.html) module documentation for
 more information on low-level API, request struct, and developing plugins.
