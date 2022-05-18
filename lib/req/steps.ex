@@ -215,7 +215,7 @@ defmodule Req.Steps do
       Mix.install([
         :req,
         {:brotli, "~> 0.3.0"},
-        {:ezstd, "~> 0.1"}
+        {:ezstd, "~> 1.0"}
       ])
 
       response = Req.get!("https://httpbin.org/anything")
@@ -608,7 +608,7 @@ defmodule Req.Steps do
   | gzip, x-gzip  | `:zlib.gunzip/1`                                |
   | zip           | `:zlib.unzip/1`                                 |
   | br            | `:brotli.decode/1` (if [brotli] is installed)   |
-  | zstd          | :ezstd.decompress/1 (if [ezstd] is installed) |
+  | zstd          | `:ezstd.decompress/1` (if [ezstd] is installed) |
 
   ## Examples
 
