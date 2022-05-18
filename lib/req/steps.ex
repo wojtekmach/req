@@ -721,6 +721,8 @@ defmodule Req.Steps do
       true
   """
   @doc step: :response
+  def output(request_response)
+
   def output({request, response}) do
     output({request, response}, Map.get(request.options, :output))
   end
