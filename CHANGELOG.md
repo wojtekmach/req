@@ -253,6 +253,18 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
 
 ### Step changes
 
+  * New step: `run_plug`
+
+  * New step: `put_user_agent` (replaces part of removed `put_default_headers`)
+
+  * New step: `compressed` (replaces part of removed `put_default_headers`)
+
+  * New step: `compress_body`
+
+  * New step: `output`
+
+  * New step: `handle_http_errors`
+
   * `put_base_url`: Ignore base URL if given URL contains scheme
 
   * `run_finch`: Add `:http2` option that picks appropriate default pool started by
@@ -263,7 +275,9 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
 
   * `cache`: Include request method in cache key
 
-  * `decompress_body`: Support Brotli
+  * `decompress_body`, `compressed`: Support Brotli
+
+  * `decompress_body`, `compressed`: Support Zstandard
 
   * `decode_body`: Support `decode_body: false` option to disable automatic body decoding
 
@@ -277,17 +291,6 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
     retry, and `fun` - a 1-arity function that accepts either a `Req.Response` or an exception
     struct and returns boolean whether to retry
 
-  * New step: `run_plug`
-
-  * New step: `put_user_agent` (replaces part of removed `put_default_headers`)
-
-  * New step: `compressed` (replaces part of removed `put_default_headers`)
-
-  * New step: `compress_body`
-
-  * New step: `output`
-
-  * New step: `handle_http_errors`
 
 ### Deprecations
 
