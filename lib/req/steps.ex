@@ -178,10 +178,9 @@ defmodule Req.Steps do
   Supported formats:
 
     * `gzip`
-
     * `deflate`
-
     * `br` (if [brotli] is installed)
+    * `zstd` (if [ezstd] is installed)
 
   ## Request Options
 
@@ -210,18 +209,21 @@ defmodule Req.Steps do
       iex> response.body |> binary_part(0, 15)
       "<!DOCTYPE html>"
 
-  If the [brotli] package is installed, Brotli compression will also be requested:
+  The Brotli and Zstandard compression algorithms are also supported if the optional
+  packages are installed:
 
       Mix.install([
         :req,
-        {:brotli, "~> 0.3.0"}
+        {:brotli, "~> 0.3.0"},
+        {:ezstd, "~> 1.0"}
       ])
 
-      response = Req.get!("https://httpbin.org/brotli")
+      response = Req.get!("https://httpbin.org/anything")
       response.body["headers"]["Accept-Encoding"]
-      #=> "br, gzip, deflate"
+      #=> "zstd, br, gzip, deflate"
 
   [brotli]: https://hex.pm/packages/brotli
+  [ezstd]: https://hex.pm/packages/ezstd
   """
   @doc step: :request
   def compressed(request) do
@@ -247,10 +249,20 @@ defmodule Req.Steps do
     end
   end
 
+  defmacrop ezstd_loaded? do
+    if Code.ensure_loaded?(:ezstd) do
+      true
+    else
+      quote do
+        Code.ensure_loaded?(:ezstd)
+      end
+    end
+  end
+
   defp supported_accept_encoding do
     value = "gzip, deflate"
     value = if brotli_loaded?(), do: "br, " <> value, else: value
-    value
+    if ezstd_loaded?(), do: "zstd, " <> value, else: value
   end
 
   @doc """
@@ -591,11 +603,12 @@ defmodule Req.Steps do
 
   Supported formats:
 
-  | Format        | Decoder                                       |
-  | ------------- | --------------------------------------------- |
-  | gzip, x-gzip  | `:zlib.gunzip/1`                              |
-  | zip           | `:zlib.unzip/1`                               |
-  | br            | `:brotli.decode/1` (if [brotli] is installed) |
+  | Format        | Decoder                                         |
+  | ------------- | ----------------------------------------------- |
+  | gzip, x-gzip  | `:zlib.gunzip/1`                                |
+  | zip           | `:zlib.unzip/1`                                 |
+  | br            | `:brotli.decode/1` (if [brotli] is installed)   |
+  | zstd          | `:ezstd.decompress/1` (if [ezstd] is installed) |
 
   ## Examples
 
@@ -619,6 +632,7 @@ defmodule Req.Steps do
       #=> true
 
   [brotli]: http://hex.pm/packages/brotli
+  [ezstd]: https://hex.pm/packages/ezstd
   """
   @doc step: :response
   def decompress_body(request_response)
@@ -654,6 +668,14 @@ defmodule Req.Steps do
       decompressed
     else
       raise("`:brotli` decompression library not loaded")
+    end
+  end
+
+  defp decompress_with_algorithm("zstd", body) do
+    if ezstd_loaded?() do
+      :ezstd.decompress(body)
+    else
+      raise("`:ezstd` decompression library not loaded")
     end
   end
 

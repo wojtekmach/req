@@ -235,6 +235,16 @@ defmodule Req.StepsTest do
     assert Req.get!(c.url).body == "foo"
   end
 
+  test "decompress_body/1 - zstd", c do
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      conn
+      |> Plug.Conn.put_resp_header("content-encoding", "zstd")
+      |> Plug.Conn.send_resp(200, :ezstd.compress("foo"))
+    end)
+
+    assert Req.get!(c.url).body == "foo"
+  end
+
   @tag :tmp_dir
   test "output/1: path (compressed)", c do
     Bypass.expect_once(c.bypass, "GET", "/foo.txt", fn conn ->
