@@ -664,8 +664,6 @@ defmodule Req do
   end
 
   @doc """
-  Sets default options.
-
   Sets default options for `Req.new/1`.
 
   Avoid setting default options in libraries as they are global.
