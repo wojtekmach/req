@@ -15,7 +15,7 @@ jobs:
         include:
           - pair:
               elixir: '1.11'
-              otp: 22
+              otp: 22.3
           - pair:
               elixir: '1.13'
               otp: 25
