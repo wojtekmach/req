@@ -234,6 +234,8 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
 
   * Add `Req.Response.new/1`
 
+  * Add `Req.Response.json/2`
+
   * Add `Req.Response.get_header/2`
 
   * Add `Req.Response.put_header/3`

@@ -36,6 +36,33 @@ defmodule Req.Response do
   end
 
   @doc """
+  Builds or updates a response with JSON body.
+
+  ## Example
+
+      iex> Req.Response.json(%{hello: 42})
+      %Req.Response{
+        status: 200,
+        headers: [{"content-type", "application/json"}],
+        body: ~s|{"hello":42}|
+      }
+
+      iex> resp = Req.Response.new()
+      iex> Req.Response.json(resp, %{hello: 42})
+      %Req.Response{
+        status: 200,
+        headers: [{"content-type", "application/json"}],
+        body: ~s|{"hello":42}|
+      }
+  """
+  @spec json(t(), body :: term()) :: t()
+  def json(response \\ new(), body) do
+    response
+    |> put_header("content-type", "application/json")
+    |> Map.replace!(:body, Jason.encode!(body))
+  end
+
+  @doc """
   Gets the value for a specific private `key`.
   """
   @spec get_private(t(), key :: atom(), default :: term()) :: term()
