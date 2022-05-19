@@ -34,8 +34,8 @@ iex> Req.post!(req, json: %{x: 2}).body["form"]
 
 ### Improved Error Handling
 
-Req now validate option names ensuring users didn't accidentally mistyped them.
-If that happened, it will try to give a helpful error message. Here are some examples:
+Req now validates option names ensuring users didn't accidentally mistyped them.
+If they did, it will try to give a helpful error message. Here are some examples:
 
 ```elixir
 Req.request!(urll: "https://httpbin.org")
