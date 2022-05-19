@@ -22,16 +22,23 @@ defmodule Req.Response do
           private: map()
         }
 
-  defstruct [
-    :status,
-    headers: [],
-    body: "",
-    private: %{}
-  ]
+  defstruct status: 200,
+            headers: [],
+            body: "",
+            private: %{}
+
+  @doc """
+  Returns a new response.
+  """
+  @spec new(options :: keyword()) :: t()
+  def new(options \\ []) do
+    struct!(__MODULE__, options)
+  end
 
   @doc """
   Gets the value for a specific private `key`.
   """
+  @spec get_private(t(), key :: atom(), default :: term()) :: term()
   def get_private(response, key, default \\ nil) when is_atom(key) do
     Map.get(response.private, key, default)
   end
@@ -39,6 +46,7 @@ defmodule Req.Response do
   @doc """
   Assigns a private `key` to `value`.
   """
+  @spec put_private(t(), key :: atom(), value :: term()) :: t()
   def put_private(response, key, value) when is_atom(key) do
     put_in(response.private[key], value)
   end
