@@ -174,6 +174,22 @@ Req.request!(url: "http://example", adapter: adapter).body
 #=> "it works!"
 ```
 
+Here is another one that uses the [`json/2`][resp_json] function to conveniently
+return a JSON response:
+
+[resp_json]: https://wojtekmach.pl/docs/req/Req.Response.html#json/2
+
+    adapter = fn request ->
+      response = Req.Response.json(%{hello: 42})
+      {request, response}
+    end
+
+    resp = Req.request!(url: "http://example", adapter: adapter)
+    resp.headers
+    #=> [{"content-type", "application/json"}]
+    resp.body
+    #=> %{"hello" => 42}
+
 And here is a naive Hackney-based adapter and how we can use it:
 
 ```elixir

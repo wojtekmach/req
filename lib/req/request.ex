@@ -268,7 +268,21 @@ defmodule Req.Request do
       Req.request!(url: "http://example", adapter: adapter).body
       #=> "it works!"
 
-  And here is a naive Hackney-based implementation:
+  Here is another one that uses the `Req.Response.json/2` function to conveniently
+  return a JSON response:
+
+      adapter = fn request ->
+        response = Req.Response.json(%{hello: 42})
+        {request, response}
+      end
+
+      resp = Req.request!(url: "http://example", adapter: adapter)
+      resp.headers
+      #=> [{"content-type", "application/json"}]
+      resp.body
+      #=> %{"hello" => 42}
+
+  And here is a naive Hackney-based adapter:
 
       hackney = fn request ->
         case :hackney.request(
