@@ -310,8 +310,10 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
   * `follow_redirects`: Don't send auth headers on redirect to different scheme/host/port
     unless `location_trusted: true` is set
 
+  * `retry`: The `:retry` option handles the `Retry-After` response header on HTTP 429 responses 
+
   * `retry`: The `:retry` option can now be set to `:safe` (default) to only retry GET/HEAD
-    requests on HTTP 408/5xx responses or exceptions, `:always` to always retry, `:never` to never
+    requests on HTTP 408/429/5xx responses or exceptions, `:always` to always retry, `:never` to never
     retry, and `fun` - a 1-arity function that accepts either a `Req.Response` or an exception
     struct and returns boolean whether to retry
 

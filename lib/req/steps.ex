@@ -1029,6 +1029,8 @@ defmodule Req.Steps do
 
   ## Error steps
 
+  @default_retry_delay 2000
+
   @doc """
   Retries a request in face of errors.
 
@@ -1038,7 +1040,7 @@ defmodule Req.Steps do
 
     * `:retry` - can be one of the following:
 
-        * `:safe` (default) - retry GET/HEAD requests on HTTP 408/5xx responses or exceptions
+        * `:safe` (default) - retry GET/HEAD requests on HTTP 408/429/5xx responses or exceptions
 
         * `:always` - always retry
 
@@ -1048,7 +1050,8 @@ defmodule Req.Steps do
           and returns boolean whether to retry
 
     * `:retry_delay` - sleep this number of milliseconds before making another attempt, defaults
-      to `2000`
+      to `#{@default_retry_delay}`. Will be ignored if HTTP 429 response includes `Retry-After`
+      header, in favor of the delay interval specified in the header.
 
     * `:max_retries` - maximum number of retry attempts, defaults to `2` (for a total of `3`
       requests to the server, including the initial one.)
@@ -1082,7 +1085,7 @@ defmodule Req.Steps do
       :safe ->
         if request.method in [:get, :head] do
           case response_or_exception do
-            %Req.Response{status: status} when status == 408 or status in 500..599 ->
+            %Req.Response{status: status} when status in [408, 429] or status in 500..599 ->
               retry(request, response_or_exception)
 
             %Req.Response{} ->
@@ -1116,7 +1119,7 @@ defmodule Req.Steps do
   end
 
   defp retry(request, response_or_exception) do
-    delay = Map.get(request.options, :retry_delay, 2000)
+    delay = get_retry_delay(request, response_or_exception)
     max_retries = Map.get(request.options, :max_retries, 2)
     retry_count = Req.Request.get_private(request, :req_retry_count, 0)
 
@@ -1129,6 +1132,32 @@ defmodule Req.Steps do
       {Req.Request.halt(request), result}
     else
       {request, response_or_exception}
+    end
+  end
+
+  defp get_retry_delay(request, %Req.Response{status: 429} = response) do
+    case List.keyfind(response.headers, "retry-after", 0) do
+      {_, header_delay} ->
+        retry_delay_in_ms(header_delay)
+
+      nil ->
+        Map.get(request.options, :retry_delay, @default_retry_delay)
+    end
+  end
+
+  defp get_retry_delay(request, _response_or_exception) do
+    Map.get(request.options, :retry_delay, @default_retry_delay)
+  end
+
+  defp retry_delay_in_ms(delay_value) do
+    case Integer.parse(delay_value) do
+      {seconds, _} ->
+        :timer.seconds(seconds)
+
+      :error ->
+        delay_value
+        |> parse_http_datetime()
+        |> DateTime.diff(DateTime.utc_now(), :millisecond)
     end
   end
 
@@ -1209,5 +1238,32 @@ defmodule Req.Steps do
   @doc false
   def format_http_datetime(datetime) do
     Calendar.strftime(datetime, "%a, %d %b %Y %H:%M:%S GMT")
+  end
+
+  @month_numbers %{
+    "Jan" => "01",
+    "Feb" => "02",
+    "Mar" => "03",
+    "Apr" => "04",
+    "May" => "05",
+    "Jun" => "06",
+    "Jul" => "07",
+    "Aug" => "08",
+    "Sep" => "09",
+    "Oct" => "10",
+    "Nov" => "11",
+    "Dec" => "12"
+  }
+  defp parse_http_datetime(datetime) do
+    [_day_of_week, day, month, year, time, "GMT"] = String.split(datetime, " ")
+    date = year <> "-" <> @month_numbers[month] <> "-" <> day
+
+    case DateTime.from_iso8601(date <> " " <> time <> "Z") do
+      {:ok, valid_datetime, 0} ->
+        valid_datetime
+
+      {:error, reason} ->
+        raise "could not parse \"Retry-After\" header #{datetime} - #{reason}"
+    end
   end
 end
