@@ -250,6 +250,8 @@ See "Adapter" seciton in `Req.Request` module documentation for more information
 
   * Add `Req.Request.get_header/2`
 
+  * Add `Req.Request.update_private/4`
+
   * Add `Req.Response.new/1`
 
   * Add `Req.Response.json/2`

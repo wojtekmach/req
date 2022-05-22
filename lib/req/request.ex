@@ -346,6 +346,25 @@ defmodule Req.Request do
   end
 
   @doc """
+  Updates private `key` with the given function.
+
+  If `key` is present in request private map then the existing value is passed to `fun` and its
+  result is used as the updated value of `key`. If `key` is not present, `default` is inserted
+  as the value of `key`. The default value will not be passed through the update function.
+
+  ## Examples
+
+      iex> req = %Req.Request{private: %{a: 1}}
+      iex> Req.Request.update_private(req, :a, 11, & &1 + 1).private
+      %{a: 2}
+      iex> Req.Request.update_private(req, :b, 11, & &1 + 1).private
+      %{a: 1, b: 11}
+  """
+  def update_private(request, key, default, fun) when is_atom(key) and is_function(fun, 1) do
+    update_in(request.private, &Map.update(&1, key, default, fun))
+  end
+
+  @doc """
   Assigns a private `key` to `value`.
   """
   def put_private(request, key, value) when is_atom(key) do
