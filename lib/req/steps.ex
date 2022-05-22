@@ -1050,8 +1050,8 @@ defmodule Req.Steps do
           and returns boolean whether to retry
 
     * `:retry_delay` - sleep this number of milliseconds before making another attempt, defaults
-      to `#{@default_retry_delay}`. Will be ignored if HTTP 429 response includes `Retry-After`
-      header, in favor of the delay interval specified in the header.
+      to `#{@default_retry_delay}`. If the response is HTTP 429 and contains the `retry-after`
+      header, the value of the header is used as the next retry delay.
 
     * `:max_retries` - maximum number of retry attempts, defaults to `2` (for a total of `3`
       requests to the server, including the initial one.)
@@ -1151,13 +1151,14 @@ defmodule Req.Steps do
 
   defp retry_delay_in_ms(delay_value) do
     case Integer.parse(delay_value) do
-      {seconds, _} ->
+      {seconds, ""} ->
         :timer.seconds(seconds)
 
       :error ->
         delay_value
         |> parse_http_datetime()
         |> DateTime.diff(DateTime.utc_now(), :millisecond)
+        |> max(0)
     end
   end
 

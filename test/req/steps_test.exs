@@ -699,45 +699,28 @@ defmodule Req.StepsTest do
   end
 
   @tag :capture_log
-  test "retry: retry-after", c do
-    {:ok, _} = Agent.start_link(fn -> [] end, name: :timestamps)
+  @tag timeout: 1000
+  test "retry: retry-after" do
+    adapter = fn request ->
+      request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
+      attempt = request.private.attempt
 
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      now = DateTime.utc_now()
+      response =
+        case attempt do
+          0 -> Req.Response.new(status: 429) |> retry_after(0)
+          1 -> Req.Response.new(status: 429) |> retry_after(DateTime.utc_now())
+          2 -> Req.Response.new(status: 200, body: "ok")
+        end
 
-      case Agent.get(:timestamps, & &1) do
-        [] ->
-          Agent.update(:timestamps, fn times -> [now | times] end)
+      {request, response}
+    end
 
-          conn
-          |> Plug.Conn.put_resp_header("retry-after", "1")
-          |> Plug.Conn.send_resp(429, "later")
-
-        [_] ->
-          target_time =
-            now
-            |> DateTime.add(1)
-            |> Req.Steps.format_http_datetime()
-
-          Agent.update(:timestamps, fn times -> [now | times] end)
-
-          conn
-          |> Plug.Conn.put_resp_header("retry-after", target_time)
-          |> Plug.Conn.send_resp(429, "later")
-
-        _ ->
-          Agent.update(:timestamps, fn times -> [now | times] end)
-          Plug.Conn.send_resp(conn, 200, "ok")
-      end
-    end)
-
-    request = Req.new(url: c.url, retry_delay: 10)
-    assert Req.get!(request).body == "ok"
-
-    [third, second, first] = Agent.get(:timestamps, & &1)
-    assert_in_delta DateTime.diff(second, first), 1, 0.01
-    assert_in_delta DateTime.diff(third, second), 1, 0.01
+    assert Req.request!(adapter: adapter, retry_delay: 10000).body == "ok"
   end
+
+  defp retry_after(r, value), do: Req.Response.put_header(r, "retry-after", retry_after(value))
+  defp retry_after(integer) when is_integer(integer), do: to_string(integer)
+  defp retry_after(%DateTime{} = dt), do: Req.Steps.format_http_datetime(dt)
 
   @tag :capture_log
   test "retry: always failing", c do
