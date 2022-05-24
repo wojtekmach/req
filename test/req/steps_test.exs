@@ -699,6 +699,30 @@ defmodule Req.StepsTest do
   end
 
   @tag :capture_log
+  @tag timeout: 1000
+  test "retry: retry-after" do
+    adapter = fn request ->
+      request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
+      attempt = request.private.attempt
+
+      response =
+        case attempt do
+          0 -> Req.Response.new(status: 429) |> retry_after(0)
+          1 -> Req.Response.new(status: 429) |> retry_after(DateTime.utc_now())
+          2 -> Req.Response.new(status: 200, body: "ok")
+        end
+
+      {request, response}
+    end
+
+    assert Req.request!(adapter: adapter, retry_delay: 10000).body == "ok"
+  end
+
+  defp retry_after(r, value), do: Req.Response.put_header(r, "retry-after", retry_after(value))
+  defp retry_after(integer) when is_integer(integer), do: to_string(integer)
+  defp retry_after(%DateTime{} = dt), do: Req.Steps.format_http_datetime(dt)
+
+  @tag :capture_log
   test "retry: always failing", c do
     pid = self()
 
