@@ -217,7 +217,7 @@ Req.get!("https://api.github.com/repos/elixir-lang/elixir", adapter: hackney).bo
 #=> "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
 ```
 
-See "Adapter" seciton in `Req.Request` module documentation for more information.
+See "Adapter" section in `Req.Request` module documentation for more information.
 
 ### Major changes
 
