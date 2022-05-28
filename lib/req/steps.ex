@@ -895,7 +895,7 @@ defmodule Req.Steps do
       to `true`, credentials will be sent to any host.
 
     * `:max_redirects` - the maximum number of redirects, defaults to `10`.
-      If the limit is reached, an erorr is raised.
+      If the limit is reached, an error is raised.
 
 
   ## Examples
