@@ -25,7 +25,8 @@ defmodule Req.MixProject do
         exclude: [
           NimbleCSV.RFC4180,
           Plug.Test,
-          :brotli
+          :brotli,
+          :ezstd
         ]
       ]
     ]
