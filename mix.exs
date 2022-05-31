@@ -55,6 +55,7 @@ defmodule Req.MixProject do
       {:finch, "~> 0.9.0 or ~> 0.10.0 or ~> 0.11.0 or ~> 0.12.0"},
       {:mime, "~> 1.6 or ~> 2.0"},
       {:jason, "~> 1.0"},
+      {:aws_signature, "~> 0.3.1", optional: true},
       {:nimble_csv, "~> 1.0", optional: true},
       {:plug, "~> 1.0", optional: true},
       {:brotli, "~> 0.3.1", optional: true},
