@@ -596,6 +596,59 @@ defmodule Req.Steps do
     plug.(conn)
   end
 
+  @default_region_for_global_services "us-east-1"
+
+  @doc """
+  Sign the request using AWS Signature V4.
+
+  ## Request Options
+
+    * `:aws_sigv4` - if set, the AWS credentials to sign request.
+
+      * `:access_key_id` - the aws access key id from AWS.
+
+      * `:secret_access_key` - the secret access key from AWS.
+
+      * `:service` - the AWS service.
+
+      * `:region` - if set, sets the region for AWS service. If not set,
+        will use the default region for global service (#{@default_region_for_global_services}).
+        See more here: https://docs.aws.amazon.com/general/latest/gr/sigv4_changes.html.
+
+      * `:options` - if set, sets the custom options to `:aws_signature.sign_v4/10`.
+
+  """
+  @doc step: :request
+  def put_aws_sigv4(%{options: options} = request) do
+    if aws_opts = options[:aws_sigv4] do
+      access_key_id = Keyword.fetch!(aws_opts, :access_key_id)
+      secret_access_key = Keyword.fetch!(aws_opts, :secret_access_key)
+      service = Keyword.fetch!(aws_opts, :service)
+      region = Keyword.get(aws_opts, :region, @default_region_for_global_services)
+      options = Keyword.get(aws_opts, :options, [])
+
+      headers =
+        :aws_signature.sign_v4(
+          access_key_id,
+          secret_access_key,
+          region,
+          service,
+          now(),
+          to_string(request.method),
+          to_string(request.url),
+          request.headers,
+          request.body,
+          options
+        )
+
+      put_in(request.headers, headers)
+    else
+      request
+    end
+  end
+
+  defp now, do: NaiveDateTime.utc_now() |> NaiveDateTime.to_erl()
+
   ## Response steps
 
   @doc """

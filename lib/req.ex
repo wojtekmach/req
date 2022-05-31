@@ -77,7 +77,8 @@ defmodule Req do
         put_range: &Req.Steps.put_range/1,
         cache: &Req.Steps.cache/1,
         put_plug: &Req.Steps.put_plug/1,
-        compress_body: &Req.Steps.compress_body/1
+        compress_body: &Req.Steps.compress_body/1,
+        put_aws_sigv4: &Req.Steps.put_aws_sigv4/1
       ],
       response_steps: [
         retry: &Req.Steps.retry/1,
@@ -118,7 +119,8 @@ defmodule Req do
           :finch,
           :finch_options,
           :http2,
-          :unix_socket
+          :unix_socket,
+          :aws_sigv4
         ])
     }
 

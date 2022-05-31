@@ -211,6 +211,32 @@ defmodule Req.StepsTest do
     assert List.keyfind(req.headers, "content-encoding", 0) == {"content-encoding", "gzip"}
   end
 
+  test "put_aws_sigv4/1", c do
+    req =
+      Req.new(
+        method: :post,
+        url: URI.parse(c.url),
+        body: Jason.encode!(%{a: 1}),
+        aws_sigv4: [
+          access_key_id: "some key id",
+          secret_access_key: "some secret key",
+          service: "athena",
+          region: "us-east-1"
+        ]
+      )
+      |> Req.Request.prepare()
+
+    assert Jason.decode!(req.body) == %{"a" => 1}
+    assert {"Authorization", auth} = List.keyfind(req.headers, "Authorization", 0)
+    assert {"X-Amz-Date", _now} = List.keyfind(req.headers, "X-Amz-Date", 0)
+
+    assert {"X-Amz-Content-SHA256", _sha256} =
+             List.keyfind(req.headers, "X-Amz-Content-SHA256", 0)
+
+    assert "AWS4-HMAC-SHA256 Credential=some key id/20220531/us-east-1/athena/aws4_request,SignedHeaders=accept-encoding;user-agent;x-amz-content-sha256;x-amz-date,Signature=" <>
+             _ = auth
+  end
+
   ## Response steps
 
   test "decompress_body/1 - gzip", c do
