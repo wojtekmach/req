@@ -26,7 +26,8 @@ defmodule Req.MixProject do
           NimbleCSV.RFC4180,
           Plug.Test,
           :brotli,
-          :ezstd
+          :ezstd,
+          :aws_signature
         ]
       ]
     ]
