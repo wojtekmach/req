@@ -227,13 +227,10 @@ defmodule Req.StepsTest do
       |> Req.Request.prepare()
 
     assert Jason.decode!(req.body) == %{"a" => 1}
-    assert {"Authorization", auth} = List.keyfind(req.headers, "Authorization", 0)
 
-    assert {"X-Amz-Date", <<date::binary-size(8), _::binary>>} =
-             List.keyfind(req.headers, "X-Amz-Date", 0)
-
-    assert {"X-Amz-Content-SHA256", _sha256} =
-             List.keyfind(req.headers, "X-Amz-Content-SHA256", 0)
+    assert [auth] = Req.Request.get_header(req, "Authorization")
+    assert [<<date::binary-size(8), _::binary>>] = Req.Request.get_header(req, "X-Amz-Date")
+    assert [_sha256] = Req.Request.get_header(req, "X-Amz-Content-SHA256")
 
     assert auth =~
              "AWS4-HMAC-SHA256 Credential=some key id/#{date}/us-east-1/athena/aws4_request,SignedHeaders=accept-encoding;user-agent;x-amz-content-sha256;x-amz-date,Signature="

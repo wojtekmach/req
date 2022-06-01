@@ -596,7 +596,17 @@ defmodule Req.Steps do
     plug.(conn)
   end
 
-  @default_region_for_global_services "us-east-1"
+  defmacrop aws_signature_loaded? do
+    if Code.ensure_loaded?(:aws_signature) do
+      true
+    else
+      quote do
+        Code.ensure_loaded?(:aws_signature)
+      end
+    end
+  end
+
+  @default_aws_region_for_global_services "us-east-1"
 
   @doc """
   Sign the request using AWS Signature V4.
@@ -612,38 +622,60 @@ defmodule Req.Steps do
       * `:service` - the AWS service.
 
       * `:region` - if set, sets the region for AWS service. If not set,
-        will use the default region for global service (#{@default_region_for_global_services}).
+        will use the default region for global service (#{@default_aws_region_for_global_services}).
         See more here: https://docs.aws.amazon.com/general/latest/gr/sigv4_changes.html.
 
       * `:options` - if set, sets the custom options to `:aws_signature.sign_v4/10`.
 
+  ## Examples
+
+      iex> aws_opts = [
+      ...>   access_key_id: "my access key id",
+      ...>   secret_access_key: "my secret access key",
+      ...>   service: "s3",
+      ...>   region: "us-east-1"
+      ...> ]
+      iex> req = Req.new(url: URI.parse("https://ossci-datasets.s3.amazonaws.com"), aws_sigv4: aws_opts)
+      iex> Req.get!(req).body
+      [
+        "mnist/",
+        "mnist/t10k-images-idx3-ubyte.gz",
+        "mnist/t10k-labels-idx1-ubyte.gz",
+        "mnist/train-images-idx3-ubyte.gz",
+        "mnist/train-labels-idx1-ubyte.gz"
+      ]
+
   """
   @doc step: :request
-  def put_aws_sigv4(%{options: options} = request) do
-    if aws_opts = options[:aws_sigv4] do
-      access_key_id = Keyword.fetch!(aws_opts, :access_key_id)
-      secret_access_key = Keyword.fetch!(aws_opts, :secret_access_key)
-      service = Keyword.fetch!(aws_opts, :service)
-      region = Keyword.get(aws_opts, :region, @default_region_for_global_services)
-      options = Keyword.get(aws_opts, :options, [])
-
-      headers =
-        :aws_signature.sign_v4(
-          access_key_id,
-          secret_access_key,
-          region,
-          service,
-          now(),
-          to_string(request.method),
-          to_string(request.url),
-          request.headers,
-          request.body,
-          options
-        )
-
-      put_in(request.headers, headers)
+  def put_aws_sigv4(request) do
+    unless aws_signature_loaded?() do
+      raise ~s|please add {:aws_signature, "~> 0.3.0"} to your dependencies to use this step|
     else
-      request
+      if aws_opts = request.options[:aws_sigv4] do
+        access_key_id = Keyword.fetch!(aws_opts, :access_key_id)
+        secret_access_key = Keyword.fetch!(aws_opts, :secret_access_key)
+        service = Keyword.fetch!(aws_opts, :service)
+        region = Keyword.get(aws_opts, :region, @default_aws_region_for_global_services)
+        options = Keyword.get(aws_opts, :options, [])
+
+        headers =
+          :aws_signature.sign_v4(
+            access_key_id,
+            secret_access_key,
+            region,
+            service,
+            now(),
+            to_string(request.method),
+            to_string(request.url),
+            request.headers,
+            request.body,
+            options
+          )
+
+        put_in(request.headers, headers)
+      else
+        request
+      end
     end
   end
 
