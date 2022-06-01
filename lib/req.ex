@@ -441,7 +441,7 @@ defmodule Req do
 
     * `:auth` - sets request authentication (via [`auth`](`Req.Steps.auth/1`) step).
 
-    * `:aws_sigv4` - sets the AWS authentication signature (via [`put_aws_sigv4`](`Req.Steps.put_aws_sigv4()`) step).
+    * `:aws_sigv4` - sets the AWS authentication signature (via [`put_aws_sigv4`](`Req.Steps.put_aws_sigv4/1`) step).
 
   Request body options:
 
