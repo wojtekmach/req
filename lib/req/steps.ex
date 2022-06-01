@@ -635,15 +635,10 @@ defmodule Req.Steps do
       ...>   service: "s3",
       ...>   region: "us-east-1"
       ...> ]
-      iex> req = Req.new(url: URI.parse("https://ossci-datasets.s3.amazonaws.com"), aws_sigv4: aws_opts)
-      iex> Req.get!(req).body
-      [
-        "mnist/",
-        "mnist/t10k-images-idx3-ubyte.gz",
-        "mnist/t10k-labels-idx1-ubyte.gz",
-        "mnist/train-images-idx3-ubyte.gz",
-        "mnist/train-labels-idx1-ubyte.gz"
-      ]
+      iex> headers = [{"Host", "my-bucket.s3.amazonaws.com"}, {"Content-Type", "text/csv charset=utf-8"}]
+      iex> req = Req.new(url: "https://my-bucket.s3.amazonaws.com/test.csv", headers: headers, aws_sigv4: aws_opts)
+      iex> Req.put!(req, body: "").status
+      200
 
   """
   @doc step: :request
