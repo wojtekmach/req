@@ -683,9 +683,14 @@ defmodule Req.StepsTest do
 
       response =
         case attempt do
-          0 -> Req.Response.new(status: 500, body: "oops")
-          1 -> Req.Response.new(status: 500, body: "oops")
-          2 -> Req.Response.new(status: 200, body: "ok") |> Req.Response.put_private(:delay, delay)
+          0 ->
+            Req.Response.new(status: 500, body: "oops")
+
+          1 ->
+            Req.Response.new(status: 500, body: "oops")
+
+          2 ->
+            Req.Response.new(status: 200, body: "ok") |> Req.Response.put_private(:delay, delay)
         end
 
       {request, response}
@@ -713,9 +718,14 @@ defmodule Req.StepsTest do
 
       response =
         case attempt do
-          0 -> Req.Response.new(status: 500, body: "oops")
-          1 -> Req.Response.new(status: 500, body: "oops")
-          2 -> Req.Response.new(status: 200, body: "ok") |> Req.Response.put_private(:delay, delay)
+          0 ->
+            Req.Response.new(status: 500, body: "oops")
+
+          1 ->
+            Req.Response.new(status: 500, body: "oops")
+
+          2 ->
+            Req.Response.new(status: 200, body: "ok") |> Req.Response.put_private(:delay, delay)
         end
 
       {request, response}

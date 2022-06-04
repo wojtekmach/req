@@ -1172,7 +1172,7 @@ defmodule Req.Steps do
       {func, delay} when is_function(func) and is_integer(delay) ->
         options = Map.put(request.options, :retry_delay, {func, func.(delay)})
         {%{request | options: options}, delay}
-      end
+    end
   end
 
   defp retry_delay_in_ms(delay_value) do
