@@ -317,6 +317,10 @@ See "Adapter" section in `Req.Request` module documentation for more information
     retry, and `fun` - a 1-arity function that accepts either a `Req.Response` or an exception
     struct and returns boolean whether to retry
 
+  * `retry`: The `:retry_delay` option now accepts a `{&fun/1, delay}` tuple. Retry is delayed by
+    `delay` milliseconds and `delay` is transformed into `fun.(delay)` with each attempt. The default
+    value for `:retry_delay` is now `{fn delay -> delay * 2 end, 2000`} - a simple exponential backoff.
+
 
 ### Deprecations
 
