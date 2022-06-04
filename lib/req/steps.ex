@@ -21,8 +21,7 @@ defmodule Req.Steps do
 
   ## Request Options
 
-    * `:base_url` - if set, the request URL is prepended with this base URL.
-      If request URL contains a scheme, base URL is ignored.
+    * `:base_url` - if set, the request URL is merged with this base URL.
 
   ## Examples
 
@@ -37,15 +36,8 @@ defmodule Req.Steps do
   def put_base_url(request)
 
   def put_base_url(%{options: %{base_url: base_url}} = request) do
-    if request.url.scheme do
-      request
-    else
-      # remove when we require Elixir v1.13
-      url = request.url.path || ""
-
-      url = URI.parse(base_url <> url)
-      %{request | url: url}
-    end
+    url = URI.merge(base_url, request.url)
+    %{request | url: url}
   end
 
   def put_base_url(request) do
