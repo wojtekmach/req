@@ -275,6 +275,8 @@ See "Adapter" section in `Req.Request` module documentation for more information
   * Remove `Req.Request.unix_socket` field. Add option on `run_finch` step with the same name
     instead.
 
+  * Require Elixir 1.12
+
 ### Step changes
 
   * New step: `run_plug`
