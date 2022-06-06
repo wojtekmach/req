@@ -1134,9 +1134,9 @@ defmodule Req.Steps do
   end
 
   defp get_retry_delay(request, %Req.Response{status: 429} = response, retry_count) do
-    case Req.Request.get_header(request, "retry-after") do
+    case Req.Response.get_header(response, "retry-after") do
       [delay] ->
-        {request, retry_delay_in_ms(header_delay)}
+        {request, retry_delay_in_ms(delay)}
 
       [] ->
         calculate_retry_delay(request, retry_count)
@@ -1150,10 +1150,6 @@ defmodule Req.Steps do
   defp calculate_retry_delay(request, retry_count) do
     case Map.get(request.options, :retry_delay, &exp_backoff/1) do
       delay when is_integer(delay) ->
-        IO.warn(
-          "setting :retry_delay to an integer is deprecated in favour of: fn _ -> integer end"
-        )
-
         {request, delay}
 
       fun when is_function(fun, 1) ->
