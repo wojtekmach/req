@@ -689,6 +689,9 @@ defmodule Req.StepsTest do
             Req.Response.new(status: 500, body: "oops")
 
           2 ->
+            Req.Response.new(status: 500, body: "oops")
+
+          3 ->
             Req.Response.new(status: 200, body: "ok")
         end
 
@@ -709,8 +712,9 @@ defmodule Req.StepsTest do
         assert response.body == "ok - updated"
       end)
 
-    assert log =~ "will retry in 1ms, 2 attempts left"
-    assert log =~ "will retry in 2ms, 1 attempt left"
+    assert log =~ "will retry in 1ms, 3 attempts left"
+    assert log =~ "will retry in 2ms, 2 attempts left"
+    assert log =~ "will retry in 4ms, 1 attempt left"
   end
 
   @tag :capture_log
@@ -749,7 +753,7 @@ defmodule Req.StepsTest do
       end)
 
     assert log =~ "will retry in 1ms, 2 attempts left"
-    assert log =~ "will retry in 1ms, 1 attempt left"
+    assert log =~ "will retry in 1ms, 2 attempts left"
   end
 
   @tag :capture_log
@@ -797,6 +801,7 @@ defmodule Req.StepsTest do
     assert_received :ping
     assert_received :ping
     assert_received :ping
+    assert_received :ping
     refute_received _
   end
 
@@ -812,6 +817,7 @@ defmodule Req.StepsTest do
     request = Req.new(url: c.url, retry: :always, retry_delay: 1)
 
     assert Req.post!(request).status == 500
+    assert_received :ping
     assert_received :ping
     assert_received :ping
     assert_received :ping
@@ -850,6 +856,7 @@ defmodule Req.StepsTest do
     request = Req.new(url: c.url, retry: fun, retry_delay: 1)
 
     assert Req.post!(request).status == 500
+    assert_received :ping
     assert_received :ping
     assert_received :ping
     assert_received :ping
@@ -980,10 +987,13 @@ defmodule Req.StepsTest do
         assert_receive :ping
         assert_receive :ping
         assert_receive :ping
+        assert_receive :ping
         refute_receive _
       end)
 
-    refute log =~ "3 attempts left"
+    refute log =~ "4 attempts left"
+
+    assert log =~ "3 attempts left"
     assert log =~ "2 attempts left"
     assert log =~ "1 attempt left"
   end

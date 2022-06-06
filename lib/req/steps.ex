@@ -1046,7 +1046,7 @@ defmodule Req.Steps do
       If the response is HTTP 429 and contains the `retry-after` header, the value of the header is used to
       determine the next retry delay.
 
-    * `:max_retries` - maximum number of retry attempts, defaults to `2` (for a total of `3`
+    * `:max_retries` - maximum number of retry attempts, defaults to `3` (for a total of `4`
       requests to the server, including the initial one.)
 
   ## Examples
@@ -1111,7 +1111,7 @@ defmodule Req.Steps do
   defp retry(request, response_or_exception) do
     retry_count = Req.Request.get_private(request, :req_retry_count, 0)
     {request, delay} = get_retry_delay(request, response_or_exception, retry_count)
-    max_retries = Map.get(request.options, :max_retries, 2)
+    max_retries = Map.get(request.options, :max_retries, 3)
 
     if retry_count < max_retries do
       log_retry(response_or_exception, retry_count, max_retries, delay)

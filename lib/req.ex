@@ -489,7 +489,7 @@ defmodule Req do
       number of milliseconds to sleep before making another attempt.
       Defaults to a simple exponential backoff: 1s, 2s, 4s, 8s, ...
 
-    * `:max_retries` - maximum number of retry attempts, defaults to `2` (for a total of `3`
+    * `:max_retries` - maximum number of retry attempts, defaults to `3` (for a total of `4`
       requests to the server, including the initial one.)
 
   Caching options ([`cache`](`Req.Steps.cache/1`) step):
