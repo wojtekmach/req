@@ -275,6 +275,8 @@ See "Adapter" section in `Req.Request` module documentation for more information
   * Remove `Req.Request.unix_socket` field. Add option on `run_finch` step with the same name
     instead.
 
+  * Require Elixir 1.12
+
 ### Step changes
 
   * New step: `run_plug`
@@ -316,6 +318,9 @@ See "Adapter" section in `Req.Request` module documentation for more information
     requests on HTTP 408/429/5xx responses or exceptions, `:always` to always retry, `:never` to never
     retry, and `fun` - a 1-arity function that accepts either a `Req.Response` or an exception
     struct and returns boolean whether to retry
+
+  * `retry`: The `:retry_delay` option now accepts a function that takes a retry count (starting at 0)
+    and returns the delay. Defaults to a simple exponential backoff: 1s, 2s, 4s, 8s, ...
 
 
 ### Deprecations

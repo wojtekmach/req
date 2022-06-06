@@ -1029,8 +1029,6 @@ defmodule Req.Steps do
 
   ## Error steps
 
-  @default_retry_delay 2000
-
   @doc """
   Retries a request in face of errors.
 
@@ -1049,9 +1047,12 @@ defmodule Req.Steps do
         * `fun` - a 1-arity function that accepts either a `Req.Response` or an exception struct
           and returns boolean whether to retry
 
-    * `:retry_delay` - sleep this number of milliseconds before making another attempt, defaults
-      to `#{@default_retry_delay}`. If the response is HTTP 429 and contains the `retry-after`
-      header, the value of the header is used as the next retry delay.
+    * `:retry_delay` - a function that receives the retry count (starting at 0) and returns the delay, the
+      number of milliseconds to sleep before making another attempt.
+      Defaults to a simple exponential backoff: 1s, 2s, 4s, 8s, ...
+
+      If the response is HTTP 429 and contains the `retry-after` header, the value of the header is used to
+      determine the next retry delay.
 
     * `:max_retries` - maximum number of retry attempts, defaults to `2` (for a total of `3`
       requests to the server, including the initial one.)
@@ -1062,19 +1063,16 @@ defmodule Req.Steps do
 
       iex> Req.get!("https://httpbin.org/status/500,200").status
       # 19:02:08.463 [error] retry: got response with status 500, will retry in 2000ms, 2 attempts left
-      # 19:02:10.710 [error] retry: got response with status 500, will retry in 2000ms, 1 attempt left
+      # 19:02:10.710 [error] retry: got response with status 500, will retry in 4000ms, 1 attempt left
       200
 
-  With custom options:
+  Delay with jitter:
 
-      iex> Req.get!("http://localhost:9999", retry_delay: 100, max_retries: 3)
-      # 17:00:38.371 [error] retry: got exception, will retry in 100ms, 3 attempts left
-      # 17:00:38.371 [error] ** (Mint.TransportError) connection refused
-      # 17:00:38.473 [error] retry: got exception, will retry in 100ms, 2 attempts left
-      # 17:00:38.473 [error] ** (Mint.TransportError) connection refused
-      # 17:00:38.575 [error] retry: got exception, will retry in 100ms, 1 attempt left
-      # 17:00:38.575 [error] ** (Mint.TransportError) connection refused
-      ** (Mint.TransportError) connection refused
+      iex> delay = fn n -> trunc(Integer.pow(2, n) * 1000 * (1 - 0.1 * :rand.uniform())) end
+      iex> Req.get!("https://httpbin.org/status/500,200", retry_delay: delay).status
+      # 08:43:19.101 [error] retry: got response with status 500, will retry in 941ms, 2 attempts left
+      # 08:43:22.958 [error] retry: got response with status 500, will retry in 1877s, 1 attempt left
+      200
 
   """
   @doc step: :error
@@ -1119,9 +1117,9 @@ defmodule Req.Steps do
   end
 
   defp retry(request, response_or_exception) do
-    delay = get_retry_delay(request, response_or_exception)
-    max_retries = Map.get(request.options, :max_retries, 2)
     retry_count = Req.Request.get_private(request, :req_retry_count, 0)
+    {request, delay} = get_retry_delay(request, response_or_exception, retry_count)
+    max_retries = Map.get(request.options, :max_retries, 2)
 
     if retry_count < max_retries do
       log_retry(response_or_exception, retry_count, max_retries, delay)
@@ -1135,18 +1133,32 @@ defmodule Req.Steps do
     end
   end
 
-  defp get_retry_delay(request, %Req.Response{status: 429} = response) do
-    case List.keyfind(response.headers, "retry-after", 0) do
-      {_, header_delay} ->
-        retry_delay_in_ms(header_delay)
+  defp get_retry_delay(request, %Req.Response{status: 429} = response, retry_count) do
+    case Req.Response.get_header(response, "retry-after") do
+      [delay] ->
+        {request, retry_delay_in_ms(delay)}
 
-      nil ->
-        Map.get(request.options, :retry_delay, @default_retry_delay)
+      [] ->
+        calculate_retry_delay(request, retry_count)
     end
   end
 
-  defp get_retry_delay(request, _response_or_exception) do
-    Map.get(request.options, :retry_delay, @default_retry_delay)
+  defp get_retry_delay(request, _response, retry_count) do
+    calculate_retry_delay(request, retry_count)
+  end
+
+  defp calculate_retry_delay(request, retry_count) do
+    case Map.get(request.options, :retry_delay, &exp_backoff/1) do
+      delay when is_integer(delay) ->
+        {request, delay}
+
+      fun when is_function(fun, 1) ->
+        {request, fun.(retry_count)}
+    end
+  end
+
+  defp exp_backoff(n) do
+    Integer.pow(2, n) * 1000
   end
 
   defp retry_delay_in_ms(delay_value) do

@@ -675,27 +675,81 @@ defmodule Req.StepsTest do
   ## Error steps
 
   @tag :capture_log
-  test "retry: eventually successful", c do
-    {:ok, _} = Agent.start_link(fn -> 0 end, name: :counter)
+  test "retry: eventually successful - function", c do
+    adapter = fn request ->
+      request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
+      attempt = request.private.attempt
 
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      if Agent.get_and_update(:counter, &{&1, &1 + 1}) < 2 do
-        Plug.Conn.send_resp(conn, 500, "oops")
-      else
-        Plug.Conn.send_resp(conn, 200, "ok")
-      end
-    end)
+      response =
+        case attempt do
+          0 ->
+            Req.Response.new(status: 500, body: "oops")
+
+          1 ->
+            Req.Response.new(status: 500, body: "oops")
+
+          2 ->
+            Req.Response.new(status: 200, body: "ok")
+        end
+
+      {request, response}
+    end
 
     request =
-      Req.new(url: c.url, retry_delay: 1)
+      Req.new(adapter: adapter, url: c.url, retry_delay: &Integer.pow(2, &1))
       |> Req.Request.prepend_response_steps(
         foo: fn {request, response} ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
         end
       )
 
-    assert Req.get!(request).body == "ok - updated"
-    assert Agent.get(:counter, & &1) == 3
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        response = Req.get!(request)
+        assert response.body == "ok - updated"
+      end)
+
+    assert log =~ "will retry in 1ms, 2 attempts left"
+    assert log =~ "will retry in 2ms, 1 attempt left"
+  end
+
+  @tag :capture_log
+  test "retry: eventually successful - integer", c do
+    adapter = fn request ->
+      request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
+      attempt = request.private.attempt
+
+      response =
+        case attempt do
+          0 ->
+            Req.Response.new(status: 500, body: "oops")
+
+          1 ->
+            Req.Response.new(status: 500, body: "oops")
+
+          2 ->
+            Req.Response.new(status: 200, body: "ok")
+        end
+
+      {request, response}
+    end
+
+    request =
+      Req.new(adapter: adapter, url: c.url, retry_delay: 1)
+      |> Req.Request.prepend_response_steps(
+        foo: fn {request, response} ->
+          {request, update_in(response.body, &(&1 <> " - updated"))}
+        end
+      )
+
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        response = Req.get!(request)
+        assert response.body == "ok - updated"
+      end)
+
+    assert log =~ "will retry in 1ms, 2 attempts left"
+    assert log =~ "will retry in 1ms, 1 attempt left"
   end
 
   @tag :capture_log
