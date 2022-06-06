@@ -1029,8 +1029,6 @@ defmodule Req.Steps do
 
   ## Error steps
 
-  @default_retry_delay 2000
-
   @doc """
   Retries a request in face of errors.
 
@@ -1049,12 +1047,9 @@ defmodule Req.Steps do
         * `fun` - a 1-arity function that accepts either a `Req.Response` or an exception struct
           and returns boolean whether to retry
 
-    * `:retry_delay` - can be a `{&fun/1, delay}` tuple or simply an integer `delay`. Request process will sleep
-      `delay` number of milliseconds before making another attempt. If a tuple is provided, on each successive attempt
-      `delay` is transformed into `fun.(delay)`.
-
-      The default value for this option is `{fn delay -> delay * 2} end, #{@default_retry_delay}}`- a simple
-      exponential backoff.
+    * `:retry_delay` - a function that receives the retry count (starting at 0) and returns the delay, the
+      number of milliseconds to sleep before making another attempt.
+      Defaults to a simple exponential backoff: 1s, 2s, 4s, 8s, ...
 
       If the response is HTTP 429 and contains the `retry-after` header, the value of the header is used to
       determine the next retry delay.
@@ -1071,25 +1066,13 @@ defmodule Req.Steps do
       # 19:02:10.710 [error] retry: got response with status 500, will retry in 4000ms, 1 attempt left
       200
 
-  Adding jitter:
+  Delay with jitter:
 
-      iex> jitter = fn delay -> ceil(:rand.uniform() * 0.1 * delay) end
-      iex> backoff_func = fn delay -> delay * 2 + jitter.(delay) end
-      iex> Req.get!("https://httpbin.org/status/500,200", retry_delay: {backoff_func, 1000}).status
-      # 08:43:19.101 [error] retry: got response with status 500, will retry in 1000ms, 2 attempts left
-      # 08:43:22.958 [error] retry: got response with status 500, will retry in 2036ms, 1 attempt left
+      iex> delay = fn n -> trunc(Integer.pow(2, n) * 1000 * (1 - 0.1 * :rand.uniform())) end
+      iex> Req.get!("https://httpbin.org/status/500,200", retry_delay: delay).status
+      # 08:43:19.101 [error] retry: got response with status 500, will retry in 941ms, 2 attempts left
+      # 08:43:22.958 [error] retry: got response with status 500, will retry in 1877s, 1 attempt left
       200
-
-  With custom options:
-
-      iex> Req.get!("http://localhost:9999", retry_delay: 100, max_retries: 3)
-      # 17:00:38.371 [error] retry: got exception, will retry in 100ms, 3 attempts left
-      # 17:00:38.371 [error] ** (Mint.TransportError) connection refused
-      # 17:00:38.473 [error] retry: got exception, will retry in 100ms, 2 attempts left
-      # 17:00:38.473 [error] ** (Mint.TransportError) connection refused
-      # 17:00:38.575 [error] retry: got exception, will retry in 100ms, 1 attempt left
-      # 17:00:38.575 [error] ** (Mint.TransportError) connection refused
-      ** (Mint.TransportError) connection refused
 
   """
   @doc step: :error
@@ -1134,9 +1117,9 @@ defmodule Req.Steps do
   end
 
   defp retry(request, response_or_exception) do
-    {request, delay} = get_retry_delay(request, response_or_exception)
-    max_retries = Map.get(request.options, :max_retries, 2)
     retry_count = Req.Request.get_private(request, :req_retry_count, 0)
+    {request, delay} = get_retry_delay(request, response_or_exception, retry_count)
+    max_retries = Map.get(request.options, :max_retries, 2)
 
     if retry_count < max_retries do
       log_retry(response_or_exception, retry_count, max_retries, delay)
@@ -1150,29 +1133,36 @@ defmodule Req.Steps do
     end
   end
 
-  defp get_retry_delay(request, %Req.Response{status: 429} = response) do
-    case List.keyfind(response.headers, "retry-after", 0) do
-      {_, header_delay} ->
+  defp get_retry_delay(request, %Req.Response{status: 429} = response, retry_count) do
+    case Req.Request.get_header(request, "retry-after") do
+      [delay] ->
         {request, retry_delay_in_ms(header_delay)}
 
-      nil ->
-        calculate_retry_delay(request)
+      [] ->
+        calculate_retry_delay(request, retry_count)
     end
   end
 
-  defp get_retry_delay(request, _response) do
-    calculate_retry_delay(request)
+  defp get_retry_delay(request, _response, retry_count) do
+    calculate_retry_delay(request, retry_count)
   end
 
-  defp calculate_retry_delay(request) do
-    case Map.get(request.options, :retry_delay, {fn delay -> delay * 2 end, @default_retry_delay}) do
+  defp calculate_retry_delay(request, retry_count) do
+    case Map.get(request.options, :retry_delay, &exp_backoff/1) do
       delay when is_integer(delay) ->
+        IO.warn(
+          "setting :retry_delay to an integer is deprecated in favour of: fn _ -> integer end"
+        )
+
         {request, delay}
 
-      {func, delay} when is_function(func) and is_integer(delay) ->
-        options = Map.put(request.options, :retry_delay, {func, func.(delay)})
-        {%{request | options: options}, delay}
+      fun when is_function(fun, 1) ->
+        {request, fun.(retry_count)}
     end
+  end
+
+  defp exp_backoff(n) do
+    Integer.pow(2, n) * 1000
   end
 
   defp retry_delay_in_ms(delay_value) do

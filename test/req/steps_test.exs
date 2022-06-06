@@ -679,7 +679,6 @@ defmodule Req.StepsTest do
     adapter = fn request ->
       request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
       attempt = request.private.attempt
-      {_func, delay} = request.options.retry_delay
 
       response =
         case attempt do
@@ -690,23 +689,28 @@ defmodule Req.StepsTest do
             Req.Response.new(status: 500, body: "oops")
 
           2 ->
-            Req.Response.new(status: 200, body: "ok") |> Req.Response.put_private(:delay, delay)
+            Req.Response.new(status: 200, body: "ok")
         end
 
       {request, response}
     end
 
     request =
-      Req.new(adapter: adapter, url: c.url, retry_delay: {fn state -> state * 2 end, 1})
+      Req.new(adapter: adapter, url: c.url, retry_delay: &Integer.pow(2, &1))
       |> Req.Request.prepend_response_steps(
         foo: fn {request, response} ->
           {request, update_in(response.body, &(&1 <> " - updated"))}
         end
       )
 
-    response = Req.get!(request)
-    assert response.body == "ok - updated"
-    assert response.private.delay == 4
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        response = Req.get!(request)
+        assert response.body == "ok - updated"
+      end)
+
+    assert log =~ "will retry in 1ms, 2 attempts left"
+    assert log =~ "will retry in 2ms, 1 attempt left"
   end
 
   @tag :capture_log
@@ -714,7 +718,6 @@ defmodule Req.StepsTest do
     adapter = fn request ->
       request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
       attempt = request.private.attempt
-      delay = request.options.retry_delay
 
       response =
         case attempt do
@@ -725,7 +728,7 @@ defmodule Req.StepsTest do
             Req.Response.new(status: 500, body: "oops")
 
           2 ->
-            Req.Response.new(status: 200, body: "ok") |> Req.Response.put_private(:delay, delay)
+            Req.Response.new(status: 200, body: "ok")
         end
 
       {request, response}
@@ -739,9 +742,14 @@ defmodule Req.StepsTest do
         end
       )
 
-    response = Req.get!(request)
-    assert response.body == "ok - updated"
-    assert response.private.delay == 1
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        response = Req.get!(request)
+        assert response.body == "ok - updated"
+      end)
+
+    assert log =~ "will retry in 1ms, 2 attempts left"
+    assert log =~ "will retry in 1ms, 1 attempt left"
   end
 
   @tag :capture_log

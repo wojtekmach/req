@@ -485,8 +485,9 @@ defmodule Req do
       1-arity function that accepts either a `Req.Response` or an exception struct and returns
       boolean whether to retry
 
-    * `:retry_delay` - sleep this number of milliseconds before making another attempt, defaults
-      to `2000`
+    * `:retry_delay` - a function that receives the retry count (starting at 0) and returns the delay, the
+      number of milliseconds to sleep before making another attempt.
+      Defaults to a simple exponential backoff: 1s, 2s, 4s, 8s, ...
 
     * `:max_retries` - maximum number of retry attempts, defaults to `2` (for a total of `3`
       requests to the server, including the initial one.)
