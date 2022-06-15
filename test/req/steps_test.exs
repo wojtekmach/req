@@ -964,7 +964,7 @@ defmodule Req.StepsTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
-    options = [finch_options: [pool_timeout: 0]]
+    options = [pool_timeout: 0]
     assert {:timeout, _} = catch_exit(Req.get!(c.url, options))
   end
 
@@ -977,7 +977,7 @@ defmodule Req.StepsTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
-    options = [finch_options: [receive_timeout: 0], retry_delay: 10]
+    options = [receive_timeout: 0, retry_delay: 10]
 
     log =
       ExUnit.CaptureLog.capture_log(fn ->

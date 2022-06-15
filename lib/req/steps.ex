@@ -451,10 +451,10 @@ defmodule Req.Steps do
 
     * `:finch` - the name of the Finch pool. Defaults to a pool automatically started by
       Req. The default pool uses HTTP/1 although that may change in the future.
-      This option takes precedence over `:http2` option mentioned below.
 
-    * `:finch_options` - options passed down to Finch when making the request, defaults to `[]`.
-       See `Finch.request/3` for a list of available options.
+    * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
+
+    * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
     * `:http2` - if `true`, uses an HTTP/2 pool automatically started by Req.
 
@@ -464,7 +464,7 @@ defmodule Req.Steps do
 
   Custom `:receive_timeout`:
 
-      iex> Req.get!(url: url, finch_options: [receive_timeout: 1000])
+      iex> Req.get!(url: url, receive_timeout: 1000)
 
   Connecting through UNIX socket:
 
@@ -497,7 +497,8 @@ defmodule Req.Steps do
       Finch.build(request.method, request.url, request.headers, request.body)
       |> Map.replace!(:unix_socket, request.options[:unix_socket])
 
-    finch_options = Map.get(request.options, :finch_options, [])
+    finch_options =
+      request.options |> Map.take([:receive_timeout, :pool_timeout]) |> Enum.to_list()
 
     case Finch.request(finch_request, finch_name, finch_options) do
       {:ok, response} ->

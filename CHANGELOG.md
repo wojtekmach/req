@@ -296,6 +296,8 @@ See "Adapter" section in `Req.Request` module documentation for more information
   * `run_finch`: Add `:http2` option that picks appropriate default pool started by
     Req
 
+  * `run_finch`: Replace `:finch_options` with `:receive_timeout` and `:pool_timeout` options
+
   * `encode_body`: Add `:form` and `:json` options (previously used as `{:form, data}` and
     `{:json, data}`)
 
