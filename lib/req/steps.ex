@@ -474,13 +474,13 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def run_finch(request) do
-    finch_request =
-      Finch.build(request.method, request.url, request.headers, request.body)
-      |> Map.replace!(:unix_socket, request.options[:unix_socket])
-
     finch_name =
       case Map.fetch(request.options, :finch) do
         {:ok, name} ->
+          if request.options[:http2] do
+            raise ArgumentError, "cannot set both :finch and :http2 options"
+          end
+
           name
 
         :error ->
@@ -492,6 +492,10 @@ defmodule Req.Steps do
               Req.FinchHTTP1
           end
       end
+
+    finch_request =
+      Finch.build(request.method, request.url, request.headers, request.body)
+      |> Map.replace!(:unix_socket, request.options[:unix_socket])
 
     finch_options = Map.get(request.options, :finch_options, [])
 

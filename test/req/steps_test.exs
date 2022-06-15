@@ -998,6 +998,12 @@ defmodule Req.StepsTest do
     assert log =~ "1 attempt left"
   end
 
+  test "run_finch/1: :finch and :http2" do
+    assert_raise ArgumentError, "cannot set both :finch and :http2 options", fn ->
+      Req.request!(finch: MyFinch, http2: true)
+    end
+  end
+
   defp json(conn, status, data) do
     conn
     |> Plug.Conn.put_resp_content_type("application/json")
