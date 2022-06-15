@@ -116,6 +116,7 @@ defmodule Req do
           :cache_dir,
           :plug,
           :finch,
+          :connect_options,
           :receive_timeout,
           :pool_timeout,
           :http2,
@@ -510,6 +511,8 @@ defmodule Req do
   Finch options ([`run_finch`](`Req.Steps.run_finch/1`) step)
 
     * `:finch` - the Finch pool to use. Defaults to pool automatically started by `Req`.
+
+    * `:connect_options` - dynamically starts (or re-uses) Finch pool with the given connection options.
 
     * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
 

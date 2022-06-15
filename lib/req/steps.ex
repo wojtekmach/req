@@ -452,6 +452,9 @@ defmodule Req.Steps do
     * `:finch` - the name of the Finch pool. Defaults to a pool automatically started by
       Req. The default pool uses HTTP/1 although that may change in the future.
 
+    * `:connect_options` - dynamically starts (or re-uses) Finch pool with the given
+      connection options. See `Mint.connect/4` for a list of available options.
+
     * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
 
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
@@ -471,6 +474,10 @@ defmodule Req.Steps do
       iex> Req.get!("http:///v1.41/_ping", unix_socket: "/var/run/docker.sock").body
       "OK"
 
+  Connecting with custom transport options:
+
+      iex> Req.get!(url: url, connect_options: [transport_opts: [timeout: 5000]])
+
   """
   @doc step: :request
   def run_finch(request) do
@@ -481,15 +488,44 @@ defmodule Req.Steps do
             raise ArgumentError, "cannot set both :finch and :http2 options"
           end
 
+          if request.options[:connect_options] do
+            raise ArgumentError, "cannot set both :finch and :connect_options"
+          end
+
           name
 
         :error ->
           cond do
+            request.options[:http2] && request.options[:connect_options] ->
+              if request.options[:connect_options] do
+                raise ArgumentError, "cannot set both :connect_options and :http2 options"
+              end
+
+            options = request.options[:connect_options] ->
+              name =
+                options
+                |> :erlang.term_to_binary()
+                |> :erlang.md5()
+                |> Base.url_encode64(padding: false)
+
+              name = Module.concat(Req.FinchSupervisor, name)
+
+              case DynamicSupervisor.start_child(
+                     Req.FinchSupervisor,
+                     {Finch, name: name, pools: %{default: [conn_opts: options]}}
+                   ) do
+                {:ok, _} ->
+                  name
+
+                {:error, {:already_started, _}} ->
+                  name
+              end
+
             request.options[:http2] ->
-              Req.FinchHTTP2
+              Req.FinchSupervisor.HTTP2
 
             true ->
-              Req.FinchHTTP1
+              Req.FinchSupervisor.HTTP1
           end
       end
 
