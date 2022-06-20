@@ -452,8 +452,12 @@ defmodule Req.Steps do
     * `:finch` - the name of the Finch pool. Defaults to a pool automatically started by
       Req. The default pool uses HTTP/1 although that may change in the future.
 
-    * `:connect_options` - dynamically starts (or re-uses) Finch pool with the given
-      connection options. See `Mint.connect/4` for a list of available options.
+    * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
+      the given connection options:
+
+        * `:timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
+
+        * `:protocol` - the HTTP protocol to use, defaults to `:http1`.
 
     * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
 
@@ -484,10 +488,6 @@ defmodule Req.Steps do
     finch_name =
       case Map.fetch(request.options, :finch) do
         {:ok, name} ->
-          if request.options[:http2] do
-            raise ArgumentError, "cannot set both :finch and :http2 options"
-          end
-
           if request.options[:connect_options] do
             raise ArgumentError, "cannot set both :finch and :connect_options"
           end
@@ -496,23 +496,27 @@ defmodule Req.Steps do
 
         :error ->
           cond do
-            request.options[:http2] && request.options[:connect_options] ->
-              if request.options[:connect_options] do
-                raise ArgumentError, "cannot set both :connect_options and :http2 options"
-              end
-
             options = request.options[:connect_options] ->
+              Req.Request.validate_options(options, MapSet.new([:timeout, :protocol]))
+
+              pool_opts = [
+                conn_opts: [transport_opts: [timeout: options[:timeout] || 30_000]],
+                protocol: options[:protocol] || :http1
+              ]
+
+              IO.inspect(pool_opts)
+
               name =
                 options
                 |> :erlang.term_to_binary()
                 |> :erlang.md5()
                 |> Base.url_encode64(padding: false)
 
-              name = Module.concat(Req.FinchSupervisor, name)
+              name = Module.concat(Req.FinchSupervisor, "Pool_#{name}")
 
               case DynamicSupervisor.start_child(
                      Req.FinchSupervisor,
-                     {Finch, name: name, pools: %{default: [conn_opts: options]}}
+                     {Finch, name: name, pools: %{default: pool_opts}}
                    ) do
                 {:ok, _} ->
                   name
@@ -535,6 +539,9 @@ defmodule Req.Steps do
 
     finch_options =
       request.options |> Map.take([:receive_timeout, :pool_timeout]) |> Enum.to_list()
+
+    IO.inspect(finch_request)
+    IO.inspect(finch_name)
 
     case Finch.request(finch_request, finch_name, finch_options) do
       {:ok, response} ->

@@ -16,12 +16,6 @@ defmodule Req.Application do
           {Finch, name: Req.FinchSupervisor.HTTP1, pools: %{default: [protocol: :http1]}}
         )
 
-      {:ok, _} =
-        DynamicSupervisor.start_child(
-          Req.FinchSupervisor,
-          {Finch, name: Req.FinchSupervisor.HTTP2, pools: %{default: [protocol: :http2]}}
-        )
-
       {:ok, sup}
     end
   end

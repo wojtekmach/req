@@ -119,7 +119,6 @@ defmodule Req do
           :connect_options,
           :receive_timeout,
           :pool_timeout,
-          :http2,
           :unix_socket
         ])
     }
@@ -512,13 +511,16 @@ defmodule Req do
 
     * `:finch` - the Finch pool to use. Defaults to pool automatically started by `Req`.
 
-    * `:connect_options` - dynamically starts (or re-uses) Finch pool with the given connection options.
+    * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
+      the given connection options:
+
+        * `:timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
+
+        * `:protocol` - the HTTP protocol to use, defaults to `:http1`.
 
     * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
 
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
-
-    * `:http2` - if `true`, uses an HTTP/2 pool automatically started by Req.
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket
 

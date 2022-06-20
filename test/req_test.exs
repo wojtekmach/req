@@ -11,6 +11,11 @@ defmodule ReqTest do
     [bypass: bypass, url: "http://localhost:#{bypass.port}"]
   end
 
+  test "foo" do
+    Req.request!(url: "https://httpbin.org/anything", connect_options: [protocol: :http2])
+    |> IO.inspect()
+  end
+
   test "headers", c do
     pid = self()
 
