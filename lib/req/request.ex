@@ -523,7 +523,8 @@ defmodule Req.Request do
   ## Examples
 
       iex> req = Req.new()
-      iex> Req.Request.put_header(req, "accept", "application/json").headers
+      iex> req = Req.Request.put_header(req, "accept", "application/json")
+      iex> req.headers
       [{"accept", "application/json"}]
 
   """
@@ -531,6 +532,25 @@ defmodule Req.Request do
   def put_header(%Req.Request{} = request, key, value)
       when is_binary(key) and is_binary(value) do
     %{request | headers: List.keystore(request.headers, key, 0, {key, value})}
+  end
+
+  @doc """
+  Adds (or replaces) multiple request headers.
+
+  See `put_header/3` for more information.
+
+  ## Examples
+
+      iex> req = Req.new()
+      iex> req = Req.Request.put_headers(req, [{"accept", "text/html"}, {"accept-encoding", "gzip"}])
+      iex> req.headers
+      [{"accept", "text/html"}, {"accept-encoding", "gzip"}]
+  """
+  @spec put_headers(t(), [{binary(), binary()}]) :: t()
+  def put_headers(%Req.Request{} = request, headers) do
+    for {key, value} <- headers, reduce: request do
+      acc -> put_header(acc, key, value)
+    end
   end
 
   @doc """
