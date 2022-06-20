@@ -533,14 +533,29 @@ defmodule Req.Request do
     %{request | headers: List.keystore(request.headers, key, 0, {key, value})}
   end
 
-  @doc false
+  @doc """
+  Adds a request header (`key`) unless already present.
+
+  See `put_header/3` for more information.
+
+  ## Examples
+
+      iex> req =
+      ...>   Req.new()
+      ...>   |> Req.Request.put_new_header("accept", "application/json")
+      ...>   |> Req.Request.put_new_header("accept", "application/html")
+      iex> req.headers
+      [{"accept", "application/json"}]
+  """
   @spec put_new_header(t(), binary(), binary()) :: t()
-  def put_new_header(%Req.Request{headers: headers} = request, key, value)
+  def put_new_header(%Req.Request{} = request, key, value)
       when is_binary(key) and is_binary(value) do
-    if Enum.any?(headers, &(String.downcase(elem(&1, 0)) == key)) do
-      request
-    else
-      put_header(request, key, value)
+    case get_header(request, key) do
+      [] ->
+        put_header(request, key, value)
+
+      _ ->
+        request
     end
   end
 

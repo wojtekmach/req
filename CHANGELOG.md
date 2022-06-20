@@ -248,6 +248,8 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
   * Add `Req.Request.put_header/3`
 
+  * Add `Req.Request.put_new_header/3`
+
   * Add `Req.Request.get_header/2`
 
   * Add `Req.Request.update_private/4`
