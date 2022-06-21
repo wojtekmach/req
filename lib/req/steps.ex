@@ -517,7 +517,7 @@ defmodule Req.Steps do
               end
 
             true ->
-              Req.FinchHTTP1
+              Req.Finch
           end
       end
 
