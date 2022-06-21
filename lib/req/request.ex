@@ -16,7 +16,7 @@ defmodule Req.Request do
   ones.
 
   To make using custom steps by others even easier, they can be packaged up into plugins.
-  See ["Wriging Plugins"](#module-writing-plugins) section for more information.
+  See ["Writing Plugins"](#module-writing-plugins) section for more information.
 
   ## The Low-level API
 
