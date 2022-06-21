@@ -6,7 +6,8 @@ defmodule Req.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      {DynamicSupervisor, strategy: :one_for_one, name: Req.FinchSupervisor}
+      {DynamicSupervisor, strategy: :one_for_one, name: Req.FinchSupervisor},
+      {Finch, name: Req.FinchSupervisor.HTTP2, pools: %{default: [protocol: :http2]}}
     ]
 
     with {:ok, sup} <- Supervisor.start_link(children, strategy: :one_for_one) do

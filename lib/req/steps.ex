@@ -500,19 +500,11 @@ defmodule Req.Steps do
               Req.Request.validate_options(options, MapSet.new([:timeout, :protocol]))
 
               pool_opts = [
-                conn_opts: [transport_opts: [timeout: options[:timeout] || 30_000]],
+                # conn_opts: [transport_opts: [timeout: options[:timeout] || 30_000]],
                 protocol: options[:protocol] || :http1
               ]
 
-              IO.inspect(pool_opts)
-
-              name =
-                options
-                |> :erlang.term_to_binary()
-                |> :erlang.md5()
-                |> Base.url_encode64(padding: false)
-
-              name = Module.concat(Req.FinchSupervisor, "Pool_#{name}")
+              name = custom_pool_name(pool_opts)
 
               case DynamicSupervisor.start_child(
                      Req.FinchSupervisor,
@@ -524,9 +516,6 @@ defmodule Req.Steps do
                 {:error, {:already_started, _}} ->
                   name
               end
-
-            request.options[:http2] ->
-              Req.FinchSupervisor.HTTP2
 
             true ->
               Req.FinchSupervisor.HTTP1
@@ -540,8 +529,9 @@ defmodule Req.Steps do
     finch_options =
       request.options |> Map.take([:receive_timeout, :pool_timeout]) |> Enum.to_list()
 
-    IO.inspect(finch_request)
     IO.inspect(finch_name)
+    IO.inspect(finch_request)
+    IO.inspect(finch_options)
 
     case Finch.request(finch_request, finch_name, finch_options) do
       {:ok, response} ->
@@ -556,6 +546,16 @@ defmodule Req.Steps do
       {:error, exception} ->
         {request, exception}
     end
+  end
+
+  defp custom_pool_name(options) do
+    name =
+      options
+      |> :erlang.term_to_binary()
+      |> :erlang.md5()
+      |> Base.url_encode64(padding: false)
+
+    Module.concat(Req.FinchSupervisor, "Pool_#{name}")
   end
 
   @doc """

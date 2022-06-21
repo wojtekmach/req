@@ -12,8 +12,26 @@ defmodule ReqTest do
   end
 
   test "foo" do
-    Req.request!(url: "https://httpbin.org/anything", connect_options: [protocol: :http2])
+    {:ok, _} =
+      DynamicSupervisor.start_child(
+        Req.FinchSupervisor,
+        {Finch, name: H2, pools: %{default: [protocol: :http2]}}
+      )
+
+    Finch.build(
+      :get,
+      "https://httpbin.org/anything",
+      [
+        {"user-agent", "req/0.3.0-dev"},
+        {"accept-encoding", "zstd, br, gzip, deflate"}
+      ],
+      ""
+    )
     |> IO.inspect()
+    |> Finch.request(H2)
+
+    # Req.request!(url: "https://httpbin.org/anything", finch: Req.FinchSupervisor.HTTP2)
+    # |> IO.inspect()
   end
 
   test "headers", c do
