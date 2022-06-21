@@ -575,7 +575,7 @@ defmodule Req.Steps do
         assert Req.get!("http:///hello", plug: Echo).body == "hello"
       end
 
-  Here is the same example but with plug as an anonymous function:
+  You can define plugs as functions too:
 
       test "echo" do
         echo = fn conn ->
@@ -585,6 +585,9 @@ defmodule Req.Steps do
 
         assert Req.get!("http:///hello", plug: echo).body == "hello"
       end
+
+  which is particularly useful to create HTTP service mocks with tools like
+  [Bypass](https://github.com/PSPDFKit-labs/bypass).
 
   Here is another example, let's run the request against `Plug.Static` pointed to the Req's source
   code and fetch the README:

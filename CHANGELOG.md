@@ -157,6 +157,22 @@ test "echo" do
 end
 ```
 
+you can define plugs as functions too:
+
+```elixir
+test "echo" do
+  echo = fn conn ->
+    "/" <> path = conn.request_path
+    Plug.Conn.send_resp(conn, 200, path)
+  end
+
+  assert Req.get!("http:///hello", plug: echo).body == "hello"
+end
+```
+
+which is particularly useful to create HTTP service mocks with tools like
+[Bypass](https://github.com/PSPDFKit-labs/bypass).
+
 ### Request Adapters
 
 While Req always used Finch as the underlying HTTP client, it was designed from the day one to
@@ -283,7 +299,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
 ### Step changes
 
-  * New step: `run_plug`
+  * New step: `put_plug`
 
   * New step: `put_user_agent` (replaces part of removed `put_default_headers`)
 
