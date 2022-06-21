@@ -1025,6 +1025,12 @@ defmodule Req.StepsTest do
     assert Req.request!(req).body == "ok"
   end
 
+  test "run_finch/1: :connect_options bad option", c do
+    assert_raise ArgumentError, "unknown option :timeou. Did you mean :timeout?", fn ->
+      Req.get!(c.url, connect_options: [timeou: 0])
+    end
+  end
+
   test "run_finch/1: :finch and :connect_options" do
     assert_raise ArgumentError, "cannot set both :finch and :connect_options", fn ->
       Req.request!(finch: MyFinch, connect_options: [timeout: 0])
