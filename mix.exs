@@ -1,7 +1,7 @@
 defmodule Req.MixProject do
   use Mix.Project
 
-  @version "0.3.0-dev"
+  @version "0.3.0"
   @source_url "https://github.com/wojtekmach/req"
 
   def project do
@@ -41,8 +41,7 @@ defmodule Req.MixProject do
 
   defp package do
     [
-      description:
-        "Req is an HTTP client with a focus on ease of use and composability, built on top of Finch.",
+      description: "Req is a batteries-included HTTP client for Elixir.",
       licenses: ["Apache-2.0"],
       links: %{
         "GitHub" => @source_url
@@ -58,7 +57,7 @@ defmodule Req.MixProject do
       {:nimble_csv, "~> 1.0", optional: true},
       {:plug, "~> 1.0", optional: true},
       {:brotli, "~> 0.3.1", optional: true},
-      {:ezstd, "~>1.0", optional: true},
+      {:ezstd, "~> 1.0", optional: true},
       {:bypass, "~> 2.1", only: :test},
       {:ex_doc, ">= 0.0.0", only: :docs}
     ]

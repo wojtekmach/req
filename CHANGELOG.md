@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v0.3.0-dev
+## v0.3.0
 
 Req v0.3.0 brings redesigned API, new steps, and improvements to existing steps.
 

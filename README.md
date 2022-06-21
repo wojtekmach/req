@@ -6,8 +6,6 @@
 
 Req is a batteries-included HTTP client for Elixir.
 
-(**Note**: This is the README for the current main branch. See [README for Req v0.2.2](https://github.com/wojtekmach/req/tree/v0.2.2#readme))
-
 ## Features
 
   * An easy to use high-level API in [`Req`][req] module: [`request/1`][req.request], [`request!/1`][req.request!], [`get!/2`][req.get!], [`head!/2`][req.head!], [`post!/2`][req.post!], [`put!/2`][req.put!], [`patch!/2`][req.patch!], and [`delete!/2`][req.delete!]
@@ -72,7 +70,7 @@ The easiest way to use Req is with [`Mix.install/2`](https://hexdocs.pm/mix/Mix.
 
 ```elixir
 Mix.install([
-  {:req, github: "wojtekmach/req"}
+  {:req, "~> 0.3.0"}
 ])
 
 Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
@@ -129,7 +127,7 @@ And here is how they can be used:
 
 ```elixir
 Mix.install([
-  {:req, github: "wojtekmach/req"},
+  {:req, "~> 0.3.0"},
   {:req_easyhtml, github: "wojtekmach/req_easyhtml"},
   {:req_s3, github: "wojtekmach/req_s3"},
   {:req_hex, github: "wojtekmach/req_hex"},
