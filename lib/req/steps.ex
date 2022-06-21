@@ -463,8 +463,6 @@ defmodule Req.Steps do
 
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
-    * `:http2` - if `true`, uses an HTTP/2 pool automatically started by Req.
-
     * `:unix_socket` - if set, connect through the given UNIX domain socket
 
   ## Examples
@@ -500,7 +498,7 @@ defmodule Req.Steps do
               Req.Request.validate_options(options, MapSet.new([:timeout, :protocol]))
 
               pool_opts = [
-                # conn_opts: [transport_opts: [timeout: options[:timeout] || 30_000]],
+                conn_opts: [transport_opts: [timeout: options[:timeout] || 30_000]],
                 protocol: options[:protocol] || :http1
               ]
 
@@ -528,10 +526,6 @@ defmodule Req.Steps do
 
     finch_options =
       request.options |> Map.take([:receive_timeout, :pool_timeout]) |> Enum.to_list()
-
-    IO.inspect(finch_name)
-    IO.inspect(finch_request)
-    IO.inspect(finch_options)
 
     case Finch.request(finch_request, finch_name, finch_options) do
       {:ok, response} ->
