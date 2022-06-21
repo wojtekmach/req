@@ -469,17 +469,18 @@ defmodule Req.Steps do
 
   Custom `:receive_timeout`:
 
-      iex> Req.get!(url: url, receive_timeout: 1000)
+      iex> Req.get!(url, receive_timeout: 1000)
 
   Connecting through UNIX socket:
 
       iex> Req.get!("http:///v1.41/_ping", unix_socket: "/var/run/docker.sock").body
       "OK"
 
-  Connecting with custom transport options:
+  Connecting with custom connection options:
 
-      iex> Req.get!(url: url, connect_options: [transport_opts: [timeout: 5000]])
+      iex> Req.get!(url, connect_options: [timeout: 5000])
 
+      iex> Req.get!(url, connect_options: [protocol: :http2])
   """
   @doc step: :request
   def run_finch(request) do
