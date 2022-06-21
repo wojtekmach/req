@@ -452,11 +452,16 @@ defmodule Req.Steps do
     * `:finch` - the name of the Finch pool. Defaults to a pool automatically started by
       Req. The default pool uses HTTP/1 although that may change in the future.
 
+    * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
+      the given connection options:
+
+        * `:timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
+
+        * `:protocol` - the HTTP protocol to use, defaults to `:http1`.
+
     * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
 
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
-
-    * `:http2` - if `true`, uses an HTTP/2 pool automatically started by Req.
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket
 
@@ -464,32 +469,55 @@ defmodule Req.Steps do
 
   Custom `:receive_timeout`:
 
-      iex> Req.get!(url: url, receive_timeout: 1000)
+      iex> Req.get!(url, receive_timeout: 1000)
 
   Connecting through UNIX socket:
 
       iex> Req.get!("http:///v1.41/_ping", unix_socket: "/var/run/docker.sock").body
       "OK"
 
+  Connecting with custom connection options:
+
+      iex> Req.get!(url, connect_options: [timeout: 5000])
+
+      iex> Req.get!(url, connect_options: [protocol: :http2])
   """
   @doc step: :request
   def run_finch(request) do
     finch_name =
       case Map.fetch(request.options, :finch) do
         {:ok, name} ->
-          if request.options[:http2] do
-            raise ArgumentError, "cannot set both :finch and :http2 options"
+          if request.options[:connect_options] do
+            raise ArgumentError, "cannot set both :finch and :connect_options"
           end
 
           name
 
         :error ->
           cond do
-            request.options[:http2] ->
-              Req.FinchHTTP2
+            options = request.options[:connect_options] ->
+              Req.Request.validate_options(options, MapSet.new([:timeout, :protocol]))
+
+              pool_opts = [
+                conn_opts: [transport_opts: [timeout: options[:timeout] || 30_000]],
+                protocol: options[:protocol] || :http1
+              ]
+
+              name = custom_pool_name(pool_opts)
+
+              case DynamicSupervisor.start_child(
+                     Req.FinchSupervisor,
+                     {Finch, name: name, pools: %{default: pool_opts}}
+                   ) do
+                {:ok, _} ->
+                  name
+
+                {:error, {:already_started, _}} ->
+                  name
+              end
 
             true ->
-              Req.FinchHTTP1
+              Req.Finch
           end
       end
 
@@ -513,6 +541,16 @@ defmodule Req.Steps do
       {:error, exception} ->
         {request, exception}
     end
+  end
+
+  defp custom_pool_name(options) do
+    name =
+      options
+      |> :erlang.term_to_binary()
+      |> :erlang.md5()
+      |> Base.url_encode64(padding: false)
+
+    Module.concat(Req.FinchSupervisor, "Pool_#{name}")
   end
 
   @doc """

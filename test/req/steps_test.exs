@@ -998,9 +998,36 @@ defmodule Req.StepsTest do
     assert log =~ "1 attempt left"
   end
 
-  test "run_finch/1: :finch and :http2" do
-    assert_raise ArgumentError, "cannot set both :finch and :http2 options", fn ->
-      Req.request!(finch: MyFinch, http2: true)
+  test "run_finch/1: :connect_options :timeout", c do
+    req =
+      Req.new(
+        url: c.url,
+        connect_options: [timeout: 0],
+        retry: :never
+      )
+
+    assert Req.request(req) == {:error, %Mint.TransportError{reason: :timeout}}
+    assert Req.request(req) == {:error, %Mint.TransportError{reason: :timeout}}
+  end
+
+  test "run_finch/1: :connect_options :protocol", c do
+    Bypass.stub(c.bypass, "GET", "/", fn conn ->
+      {_, %{version: :"HTTP/2"}} = conn.adapter
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    req =
+      Req.new(
+        url: c.url,
+        connect_options: [protocol: :http2]
+      )
+
+    assert Req.request!(req).body == "ok"
+  end
+
+  test "run_finch/1: :finch and :connect_options" do
+    assert_raise ArgumentError, "cannot set both :finch and :connect_options", fn ->
+      Req.request!(finch: MyFinch, connect_options: [timeout: 0])
     end
   end
 

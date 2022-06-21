@@ -716,12 +716,12 @@ defmodule Req.Request do
         MapSet.new([:method, :url, :headers, :body, :adapter])
       )
 
-    do_validate_options(options, registered)
+    validate_options(options, registered)
   end
 
-  defp do_validate_options([{name, _value} | rest], registered) do
+  def validate_options([{name, _value} | rest], registered) do
     if name in registered do
-      do_validate_options(rest, registered)
+      validate_options(rest, registered)
     else
       case did_you_mean(Atom.to_string(name), registered) do
         {similar, score} when score > 0.8 ->
@@ -733,7 +733,7 @@ defmodule Req.Request do
     end
   end
 
-  defp do_validate_options([], _registered) do
+  def validate_options([], _registered) do
     :ok
   end
 
