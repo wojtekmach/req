@@ -137,7 +137,7 @@ Req.get!(req, url: "https://api.github.com/user").body["login"]
 Notice all plugins can be attached to the same request struct which makes it really easy to
 explore different endpoints.
 
-See ["Writing Plugins" section in `Req.Request` module documentation](https://wojtekmach.pl/docs/req/Req.Request.html#module-writing-plugins)
+See ["Writing Plugins" section in `Req.Request` module documentation](https://hexdocs.pm/req/Req.Request.html#module-writing-plugins)
 for more information.
 
 ### Plug Integration
@@ -177,7 +177,7 @@ Req.request!(url: "http://example", adapter: adapter).body
 Here is another one that uses the [`json/2`][resp_json] function to conveniently
 return a JSON response:
 
-[resp_json]: https://wojtekmach.pl/docs/req/Req.Response.html#json/2
+[resp_json]: https://hexdocs.pm/req/Req.Response.html#json/2
 
 ```elixir
   adapter = fn request ->
