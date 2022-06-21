@@ -196,10 +196,10 @@ return a JSON response:
 [resp_json]: https://hexdocs.pm/req/Req.Response.html#json/2
 
 ```elixir
-  adapter = fn request ->
-    response = Req.Response.json(%{hello: 42})
-    {request, response}
-  end
+adapter = fn request ->
+  response = Req.Response.json(%{hello: 42})
+  {request, response}
+end
 
 resp = Req.request!(url: "http://example", adapter: adapter)
 resp.headers
