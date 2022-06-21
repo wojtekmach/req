@@ -81,7 +81,7 @@ And here's how they can be used:
 
 ```elixir
 Mix.install([
-  {:req, github: "wojtekmach/req"},
+  {:req, "~> 0.3.0"},
   {:req_easyhtml, github: "wojtekmach/req_easyhtml"},
   {:req_s3, github: "wojtekmach/req_s3"},
   {:req_hex, github: "wojtekmach/req_hex"},
