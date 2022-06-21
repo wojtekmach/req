@@ -16,7 +16,7 @@ defmodule Req.Request do
   ones.
 
   To make using custom steps by others even easier, they can be packaged up into plugins.
-  See ["Wriging Plugins"](#module-writing-plugins) section for more information.
+  See ["Writing Plugins"](#module-writing-plugins) section for more information.
 
   ## The Low-level API
 
@@ -411,7 +411,7 @@ defmodule Req.Request do
 
   ## Examples
 
-      Req.Request.append_request_steps(request,
+      Req.Request.append_response_steps(request,
         noop: fn {request, response} -> {request, response} end,
         inspect: &IO.inspect/1
       )
@@ -425,7 +425,7 @@ defmodule Req.Request do
 
   ## Examples
 
-      Req.Request.prepend_request_steps(request,
+      Req.Request.prepend_response_steps(request,
         noop: fn {request, response} -> {request, response} end,
         inspect: &IO.inspect/1
       )
