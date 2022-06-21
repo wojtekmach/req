@@ -517,7 +517,7 @@ defmodule Req.Steps do
               end
 
             true ->
-              Req.FinchSupervisor.HTTP1
+              Req.FinchHTTP1
           end
       end
 

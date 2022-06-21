@@ -297,8 +297,8 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
   * `put_base_url`: Ignore base URL if given URL contains scheme
 
-  * `run_finch`: Add `:connect_options` which dynamically starts (or re-uses) Finch pool with
-    the given connection options.
+  * `run_finch`: Add `:connect_options` which dynamically starts (or re-uses already started)
+    Finch pool with the given connection options.
 
   * `run_finch`: Replace `:finch_options` with `:receive_timeout` and `:pool_timeout` options
 
