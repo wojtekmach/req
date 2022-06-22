@@ -166,9 +166,16 @@ defmodule Req.StepsTest do
     assert "req/" <> _ = Req.get!(c.url).body
   end
 
-  test "encode_body/1: json" do
-    req = Req.new(json: %{a: 1}) |> Req.Request.prepare()
-    assert req.body |> IO.iodata_to_binary() == ~s|{"a":1}|
+  test "encode_body/1: json", c do
+    Bypass.expect(c.bypass, "POST", "/", fn conn ->
+      assert {:ok, ~s|{"a":1}|, conn} = Plug.Conn.read_body(conn)
+      assert ["application/json, */*;q=0.5"] = Plug.Conn.get_req_header(conn, "accept")
+      assert ["application/json"] = Plug.Conn.get_req_header(conn, "content-type")
+
+      Plug.Conn.send_resp(conn, 200, "")
+    end)
+
+    Req.post!(c.url, json: %{a: 1})
   end
 
   test "encode_body/1: form" do
