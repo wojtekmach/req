@@ -555,7 +555,7 @@ defmodule Req do
       ...>   {request, response}
       ...> end
       iex>
-      iex> {:ok, response} = Req.request(url: "http://example")
+      iex> {:ok, response} = Req.request(adapter: adapter, url: "http://example")
       iex> response.body
       "it works!"
   """
