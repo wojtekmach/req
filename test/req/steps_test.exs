@@ -169,7 +169,7 @@ defmodule Req.StepsTest do
   test "encode_body/1: json", c do
     Bypass.expect(c.bypass, "POST", "/", fn conn ->
       assert {:ok, ~s|{"a":1}|, conn} = Plug.Conn.read_body(conn)
-      assert ["application/json, */*;q=0.5"] = Plug.Conn.get_req_header(conn, "accept")
+      assert ["application/json"] = Plug.Conn.get_req_header(conn, "accept")
       assert ["application/json"] = Plug.Conn.get_req_header(conn, "content-type")
 
       Plug.Conn.send_resp(conn, 200, "")
