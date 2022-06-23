@@ -264,7 +264,9 @@ defmodule Req.Steps do
 
     * `:form` - if set, encodes the request body as form data (using `URI.encode_query/1`).
 
-    * `:json` - if set, encodes the request body as JSON (using `Jason.encode_to_iodata!/1`).
+    * `:json` - if set, encodes the request body as JSON (using `Jason.encode_to_iodata!/1`), sets
+                the `accept` header to `application/json`, and the `content-type`
+                header to `application/json`.
 
   ## Examples
 
@@ -285,6 +287,7 @@ defmodule Req.Steps do
       data = request.options[:json] ->
         %{request | body: Jason.encode_to_iodata!(data)}
         |> Req.Request.put_new_header("content-type", "application/json")
+        |> Req.Request.put_new_header("accept", "application/json")
 
       true ->
         request
