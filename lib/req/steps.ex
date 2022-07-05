@@ -16,6 +16,39 @@ defmodule Req.Steps do
   ## Request steps
 
   @doc """
+  Sets base params for all requests.
+
+
+  ## Request Options
+
+    * `:base_params` - if set, the request params is merged with this base params.
+
+  ## Examples
+
+      iex> req = Req.new(base_url: "https://httpbin.org/anything", base_params: [foo: "bar"])
+      iex> Req.get!(req).body["args"]
+      %{"foo" => "bar"}
+      iex> Req.get!(req, params: [bar: "baz"]).body["args"]
+      %{"bar" => "baz", "foo" => "bar"}
+      iex> Req.get!("https://httpbin.org/anything", params: [bar: "baz"]).body["args"]
+      %{"bar" => "baz"}
+      iex> Req.get!(req, params: [foo: "foo"]).body["args"]
+      %{"foo" => "foo"}
+
+  """
+  @doc step: :request
+  def put_base_params(request)
+
+  def put_base_params(%{options: %{base_params: base_params, params: params}} = request) do
+    params = Keyword.merge(base_params, params, fn _k, _v1, v2 -> v2 end)
+    put_in(request.options.params, params)
+  end
+
+  def put_base_params(request) do
+    request
+  end
+
+  @doc """
   Sets base URL for all requests.
 
 
@@ -309,7 +342,10 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def put_params(request) do
-    put_params(request, Map.get(request.options, :params, []))
+    put_params(
+      request,
+      Map.get(request.options, :params, Map.get(request.options, :base_params, []))
+    )
   end
 
   defp put_params(request, []) do

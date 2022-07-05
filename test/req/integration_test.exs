@@ -28,6 +28,7 @@ defmodule Req.IntegrationTest do
       auth: 1,
       put_user_agent: 1,
       compressed: 1,
+      put_base_params: 1,
       put_base_url: 1,
       encode_body: 1,
       put_params: 1,
