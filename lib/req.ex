@@ -578,7 +578,9 @@ defmodule Req do
   @spec request(Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
   def request(request, options) when is_list(options) do
-    {request_options, options} = Keyword.split(options, [:method, :url, :headers, :body])
+    {request_options, options} =
+      Keyword.split(options, [:method, :url, :headers, :body, :adapter])
+
     Req.Request.validate_options(request, options)
 
     request_options =
