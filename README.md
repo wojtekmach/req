@@ -128,10 +128,10 @@ And here is how they can be used:
 ```elixir
 Mix.install([
   {:req, "~> 0.3.0"},
-  {:req_easyhtml, github: "wojtekmach/req_easyhtml"},
-  {:req_s3, github: "wojtekmach/req_s3"},
-  {:req_hex, github: "wojtekmach/req_hex"},
-  {:req_github_oauth, github: "wojtekmach/req_github_oauth"}
+  {:req_easyhtml, "~> 0.1.0"},
+  {:req_s3, "~> 0.1.0"},
+  {:req_hex, "~> 0.1.0"},
+  {:req_github_oauth, "~> 0.1.0"}
 ])
 
 req =
