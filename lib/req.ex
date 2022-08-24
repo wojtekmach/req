@@ -271,7 +271,7 @@ defmodule Req do
       "hello!"
   """
   @spec post!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def post!(url_or_request, options) do
+  def post!(url_or_request, options \\ []) do
     if Keyword.keyword?(options) do
       case post(url_or_request, options) do
         {:ok, response} -> response
