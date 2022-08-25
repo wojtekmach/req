@@ -147,14 +147,44 @@ defmodule Req do
 
   """
   @spec get!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def get!(url_or_request, options \\ [])
-
-  def get!(%Req.Request{} = request, options) do
-    request!(%{request | method: :get}, options)
+  def get!(url_or_request, options \\ []) do
+    case get(url_or_request, options) do
+      {:ok, response} -> response
+      {:error, exception} -> raise exception
+    end
   end
 
-  def get!(url, options) do
-    request!([method: :get, url: URI.parse(url)] ++ options)
+  @doc """
+  Makes a GET request.
+
+  See `request/1` for a list of supported options.
+
+  ## Examples
+
+  With URL:
+
+      iex> {:ok, res} = Req.get("https://api.github.com/repos/elixir-lang/elixir")
+      iex> res.body["description"]
+      "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+
+  With request struct:
+
+      iex> req = Req.new(base_url: "https://api.github.com")
+      iex> {:ok, res} = Req.get(req, url: "/repos/elixir-lang/elixir")
+      iex> res.status
+      200
+
+  """
+  @spec get(url() | Req.Request.t(), options :: keyword()) ::
+          {:ok, Req.Response.t()} | {:error, Exception.t()}
+  def get(url_or_request, options \\ [])
+
+  def get(%Req.Request{} = request, options) do
+    request(%{request | method: :get}, options)
+  end
+
+  def get(url, options) do
+    request([method: :get, url: URI.parse(url)] ++ options)
   end
 
   @doc """
@@ -177,14 +207,43 @@ defmodule Req do
 
   """
   @spec head!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def head!(url_or_request, options \\ [])
-
-  def head!(%Req.Request{} = request, options) do
-    request!(%{request | method: :head}, options)
+  def head!(url_or_request, options \\ []) do
+    case head(url_or_request, options) do
+      {:ok, response} -> response
+      {:error, exception} -> raise exception
+    end
   end
 
-  def head!(url, options) do
-    request!([method: :head, url: URI.parse(url)] ++ options)
+  @doc """
+  Makes a HEAD request.
+
+  See `request/1` for a list of supported options.
+
+  ## Examples
+
+  With URL:
+
+      iex> {:ok, res} = Req.head("https://httpbin.org/status/201")
+      iex> res.status
+      201
+
+  With request struct:
+
+      iex> req = Req.new(base_url: "https://httpbin.org")
+      iex> {:ok, res} = Req.head(req, url: "/status/201")
+      iex> res.status
+      201
+
+  """
+  @spec head(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  def head(url_or_request, options \\ [])
+
+  def head(%Req.Request{} = request, options) do
+    request(%{request | method: :head}, options)
+  end
+
+  def head(url, options) do
+    request([method: :head, url: URI.parse(url)] ++ options)
   end
 
   @doc """
@@ -212,15 +271,12 @@ defmodule Req do
       "hello!"
   """
   @spec post!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def post!(url_or_request, options \\ [])
-
-  def post!(%Req.Request{} = request, options) do
-    request!(%{request | method: :post}, options)
-  end
-
-  def post!(url, options) do
+  def post!(url_or_request, options \\ []) do
     if Keyword.keyword?(options) do
-      request!([method: :post, url: URI.parse(url)] ++ options)
+      case post(url_or_request, options) do
+        {:ok, response} -> response
+        {:error, exception} -> raise exception
+      end
     else
       case options do
         {:form, data} ->
@@ -229,7 +285,7 @@ defmodule Req do
               "Req.post!(url, form: data)"
           )
 
-          request!(method: :post, url: URI.parse(url), form: data)
+          request!(method: :post, url: URI.parse(url_or_request), form: data)
 
         {:json, data} ->
           IO.warn(
@@ -237,11 +293,11 @@ defmodule Req do
               "Req.post!(url, json: data)"
           )
 
-          request!(method: :post, url: URI.parse(url), json: data)
+          request!(method: :post, url: URI.parse(url_or_request), json: data)
 
         data ->
           IO.warn("Req.post!(url, body) is deprecated in favour of Req.post!(url, body: body)")
-          request!(method: :post, url: URI.parse(url), body: data)
+          request!(method: :post, url: URI.parse(url_or_request), body: data)
       end
     end
   end
@@ -276,6 +332,46 @@ defmodule Req do
   end
 
   @doc """
+  Makes a POST request.
+
+  See `request/1` for a list of supported options.
+
+  ## Examples
+
+  With URL:
+
+      iex> {:ok, res} = Req.post("https://httpbin.org/anything", body: "hello!")
+      iex> res.body["data"]
+      "hello!"
+
+      iex> {:ok, res} = Req.post("https://httpbin.org/anything", form: [x: 1])
+      iex> res.body["form"]
+      %{"x" => "1"}
+
+      iex> {:ok, res} = Req.post("https://httpbin.org/anything", json: %{x: 2})
+      iex> res.body["json"]
+      %{"x" => 2}
+
+  With request struct:
+
+      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> {:ok, res} = Req.post(req, body: "hello!")
+      iex> res.body["data"]
+      "hello!"
+  """
+  @spec post(url() | Req.Request.t(), options :: keyword()) ::
+          {:ok, Req.Response.t()} | {:error, Exception.t()}
+  def post(url_or_request, options \\ [])
+
+  def post(%Req.Request{} = request, options) do
+    request(%{request | method: :post}, options)
+  end
+
+  def post(url, options) do
+    request([method: :post, url: URI.parse(url)] ++ options)
+  end
+
+  @doc """
   Makes a PUT request.
 
   See `request/1` for a list of supported options.
@@ -294,18 +390,10 @@ defmodule Req do
       "hello!"
   """
   @spec put!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def put!(url_or_request, options \\ [])
-
-  def put!(%Req.Request{} = request, options) do
-    request!(%{request | method: :put}, options)
-  end
-
-  def put!(url, options) do
-    if Keyword.keyword?(options) do
-      request!([method: :put, url: URI.parse(url)] ++ options)
-    else
-      IO.warn("Req.put!(url, body) is deprecated in favour of Req.put!(url, body: body)")
-      request!(url: URI.parse(url), body: options)
+  def put!(url_or_request, options \\ []) do
+    case put(url_or_request, options) do
+      {:ok, response} -> response
+      {:error, exception} -> raise exception
     end
   end
 
@@ -317,6 +405,43 @@ defmodule Req do
     )
 
     request!([method: :put, url: url, body: body] ++ options)
+  end
+
+  @doc """
+  Makes a PUT request.
+
+  See `request/1` for a list of supported options.
+
+  ## Examples
+
+  With URL:
+
+      iex> {:ok, res} = Req.put("https://httpbin.org/anything", body: "hello!")
+      iex> res.body["data"]
+      "hello!"
+
+  With request struct:
+
+      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> {:ok, res} = Req.put(req, body: "hello!")
+      iex> res.body["data"]
+      "hello!"
+  """
+  @spec put(url() | Req.Request.t(), options :: keyword()) ::
+          {:ok, Req.Response.t()} | {:error, Exception.t()}
+  def put(url_or_request, options \\ [])
+
+  def put(%Req.Request{} = request, options) do
+    request(%{request | method: :put}, options)
+  end
+
+  def put(url, options) do
+    if Keyword.keyword?(options) do
+      request([method: :put, url: URI.parse(url)] ++ options)
+    else
+      IO.warn("Req.put!(url, body) is deprecated in favour of Req.put!(url, body: body)")
+      request(url: URI.parse(url), body: options)
+    end
   end
 
   @doc """
@@ -338,14 +463,43 @@ defmodule Req do
       "hello!"
   """
   @spec patch!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def patch!(url_or_request, options \\ [])
-
-  def patch!(%Req.Request{} = request, options) do
-    request!(%{request | method: :patch}, options)
+  def patch!(url_or_request, options \\ []) do
+    case patch(url_or_request, options) do
+      {:ok, response} -> response
+      {:error, exception} -> raise exception
+    end
   end
 
-  def patch!(url, options) do
-    request!([method: :patch, url: url] ++ options)
+  @doc """
+  Makes a PATCH request.
+
+  See `request/1` for a list of supported options.
+
+  ## Examples
+
+  With URL:
+
+      iex> {:ok, res} = Req.patch("https://httpbin.org/anything", body: "hello!")
+      iex> res.body["data"]
+      "hello!"
+
+  With request struct:
+
+      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> {:ok, res} = Req.patch(req, body: "hello!")
+      iex> res.body["data"]
+      "hello!"
+  """
+  @spec patch(url() | Req.Request.t(), options :: keyword()) ::
+          {:ok, Req.Response.t()} | {:error, Exception.t()}
+  def patch(url_or_request, options \\ [])
+
+  def patch(%Req.Request{} = request, options) do
+    request(%{request | method: :patch}, options)
+  end
+
+  def patch(url, options) do
+    request([method: :patch, url: url] ++ options)
   end
 
   @doc """
@@ -367,14 +521,43 @@ defmodule Req do
       "DELETE"
   """
   @spec delete!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def delete!(url_or_request, options \\ [])
-
-  def delete!(%Req.Request{} = request, options) do
-    request!(%{request | method: :delete}, options)
+  def delete!(url_or_request, options \\ []) do
+    case delete(url_or_request, options) do
+      {:ok, response} -> response
+      {:error, exception} -> raise exception
+    end
   end
 
-  def delete!(url, options) do
-    request!([method: :delete, url: url] ++ options)
+  @doc """
+  Makes a DELETE request.
+
+  See `request/1` for a list of supported options.
+
+  ## Examples
+
+  With URL:
+
+      iex> {:ok, res} = Req.delete("https://httpbin.org/anything")
+      iex> res.body["method"]
+      "DELETE"
+
+  With request struct:
+
+      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> {:ok, res} = Req.delete(req)
+      iex> res.body["method"]
+      "DELETE"
+  """
+  @spec delete(url() | Req.Request.t(), options :: keyword()) ::
+          {:ok, Req.Response.t()} | {:error, Exception.t()}
+  def delete(url_or_request, options \\ [])
+
+  def delete(%Req.Request{} = request, options) do
+    request(%{request | method: :delete}, options)
+  end
+
+  def delete(url, options) do
+    request([method: :delete, url: url] ++ options)
   end
 
   @doc """
