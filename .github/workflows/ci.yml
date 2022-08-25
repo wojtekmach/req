@@ -27,6 +27,7 @@ jobs:
         with:
           otp-version: ${{matrix.pair.otp}}
           elixir-version: ${{matrix.pair.elixir}}
+          version-type: strict
 
       - uses: actions/cache@v2
         with:
