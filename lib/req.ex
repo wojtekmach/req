@@ -100,6 +100,7 @@ defmodule Req do
           :params,
           :auth,
           :form,
+          :form_multi,
           :json,
           :compress_body,
           :compressed,

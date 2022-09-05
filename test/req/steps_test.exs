@@ -186,6 +186,25 @@ defmodule Req.StepsTest do
     assert req.body == "a=1"
   end
 
+  test "encode_body/1: form_multi" do
+    req = Req.new(form_multi: [a: "foo", b: "bar"]) |> Req.Request.prepare()
+
+    # Get the randomly generated boundary from the header
+    re = ~r|multipart/form-data;boundary="([[:alnum:]]+)"|
+    [content_type] = Req.Request.get_header(req, "content-type")
+    [_, boundary] = Regex.run(re, content_type)
+
+    assert req.body ==
+             ~s(--#{boundary}\nContent-Disposition: form-data; name=\"a\"\n\nfoo\n--#{boundary}\nContent-Disposition: form-data; name=\"b\"\n\nbar\n--#{boundary}--)
+
+    # Ensure Stream values also work
+    stream_val = Stream.cycle(["foo"]) |> Stream.take(1)
+    req = Req.new(form_multi: [a: stream_val]) |> Req.Request.prepare()
+
+    assert req.body
+           |> String.contains?(~s(\nContent-Disposition: form-data; name=\"a\"\n\nfoo\n--))
+  end
+
   test "put_params/1" do
     req = Req.new(url: "http://foo", params: [x: 1, y: 2]) |> Req.Request.prepare()
     assert URI.to_string(req.url) == "http://foo?x=1&y=2"

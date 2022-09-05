@@ -289,9 +289,47 @@ defmodule Req.Steps do
         |> Req.Request.put_new_header("content-type", "application/json")
         |> Req.Request.put_new_header("accept", "application/json")
 
+      data = request.options[:form_multi] ->
+        # Generate a random boundary
+        boundary =
+          :crypto.strong_rand_bytes(16)
+          |> Base.encode32(case: :lower, padding: false)
+
+        body =
+          encode_body_multipart_form(data, boundary)
+          |> Enum.to_list()
+          |> IO.iodata_to_binary()
+
+        %{request | body: body}
+        |> Req.Request.put_new_header(
+          "content-type",
+          ~s(multipart/form-data;boundary="#{boundary}")
+        )
+
       true ->
         request
     end
+  end
+
+  defp encode_body_multipart_form(data, boundary) do
+    [
+      ["--#{boundary}\n"],
+      data
+      |> Stream.flat_map(fn
+        {key, val} when is_binary(val) ->
+          [~s(Content-Disposition: form-data; name="#{key}"\n\n), val]
+
+        {key, stream} when is_struct(stream, Stream) ->
+          [
+            ~s(Content-Disposition: form-data; name="#{key}"\n\n),
+            stream |> Enum.to_list() |> IO.iodata_to_binary()
+          ]
+      end)
+      |> Stream.chunk_every(2)
+      |> Stream.intersperse("\n--#{boundary}\n"),
+      ["\n--#{boundary}--"]
+    ]
+    |> Stream.concat()
   end
 
   @doc """
