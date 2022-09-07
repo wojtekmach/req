@@ -14,19 +14,20 @@ jobs:
       matrix:
         include:
           - pair:
-              elixir: '1.12'
-              otp: 24.3
+              elixir: "1.12"
+              otp: "24.3.4.2"
           - pair:
-              elixir: '1.13'
-              otp: 25
+              elixir: "1.13"
+              otp: "25"
             lint: lint
     steps:
       - uses: actions/checkout@v2
 
-      - uses: erlef/setup-beam@v1
+      - uses: erlef/setup-beam@main
         with:
           otp-version: ${{matrix.pair.otp}}
           elixir-version: ${{matrix.pair.elixir}}
+          version-type: strict
 
       - uses: actions/cache@v2
         with:
