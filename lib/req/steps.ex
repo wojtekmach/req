@@ -36,13 +36,11 @@ defmodule Req.Steps do
   def put_base_url(request)
 
   def put_base_url(%{options: %{base_url: base_url}} = request) do
-    url = to_string(request.url)
-
-    if Regex.match?(~r/^https?:\/\//i, url) do
+    if request.url.scheme != nil do
       # skip if url is already with scheme
       request
     else
-      %{request | url: URI.parse(join(base_url, url))}
+      %{request | url: URI.parse(join(base_url, request.url))}
     end
   end
 
@@ -51,8 +49,7 @@ defmodule Req.Steps do
   end
 
   defp join(base, url) do
-    case {String.last(base), url} do
-      {nil, url} -> url
+    case {String.last(base), to_string(url)} do
       {"/", "/" <> rest} -> base <> rest
       {"/", rest} -> base <> rest
       {_, ""} -> base
