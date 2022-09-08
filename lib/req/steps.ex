@@ -49,7 +49,7 @@ defmodule Req.Steps do
   end
 
   defp join(base, url) do
-    case {String.last(base), to_string(url)} do
+    case {:binary.last(base), to_string(url)} do
       {"/", "/" <> rest} -> base <> rest
       {"/", rest} -> base <> rest
       {_, ""} -> base
