@@ -50,8 +50,8 @@ defmodule Req.Steps do
 
   defp join(base, url) do
     case {:binary.last(base), to_string(url)} do
-      {"/", "/" <> rest} -> base <> rest
-      {"/", rest} -> base <> rest
+      {?/, "/" <> rest} -> base <> rest
+      {?/, rest} -> base <> rest
       {_, ""} -> base
       {_, "/" <> rest} -> base <> "/" <> rest
       {_, rest} -> base <> "/" <> rest
