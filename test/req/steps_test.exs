@@ -31,6 +31,7 @@ defmodule Req.StepsTest do
 
   test "put_base_url/1: with base path", c do
     Bypass.expect(c.bypass, "GET", "/api/v2/foo", fn conn ->
+      assert conn.request_path == "/api/v2/foo"
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
