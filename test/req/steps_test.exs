@@ -1019,6 +1019,10 @@ defmodule Req.StepsTest do
   end
 
   test "run_finch/1: :connect_options :timeout", c do
+    Bypass.stub(c.bypass, "GET", "/", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
     req =
       Req.new(
         url: c.url,
