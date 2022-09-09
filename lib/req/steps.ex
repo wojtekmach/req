@@ -37,7 +37,6 @@ defmodule Req.Steps do
 
   def put_base_url(%{options: %{base_url: base_url}} = request) do
     if request.url.scheme != nil do
-      # skip if url is already with scheme
       request
     else
       %{request | url: URI.parse(join(base_url, request.url))}

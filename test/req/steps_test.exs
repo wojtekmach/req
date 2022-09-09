@@ -39,6 +39,7 @@ defmodule Req.StepsTest do
     assert Req.get!("foo", base_url: c.url <> "/api/v2").body == "ok"
     assert Req.get!("/foo", base_url: c.url <> "/api/v2/").body == "ok"
     assert Req.get!("foo", base_url: c.url <> "/api/v2/").body == "ok"
+    assert Req.get!("", base_url: c.url <> "/api/v2/foo").body == "ok"
   end
 
   test "auth/1: basic" do
