@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v0.3.1 (2022-09-09)
+
+  * `encode_body`: Set Accept header in JSON requests
+  * `put_base_url`: Fix merging with leading and/or trailing slashes
+  * Fix merging :adapter option
+  * Add get/2, post/2, put/2, patch/2, delete/2 and head/2
+
 ## v0.3.0 (2022-06-21)
 
 Req v0.3.0 brings redesigned API, new steps, and improvements to existing steps.
