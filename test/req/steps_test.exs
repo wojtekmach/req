@@ -29,6 +29,19 @@ defmodule Req.StepsTest do
     assert Req.get!(c.url, base_url: "ignored").body == "ok"
   end
 
+  test "put_base_url/1: with base path", c do
+    Bypass.expect(c.bypass, "GET", "/api/v2/foo", fn conn ->
+      assert conn.request_path == "/api/v2/foo"
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    assert Req.get!("/foo", base_url: c.url <> "/api/v2").body == "ok"
+    assert Req.get!("foo", base_url: c.url <> "/api/v2").body == "ok"
+    assert Req.get!("/foo", base_url: c.url <> "/api/v2/").body == "ok"
+    assert Req.get!("foo", base_url: c.url <> "/api/v2/").body == "ok"
+    assert Req.get!("", base_url: c.url <> "/api/v2/foo").body == "ok"
+  end
+
   test "auth/1: basic" do
     req = Req.new(auth: {"foo", "bar"}) |> Req.Request.prepare()
 
