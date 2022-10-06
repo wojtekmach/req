@@ -6,6 +6,8 @@ defmodule ReqTest do
       new: 1
     ]
 
+  doctest Req.Test
+
   setup do
     bypass = Bypass.open()
     [bypass: bypass, url: "http://localhost:#{bypass.port}"]
