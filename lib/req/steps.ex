@@ -512,10 +512,15 @@ defmodule Req.Steps do
         :error ->
           cond do
             options = request.options[:connect_options] ->
-              Req.Request.validate_options(options, MapSet.new([:timeout, :protocol]))
+              Req.Request.validate_options(options, MapSet.new([:timeout, :proxy, :protocol]))
 
               pool_opts = [
-                conn_opts: [transport_opts: [timeout: options[:timeout] || 30_000]],
+                conn_opts: [
+                  proxy: options[:proxy] || nil,
+                  transport_opts: [
+                    timeout: options[:timeout] || 30_000
+                  ]
+                ],
                 protocol: options[:protocol] || :http1
               ]
 
