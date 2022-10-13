@@ -825,25 +825,6 @@ defmodule Req.StepsTest do
     refute_received _
   end
 
-  @tag :capture_log
-  test "retry: always", c do
-    pid = self()
-
-    Bypass.expect(c.bypass, "POST", "/", fn conn ->
-      send(pid, :ping)
-      Plug.Conn.send_resp(conn, 500, "oops")
-    end)
-
-    request = Req.new(url: c.url, retry: :always, retry_delay: 1)
-
-    assert Req.post!(request).status == 500
-    assert_received :ping
-    assert_received :ping
-    assert_received :ping
-    assert_received :ping
-    refute_received _
-  end
-
   test "retry: never", c do
     pid = self()
 
