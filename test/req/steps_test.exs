@@ -342,9 +342,9 @@ defmodule Req.StepsTest do
 
   @tag :tmp_dir
   test "decode_body/1: tar (content-type)", c do
-    files = [{'foo.txt', "bar"}]
+    files = [{~c"foo.txt", "bar"}]
 
-    path = '#{c.tmp_dir}/foo.tar'
+    path = ~c"#{c.tmp_dir}/foo.tar"
     :ok = :erl_tar.create(path, files)
     tar = File.read!(path)
 
@@ -359,9 +359,9 @@ defmodule Req.StepsTest do
 
   @tag :tmp_dir
   test "decode_body/1: tar (path)", c do
-    files = [{'foo.txt', "bar"}]
+    files = [{~c"foo.txt", "bar"}]
 
-    path = '#{c.tmp_dir}/foo.tar'
+    path = ~c"#{c.tmp_dir}/foo.tar"
     :ok = :erl_tar.create(path, files)
     tar = File.read!(path)
 
@@ -376,9 +376,9 @@ defmodule Req.StepsTest do
 
   @tag :tmp_dir
   test "decode_body/1: tar.gz (path)", c do
-    files = [{'foo.txt', "bar"}]
+    files = [{~c"foo.txt", "bar"}]
 
-    path = '#{c.tmp_dir}/foo.tar'
+    path = ~c"#{c.tmp_dir}/foo.tar"
     :ok = :erl_tar.create(path, files, [:compressed])
     tar = File.read!(path)
 
@@ -392,10 +392,10 @@ defmodule Req.StepsTest do
   end
 
   test "decode_body/1: zip (content-type)", c do
-    files = [{'foo.txt', "bar"}]
+    files = [{~c"foo.txt", "bar"}]
 
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      {:ok, {'foo.zip', data}} = :zip.create('foo.zip', files, [:memory])
+      {:ok, {~c"foo.zip", data}} = :zip.create(~c"foo.zip", files, [:memory])
 
       conn
       |> Plug.Conn.put_resp_content_type("application/zip", nil)
@@ -406,10 +406,10 @@ defmodule Req.StepsTest do
   end
 
   test "decode_body/1: zip (path)", c do
-    files = [{'foo.txt', "bar"}]
+    files = [{~c"foo.txt", "bar"}]
 
     Bypass.expect(c.bypass, "GET", "/foo.zip", fn conn ->
-      {:ok, {'foo.zip', data}} = :zip.create('foo.zip', files, [:memory])
+      {:ok, {~c"foo.zip", data}} = :zip.create(~c"foo.zip", files, [:memory])
 
       conn
       |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)

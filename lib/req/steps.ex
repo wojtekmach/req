@@ -399,7 +399,7 @@ defmodule Req.Steps do
   @doc step: :request
   def cache(request) do
     if request.options[:cache] do
-      dir = Map.get(request.options, :cache_dir) || :filename.basedir(:user_cache, 'req')
+      dir = Map.get(request.options, :cache_dir) || :filename.basedir(:user_cache, ~c"req")
       cache_path = cache_path(dir, request)
 
       request
