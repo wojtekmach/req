@@ -853,7 +853,7 @@ defmodule Req.Steps do
     decode_body({request, response}, format(request, response))
   end
 
-  defp decode_body({request, response}, "json") do
+  defp decode_body({request, response}, format) when format in ~w(json json-api) do
     {request, update_in(response.body, &Jason.decode!/1)}
   end
 
