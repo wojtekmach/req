@@ -320,6 +320,16 @@ defmodule Req.StepsTest do
     assert Req.get!(c.url).body == %{"a" => 1}
   end
 
+  test "decode_body/1: json-api", c do
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      conn
+      |> Plug.Conn.put_resp_header("content-type", "application/vnd.api+json; charset=utf-8")
+      |> json(200, %{a: 1})
+    end)
+
+    assert Req.get!(c.url).body == %{"a" => 1}
+  end
+
   @tag :tmp_dir
   test "decode_body/1: with output", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
@@ -1041,8 +1051,15 @@ defmodule Req.StepsTest do
   end
 
   defp json(conn, status, data) do
-    conn
-    |> Plug.Conn.put_resp_content_type("application/json")
-    |> Plug.Conn.send_resp(status, Jason.encode_to_iodata!(data))
+    conn =
+      case Plug.Conn.get_resp_header(conn, "content-type") do
+        [] ->
+          Plug.Conn.put_resp_content_type(conn, "application/json")
+
+        _ ->
+          conn
+      end
+
+    Plug.Conn.send_resp(conn, status, Jason.encode_to_iodata!(data))
   end
 end
