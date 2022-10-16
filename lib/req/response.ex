@@ -54,12 +54,28 @@ defmodule Req.Response do
         headers: [{"content-type", "application/json"}],
         body: ~s|{"hello":42}|
       }
+
+      iex> Req.Response.new()
+      iex> |> Req.Response.put_header("content-type", "application/vnd.api+json; charset=utf-8")
+      iex> |> Req.Response.json(%{hello: 42})
+      %Req.Response{
+        status: 200,
+        headers: [{"content-type", "application/vnd.api+json; charset=utf-8"}],
+        body: ~s|{"hello":42}|
+      }
   """
   @spec json(t(), body :: term()) :: t()
   def json(response \\ new(), body) do
-    response
-    |> put_header("content-type", "application/json")
-    |> Map.replace!(:body, Jason.encode!(body))
+    response =
+      case get_header(response, "content-type") do
+        [] ->
+          put_header(response, "content-type", "application/json")
+
+        _ ->
+          response
+      end
+
+    Map.replace!(response, :body, Jason.encode!(body))
   end
 
   @doc """
