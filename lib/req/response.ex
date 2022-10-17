@@ -55,7 +55,7 @@ defmodule Req.Response do
         body: ~s|{"hello":42}|
       }
 
-If the request already contains a 'content-type' header, it is kept as is:
+  If the request already contains a 'content-type' header, it is kept as is:
 
       iex> Req.Response.new()
       iex> |> Req.Response.put_header("content-type", "application/vnd.api+json; charset=utf-8")
