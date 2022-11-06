@@ -475,6 +475,8 @@ defmodule Req.Steps do
 
         * `:protocol` - the HTTP protocol to use, defaults to `:http1`.
 
+        * `:proxy` - a proxy to use given in a format supported by the Mint package: A tuple `{schema, address, port, options}`.
+
     * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
 
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
@@ -512,14 +514,14 @@ defmodule Req.Steps do
         :error ->
           cond do
             options = request.options[:connect_options] ->
-              Req.Request.validate_options(options, MapSet.new([:timeout, :proxy, :protocol]))
+              Req.Request.validate_options(options, MapSet.new([:timeout, :protocol, :proxy]))
 
               pool_opts = [
                 conn_opts: [
-                  proxy: options[:proxy] || nil,
                   transport_opts: [
                     timeout: options[:timeout] || 30_000
-                  ]
+                  ],
+                  proxy: options[:proxy]
                 ],
                 protocol: options[:protocol] || :http1
               ]
