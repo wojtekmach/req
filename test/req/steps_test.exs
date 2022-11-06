@@ -320,6 +320,16 @@ defmodule Req.StepsTest do
     assert Req.get!(c.url).body == %{"a" => 1}
   end
 
+  test "decode_body/1: json-api", c do
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      conn
+      |> Plug.Conn.put_resp_header("content-type", "application/vnd.api+json; charset=utf-8")
+      |> json(200, %{a: 1})
+    end)
+
+    assert Req.get!(c.url).body == %{"a" => 1}
+  end
+
   @tag :tmp_dir
   test "decode_body/1: with output", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
@@ -342,9 +352,9 @@ defmodule Req.StepsTest do
 
   @tag :tmp_dir
   test "decode_body/1: tar (content-type)", c do
-    files = [{'foo.txt', "bar"}]
+    files = [{~c"foo.txt", "bar"}]
 
-    path = '#{c.tmp_dir}/foo.tar'
+    path = ~c"#{c.tmp_dir}/foo.tar"
     :ok = :erl_tar.create(path, files)
     tar = File.read!(path)
 
@@ -359,9 +369,9 @@ defmodule Req.StepsTest do
 
   @tag :tmp_dir
   test "decode_body/1: tar (path)", c do
-    files = [{'foo.txt', "bar"}]
+    files = [{~c"foo.txt", "bar"}]
 
-    path = '#{c.tmp_dir}/foo.tar'
+    path = ~c"#{c.tmp_dir}/foo.tar"
     :ok = :erl_tar.create(path, files)
     tar = File.read!(path)
 
@@ -376,9 +386,9 @@ defmodule Req.StepsTest do
 
   @tag :tmp_dir
   test "decode_body/1: tar.gz (path)", c do
-    files = [{'foo.txt', "bar"}]
+    files = [{~c"foo.txt", "bar"}]
 
-    path = '#{c.tmp_dir}/foo.tar'
+    path = ~c"#{c.tmp_dir}/foo.tar"
     :ok = :erl_tar.create(path, files, [:compressed])
     tar = File.read!(path)
 
@@ -392,10 +402,10 @@ defmodule Req.StepsTest do
   end
 
   test "decode_body/1: zip (content-type)", c do
-    files = [{'foo.txt', "bar"}]
+    files = [{~c"foo.txt", "bar"}]
 
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      {:ok, {'foo.zip', data}} = :zip.create('foo.zip', files, [:memory])
+      {:ok, {~c"foo.zip", data}} = :zip.create(~c"foo.zip", files, [:memory])
 
       conn
       |> Plug.Conn.put_resp_content_type("application/zip", nil)
@@ -406,10 +416,10 @@ defmodule Req.StepsTest do
   end
 
   test "decode_body/1: zip (path)", c do
-    files = [{'foo.txt', "bar"}]
+    files = [{~c"foo.txt", "bar"}]
 
     Bypass.expect(c.bypass, "GET", "/foo.zip", fn conn ->
-      {:ok, {'foo.zip', data}} = :zip.create('foo.zip', files, [:memory])
+      {:ok, {~c"foo.zip", data}} = :zip.create(~c"foo.zip", files, [:memory])
 
       conn
       |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
@@ -825,25 +835,6 @@ defmodule Req.StepsTest do
     refute_received _
   end
 
-  @tag :capture_log
-  test "retry: always", c do
-    pid = self()
-
-    Bypass.expect(c.bypass, "POST", "/", fn conn ->
-      send(pid, :ping)
-      Plug.Conn.send_resp(conn, 500, "oops")
-    end)
-
-    request = Req.new(url: c.url, retry: :always, retry_delay: 1)
-
-    assert Req.post!(request).status == 500
-    assert_received :ping
-    assert_received :ping
-    assert_received :ping
-    assert_received :ping
-    refute_received _
-  end
-
   test "retry: never", c do
     pid = self()
 
@@ -1018,19 +1009,17 @@ defmodule Req.StepsTest do
     assert log =~ "1 attempt left"
   end
 
-  test "run_finch/1: :connect_options :timeout", c do
-    Bypass.stub(c.bypass, "GET", "/", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
+  test "run_finch/1: :connect_options :timeout" do
+    {:ok, listen_sock} = :gen_tcp.listen(0, [:binary])
+    {:ok, port} = :inet.port(listen_sock)
 
     req =
       Req.new(
-        url: c.url,
+        url: "http://localhost:#{port}",
         connect_options: [timeout: 0],
         retry: :never
       )
 
-    assert Req.request(req) == {:error, %Mint.TransportError{reason: :timeout}}
     assert Req.request(req) == {:error, %Mint.TransportError{reason: :timeout}}
   end
 
@@ -1062,8 +1051,15 @@ defmodule Req.StepsTest do
   end
 
   defp json(conn, status, data) do
-    conn
-    |> Plug.Conn.put_resp_content_type("application/json")
-    |> Plug.Conn.send_resp(status, Jason.encode_to_iodata!(data))
+    conn =
+      case Plug.Conn.get_resp_header(conn, "content-type") do
+        [] ->
+          Plug.Conn.put_resp_content_type(conn, "application/json")
+
+        _ ->
+          conn
+      end
+
+    Plug.Conn.send_resp(conn, status, Jason.encode_to_iodata!(data))
   end
 end

@@ -399,7 +399,7 @@ defmodule Req.Steps do
   @doc step: :request
   def cache(request) do
     if request.options[:cache] do
-      dir = Map.get(request.options, :cache_dir) || :filename.basedir(:user_cache, 'req')
+      dir = Map.get(request.options, :cache_dir) || :filename.basedir(:user_cache, ~c"req")
       cache_path = cache_path(dir, request)
 
       request
@@ -858,7 +858,7 @@ defmodule Req.Steps do
     decode_body({request, response}, format(request, response))
   end
 
-  defp decode_body({request, response}, "json") do
+  defp decode_body({request, response}, format) when format in ~w(json json-api) do
     {request, update_in(response.body, &Jason.decode!/1)}
   end
 
@@ -1099,8 +1099,6 @@ defmodule Req.Steps do
 
         * `:safe` (default) - retry GET/HEAD requests on HTTP 408/429/5xx responses or exceptions
 
-        * `:always` - always retry
-
         * `:never` - never retry
 
         * `fun` - a 1-arity function that accepts either a `Req.Response` or an exception struct
@@ -1155,9 +1153,6 @@ defmodule Req.Steps do
           {request, response_or_exception}
         end
 
-      :always ->
-        retry(request, response_or_exception)
-
       :never ->
         {request, response_or_exception}
 
@@ -1170,7 +1165,7 @@ defmodule Req.Steps do
 
       other ->
         raise ArgumentError,
-              "expected :retry to be :safe, :always, :never or a 1-arity function, " <>
+              "expected :retry to be :safe, :never, or a 1-arity function, " <>
                 "got: #{inspect(other)}"
     end
   end

@@ -665,9 +665,8 @@ defmodule Req do
   Retry options ([`retry`](`Req.Steps.retry/1`) step):
 
     * `:retry`: can be set to: `:safe` (default) to only retry GET/HEAD requests on HTTP 408/5xx
-      responses or exceptions, `:always` to always retry, `:never` to never retry, and `fun` - a
-      1-arity function that accepts either a `Req.Response` or an exception struct and returns
-      boolean whether to retry
+      responses or exceptions, `:never` to never retry, and `fun` - a 1-arity function that accepts
+      either a `Req.Response` or an exception struct and returns boolean whether to retry
 
     * `:retry_delay` - a function that receives the retry count (starting at 0) and returns the delay, the
       number of milliseconds to sleep before making another attempt.
