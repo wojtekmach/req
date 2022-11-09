@@ -475,7 +475,9 @@ defmodule Req.Steps do
 
         * `:protocol` - the HTTP protocol to use, defaults to `:http1`.
 
-        * `:proxy` - a proxy to use given in a format supported by the Mint package: A tuple `{schema, address, port, options}`.
+        * `:proxy` - a `{schema, address, port, options}` tuple. See
+          [Mint "Proxying" documentation](https://hexdocs.pm/mint/Mint.HTTP.html#connect/4-proxying)
+          for more information.
 
     * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
 
