@@ -835,6 +835,38 @@ defmodule Req.StepsTest do
     refute_received _
   end
 
+  @tag :capture_log
+  test "retry: don't repeat query string", c do
+    pid = self()
+
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      send(pid, :ping)
+      Plug.Conn.send_resp(conn, 500, "oops")
+    end)
+
+    request =
+      Req.new(url: c.url, params: [foo: "bar"], retry_delay: 1)
+      |> Req.Request.append_request_steps(
+        logger_request: fn request ->
+          assert URI.to_string(request.url) == "#{c.url}?foo=bar"
+
+          request
+        end
+      )
+      |> Req.Request.prepend_response_steps(
+        foo: fn {request, response} ->
+          {request, update_in(response.body, &(&1 <> " - updated"))}
+        end
+      )
+
+    assert Req.get!(request).body == "oops - updated"
+    assert_received :ping
+    assert_received :ping
+    assert_received :ping
+    assert_received :ping
+    refute_received _
+  end
+
   test "retry: never", c do
     pid = self()
 

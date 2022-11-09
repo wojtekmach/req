@@ -330,12 +330,16 @@ defmodule Req.Steps do
   end
 
   defp put_params(request, params) do
-    encoded = URI.encode_query(params)
+    if Req.Request.get_private(request, :req_retry_count) do
+      request
+    else
+      encoded = URI.encode_query(params)
 
-    update_in(request.url.query, fn
-      nil -> encoded
-      query -> query <> "&" <> encoded
-    end)
+      update_in(request.url.query, fn
+        nil -> encoded
+        query -> query <> "&" <> encoded
+      end)
+    end
   end
 
   @doc """
