@@ -874,6 +874,24 @@ defmodule Req.StepsTest do
     refute_received _
   end
 
+  @tag :capture_log
+  test "retry: does not re-encode params", c do
+    pid = self()
+
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      assert conn.query_string == "a=1&b=2"
+      send(pid, :ping)
+      Plug.Conn.send_resp(conn, 500, "oops")
+    end)
+
+    assert Req.get!(c.url, params: [a: 1, b: 2], retry_delay: 1).status == 500
+    assert_received :ping
+    assert_received :ping
+    assert_received :ping
+    assert_received :ping
+    refute_received _
+  end
+
   @tag :tmp_dir
   test "cache", c do
     pid = self()

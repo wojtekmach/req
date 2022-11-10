@@ -336,7 +336,8 @@ defmodule Req.Request do
             response_steps: [],
             error_steps: [],
             private: %{},
-            registered_options: MapSet.new()
+            registered_options: MapSet.new(),
+            current_request_steps: []
 
   @doc """
   Gets the value for a specific private `key`.
@@ -389,7 +390,11 @@ defmodule Req.Request do
       )
   """
   def append_request_steps(request, steps) do
-    update_in(request.request_steps, &(&1 ++ steps))
+    %{
+      request
+      | request_steps: request.request_steps ++ steps,
+        current_request_steps: request.current_request_steps ++ Keyword.keys(steps)
+    }
   end
 
   @doc """
@@ -403,7 +408,11 @@ defmodule Req.Request do
       )
   """
   def prepend_request_steps(request, steps) do
-    update_in(request.request_steps, &(steps ++ &1))
+    %{
+      request
+      | request_steps: steps ++ request.request_steps,
+        current_request_steps: Keyword.keys(steps) ++ request.current_request_steps
+    }
   end
 
   @doc """
@@ -417,7 +426,10 @@ defmodule Req.Request do
       )
   """
   def append_response_steps(request, steps) do
-    update_in(request.response_steps, &(&1 ++ steps))
+    %{
+      request
+      | response_steps: request.response_steps ++ steps
+    }
   end
 
   @doc """
@@ -431,7 +443,10 @@ defmodule Req.Request do
       )
   """
   def prepend_response_steps(request, steps) do
-    update_in(request.response_steps, &(steps ++ &1))
+    %{
+      request
+      | response_steps: steps ++ request.response_steps
+    }
   end
 
   @doc """
@@ -445,7 +460,10 @@ defmodule Req.Request do
       )
   """
   def append_error_steps(request, steps) do
-    update_in(request.error_steps, &(&1 ++ steps))
+    %{
+      request
+      | error_steps: request.error_steps ++ steps
+    }
   end
 
   @doc """
@@ -459,7 +477,10 @@ defmodule Req.Request do
       )
   """
   def prepend_error_steps(request, steps) do
-    update_in(request.error_steps, &(steps ++ &1))
+    %{
+      request
+      | error_steps: steps ++ request.error_steps
+    }
   end
 
   @doc false
@@ -611,13 +632,27 @@ defmodule Req.Request do
   Returns `{:ok, response}` or `{:error, exception}`.
   """
   def run(request) do
-    run_request(request.request_steps, request)
+    run_request(request)
   end
 
-  defp run_request([step | steps], request) do
-    case run_step(step, request) do
+  @doc """
+  Runs a request pipeline and returns a response or raises an error.
+
+  See `run/1` for more information.
+  """
+  def run!(request) do
+    case run(request) do
+      {:ok, response} -> response
+      {:error, exception} -> raise exception
+    end
+  end
+
+  defp run_request(%{current_request_steps: [step | rest]} = request) do
+    step = Keyword.fetch!(request.request_steps, step)
+
+    case step.(request) do
       %Req.Request{} = request ->
-        run_request(steps, request)
+        run_request(%{request | current_request_steps: rest})
 
       {%Req.Request{halted: true}, response_or_exception} ->
         result(response_or_exception)
@@ -630,8 +665,8 @@ defmodule Req.Request do
     end
   end
 
-  defp run_request([], request) do
-    case run_step({:adapter, request.adapter}, request) do
+  defp run_request(%{current_request_steps: []} = request) do
+    case request.adapter.(request) do
       {request, %Req.Response{} = response} ->
         run_response(request, response)
 
@@ -641,18 +676,6 @@ defmodule Req.Request do
       other ->
         raise "expected adapter to return {request, response} or {request, exception}, " <>
                 "got: #{inspect(other)}"
-    end
-  end
-
-  @doc """
-  Runs a request pipeline and returns a response or raises an error.
-
-  See `run/1` for more information.
-  """
-  def run!(request) do
-    case run(request) do
-      {:ok, response} -> response
-      {:error, exception} -> raise exception
     end
   end
 

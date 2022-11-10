@@ -60,14 +60,47 @@ defmodule Req do
     {body, options} = Keyword.pop(options, :body, "")
     {plugins, options} = Keyword.pop(options, :plugins, [])
 
-    request = %Req.Request{
-      adapter: adapter,
-      method: method,
-      url: url && URI.parse(url),
-      headers: encode_headers(headers),
-      body: body,
-      options: Map.new(options),
-      request_steps: [
+    request =
+      %Req.Request{
+        adapter: adapter,
+        method: method,
+        url: url && URI.parse(url),
+        headers: encode_headers(headers),
+        body: body,
+        options: Map.new(options),
+        registered_options:
+          MapSet.new([
+            :user_agent,
+            :compressed,
+            :range,
+            :http_errors,
+            :base_url,
+            :params,
+            :auth,
+            :form,
+            :json,
+            :compress_body,
+            :compressed,
+            :raw,
+            :decode_body,
+            :output,
+            :follow_redirects,
+            :location_trusted,
+            :max_redirects,
+            :retry,
+            :retry_delay,
+            :max_retries,
+            :cache,
+            :cache_dir,
+            :plug,
+            :finch,
+            :connect_options,
+            :receive_timeout,
+            :pool_timeout,
+            :unix_socket
+          ])
+      }
+      |> Req.Request.prepend_request_steps(
         put_user_agent: &Req.Steps.put_user_agent/1,
         compressed: &Req.Steps.compressed/1,
         encode_body: &Req.Steps.encode_body/1,
@@ -78,50 +111,16 @@ defmodule Req do
         cache: &Req.Steps.cache/1,
         put_plug: &Req.Steps.put_plug/1,
         compress_body: &Req.Steps.compress_body/1
-      ],
-      response_steps: [
+      )
+      |> Req.Request.prepend_response_steps(
         retry: &Req.Steps.retry/1,
         follow_redirects: &Req.Steps.follow_redirects/1,
         decompress_body: &Req.Steps.decompress_body/1,
         decode_body: &Req.Steps.decode_body/1,
         handle_http_errors: &Req.Steps.handle_http_errors/1,
         output: &Req.Steps.output/1
-      ],
-      error_steps: [
-        retry: &Req.Steps.retry/1
-      ],
-      registered_options:
-        MapSet.new([
-          :user_agent,
-          :compressed,
-          :range,
-          :http_errors,
-          :base_url,
-          :params,
-          :auth,
-          :form,
-          :json,
-          :compress_body,
-          :compressed,
-          :raw,
-          :decode_body,
-          :output,
-          :follow_redirects,
-          :location_trusted,
-          :max_redirects,
-          :retry,
-          :retry_delay,
-          :max_retries,
-          :cache,
-          :cache_dir,
-          :plug,
-          :finch,
-          :connect_options,
-          :receive_timeout,
-          :pool_timeout,
-          :unix_socket
-        ])
-    }
+      )
+      |> Req.Request.prepend_error_steps(retry: &Req.Steps.retry/1)
 
     Req.Request.validate_options(request, options)
     run_plugins(plugins, request)
