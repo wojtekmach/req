@@ -909,6 +909,10 @@ defmodule Req do
     run_plugins(rest, plugin.run(request))
   end
 
+  defp run_plugins([plugin | rest], request) when is_function(plugin, 1) do
+    run_plugins(rest, plugin.(request))
+  end
+
   defp run_plugins([], request) do
     request
   end
