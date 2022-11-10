@@ -700,6 +700,10 @@ defmodule Req do
 
         * `:protocol` - the HTTP protocol to use, defaults to `:http1`.
 
+        * `:proxy` - a `{schema, address, port, options}` tuple. See
+          [Mint "Proxying" documentation](https://hexdocs.pm/mint/Mint.HTTP.html#connect/4-proxying)
+          for more information.
+
     * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
 
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
