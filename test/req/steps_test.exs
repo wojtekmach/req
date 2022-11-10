@@ -1043,17 +1043,17 @@ defmodule Req.StepsTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
+    # Bypass will forward request to itself
     # Not quite a proper forward proxy server, but good enough
     test_proxy = {:http, "localhost", c.bypass.port, []}
 
     req =
       Req.new(
-        base_url: c.url, # Bypass forwards request to itself
-        url: "/foo/bar",
+        base_url: c.url,
         connect_options: [proxy: test_proxy]
       )
 
-    assert Req.request!(req).body == "ok"
+    assert Req.request!(req, url: "/foo/bar").body == "ok"
   end
 
   test "run_finch/1: :connect_options bad option", c do
