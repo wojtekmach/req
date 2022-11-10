@@ -518,7 +518,7 @@ defmodule Req.Steps do
             options = request.options[:connect_options] ->
               Req.Request.validate_options(options, MapSet.new([:timeout, :protocol, :proxy]))
 
-              proxy_opt = if is_nil(options[:proxy]), do: [], else: [proxy: options[:proxy]]
+              proxy_opts = Keyword.take(options, [:proxy])
 
               pool_opts = [
                 conn_opts:
@@ -526,7 +526,7 @@ defmodule Req.Steps do
                     transport_opts: [
                       timeout: options[:timeout] || 30_000
                     ]
-                  ] ++ proxy_opt,
+                  ] ++ proxy_opts,
                 protocol: options[:protocol] || :http1
               ]
 
