@@ -53,77 +53,127 @@ defmodule Req do
   @spec new(options :: keyword()) :: Req.Request.t()
   def new(options \\ []) do
     options = Keyword.merge(default_options(), options)
-    {adapter, options} = Keyword.pop(options, :adapter, &Req.Steps.run_finch/1)
-    {method, options} = Keyword.pop(options, :method, :get)
-    {headers, options} = Keyword.pop(options, :headers, [])
-    {url, options} = Keyword.pop(options, :url, "")
-    {body, options} = Keyword.pop(options, :body, "")
     {plugins, options} = Keyword.pop(options, :plugins, [])
 
-    request =
-      %Req.Request{
-        adapter: adapter,
-        method: method,
-        url: url && URI.parse(url),
-        headers: encode_headers(headers),
-        body: body,
-        options: Map.new(options),
-        registered_options:
-          MapSet.new([
-            :user_agent,
-            :compressed,
-            :range,
-            :http_errors,
-            :base_url,
-            :params,
-            :auth,
-            :form,
-            :json,
-            :compress_body,
-            :compressed,
-            :raw,
-            :decode_body,
-            :output,
-            :follow_redirects,
-            :location_trusted,
-            :max_redirects,
-            :retry,
-            :retry_delay,
-            :max_retries,
-            :cache,
-            :cache_dir,
-            :plug,
-            :finch,
-            :connect_options,
-            :receive_timeout,
-            :pool_timeout,
-            :unix_socket
-          ])
-      }
-      |> Req.Request.prepend_request_steps(
-        put_user_agent: &Req.Steps.put_user_agent/1,
-        compressed: &Req.Steps.compressed/1,
-        encode_body: &Req.Steps.encode_body/1,
-        put_base_url: &Req.Steps.put_base_url/1,
-        auth: &Req.Steps.auth/1,
-        put_params: &Req.Steps.put_params/1,
-        put_range: &Req.Steps.put_range/1,
-        cache: &Req.Steps.cache/1,
-        put_plug: &Req.Steps.put_plug/1,
-        compress_body: &Req.Steps.compress_body/1
-      )
-      |> Req.Request.prepend_response_steps(
-        retry: &Req.Steps.retry/1,
-        follow_redirects: &Req.Steps.follow_redirects/1,
-        decompress_body: &Req.Steps.decompress_body/1,
-        decode_body: &Req.Steps.decode_body/1,
-        handle_http_errors: &Req.Steps.handle_http_errors/1,
-        output: &Req.Steps.output/1
-      )
-      |> Req.Request.prepend_error_steps(retry: &Req.Steps.retry/1)
+    %Req.Request{
+      registered_options:
+        MapSet.new([
+          :user_agent,
+          :compressed,
+          :range,
+          :http_errors,
+          :base_url,
+          :params,
+          :auth,
+          :form,
+          :json,
+          :compress_body,
+          :compressed,
+          :raw,
+          :decode_body,
+          :output,
+          :follow_redirects,
+          :location_trusted,
+          :max_redirects,
+          :retry,
+          :retry_delay,
+          :max_retries,
+          :cache,
+          :cache_dir,
+          :plug,
+          :finch,
+          :connect_options,
+          :receive_timeout,
+          :pool_timeout,
+          :unix_socket
+        ])
+    }
+    |> update(options)
+    |> Req.Request.prepend_request_steps(
+      put_user_agent: &Req.Steps.put_user_agent/1,
+      compressed: &Req.Steps.compressed/1,
+      encode_body: &Req.Steps.encode_body/1,
+      put_base_url: &Req.Steps.put_base_url/1,
+      auth: &Req.Steps.auth/1,
+      put_params: &Req.Steps.put_params/1,
+      put_range: &Req.Steps.put_range/1,
+      cache: &Req.Steps.cache/1,
+      put_plug: &Req.Steps.put_plug/1,
+      compress_body: &Req.Steps.compress_body/1
+    )
+    |> Req.Request.prepend_response_steps(
+      retry: &Req.Steps.retry/1,
+      follow_redirects: &Req.Steps.follow_redirects/1,
+      decompress_body: &Req.Steps.decompress_body/1,
+      decode_body: &Req.Steps.decode_body/1,
+      handle_http_errors: &Req.Steps.handle_http_errors/1,
+      output: &Req.Steps.output/1
+    )
+    |> Req.Request.prepend_error_steps(retry: &Req.Steps.retry/1)
+    |> run_plugins(plugins)
+  end
 
-    Req.Request.validate_options(request, options)
-    run_plugins(plugins, request)
+  @doc """
+  Updates a request struct.
+
+  See `request/1` for a list of available options. See `Req.Request` module documentation
+  for more information on the underlying request struct.
+
+  ## Examples
+
+      iex> req = Req.new(base_url: "https://httpbin.org")
+      iex> req = Req.update(req, auth: {"alice", "secret"})
+      iex> req.options
+      %{auth: {"alice", "secret"}, base_url: "https://httpbin.org"}
+
+  Passing :headers will automatically merge them:
+
+      iex> req = Req.new(headers: [a: 1])
+      iex> req = Req.update(req, headers: [b: 2])
+      iex> req.headers
+      [{"a", "1"}, {"b", "2"}]
+
+  """
+  @spec update(Req.Request.t(), options :: keyword()) :: Req.Request.t()
+  def update(%Req.Request{} = request, options) when is_list(options) do
+    request_option_names = [:method, :url, :headers, :body, :adapter]
+
+    {request_options, options} = Keyword.split(options, request_option_names)
+
+    registered =
+      MapSet.union(
+        request.registered_options,
+        MapSet.new(request_option_names)
+      )
+
+    Req.Request.validate_options(options, registered)
+
+    request_options =
+      if request_options[:headers] do
+        update_in(request_options[:headers], &encode_headers/1)
+      else
+        request_options
+      end
+
+    request =
+      Map.merge(request, Map.new(request_options), fn
+        :url, _, url ->
+          URI.parse(url)
+
+        :headers, old, new ->
+          old ++ new
+
+        _, _, value ->
+          value
+      end)
+
+    request = update_in(request.options, &Map.merge(&1, Map.new(options)))
+
+    if request.options[:output] do
+      update_in(request.options, &Map.put(&1, :decode_body, false))
+    else
+      request
+    end
   end
 
   @doc """
@@ -763,42 +813,12 @@ defmodule Req do
   @spec request(Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
   def request(request, options) when is_list(options) do
-    {request_options, options} =
-      Keyword.split(options, [:method, :url, :headers, :body, :adapter])
-
-    Req.Request.validate_options(request, options)
-
-    request_options =
-      if request_options[:headers] do
-        update_in(request_options[:headers], &encode_headers/1)
-      else
-        request_options
-      end
-
-    request =
-      Map.merge(request, Map.new(request_options), fn
-        :url, _, url ->
-          URI.parse(url)
-
-        :headers, old, new ->
-          old ++ new
-
-        _, _, value ->
-          value
-      end)
-
     {plugins, options} = Keyword.pop(options, :plugins, [])
-    request = update_in(request.options, &Map.merge(&1, Map.new(options)))
-    request = run_plugins(plugins, request)
 
-    request =
-      if request.options[:output] do
-        update_in(request.options, &Map.put(&1, :decode_body, false))
-      else
-        request
-      end
-
-    Req.Request.run(request)
+    request
+    |> Req.update(options)
+    |> run_plugins(plugins)
+    |> Req.Request.run()
   end
 
   @doc false
@@ -904,15 +924,15 @@ defmodule Req do
   end
 
   # Plugins support is experimental, undocumented, and likely won't make the new release.
-  defp run_plugins([plugin | rest], request) when is_atom(plugin) do
-    run_plugins(rest, plugin.run(request))
+  defp run_plugins(request, [plugin | rest]) when is_atom(plugin) do
+    run_plugins(plugin.run(request), rest)
   end
 
-  defp run_plugins([plugin | rest], request) when is_function(plugin, 1) do
-    run_plugins(rest, plugin.(request))
+  defp run_plugins(request, [plugin | rest]) when is_function(plugin, 1) do
+    run_plugins(plugin.(request), rest)
   end
 
-  defp run_plugins([], request) do
+  defp run_plugins(request, []) do
     request
   end
 

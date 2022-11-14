@@ -35,7 +35,7 @@ defmodule Req.StepsTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
 
-    assert Req.get!("/foo", base_url: c.url <> "/api/v2").body == "ok"
+    assert Req.get!("/foo", base_url: c.url <> "/api/v2", retry: :never).body == "ok"
     assert Req.get!("foo", base_url: c.url <> "/api/v2").body == "ok"
     assert Req.get!("/foo", base_url: c.url <> "/api/v2/").body == "ok"
     assert Req.get!("foo", base_url: c.url <> "/api/v2/").body == "ok"

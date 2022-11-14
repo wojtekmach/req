@@ -1,6 +1,6 @@
 defmodule Req.RequestTest do
   use ExUnit.Case, async: true
-  doctest Req.Request, except: [register_options: 2]
+  doctest Req.Request
 
   setup do
     bypass = Bypass.open()
@@ -14,6 +14,15 @@ defmodule Req.RequestTest do
 
     request = new(url: c.url <> "/ok")
     assert {:ok, %{status: 200, body: "ok"}} = Req.Request.run(request)
+  end
+
+  test "merge_options/2: deprecated options" do
+    output =
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        Req.Request.merge_options(Req.new(), url: "foo", headers: "bar")
+      end)
+
+    assert output =~ "Passing :url/:headers is deprecated"
   end
 
   test "simple request step", c do
@@ -30,22 +39,6 @@ defmodule Req.RequestTest do
       )
 
     assert {:ok, %{status: 200, body: "ok"}} = Req.Request.run(request)
-  end
-
-  test "prepare/1" do
-    request =
-      Req.new(method: :get, base_url: "http://foo", url: "/bar", auth: {"foo", "bar"})
-      |> Req.Request.prepare()
-
-    assert request.url == URI.parse("http://foo/bar")
-
-    authorization = "Basic " <> Base.encode64("foo:bar")
-
-    assert [
-             {"user-agent", "req/" <> _},
-             {"accept-encoding", "zstd, br, gzip, deflate"},
-             {"authorization", ^authorization}
-           ] = request.headers
   end
 
   test "request step returns response", c do
@@ -238,6 +231,22 @@ defmodule Req.RequestTest do
       )
 
     assert {:ok, %{status: 200, body: "ok"}} = Req.Request.run(request)
+  end
+
+  test "prepare/1" do
+    request =
+      Req.new(method: :get, base_url: "http://foo", url: "/bar", auth: {"foo", "bar"})
+      |> Req.Request.prepare()
+
+    assert request.url == URI.parse("http://foo/bar")
+
+    authorization = "Basic " <> Base.encode64("foo:bar")
+
+    assert [
+             {"user-agent", "req/" <> _},
+             {"accept-encoding", "zstd, br, gzip, deflate"},
+             {"authorization", ^authorization}
+           ] = request.headers
   end
 
   ## Helpers

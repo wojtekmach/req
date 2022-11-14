@@ -326,7 +326,7 @@ defmodule Req.Request do
   @typep error_step() :: fun()
 
   defstruct method: :get,
-            url: "",
+            url: URI.parse(""),
             headers: [],
             body: nil,
             options: %{},
@@ -511,6 +511,24 @@ defmodule Req.Request do
   """
   @spec merge_options(t(), keyword()) :: t()
   def merge_options(%Req.Request{} = request, options) when is_list(options) do
+    # TODO: remove on v0.5
+    deprecated = [:method, :url, :headers, :body, :adapter]
+
+    options =
+      case deprecated -- deprecated -- Keyword.keys(options) do
+        [] ->
+          options
+
+        deprecated ->
+          IO.warn(
+            "Passing " <>
+              Enum.map_join(deprecated, "/", &inspect/1) <>
+              " is deprecated, use Req.update/2 instead."
+          )
+
+          Keyword.drop(options, deprecated)
+      end
+
     validate_options(request, options)
     update_in(request.options, &Map.merge(&1, Map.new(options)))
   end
@@ -615,12 +633,12 @@ defmodule Req.Request do
       iex> Req.new(bas_url: "https://httpbin.org")
       ** (ArgumentError) unknown option :bas_url. Did you mean :base_url?
 
-      iex> req =
-      ...>   Req.new(base_url: "https://httpbin.org")
-      ...>   |> Req.Request.register_options([:foo])
-      ...>
-      iex> Req.get!(req, url: "/status/201", foo: :bar).status
-      201
+      req =
+        Req.new(base_url: "https://httpbin.org")
+        |> Req.Request.register_options([:foo])
+
+      Req.get!(req, url: "/status/201", foo: :bar).status
+      #=> 201
   """
   def register_options(%Req.Request{} = request, options) when is_list(options) do
     update_in(request.registered_options, &MapSet.union(&1, MapSet.new(options)))
@@ -733,13 +751,7 @@ defmodule Req.Request do
 
   @doc false
   def validate_options(%Req.Request{} = request, options) do
-    registered =
-      MapSet.union(
-        request.registered_options,
-        MapSet.new([:method, :url, :headers, :body, :adapter])
-      )
-
-    validate_options(options, registered)
+    validate_options(options, request.registered_options)
   end
 
   def validate_options([{name, _value} | rest], registered) do

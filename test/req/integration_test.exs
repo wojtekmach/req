@@ -38,7 +38,4 @@ defmodule Req.IntegrationTest do
       decode_body: 1,
       handle_http_errors: 1
     ]
-
-  doctest Req.Request,
-    only: [register_options: 2]
 end
