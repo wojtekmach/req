@@ -1136,10 +1136,10 @@ defmodule Req.Steps do
 
         * `:safe` (default) - retry GET/HEAD requests on HTTP 408/429/5xx responses or exceptions
 
-        * `:never` - never retry
-
         * `fun` - a 1-arity function that accepts either a `Req.Response` or an exception struct
           and returns boolean whether to retry
+
+        * `false` - never retry
 
     * `:retry_delay` - a function that receives the retry count (starting at 0) and returns the delay, the
       number of milliseconds to sleep before making another attempt.
@@ -1190,7 +1190,11 @@ defmodule Req.Steps do
           {request, response_or_exception}
         end
 
+      # TODO: Deprecate in v0.4
       :never ->
+        {request, response_or_exception}
+
+      false ->
         {request, response_or_exception}
 
       fun when is_function(fun) ->
@@ -1202,7 +1206,7 @@ defmodule Req.Steps do
 
       other ->
         raise ArgumentError,
-              "expected :retry to be :safe, :never, or a 1-arity function, " <>
+              "expected :retry to be :safe, false, or a 1-arity function, " <>
                 "got: #{inspect(other)}"
     end
   end
