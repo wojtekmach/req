@@ -126,7 +126,7 @@ defmodule Req do
       iex> req.options
       %{auth: {"alice", "secret"}, base_url: "https://httpbin.org"}
 
-  Passing :headers will automatically merge them:
+  Passing `:headers` will automatically merge them:
 
       iex> req = Req.new(headers: [a: 1])
       iex> req = Req.update(req, headers: [b: 2])
