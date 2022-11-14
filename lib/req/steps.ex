@@ -475,9 +475,16 @@ defmodule Req.Steps do
 
         * `:protocol` - the HTTP protocol to use, defaults to `:http1`.
 
-        * `:proxy` - a `{schema, address, port, options}` tuple. See
-          [Mint "Proxying" documentation](https://hexdocs.pm/mint/Mint.HTTP.html#connect/4-proxying)
-          for more information.
+        * `:hostname` - Mint explicit hostname, see `Mint.HTTP.connect/4` for more information.
+
+        * `:transport_opts` - Mint transport options, see `Mint.HTTP.connect/4` for more information.
+
+        * `:proxy_headers` - Mint proxy headers, see `Mint.HTTP.connect/4` for more information.
+
+        * `:proxy` - Mint HTTP/1 proxy settings, a `{schema, address, port, options}` tuple.
+          See `Mint.HTTP.connect/4` for more information.
+
+        * `:client_settings` - Mint HTTP/2 client settings, see `Mint.HTTP.connect/4` for more information.
 
     * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
 
@@ -501,6 +508,11 @@ defmodule Req.Steps do
       iex> Req.get!(url, connect_options: [timeout: 5000])
 
       iex> Req.get!(url, connect_options: [protocol: :http2])
+
+  Connecting with built-in CA store (requires OTP 25+):
+
+      iex> Req.get!(url, connect_options: [cacerts: :public_key.cacerts_get()])
+
   """
   @doc step: :request
   def run_finch(request) do
@@ -516,17 +528,36 @@ defmodule Req.Steps do
         :error ->
           cond do
             options = request.options[:connect_options] ->
-              Req.Request.validate_options(options, MapSet.new([:timeout, :protocol, :proxy]))
+              Req.Request.validate_options(
+                options,
+                MapSet.new([
+                  :timeout,
+                  :protocol,
+                  :transport_opts,
+                  :proxy_headers,
+                  :proxy,
+                  :client_settings
+                ])
+              )
 
+              hostname_opts = Keyword.take(options, [:hostname])
+
+              transport_opts = [
+                transport_opts:
+                  Keyword.get(options, :transport_opts, []) |> Keyword.put_new(:timeout, 30_000)
+              ]
+
+              proxy_headers_opts = Keyword.take(options, [:proxy_headers])
               proxy_opts = Keyword.take(options, [:proxy])
+              client_settings_opts = Keyword.take(options, [:client_settings])
 
               pool_opts = [
                 conn_opts:
-                  [
-                    transport_opts: [
-                      timeout: options[:timeout] || 30_000
-                    ]
-                  ] ++ proxy_opts,
+                  hostname_opts ++
+                    transport_opts ++
+                    proxy_headers_opts ++
+                    proxy_opts ++
+                    client_settings_opts,
                 protocol: options[:protocol] || :http1
               ]
 

@@ -749,9 +749,15 @@ defmodule Req do
 
         * `:protocol` - the HTTP protocol to use, defaults to `:http1`.
 
-        * `:proxy` - a `{schema, address, port, options}` tuple. See
-          [Mint "Proxying" documentation](https://hexdocs.pm/mint/Mint.HTTP.html#connect/4-proxying)
-          for more information.
+        * `:hostname` - Mint explicit hostname
+
+        * `:transport_opts` - Mint transport options
+
+        * `:proxy_headers` - Mint proxy headers
+
+        * `:proxy` - Mint HTTP/1 proxy settings, a `{schema, address, port, options}` tuple.
+
+        * `:client_settings` - Mint HTTP/2 client settings
 
     * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
 

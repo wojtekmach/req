@@ -1074,6 +1074,14 @@ defmodule Req.StepsTest do
     assert Req.request!(req, url: "/foo/bar").body == "ok"
   end
 
+  test "run_finch/1: :connect_options :transport_opts", c do
+    req = Req.new(connect_options: [transport_opts: [cacertfile: "bad.pem"]])
+
+    assert_raise File.Error, ~r/could not read file "bad.pem"/, fn ->
+      Req.request!(req, url: "https://localhost:#{c.bypass.port}")
+    end
+  end
+
   test "run_finch/1: :connect_options bad option", c do
     assert_raise ArgumentError, "unknown option :timeou. Did you mean :timeout?", fn ->
       Req.get!(c.url, connect_options: [timeou: 0])
