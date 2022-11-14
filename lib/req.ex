@@ -931,7 +931,11 @@ defmodule Req do
 
   # Plugins support is experimental, undocumented, and likely won't make the new release.
   defp run_plugins(request, [plugin | rest]) when is_atom(plugin) do
-    run_plugins(plugin.run(request), rest)
+    if Code.ensure_loaded?(plugin) and function_exported?(plugin, :attach, 1) do
+      run_plugins(plugin.attach(request), rest)
+    else
+      run_plugins(plugin.run(request), rest)
+    end
   end
 
   defp run_plugins(request, [plugin | rest]) when is_function(plugin, 1) do
