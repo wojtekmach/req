@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## v0.3.2 (2022-11-14)
+
+  * `decode_body`: Decode JSON when response is json-api mime type
+  * `put_params`: Fix bug when params have been duplicated when retrying requeset
+  * `retry`: Remove `retry: :always` option
+  * `retry`: Soft-deprecate `retry: :never` in favour of `retry: false`
+  * `run_finch`: Add `:transport_opts`, `:proxy_headers`, `:proxy`, and `:client_settings` options
+  * `Req.Response.json/2`: Do not override content-type
+
 ## v0.3.1 (2022-09-09)
 
   * `encode_body`: Set Accept header in JSON requests
