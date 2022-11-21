@@ -1,6 +1,4 @@
 defmodule Req do
-  @external_resource "README.md"
-
   @moduledoc """
   The high-level API.
 
