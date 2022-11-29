@@ -663,6 +663,22 @@ defmodule Req.StepsTest do
     assert captured_log =~ "follow_redirects: redirecting to " <> c.url
   end
 
+  test "follow_redirects/1: inherit scheme", c do
+    "http:" <> no_scheme = c.url
+
+    Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+      redirect(conn, 302, "#{no_scheme}/ok")
+    end)
+
+    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    assert ExUnit.CaptureLog.capture_log(fn ->
+             assert Req.get!(c.url <> "/redirect").status == 200
+           end) =~ "[debug] follow_redirects: redirecting to #{no_scheme}/ok"
+  end
+
   defp redirect(conn, status, url) do
     conn
     |> Plug.Conn.put_resp_header("location", url)
