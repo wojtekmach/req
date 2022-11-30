@@ -516,68 +516,7 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def run_finch(request) do
-    finch_name =
-      case Map.fetch(request.options, :finch) do
-        {:ok, name} ->
-          if request.options[:connect_options] do
-            raise ArgumentError, "cannot set both :finch and :connect_options"
-          end
-
-          name
-
-        :error ->
-          cond do
-            options = request.options[:connect_options] ->
-              Req.Request.validate_options(
-                options,
-                MapSet.new([
-                  :timeout,
-                  :protocol,
-                  :transport_opts,
-                  :proxy_headers,
-                  :proxy,
-                  :client_settings
-                ])
-              )
-
-              hostname_opts = Keyword.take(options, [:hostname])
-
-              transport_opts = [
-                transport_opts:
-                  Keyword.get(options, :transport_opts, []) |> Keyword.put_new(:timeout, 30_000)
-              ]
-
-              proxy_headers_opts = Keyword.take(options, [:proxy_headers])
-              proxy_opts = Keyword.take(options, [:proxy])
-              client_settings_opts = Keyword.take(options, [:client_settings])
-
-              pool_opts = [
-                conn_opts:
-                  hostname_opts ++
-                    transport_opts ++
-                    proxy_headers_opts ++
-                    proxy_opts ++
-                    client_settings_opts,
-                protocol: options[:protocol] || :http1
-              ]
-
-              name = custom_pool_name(pool_opts)
-
-              case DynamicSupervisor.start_child(
-                     Req.FinchSupervisor,
-                     {Finch, name: name, pools: %{default: pool_opts}}
-                   ) do
-                {:ok, _} ->
-                  name
-
-                {:error, {:already_started, _}} ->
-                  name
-              end
-
-            true ->
-              Req.Finch
-          end
-      end
+    finch_name = finch_name(request)
 
     finch_request =
       Finch.build(request.method, request.url, request.headers, request.body)
@@ -601,14 +540,74 @@ defmodule Req.Steps do
     end
   end
 
-  defp custom_pool_name(options) do
-    name =
-      options
-      |> :erlang.term_to_binary()
-      |> :erlang.md5()
-      |> Base.url_encode64(padding: false)
+  defp finch_name(request) do
+    case Map.fetch(request.options, :finch) do
+      {:ok, name} ->
+        if request.options[:connect_options] do
+          raise ArgumentError, "cannot set both :finch and :connect_options"
+        end
 
-    Module.concat(Req.FinchSupervisor, "Pool_#{name}")
+        name
+
+      :error ->
+        cond do
+          options = request.options[:connect_options] ->
+            Req.Request.validate_options(
+              options,
+              MapSet.new([
+                :timeout,
+                :protocol,
+                :transport_opts,
+                :proxy_headers,
+                :proxy,
+                :client_settings
+              ])
+            )
+
+            hostname_opts = Keyword.take(options, [:hostname])
+
+            transport_opts = [
+              transport_opts:
+                Keyword.get(options, :transport_opts, []) |> Keyword.put_new(:timeout, 30_000)
+            ]
+
+            proxy_headers_opts = Keyword.take(options, [:proxy_headers])
+            proxy_opts = Keyword.take(options, [:proxy])
+            client_settings_opts = Keyword.take(options, [:client_settings])
+
+            pool_opts = [
+              conn_opts:
+                hostname_opts ++
+                  transport_opts ++
+                  proxy_headers_opts ++
+                  proxy_opts ++
+                  client_settings_opts,
+              protocol: options[:protocol] || :http1
+            ]
+
+            name =
+              options
+              |> :erlang.term_to_binary()
+              |> :erlang.md5()
+              |> Base.url_encode64(padding: false)
+
+            name = Module.concat(Req.FinchSupervisor, "Pool_#{name}")
+
+            case DynamicSupervisor.start_child(
+                   Req.FinchSupervisor,
+                   {Finch, name: name, pools: %{default: pool_opts}}
+                 ) do
+              {:ok, _} ->
+                name
+
+              {:error, {:already_started, _}} ->
+                name
+            end
+
+          true ->
+            Req.Finch
+        end
+    end
   end
 
   @doc """
