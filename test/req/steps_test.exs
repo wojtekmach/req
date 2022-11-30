@@ -8,7 +8,7 @@ defmodule Req.StepsTest do
 
   ## Request steps
 
-  test "put_base_url/1", c do
+  test "put_base_url", c do
     Bypass.expect(c.bypass, "GET", "", fn conn ->
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
@@ -21,7 +21,7 @@ defmodule Req.StepsTest do
     assert Req.get!(req, url: "").body == "ok"
   end
 
-  test "put_base_url/1: with absolute url", c do
+  test "put_base_url: with absolute url", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
@@ -29,7 +29,7 @@ defmodule Req.StepsTest do
     assert Req.get!(c.url, base_url: "ignored").body == "ok"
   end
 
-  test "put_base_url/1: with base path", c do
+  test "put_base_url: with base path", c do
     Bypass.expect(c.bypass, "GET", "/api/v2/foo", fn conn ->
       assert conn.request_path == "/api/v2/foo"
       Plug.Conn.send_resp(conn, 200, "ok")
@@ -42,14 +42,14 @@ defmodule Req.StepsTest do
     assert Req.get!("", base_url: c.url <> "/api/v2/foo").body == "ok"
   end
 
-  test "auth/1: basic" do
+  test "auth: basic" do
     req = Req.new(auth: {"foo", "bar"}) |> Req.Request.prepare()
 
     assert List.keyfind(req.headers, "authorization", 0) ==
              {"authorization", "Basic #{Base.encode64("foo:bar")}"}
   end
 
-  test "auth/1: bearer" do
+  test "auth: bearer" do
     req = Req.new(auth: {:bearer, "abcd"}) |> Req.Request.prepare()
 
     assert List.keyfind(req.headers, "authorization", 0) ==
@@ -57,7 +57,7 @@ defmodule Req.StepsTest do
   end
 
   @tag :tmp_dir
-  test "auth/1: :netrc", c do
+  test "auth: :netrc", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       expected = "Basic " <> Base.encode64("foo:bar")
 
@@ -107,7 +107,7 @@ defmodule Req.StepsTest do
   end
 
   @tag :tmp_dir
-  test "auth/1: {:netrc, path}", c do
+  test "auth: {:netrc, path}", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       expected = "Basic " <> Base.encode64("foo:bar")
 
@@ -170,7 +170,7 @@ defmodule Req.StepsTest do
     Application.put_env(:req, :default_options, [])
   end
 
-  test "default_headers/1", c do
+  test "default_headers", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       [user_agent] = Plug.Conn.get_req_header(conn, "user-agent")
       Plug.Conn.send_resp(conn, 200, user_agent)
@@ -179,7 +179,7 @@ defmodule Req.StepsTest do
     assert "req/" <> _ = Req.get!(c.url).body
   end
 
-  test "encode_body/1: json", c do
+  test "encode_body: json", c do
     Bypass.expect(c.bypass, "POST", "/", fn conn ->
       assert {:ok, ~s|{"a":1}|, conn} = Plug.Conn.read_body(conn)
       assert ["application/json"] = Plug.Conn.get_req_header(conn, "accept")
@@ -191,7 +191,7 @@ defmodule Req.StepsTest do
     Req.post!(c.url, json: %{a: 1})
   end
 
-  test "encode_body/1: form" do
+  test "encode_body: form" do
     req = Req.new(form: [a: 1]) |> Req.Request.prepare()
     assert req.body == "a=1"
 
@@ -199,7 +199,7 @@ defmodule Req.StepsTest do
     assert req.body == "a=1"
   end
 
-  test "put_params/1" do
+  test "put_params" do
     req = Req.new(url: "http://foo", params: [x: 1, y: 2]) |> Req.Request.prepare()
     assert URI.to_string(req.url) == "http://foo?x=1&y=2"
 
@@ -210,7 +210,7 @@ defmodule Req.StepsTest do
     assert URI.to_string(req.url) == "http://foo?x=1&x=1&y=2"
   end
 
-  test "put_range/1" do
+  test "put_range" do
     req = Req.new(range: "bytes=0-10") |> Req.Request.prepare()
 
     assert List.keyfind(req.headers, "range", 0) ==
@@ -222,7 +222,7 @@ defmodule Req.StepsTest do
              {"range", "bytes=0-20"}
   end
 
-  test "compress_body/1" do
+  test "compress_body" do
     req = Req.new(method: :post, json: %{a: 1}) |> Req.Request.prepare()
     assert Jason.decode!(req.body) == %{"a" => 1}
 
@@ -233,7 +233,7 @@ defmodule Req.StepsTest do
 
   ## Response steps
 
-  test "decompress_body/1 - gzip", c do
+  test "decompress_body: gzip", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       conn
       |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
@@ -243,7 +243,7 @@ defmodule Req.StepsTest do
     assert Req.get!(c.url).body == "foo"
   end
 
-  test "decompress_body/1 - brotli", c do
+  test "decompress_body: brotli", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       {:ok, body} = :brotli.encode("foo")
 
@@ -255,7 +255,7 @@ defmodule Req.StepsTest do
     assert Req.get!(c.url).body == "foo"
   end
 
-  test "decompress_body/1 - zstd", c do
+  test "decompress_body: zstd", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       conn
       |> Plug.Conn.put_resp_header("content-encoding", "zstd")
@@ -266,7 +266,7 @@ defmodule Req.StepsTest do
   end
 
   @tag :tmp_dir
-  test "output/1: path (compressed)", c do
+  test "output: path (compressed)", c do
     Bypass.expect_once(c.bypass, "GET", "/foo.txt", fn conn ->
       conn
       |> Plug.Conn.put_resp_header("content-encoding", "gzip")
@@ -278,7 +278,7 @@ defmodule Req.StepsTest do
     assert File.read!(c.tmp_dir <> "/foo.txt") == "bar"
   end
 
-  test "output/1: :remote_name", c do
+  test "output: :remote_name", c do
     Bypass.expect_once(c.bypass, "GET", "/directory/does/not/matter/foo.txt", fn conn ->
       Plug.Conn.send_resp(conn, 200, "bar")
     end)
@@ -290,7 +290,7 @@ defmodule Req.StepsTest do
     File.rm("foo.txt")
   end
 
-  test "output/1: disables decoding", c do
+  test "output: disables decoding", c do
     Bypass.expect_once(c.bypass, "GET", "/foo.json", fn conn ->
       json(conn, 200, %{a: 1})
     end)
@@ -302,7 +302,7 @@ defmodule Req.StepsTest do
     File.rm("foo.json")
   end
 
-  test "output/1: empty filename", c do
+  test "output: empty filename", c do
     Bypass.expect_once(c.bypass, "GET", "", fn conn ->
       Plug.Conn.send_resp(conn, 200, "body contents")
     end)
@@ -312,7 +312,7 @@ defmodule Req.StepsTest do
     end
   end
 
-  test "decode_body/1: json", c do
+  test "decode_body: json", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       json(conn, 200, %{a: 1})
     end)
@@ -320,7 +320,7 @@ defmodule Req.StepsTest do
     assert Req.get!(c.url).body == %{"a" => 1}
   end
 
-  test "decode_body/1: json-api", c do
+  test "decode_body: json-api", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       conn
       |> Plug.Conn.put_resp_header("content-type", "application/vnd.api+json; charset=utf-8")
@@ -331,7 +331,7 @@ defmodule Req.StepsTest do
   end
 
   @tag :tmp_dir
-  test "decode_body/1: with output", c do
+  test "decode_body: with output", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       json(conn, 200, %{a: 1})
     end)
@@ -340,7 +340,7 @@ defmodule Req.StepsTest do
     assert File.read!(c.tmp_dir <> "/a.json") == ~s|{"a":1}|
   end
 
-  test "decode_body/1: gzip", c do
+  test "decode_body: gzip", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       conn
       |> Plug.Conn.put_resp_content_type("application/x-gzip", nil)
@@ -351,7 +351,7 @@ defmodule Req.StepsTest do
   end
 
   @tag :tmp_dir
-  test "decode_body/1: tar (content-type)", c do
+  test "decode_body: tar (content-type)", c do
     files = [{~c"foo.txt", "bar"}]
 
     path = ~c"#{c.tmp_dir}/foo.tar"
@@ -368,7 +368,7 @@ defmodule Req.StepsTest do
   end
 
   @tag :tmp_dir
-  test "decode_body/1: tar (path)", c do
+  test "decode_body: tar (path)", c do
     files = [{~c"foo.txt", "bar"}]
 
     path = ~c"#{c.tmp_dir}/foo.tar"
@@ -385,7 +385,7 @@ defmodule Req.StepsTest do
   end
 
   @tag :tmp_dir
-  test "decode_body/1: tar.gz (path)", c do
+  test "decode_body: tar.gz (path)", c do
     files = [{~c"foo.txt", "bar"}]
 
     path = ~c"#{c.tmp_dir}/foo.tar"
@@ -401,7 +401,7 @@ defmodule Req.StepsTest do
     assert Req.get!(c.url <> "/foo.tar.gz").body == files
   end
 
-  test "decode_body/1: zip (content-type)", c do
+  test "decode_body: zip (content-type)", c do
     files = [{~c"foo.txt", "bar"}]
 
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
@@ -415,7 +415,7 @@ defmodule Req.StepsTest do
     assert Req.get!(c.url).body == files
   end
 
-  test "decode_body/1: zip (path)", c do
+  test "decode_body: zip (path)", c do
     files = [{~c"foo.txt", "bar"}]
 
     Bypass.expect(c.bypass, "GET", "/foo.zip", fn conn ->
@@ -429,7 +429,7 @@ defmodule Req.StepsTest do
     assert Req.get!(c.url <> "/foo.zip").body == files
   end
 
-  test "decode_body/1: csv", c do
+  test "decode_body: csv", c do
     csv = [
       ["x", "y"],
       ["1", "2"],
@@ -481,7 +481,7 @@ defmodule Req.StepsTest do
            }
   end
 
-  test "follow_redirects/1: absolute", c do
+  test "follow_redirects: absolute", c do
     Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
       redirect(conn, 302, c.url <> "/ok")
     end)
@@ -495,7 +495,7 @@ defmodule Req.StepsTest do
            end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
   end
 
-  test "follow_redirects/1: relative", c do
+  test "follow_redirects: relative", c do
     Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
       location =
         case conn.query_string do
@@ -523,7 +523,7 @@ defmodule Req.StepsTest do
            end) =~ "[debug] follow_redirects: redirecting to /ok?a=1"
   end
 
-  test "follow_redirects/1: 301..303", c do
+  test "follow_redirects: 301..303", c do
     Bypass.expect(c.bypass, "POST", "/redirect", fn conn ->
       redirect(conn, 301, c.url <> "/ok")
     end)
@@ -537,7 +537,7 @@ defmodule Req.StepsTest do
            end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
   end
 
-  test "follow_redirects/1: auth - same host", c do
+  test "follow_redirects: auth same host", c do
     auth_header = {"authorization", "Basic " <> Base.encode64("foo:bar")}
 
     Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
@@ -555,7 +555,7 @@ defmodule Req.StepsTest do
            end) =~ "[debug] follow_redirects: redirecting to #{c.url}/auth"
   end
 
-  test "follow_redirects/1: auth - location trusted" do
+  test "follow_redirects: auth location trusted" do
     adapter = fn request ->
       case request.url.host do
         "original" ->
@@ -591,7 +591,7 @@ defmodule Req.StepsTest do
            end) =~ "[debug] follow_redirects: redirecting to http://untrusted"
   end
 
-  test "follow_redirects/2: auth - different host" do
+  test "follow_redirects/2: auth different host" do
     adapter = untrusted_redirect_adapter(:host, "trusted", "untrusted")
 
     assert ExUnit.CaptureLog.capture_log(fn ->
@@ -602,7 +602,7 @@ defmodule Req.StepsTest do
            end) =~ "[debug] follow_redirects: redirecting to http://untrusted"
   end
 
-  test "follow_redirects/2: auth - different port" do
+  test "follow_redirects/2: auth different port" do
     adapter = untrusted_redirect_adapter(:port, 12345, 23456)
 
     assert ExUnit.CaptureLog.capture_log(fn ->
@@ -613,7 +613,7 @@ defmodule Req.StepsTest do
            end) =~ "[debug] follow_redirects: redirecting to http://trusted:23456"
   end
 
-  test "follow_redirects/2: auth - different scheme" do
+  test "follow_redirects/2: auth different scheme" do
     adapter = untrusted_redirect_adapter(:scheme, "http", "https")
 
     assert ExUnit.CaptureLog.capture_log(fn ->
@@ -624,7 +624,7 @@ defmodule Req.StepsTest do
            end) =~ "[debug] follow_redirects: redirecting to https://trusted"
   end
 
-  test "follow_redirects/1: skip params", c do
+  test "follow_redirects: skip params", c do
     Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
       redirect(conn, 302, c.url <> "/ok")
     end)
@@ -639,7 +639,7 @@ defmodule Req.StepsTest do
            end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
   end
 
-  test "follow_redirects/1: max redirects", c do
+  test "follow_redirects: max redirects", c do
     pid = self()
 
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
@@ -663,7 +663,7 @@ defmodule Req.StepsTest do
     assert captured_log =~ "follow_redirects: redirecting to " <> c.url
   end
 
-  test "follow_redirects/1: inherit scheme", c do
+  test "follow_redirects: inherit scheme", c do
     "http:" <> no_scheme = c.url
 
     Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
@@ -994,7 +994,7 @@ defmodule Req.StepsTest do
     refute_received _
   end
 
-  test "put_plug/1" do
+  test "put_plug" do
     plug = fn conn ->
       {:ok, body, conn} = Plug.Conn.read_body(conn)
       assert body == ~s|{"a":1}|
@@ -1004,7 +1004,7 @@ defmodule Req.StepsTest do
     assert Req.request!(plug: plug, json: %{a: 1}).body == "ok"
   end
 
-  test "run_finch/1: pool timeout", c do
+  test "run_finch: pool timeout", c do
     Bypass.stub(c.bypass, "GET", "/", fn conn ->
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
@@ -1013,7 +1013,7 @@ defmodule Req.StepsTest do
     assert {:timeout, _} = catch_exit(Req.get!(c.url, options))
   end
 
-  test "run_finch/1: receive timeout", c do
+  test "run_finch: receive timeout", c do
     pid = self()
 
     Bypass.stub(c.bypass, "GET", "/", fn conn ->
@@ -1043,7 +1043,7 @@ defmodule Req.StepsTest do
     assert log =~ "1 attempt left"
   end
 
-  test "run_finch/1: :connect_options :timeout" do
+  test "run_finch: :connect_options :timeout" do
     {:ok, listen_sock} = :gen_tcp.listen(0, [:binary])
     {:ok, port} = :inet.port(listen_sock)
 
@@ -1057,7 +1057,7 @@ defmodule Req.StepsTest do
     assert Req.request(req) == {:error, %Mint.TransportError{reason: :timeout}}
   end
 
-  test "run_finch/1: :connect_options :protocol", c do
+  test "run_finch: :connect_options :protocol", c do
     Bypass.stub(c.bypass, "GET", "/", fn conn ->
       {_, %{version: :"HTTP/2"}} = conn.adapter
       Plug.Conn.send_resp(conn, 200, "ok")
@@ -1072,7 +1072,7 @@ defmodule Req.StepsTest do
     assert Req.request!(req).body == "ok"
   end
 
-  test "run_finch/1: :connect_options :proxy", c do
+  test "run_finch: :connect_options :proxy", c do
     Bypass.expect(c.bypass, "GET", "/foo/bar", fn conn ->
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
@@ -1090,7 +1090,7 @@ defmodule Req.StepsTest do
     assert Req.request!(req, url: "/foo/bar").body == "ok"
   end
 
-  test "run_finch/1: :connect_options :transport_opts", c do
+  test "run_finch: :connect_options :transport_opts", c do
     req = Req.new(connect_options: [transport_opts: [cacertfile: "bad.pem"]])
 
     assert_raise File.Error, ~r/could not read file "bad.pem"/, fn ->
@@ -1098,13 +1098,13 @@ defmodule Req.StepsTest do
     end
   end
 
-  test "run_finch/1: :connect_options bad option", c do
+  test "run_finch: :connect_options bad option", c do
     assert_raise ArgumentError, "unknown option :timeou. Did you mean :timeout?", fn ->
       Req.get!(c.url, connect_options: [timeou: 0])
     end
   end
 
-  test "run_finch/1: :finch and :connect_options" do
+  test "run_finch: :finch and :connect_options" do
     assert_raise ArgumentError, "cannot set both :finch and :connect_options", fn ->
       Req.request!(finch: MyFinch, connect_options: [timeout: 0])
     end
