@@ -1041,26 +1041,13 @@ defmodule Req.Steps do
 
     location_trusted = Map.get(request.options, :location_trusted)
 
-    location_url = location |> URI.parse() |> inherit_from_url(request.url)
+    location_url = URI.merge(request.url, URI.parse(location))
 
     request
     |> remove_params()
     |> remove_credentials_if_untrusted(location_trusted, location_url)
     |> put_redirect_request_method()
     |> put_redirect_location(location_url)
-  end
-
-  defp inherit_from_url(location_url, previous_url) do
-    case location_url do
-      %{scheme: nil, host: nil} ->
-        %{previous_url | path: location_url.path, query: location_url.query}
-
-      %{scheme: nil} ->
-        %{location_url | scheme: previous_url.scheme}
-
-      _ ->
-        location_url
-    end
   end
 
   defp put_redirect_location(request, location_url) do
