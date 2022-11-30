@@ -568,7 +568,10 @@ defmodule Req.Steps do
 
             transport_opts = [
               transport_opts:
-                Keyword.get(options, :transport_opts, []) |> Keyword.put_new(:timeout, 30_000)
+                Keyword.merge(
+                  Keyword.take(options, [:timeout]),
+                  Keyword.get(options, :transport_opts, [])
+                )
             ]
 
             proxy_headers_opts = Keyword.take(options, [:proxy_headers])
