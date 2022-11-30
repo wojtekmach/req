@@ -1010,7 +1010,10 @@ defmodule Req.StepsTest do
     end)
 
     options = [pool_timeout: 0]
-    assert {:timeout, _} = catch_exit(Req.get!(c.url, options))
+
+    assert_raise RuntimeError, ~r/unable to provide a connection within the timeout/, fn ->
+      Req.get!(c.url, options)
+    end
   end
 
   test "run_finch: receive timeout", c do
