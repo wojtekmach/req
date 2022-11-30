@@ -1041,7 +1041,8 @@ defmodule Req.Steps do
     Logger.debug(["follow_redirects: redirecting to ", location])
 
     location_trusted = Map.get(request.options, :location_trusted)
-    location_url = URI.parse(location)
+
+    location_url = location |> URI.parse() |> inherit_from_url(request.url)
 
     request
     |> remove_params()
@@ -1050,12 +1051,21 @@ defmodule Req.Steps do
     |> put_redirect_location(location_url)
   end
 
-  defp put_redirect_location(request, location_url) do
-    if location_url.host do
-      put_in(request.url, location_url)
-    else
-      update_in(request.url, &%{&1 | path: location_url.path, query: location_url.query})
+  defp inherit_from_url(location_url, previous_url) do
+    case location_url do
+      %{scheme: nil, host: nil} ->
+        %{previous_url | path: location_url.path, query: location_url.query}
+
+      %{scheme: nil} ->
+        %{location_url | scheme: previous_url.scheme}
+
+      _ ->
+        location_url
     end
+  end
+
+  defp put_redirect_location(request, location_url) do
+    put_in(request.url, location_url)
   end
 
   defp put_redirect_request_method(request) when request.status in 307..308, do: request
