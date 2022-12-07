@@ -491,6 +491,9 @@ defmodule Req.Steps do
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket
+    
+    * `:finch_request` - a function to modify the built Finch request before execution. This function takes a 
+     Finch request and returns a Finch request. If not provided, the finch request will not be modified
 
   ## Examples
 
@@ -521,6 +524,7 @@ defmodule Req.Steps do
     finch_request =
       Finch.build(request.method, request.url, request.headers, request.body)
       |> Map.replace!(:unix_socket, request.options[:unix_socket])
+      |> update_finch_request(request)
 
     finch_options =
       request.options |> Map.take([:receive_timeout, :pool_timeout]) |> Enum.to_list()
@@ -610,6 +614,13 @@ defmodule Req.Steps do
           true ->
             Req.Finch
         end
+    end
+  end
+
+  defp update_finch_request(finch_request, request) do
+    case Map.fetch(request.options, :finch_request) do
+      {:ok, fun} -> fun.(finch_request)
+      :error -> finch_request
     end
   end
 

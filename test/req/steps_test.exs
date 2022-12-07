@@ -1,6 +1,8 @@
 defmodule Req.StepsTest do
   use ExUnit.Case, async: true
 
+  require Logger
+
   setup do
     bypass = Bypass.open()
     [bypass: bypass, url: "http://localhost:#{bypass.port}"]
@@ -1002,6 +1004,22 @@ defmodule Req.StepsTest do
     end
 
     assert Req.request!(plug: plug, json: %{a: 1}).body == "ok"
+  end
+
+  test "run_finch: :finch_request", c do
+    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    pid = self()
+
+    fun = fn request ->
+      send(pid, request)
+      request
+    end
+
+    assert Req.get!(c.url <> "/ok", finch_request: fun).body == "ok"
+    assert_received %Finch.Request{}
   end
 
   test "run_finch: pool timeout", c do

@@ -80,6 +80,7 @@ defmodule Req do
           :cache_dir,
           :plug,
           :finch,
+          :finch_request,
           :connect_options,
           :receive_timeout,
           :pool_timeout,
@@ -762,6 +763,9 @@ defmodule Req do
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket
+    
+    * `:finch_request` - a function to modify the built Finch request before execution. This function takes a 
+       Finch request and returns a Finch request. If not provided, the finch request will not be modified
 
   ## Examples
 
