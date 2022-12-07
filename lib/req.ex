@@ -83,7 +83,8 @@ defmodule Req do
           :connect_options,
           :receive_timeout,
           :pool_timeout,
-          :unix_socket
+          :unix_socket,
+          :customize_finch
         ])
     }
     |> update(options)
@@ -762,6 +763,9 @@ defmodule Req do
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket
+    
+    * `:customize_finch` - a function to modify the built Finch request before execution. This function takes a 
+       Finch request and returns a Finch request. Defaults to the identity function.
 
   ## Examples
 

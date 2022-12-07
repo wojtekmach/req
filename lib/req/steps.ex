@@ -517,10 +517,12 @@ defmodule Req.Steps do
   @doc step: :request
   def run_finch(request) do
     finch_name = finch_name(request)
+    customize_function = customize_function(request)
 
     finch_request =
       Finch.build(request.method, request.url, request.headers, request.body)
       |> Map.replace!(:unix_socket, request.options[:unix_socket])
+      |> customize_function.()
 
     finch_options =
       request.options |> Map.take([:receive_timeout, :pool_timeout]) |> Enum.to_list()
@@ -607,6 +609,13 @@ defmodule Req.Steps do
           true ->
             Req.Finch
         end
+    end
+  end
+
+  defp customize_function(request) do
+    case Map.fetch(request.options, :customize_finch) do
+      {:ok, fun} -> fun
+      :error -> &Function.identity/1
     end
   end
 
