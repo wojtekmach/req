@@ -80,11 +80,11 @@ defmodule Req do
           :cache_dir,
           :plug,
           :finch,
+          :finch_request,
           :connect_options,
           :receive_timeout,
           :pool_timeout,
-          :unix_socket,
-          :finch_request
+          :unix_socket
         ])
     }
     |> update(options)
