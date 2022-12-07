@@ -84,7 +84,7 @@ defmodule Req do
           :receive_timeout,
           :pool_timeout,
           :unix_socket,
-          :customize_finch
+          :finch_request
         ])
     }
     |> update(options)
@@ -764,8 +764,8 @@ defmodule Req do
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket
     
-    * `:customize_finch` - a function to modify the built Finch request before execution. This function takes a 
-       Finch request and returns a Finch request. Defaults to the identity function.
+    * `:finch_request` - a function to modify the built Finch request before execution. This function takes a 
+       Finch request and returns a Finch request. If not provided, the finch request will not be modified
 
   ## Examples
 

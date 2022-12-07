@@ -1,6 +1,8 @@
 defmodule Req.StepsTest do
   use ExUnit.Case, async: true
 
+  require Logger
+
   setup do
     bypass = Bypass.open()
     [bypass: bypass, url: "http://localhost:#{bypass.port}"]
@@ -906,6 +908,21 @@ defmodule Req.StepsTest do
     assert_received :ping
     assert_received :ping
     refute_received _
+  end
+
+  test "customize finch", c do
+    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    assert ExUnit.CaptureLog.capture_log(fn ->
+             assert Req.get!(c.url <> "/ok",
+                      finch_request: fn r ->
+                        Logger.debug("customize_finch function called")
+                        r
+                      end
+                    ).status == 200
+           end) =~ "[debug] customize_finch function called"
   end
 
   @tag :tmp_dir
