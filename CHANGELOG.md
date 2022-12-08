@@ -1,18 +1,24 @@
 # CHANGELOG
 
+## HEAD
+
+  * [`follow_redirects`]: Inherit scheme from previous location
+  * [`run_finch`]: Fix setting connect timeout
+  * [`run_finch`]: Add `:finch_request` option
+
 ## v0.3.2 (2022-11-14)
 
-  * `decode_body`: Decode JSON when response is json-api mime type
-  * `put_params`: Fix bug when params have been duplicated when retrying requeset
-  * `retry`: Remove `retry: :always` option
-  * `retry`: Soft-deprecate `retry: :never` in favour of `retry: false`
-  * `run_finch`: Add `:transport_opts`, `:proxy_headers`, `:proxy`, and `:client_settings` options
+  * [`decode_body`]: Decode JSON when response is json-api mime type
+  * [`put_params`]: Fix bug when params have been duplicated when retrying requeset
+  * [`retry`]: Remove `retry: :always` option
+  * [`retry`]: Soft-deprecate `retry: :never` in favour of `retry: false`
+  * [`run_finch`]: Add `:transport_opts`, `:proxy_headers`, `:proxy`, and `:client_settings` options
   * `Req.Response.json/2`: Do not override content-type
 
 ## v0.3.1 (2022-09-09)
 
-  * `encode_body`: Set Accept header in JSON requests
-  * `put_base_url`: Fix merging with leading and/or trailing slashes
+  * [`encode_body`]: Set Accept header in JSON requests
+  * [`put_base_url`]: Fix merging with leading and/or trailing slashes
   * Fix merging :adapter option
   * Add get/2, post/2, put/2, patch/2, delete/2 and head/2
 
@@ -315,65 +321,50 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
 ### Step changes
 
-  * New step: [`put_plug`][put_plug]
+  * New step: [`put_plug`]
 
-  * New step: [`put_user_agent`][put_user_agent] (replaces part of removed `put_default_headers`)
+  * New step: [`put_user_agent`] (replaces part of removed `put_default_headers`)
 
-  * New step: [`compressed`][compressed] (replaces part of removed `put_default_headers`)
+  * New step: [`compressed`] (replaces part of removed `put_default_headers`)
 
-  * New step: [`compress_body`][compress_body]
+  * New step: [`compress_body`]
 
-  * New step: [`output`][output]
+  * New step: [`output`]
 
-  * New step: [`handle_http_errors`][handle_http_errors]
+  * New step: [`handle_http_errors`]
 
-  * [`put_base_url`][put_base_url]: Ignore base URL if given URL contains scheme
+  * [`put_base_url`]: Ignore base URL if given URL contains scheme
 
-  * [`run_finch`][run_finch]: Add `:connect_options` which dynamically starts (or re-uses already started)
+  * [`run_finch`]: Add `:connect_options` which dynamically starts (or re-uses already started)
     Finch pool with the given connection options.
 
-  * [`run_finch`][run_finch]: Replace `:finch_options` with `:receive_timeout` and `:pool_timeout` options
+  * [`run_finch`]: Replace `:finch_options` with `:receive_timeout` and `:pool_timeout` options
 
-  * [`encode_body`][encode_body]: Add `:form` and `:json` options (previously used as `{:form, data}` and
+  * [`encode_body`]: Add `:form` and `:json` options (previously used as `{:form, data}` and
     `{:json, data}`)
 
-  * [`cache`][cache]: Include request method in cache key
+  * [`cache`]: Include request method in cache key
 
-  * [`decompress_body`][decompress_body], [`compressed`][compressed]: Support Brotli
+  * [`decompress_body`], [`compressed`]: Support Brotli
 
-  * [`decompress_body`][decompress_body], [`compressed`][compressed]: Support Zstandard
+  * [`decompress_body`], [`compressed`]: Support Zstandard
 
-  * [`decode_body`][decode_body]: Support `decode_body: false` option to disable automatic body decoding
+  * [`decode_body`]: Support `decode_body: false` option to disable automatic body decoding
 
-  * [`follow_redirects`][follow_redirects]: Change method to GET on 301..303 redirects
+  * [`follow_redirects`]: Change method to GET on 301..303 redirects
 
-  * [`follow_redirects`][follow_redirects]: Don't send auth headers on redirect to different scheme/host/port
+  * [`follow_redirects`]: Don't send auth headers on redirect to different scheme/host/port
     unless `location_trusted: true` is set
 
-  * [`retry`][retry]: The `Retry-After` response header on HTTP 429 responses is now respected
+  * [`retry`]: The `Retry-After` response header on HTTP 429 responses is now respected
 
-  * [`retry`][retry]: The `:retry` option can now be set to `:safe` (default) to only retry GET/HEAD
+  * [`retry`]: The `:retry` option can now be set to `:safe` (default) to only retry GET/HEAD
     requests on HTTP 408/429/5xx responses or exceptions, `:always` to always retry, `:never` to never
     retry, and `fun` - a 1-arity function that accepts either a `Req.Response` or an exception
     struct and returns boolean whether to retry
 
-  * [`retry`][retry]: The `:retry_delay` option now accepts a function that takes a retry count (starting at 0)
+  * [`retry`]: The `:retry_delay` option now accepts a function that takes a retry count (starting at 0)
     and returns the delay. Defaults to a simple exponential backoff: 1s, 2s, 4s, 8s, ...
-
-[put_plug]: https://hexdocs.pm/req/Req.Steps.html#put_plug/1
-[put_user_agent]: https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
-[compressed]: https://hexdocs.pm/req/Req.Steps.html#compressed/1
-[compress_body]: https://hexdocs.pm/req/Req.Steps.html#compress_body/1
-[output]: https://hexdocs.pm/req/Req.Steps.html#output/1
-[handle_http_errors]: https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
-[put_base_url]: https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
-[run_finch]: https://hexdocs.pm/req/Req.Steps.html#run_finch/1
-[encode_body]: https://hexdocs.pm/req/Req.Steps.html#encode_body/1
-[cache]: https://hexdocs.pm/req/Req.Steps.html#cache/1
-[decompress_body]: https://hexdocs.pm/req/Req.Steps.html#decompress_body/1
-[decode_body]: https://hexdocs.pm/req/Req.Steps.html#decode_body/1
-[follow_redirects]: https://hexdocs.pm/req/Req.Steps.html#follow_redirects/1
-[retry]: https://hexdocs.pm/req/Req.Steps.html#retry/1
 
 ### Deprecations
 
@@ -430,3 +421,19 @@ See "Adapter" section in `Req.Request` module documentation for more information
 ## v0.1.0 (2021-07-15)
 
   * Initial release
+
+[`run_finch`]:          https://hexdocs.pm/req/Req.Steps.html#run_finch/1
+[`cache`]:              https://hexdocs.pm/req/Req.Steps.html#cache/1
+[`compress_body`]:      https://hexdocs.pm/req/Req.Steps.html#compress_body/1
+[`compressed`]:         https://hexdocs.pm/req/Req.Steps.html#compressed/1
+[`decode_body`]:        https://hexdocs.pm/req/Req.Steps.html#decode_body/1
+[`decompress_body`]:    https://hexdocs.pm/req/Req.Steps.html#decompress_body/1
+[`encode_body`]:        https://hexdocs.pm/req/Req.Steps.html#encode_body/1
+[`follow_redirects`]:   https://hexdocs.pm/req/Req.Steps.html#follow_redirects/1
+[`handle_http_errors`]: https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
+[`output`]:             https://hexdocs.pm/req/Req.Steps.html#output/1
+[`put_base_url`]:       https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
+[`put_params`]:         https://hexdocs.pm/req/Req.Steps.html#put_params/1
+[`put_plug`]:           https://hexdocs.pm/req/Req.Steps.html#put_plug/1
+[`put_user_agent`]:     https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
+[`retry`]:              https://hexdocs.pm/req/Req.Steps.html#retry/1
