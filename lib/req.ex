@@ -125,12 +125,12 @@ defmodule Req do
       iex> req.options
       %{auth: {"alice", "secret"}, base_url: "https://httpbin.org"}
 
-  Passing `:headers` will automatically merge them:
+  Passing `:headers` will automatically encode and merge them:
 
-      iex> req = Req.new(headers: [a: 1])
-      iex> req = Req.update(req, headers: [b: 2])
+      iex> req = Req.new(headers: [point_x: 1])
+      iex> req = Req.update(req, headers: [point_y: 2])
       iex> req.headers
-      [{"a", "1"}, {"b", "2"}]
+      [{"point-x", "1"}, {"point-y", "2"}]
 
   """
   @spec update(Req.Request.t(), options :: keyword()) :: Req.Request.t()
@@ -616,19 +616,19 @@ defmodule Req do
     1. With a list of options, for example:
 
        ```
-       Req.request(url: url)
+       iex> Req.request(url: url)
        ```
 
     2. With a request struct, for example:
 
        ```
-       Req.new(url: url) |> Req.request()
+       iex> Req.new(url: url) |> Req.request()
        ```
 
     3. With a request struct and more options, for example:
 
        ```
-       Req.new(base_url: base_url) |> Req.request(url: url)
+       iex> Req.new(base_url: base_url) |> Req.request(url: url)
        ```
 
   This function as well as all the other ones in this module accept the same set of options described below.

@@ -422,7 +422,6 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
   * Initial release
 
-[`run_finch`]:          https://hexdocs.pm/req/Req.Steps.html#run_finch/1
 [`cache`]:              https://hexdocs.pm/req/Req.Steps.html#cache/1
 [`compress_body`]:      https://hexdocs.pm/req/Req.Steps.html#compress_body/1
 [`compressed`]:         https://hexdocs.pm/req/Req.Steps.html#compressed/1
@@ -437,3 +436,4 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`put_plug`]:           https://hexdocs.pm/req/Req.Steps.html#put_plug/1
 [`put_user_agent`]:     https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
 [`retry`]:              https://hexdocs.pm/req/Req.Steps.html#retry/1
+[`run_finch`]:          https://hexdocs.pm/req/Req.Steps.html#run_finch/1

@@ -8,69 +8,41 @@ Req is a batteries-included HTTP client for Elixir.
 
 ## Features
 
-  * An easy to use high-level API in [`Req`][req] module: [`request/1`][req.request], [`request!/1`][req.request!], [`get!/2`][req.get!], [`head!/2`][req.head!], [`post!/2`][req.post!], [`put!/2`][req.put!], [`patch!/2`][req.patch!], and [`delete!/2`][req.delete!]
+  * An easy to use high-level API: [`Req.request/1`], [`Req.new/1`], [`Req.get!/2`], [`Req.post!/2`], etc.
 
-  * Extensibility via request, response, and error steps
+  * Extensibility via request, response, and error steps.
 
-  * Request body compression and automatic response body decompression (via [`compress_body`][compress_body], [`compressed`][compressed], and [`decompress_body`][decompress_body] steps). Supports gzip, deflate, brotli and zstd decompression.
+  * Request body compression and automatic response body decompression (via [`compress_body`], [`compressed`], and [`decompress_body`] steps). Supports gzip, deflate, brotli and zstd decompression.
 
-  * Request body encoding and automatic response body decoding (via [`encode_body`][encode_body]
-    and [`decode_body`][decode_body] steps)
+  * Request body encoding and automatic response body decoding (via [`encode_body`] and [`decode_body`] steps)
 
-  * Encode params as query string (via [`put_params`][put_params] step)
+  * Encode params as query string (via [`put_params`] step)
 
-  * Basic, bearer, and `.netrc` authentication (via [`auth`][auth] step)
+  * Basic, bearer, and `.netrc` authentication (via [`auth`] step)
 
-  * Range requests (via [`put_range`][put_range]) step)
+  * Range requests (via [`put_range`]) step)
 
-  * Follows redirects (via [`follow_redirects`][follow_redirects] step)
+  * Follows redirects (via [`follow_redirects`] step)
 
-  * Retries on errors (via [`retry`][retry] step)
+  * Retries on errors (via [`retry`] step)
 
-  * Raise on 4xx/5xx errors (via [`handle_http_errors`][handle_http_errors] step)
+  * Raise on 4xx/5xx errors (via [`handle_http_errors`] step)
 
-  * Basic HTTP caching (via [`cache`][cache] step)
+  * Basic HTTP caching (via [`cache`] step)
 
-  * Setting base URL (via [`put_base_url`][put_base_url] step)
+  * Setting base URL (via [`put_base_url`] step)
 
-  * Running against a plug (via [`put_plug`][put_plug] step)
+  * Running against a plug (via [`put_plug`] step)
 
-  * Pluggable adapters. By default, Req uses [Finch][finch] (via [`run_finch`][run_finch] step).
-
-[req]: https://hexdocs.pm/req/Req.html
-[req.request]: https://hexdocs.pm/req/Req.html#request/1
-[req.request!]: https://hexdocs.pm/req/Req.html#request!/1
-[req.get!]: https://hexdocs.pm/req/Req.html#get!/2
-[req.head!]: https://hexdocs.pm/req/Req.html#head!/2
-[req.post!]: https://hexdocs.pm/req/Req.html#post!/2
-[req.put!]: https://hexdocs.pm/req/Req.html#put!/2
-[req.patch!]: https://hexdocs.pm/req/Req.html#patch!/2
-[req.delete!]: https://hexdocs.pm/req/Req.html#delete!/2
-[compressed]: https://hexdocs.pm/req/Req.Steps.html#compressed/1
-[decompress_body]: https://hexdocs.pm/req/Req.Steps.html#decompress_body/1
-[encode_body]: https://hexdocs.pm/req/Req.Steps.html#encode_body/1
-[decode_body]: https://hexdocs.pm/req/Req.Steps.html#decode_body/1
-[put_params]: https://hexdocs.pm/req/Req.Steps.html#put_params/1
-[auth]: https://hexdocs.pm/req/Req.Steps.html#auth/1
-[put_range]: https://hexdocs.pm/req/Req.Steps.html#put_range/1
-[follow_redirects]: https://hexdocs.pm/req/Req.Steps.html#follow_redirects/1
-[retry]: https://hexdocs.pm/req/Req.Steps.html#retry/1
-[handle_http_errors]: https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
-[cache]: https://hexdocs.pm/req/Req.Steps.html#cache/1
-[put_base_url]: https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
-[put_plug]: https://hexdocs.pm/req/Req.Steps.html#put_plug/1
-[compress_body]: https://hexdocs.pm/req/Req.Steps.html#compress_body/1
-[adapter]: https://hexdocs.pm/req/Req.Request.html#module-adapter
-[run_finch]: https://hexdocs.pm/req/Req.Steps.html#run_finch/1
-[finch]: https://github.com/sneako/finch
+  * Pluggable adapters. By default, Req uses [Finch] (via [`run_finch`] step).
 
 ## Usage
 
-The easiest way to use Req is with [`Mix.install/2`](https://hexdocs.pm/mix/Mix.html#install/2) (requires Elixir v1.12+):
+The easiest way to use Req is with [`Mix.install/2`] (requires Elixir v1.12+):
 
 ```elixir
 Mix.install([
-  {:req, "~> 0.3.0"}
+  {:req, "~> 0.3"}
 ])
 
 Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
@@ -92,7 +64,7 @@ Req.get!(req, url: "/repos/elixir-mint/mint").body["description"]
 #=> "Functional HTTP client for Elixir with support for HTTP/1 and HTTP/2."
 ```
 
-See [`Req.request/1`](https://hexdocs.pm/req/Req.html#request/1) for more information on available
+See [`Req.request/1`] for more information on available
 options.
 
 Virtually all of Req's features are broken down into individual pieces - steps. Req works by running
@@ -118,10 +90,10 @@ Req.get!(req, url: "/repos/wojtekmach/req").body["description"]
 Custom steps can be packaged into plugins so that they are even easier to use by others.
 Here are some examples:
 
-  * [`req_easyhtml`](https://github.com/wojtekmach/req_easyhtml)
-  * [`req_s3`](https://github.com/wojtekmach/req_s3)
-  * [`req_hex`](https://github.com/wojtekmach/req_hex)
-  * [`req_github_oauth`](https://github.com/wojtekmach/req_github_oauth)
+  * [`req_easyhtml`]
+  * [`req_s3`]
+  * [`req_hex`]
+  * [`req_github_oauth`]
 
 And here is how they can be used:
 
@@ -180,12 +152,11 @@ Req.get!(req, url: "https://api.github.com/user").body["login"]
 #=> "wojtekmach"
 ```
 
-See [`Req.Request`](https://hexdocs.pm/req/Req.Request.html) module documentation for
-more information on low-level API, request struct, and developing plugins.
+See [`Req.Request`] module documentation for more information on low-level API, request struct, and developing plugins.
 
 ## Acknowledgments
 
-Req is built on top of [Finch](http://github.com/keathley/finch) and is inspired by [cURL](https://curl.se), [Requests](https://docs.python-requests.org/en/master/), [Tesla](https://github.com/teamon/tesla), and many other HTTP clients - thank you!
+Req is built on top of [Finch] and is inspired by [cURL], [Requests], [Tesla], and many other HTTP clients - thank you!
 
 ## License
 
@@ -200,3 +171,37 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+[`Req.request/1`]: https://hexdocs.pm/req/Req.html#request/1
+[`Req.new/1`]:    https://hexdocs.pm/req/Req.html#get!/2
+[`Req.get!/2`]:    https://hexdocs.pm/req/Req.html#get!/2
+[`Req.post!/2`]:   https://hexdocs.pm/req/Req.html#post!/2
+[`Req.Request`]:   https://hexdocs.pm/req/Req.Request.html
+
+[`auth`]:               https://hexdocs.pm/req/Req.Steps.html#auth/1
+[`cache`]:              https://hexdocs.pm/req/Req.Steps.html#cache/1
+[`compress_body`]:      https://hexdocs.pm/req/Req.Steps.html#compress_body/1
+[`compressed`]:         https://hexdocs.pm/req/Req.Steps.html#compressed/1
+[`decode_body`]:        https://hexdocs.pm/req/Req.Steps.html#decode_body/1
+[`decompress_body`]:    https://hexdocs.pm/req/Req.Steps.html#decompress_body/1
+[`encode_body`]:        https://hexdocs.pm/req/Req.Steps.html#encode_body/1
+[`follow_redirects`]:   https://hexdocs.pm/req/Req.Steps.html#follow_redirects/1
+[`handle_http_errors`]: https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
+[`output`]:             https://hexdocs.pm/req/Req.Steps.html#output/1
+[`put_base_url`]:       https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
+[`put_params`]:         https://hexdocs.pm/req/Req.Steps.html#put_params/1
+[`put_plug`]:           https://hexdocs.pm/req/Req.Steps.html#put_plug/1
+[`put_range`]:          https://hexdocs.pm/req/Req.Steps.html#put_range/1
+[`put_user_agent`]:     https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
+[`retry`]:              https://hexdocs.pm/req/Req.Steps.html#retry/1
+[`run_finch`]:          https://hexdocs.pm/req/Req.Steps.html#run_finch/1
+
+[Finch]: https://github.com/sneako/finch
+[cURL]: https://curl.se
+[Requests]: https://docs.python-requests.org/en/master/
+[Tesla]: https://github.com/teamon/tesla
+[`req_easyhtml`]: https://github.com/wojtekmach/req_easyhtml
+[`req_s3`]: https://github.com/wojtekmach/req_s3
+[`req_hex`]: https://github.com/wojtekmach/req_hex
+[`req_github_oauth`]: https://github.com/wojtekmach/req_github_oauth
+[`Mix.install/2`]: https://hexdocs.pm/mix/Mix.html#install/2
