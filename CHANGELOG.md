@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## HEAD
+## v0.3.3 (2022-12-08)
 
   * [`follow_redirects`]: Inherit scheme from previous location
   * [`run_finch`]: Fix setting connect timeout
