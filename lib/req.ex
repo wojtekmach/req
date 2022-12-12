@@ -644,7 +644,7 @@ defmodule Req do
 
       The headers are automatically encoded using these rules:
 
-        * atom header names are turned into strings, replacing `-` with `_`. For example,
+        * atom header names are turned into strings, replacing `_` with `-`. For example,
           `:user_agent` becomes `"user-agent"`
 
         * string header names are left as is. Because header keys are case-insensitive
