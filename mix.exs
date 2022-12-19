@@ -76,9 +76,6 @@ defmodule Req.MixProject do
       extras: [
         "README.md",
         "CHANGELOG.md"
-      ],
-      deps: [
-        ezstd: "https://wojtekmach.pl/docs/ezstd"
       ]
     ]
   end

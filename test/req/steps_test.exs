@@ -257,6 +257,7 @@ defmodule Req.StepsTest do
     assert Req.get!(c.url).body == "foo"
   end
 
+  @tag :capture_log
   test "decompress_body: zstd", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       conn
