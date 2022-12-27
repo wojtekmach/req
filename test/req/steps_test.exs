@@ -826,7 +826,10 @@ defmodule Req.StepsTest do
     request = Req.new(adapter: adapter, url: c.url, retry_delay: 1)
     log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
 
-    assert log =~ "[error]"
+    assert String.match?(
+             log,
+             ~r/\[error\][[:blank:]]+retry: got response with status 500, will retry in 1ms, 3 attempts left/u
+           )
   end
 
   @tag :capture_log
@@ -849,7 +852,11 @@ defmodule Req.StepsTest do
 
     request = Req.new(adapter: adapter, url: c.url, retry_delay: 1, retry_log_level: :info)
     log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
-    assert log =~ "[info]"
+
+    assert String.match?(
+             log,
+             ~r/\[info\][[:blank:]]+retry: got response with status 500, will retry in 1ms, 3 attempts left/u
+           )
   end
 
   @tag :capture_log
