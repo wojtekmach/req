@@ -827,7 +827,7 @@ defmodule Req.StepsTest do
     log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
 
     assert log =~
-             "[warning] retry: got response with status 500, will retry in 1ms, 3 attempts lef"
+             "[error] retry: got response with status 500, will retry in 1ms, 3 attempts lef"
   end
 
   @tag :capture_log
