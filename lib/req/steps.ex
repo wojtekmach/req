@@ -1158,6 +1158,9 @@ defmodule Req.Steps do
       If the response is HTTP 429 and contains the `retry-after` header, the value of the header is used to
       determine the next retry delay.
 
+    * `:retry_log_level` - the log level to emit retry logs at. Can also be set to `false` to disable logging 
+      these messsages. Default to `:error` if not specified.
+      
     * `:max_retries` - maximum number of retry attempts, defaults to `3` (for a total of `4`
       requests to the server, including the initial one.)
 
@@ -1225,9 +1228,10 @@ defmodule Req.Steps do
     retry_count = Req.Request.get_private(request, :req_retry_count, 0)
     {request, delay} = get_retry_delay(request, response_or_exception, retry_count)
     max_retries = Map.get(request.options, :max_retries, 3)
+    log_level = Map.get(request.options, :retry_log_level, :error)
 
     if retry_count < max_retries do
-      log_retry(response_or_exception, retry_count, max_retries, delay)
+      log_retry(response_or_exception, retry_count, max_retries, delay, log_level)
       Process.sleep(delay)
       request = Req.Request.put_private(request, :req_retry_count, retry_count + 1)
 
@@ -1279,7 +1283,9 @@ defmodule Req.Steps do
     end
   end
 
-  defp log_retry(response_or_exception, retry_count, max_retries, delay) do
+  defp log_retry(_, _, _, _, false), do: :ok
+
+  defp log_retry(response_or_exception, retry_count, max_retries, delay, level) do
     retries_left =
       case max_retries - retry_count do
         1 -> "1 attempt"
@@ -1290,18 +1296,18 @@ defmodule Req.Steps do
 
     case response_or_exception do
       %{__exception__: true} = exception ->
-        Logger.error([
+        Logger.log(level, [
           "retry: got exception, ",
           message
         ])
 
-        Logger.error([
+        Logger.log(level, [
           "** (#{inspect(exception.__struct__)}) ",
           Exception.message(exception)
         ])
 
       response ->
-        Logger.error(["retry: got response with status #{response.status}, ", message])
+        Logger.log(level, ["retry: got response with status #{response.status}, ", message])
     end
   end
 

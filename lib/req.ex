@@ -75,6 +75,7 @@ defmodule Req do
           :max_redirects,
           :retry,
           :retry_delay,
+          :retry_log_level,
           :max_retries,
           :cache,
           :cache_dir,

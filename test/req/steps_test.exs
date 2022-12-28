@@ -806,6 +806,83 @@ defmodule Req.StepsTest do
   end
 
   @tag :capture_log
+  test "retry: default log_level", c do
+    adapter = fn request ->
+      request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
+      attempt = request.private.attempt
+
+      response =
+        case attempt do
+          0 ->
+            Req.Response.new(status: 500, body: "oops")
+
+          1 ->
+            Req.Response.new(status: 200, body: "ok")
+        end
+
+      {request, response}
+    end
+
+    request = Req.new(adapter: adapter, url: c.url, retry_delay: 1)
+    log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
+
+    assert String.match?(
+             log,
+             ~r/\[error\][[:blank:]]+retry: got response with status 500, will retry in 1ms, 3 attempts left/u
+           )
+  end
+
+  @tag :capture_log
+  test "retry: custom log_level", c do
+    adapter = fn request ->
+      request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
+      attempt = request.private.attempt
+
+      response =
+        case attempt do
+          0 ->
+            Req.Response.new(status: 500, body: "oops")
+
+          1 ->
+            Req.Response.new(status: 200, body: "ok")
+        end
+
+      {request, response}
+    end
+
+    request = Req.new(adapter: adapter, url: c.url, retry_delay: 1, retry_log_level: :info)
+    log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
+
+    assert String.match?(
+             log,
+             ~r/\[info\][[:blank:]]+retry: got response with status 500, will retry in 1ms, 3 attempts left/u
+           )
+  end
+
+  @tag :capture_log
+  test "retry: logging disabled", c do
+    adapter = fn request ->
+      request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
+      attempt = request.private.attempt
+
+      response =
+        case attempt do
+          0 ->
+            Req.Response.new(status: 500, body: "oops")
+
+          1 ->
+            Req.Response.new(status: 200, body: "ok")
+        end
+
+      {request, response}
+    end
+
+    request = Req.new(adapter: adapter, url: c.url, retry_delay: 1, retry_log_level: false)
+    log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
+    assert log == ""
+  end
+
+  @tag :capture_log
   @tag timeout: 1000
   test "retry: retry-after" do
     adapter = fn request ->
