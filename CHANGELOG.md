@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.3.4 (2023-01-03)
+
+  * [`retry`]: Add `:retry_log_level` option
+
 ## v0.3.3 (2022-12-08)
 
   * [`follow_redirects`]: Inherit scheme from previous location
