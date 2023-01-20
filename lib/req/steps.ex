@@ -308,6 +308,52 @@ defmodule Req.Steps do
   end
 
   @doc """
+  Use a templated request path.
+
+  ## Request Options
+
+    * `:path_params` - params to add to the templated path. Defaults to `[]`.
+
+  ## Examples
+
+      iex> Req.get!("https://httpbin.org/users/:id", params: [id: 123]).url[:path]
+      "https://httpbin.org/users/123"
+
+  """
+  @doc step: :request
+  @rx ~r/:([a-zA-Z]{1}[\w_]*)/
+
+  def put_path_params(request) do
+    put_path_params(request, Map.get(request.options, :path_params, []))
+  end
+
+  defp put_path_params(request, []) do
+    request
+  end
+
+  defp put_path_params(request, params) do
+    request
+    |> Req.Request.put_private(:path_params_template, request.url.path)
+    |> apply_path_params(params)
+  end
+
+  defp apply_path_params(request, params) do
+    url = build_url(request.url.path, params)
+
+    uri = Map.put(request.url, :path, url)
+
+    Map.put(request, :url, uri)
+  end
+
+  defp build_url(url, nil), do: url
+
+  defp build_url(url, params) do
+    Regex.replace(@rx, url, fn match, key ->
+      to_string(params[String.to_existing_atom(key)] || match)
+    end)
+  end
+
+  @doc """
   Adds params to request query string.
 
   ## Request Options
