@@ -316,8 +316,8 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> Req.get!("https://httpbin.org/users/:id", params: [id: 123]).url[:path]
-      "https://httpbin.org/users/123"
+      iex> Req.get!("https://httpbin.org/status/:code", path_params: [code: 200]).status
+      200
 
   """
   @doc step: :request
