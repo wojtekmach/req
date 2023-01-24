@@ -31,6 +31,7 @@ defmodule Req.IntegrationTest do
       put_base_url: 1,
       encode_body: 1,
       put_params: 1,
+      put_path_params: 1,
       put_range: 1,
       put_plug: 1,
       cache: 1,
