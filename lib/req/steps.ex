@@ -321,8 +321,6 @@ defmodule Req.Steps do
 
   """
   @doc step: :request
-  @rx ~r/:([a-zA-Z]{1}[\w_]*)/
-
   def put_path_params(request) do
     put_path_params(request, Map.get(request.options, :path_params, []))
   end
@@ -338,18 +336,14 @@ defmodule Req.Steps do
   end
 
   defp apply_path_params(request, params) do
-    url = build_url(request.url.path, params)
+    update_in(request.url.path, fn
+      nil ->
+        nil
 
-    uri = Map.put(request.url, :path, url)
-
-    Map.put(request, :url, uri)
-  end
-
-  defp build_url(url, nil), do: url
-
-  defp build_url(url, params) do
-    Regex.replace(@rx, url, fn match, key ->
-      to_string(params[String.to_existing_atom(key)] || match)
+      path ->
+        Regex.replace(~r/:([a-zA-Z]{1}[\w_]*)/, path, fn match, key ->
+          to_string(params[String.to_existing_atom(key)] || match)
+        end)
     end)
   end
 
