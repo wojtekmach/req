@@ -670,6 +670,9 @@ defmodule Req do
     * `:params` - if set, appends parameters to the request query string (via
       [`put_params`](`Req.Steps.put_params/1`) step).
 
+    * `:path_params` - if set, uses a templated request path (via
+      [`put_path_params`](`Req.Steps.put_path_params/1`) step).
+
   Authentication options:
 
     * `:auth` - sets request authentication (via [`auth`](`Req.Steps.auth/1`) step).

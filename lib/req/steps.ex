@@ -308,7 +308,7 @@ defmodule Req.Steps do
   end
 
   @doc """
-  Use a templated request path.
+  Uses a templated request path.
 
   ## Request Options
 
