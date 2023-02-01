@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v0.3.5 (2023-02-01)
+
+  * New step: [`put_path_params`]
+  * [`auth`]: Accept string
+
 ## v0.3.4 (2023-01-03)
 
   * [`retry`]: Add `:retry_log_level` option
@@ -437,6 +442,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`output`]:             https://hexdocs.pm/req/Req.Steps.html#output/1
 [`put_base_url`]:       https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
 [`put_params`]:         https://hexdocs.pm/req/Req.Steps.html#put_params/1
+[`put_path_params`]:    https://hexdocs.pm/req/Req.Steps.html#put_path_params/1
 [`put_plug`]:           https://hexdocs.pm/req/Req.Steps.html#put_plug/1
 [`put_user_agent`]:     https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
 [`retry`]:              https://hexdocs.pm/req/Req.Steps.html#retry/1
