@@ -18,7 +18,6 @@ defmodule Req.Steps do
   @doc """
   Sets base URL for all requests.
 
-
   ## Request Options
 
     * `:base_url` - if set, the request URL is merged with this base URL.
@@ -60,16 +59,20 @@ defmodule Req.Steps do
   @doc """
   Sets request authentication.
 
-  `auth` can be one of:
+  ## Request Options
 
-    * `{username, password}` - uses Basic HTTP authentication
+    * `:auth` - sets the `authorization` header:
 
-    * `{:bearer, token}` - uses Bearer HTTP authentication
+        * `string` - sets to this value;
 
-    * `:netrc` - load credentials from `.netrc` at path specified in `NETRC` environment variable;
-      if `NETRC` is not set, load `.netrc` in user's home directory
+        * `{username, password}` - uses Basic HTTP authentication;
 
-    * `{:netrc, path}` - load credentials from `path`
+        * `{:bearer, token}` - uses Bearer HTTP authentication;
+
+        * `:netrc` - load credentials from `.netrc` at path specified in `NETRC` environment variable.
+          If `NETRC` is not set, load `.netrc` in user's home directory;
+
+        * `{:netrc, path}` - load credentials from `path`
 
   ## Examples
 
@@ -97,6 +100,10 @@ defmodule Req.Steps do
 
   defp auth(request, nil) do
     request
+  end
+
+  defp auth(request, authorization) when is_binary(authorization) do
+    Req.Request.put_new_header(request, "authorization", authorization)
   end
 
   defp auth(request, {:bearer, token}) when is_binary(token) do

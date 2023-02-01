@@ -44,6 +44,12 @@ defmodule Req.StepsTest do
     assert Req.get!("", base_url: c.url <> "/api/v2/foo").body == "ok"
   end
 
+  test "auth: string" do
+    req = Req.new(auth: "foo") |> Req.Request.prepare()
+
+    assert List.keyfind(req.headers, "authorization", 0) == {"authorization", "foo"}
+  end
+
   test "auth: basic" do
     req = Req.new(auth: {"foo", "bar"}) |> Req.Request.prepare()
 

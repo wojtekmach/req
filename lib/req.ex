@@ -676,6 +676,17 @@ defmodule Req do
   Authentication options:
 
     * `:auth` - sets request authentication (via [`auth`](`Req.Steps.auth/1`) step).
+      Can be one of:
+
+        * `string` - sets to this value;
+
+        * `{username, password}` - uses Basic HTTP authentication;
+
+        * `{:bearer, token}` - uses Bearer HTTP authentication;
+
+        * `:netrc` - load credentials from the default .netrc file;
+
+        * `{:netrc, path}` - load credentials from `path`
 
   Request body options:
 
