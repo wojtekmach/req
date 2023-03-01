@@ -655,7 +655,7 @@ defmodule Req do
           in both HTTP/1.1 and HTTP/2, it is recommended for header keys to be in
           lowercase, to avoid sending duplicate keys in a request.
 
-        * `NaiveDateTime` and `DateTime` header values are encoded as "HTTP date". Otherwise,
+        * `DateTime` header values are encoded as "HTTP date". Otherwise,
           the header value is encoded with `String.Chars.to_string/1`.
 
       If you set `:headers` options both in `Req.new/1` and `request/2`, the header lists are merged.
@@ -934,9 +934,6 @@ defmodule Req do
 
       value =
         case value do
-          %NaiveDateTime{} = naive_datetime ->
-            Req.Steps.format_http_datetime(naive_datetime)
-
           %DateTime{} = datetime ->
             datetime |> DateTime.shift_zone!("Etc/UTC") |> Req.Steps.format_http_datetime()
 
