@@ -611,7 +611,8 @@ defmodule Req.Steps do
                 :transport_opts,
                 :proxy_headers,
                 :proxy,
-                :client_settings
+                :client_settings,
+                :hostname
               ])
             )
 
