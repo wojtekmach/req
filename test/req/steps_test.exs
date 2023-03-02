@@ -1203,6 +1203,25 @@ defmodule Req.StepsTest do
     assert Req.request!(req, url: "/foo/bar").body == "ok"
   end
 
+  test "run_finch: :connect_options :hostname", c do
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      # Check if passing :hostname results in the correct host header
+      if Plug.Conn.get_req_header(conn, "host") == ["example.com:#{c.bypass.port}"] do
+        Plug.Conn.send_resp(conn, 200, "ok")
+      else
+        Plug.Conn.send_resp(conn, 404, "not found")
+      end
+    end)
+
+    req =
+      Req.new(
+        base_url: c.url,
+        connect_options: [hostname: "example.com"]
+      )
+
+    assert Req.request!(req).body == "ok"
+  end
+
   test "run_finch: :connect_options :transport_opts", c do
     req = Req.new(connect_options: [transport_opts: [cacertfile: "bad.pem"]])
 
