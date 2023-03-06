@@ -70,6 +70,7 @@ defmodule Req do
           :compressed,
           :raw,
           :decode_body,
+          :extract,
           :output,
           :follow_redirects,
           :location_trusted,
@@ -708,6 +709,9 @@ defmodule Req do
 
     * `:decode_body` - if set to `false`, disables automatic response body decoding.
       Defaults to `true`.
+
+    * `:extract` - if set to a path, extracts archives (tar, zip, etc) into the
+      given directory and sets the response body to the list of extracted filenames.
 
     * `:output` - if set, writes the response body to a file (via
       [`output`](`Req.Steps.output/1`) step). Can be set to a string path or an atom

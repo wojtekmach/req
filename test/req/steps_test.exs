@@ -399,6 +399,26 @@ defmodule Req.StepsTest do
   end
 
   @tag :tmp_dir
+  test "decode_body: tar extract", c do
+    files = [{~c"foo.txt", "bar"}]
+
+    path = ~c"#{c.tmp_dir}/foo.tar"
+    :ok = :erl_tar.create(path, files, [])
+    tar = File.read!(path)
+
+    Bypass.expect(c.bypass, "GET", "/foo.tar", fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+      |> Plug.Conn.send_resp(200, tar)
+    end)
+
+    dir = "#{c.tmp_dir}/dir"
+    assert Req.get!(c.url <> "/foo.tar", extract: dir).body == ["#{dir}/foo.txt"]
+    assert File.ls!(dir) == ["foo.txt"]
+    assert File.read!("#{dir}/foo.txt") == "bar"
+  end
+
+  @tag :tmp_dir
   test "decode_body: tar.gz (path)", c do
     files = [{~c"foo.txt", "bar"}]
 
@@ -413,6 +433,26 @@ defmodule Req.StepsTest do
     end)
 
     assert Req.get!(c.url <> "/foo.tar.gz").body == files
+  end
+
+  @tag :tmp_dir
+  test "decode_body: tar.gz extract", c do
+    files = [{~c"foo.txt", "bar"}]
+
+    path = ~c"#{c.tmp_dir}/foo.tar"
+    :ok = :erl_tar.create(path, files, [:compressed])
+    tar = File.read!(path)
+
+    Bypass.expect(c.bypass, "GET", "/foo.tar.gz", fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+      |> Plug.Conn.send_resp(200, tar)
+    end)
+
+    dir = "#{c.tmp_dir}/dir"
+    assert Req.get!(c.url <> "/foo.tar.gz", extract: dir).body == ["#{dir}/foo.txt"]
+    assert File.ls!(dir) == ["foo.txt"]
+    assert File.read!("#{dir}/foo.txt") == "bar"
   end
 
   test "decode_body: zip (content-type)", c do
@@ -441,6 +481,24 @@ defmodule Req.StepsTest do
     end)
 
     assert Req.get!(c.url <> "/foo.zip").body == files
+  end
+
+  @tag :tmp_dir
+  test "decode_body: zip extract", c do
+    files = [{~c"foo.txt", "bar"}]
+
+    Bypass.expect(c.bypass, "GET", "/foo.zip", fn conn ->
+      {:ok, {~c"foo.zip", data}} = :zip.create(~c"foo.zip", files, [:memory])
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+      |> Plug.Conn.send_resp(200, data)
+    end)
+
+    dir = "#{c.tmp_dir}/dir"
+    assert Req.get!(c.url <> "/foo.zip", extract: dir).body == ["#{dir}/foo.txt"]
+    assert File.ls!(dir) == ["foo.txt"]
+    assert File.read!("#{dir}/foo.txt") == "bar"
   end
 
   test "decode_body: csv", c do
