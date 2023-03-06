@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## HEAD
+
+  ` [`run_finch`]: Fix setting `:hostname` option
+  * [`decode_body`]: Add `:extract` option to automatically extract archives (zip, tar, etc)
+
 ## v0.3.5 (2023-02-01)
 
   * New step: [`put_path_params`]
