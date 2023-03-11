@@ -44,7 +44,8 @@ defmodule Req.MixProject do
       description: "Req is a batteries-included HTTP client for Elixir.",
       licenses: ["Apache-2.0"],
       links: %{
-        "GitHub" => @source_url
+        "GitHub" => @source_url,
+        "Changelog" => "https://hexdocs.pm/req/changelog.html"
       }
     ]
   end
