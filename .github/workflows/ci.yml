@@ -15,13 +15,13 @@ jobs:
         include:
           - pair:
               elixir: "1.12"
-              otp: "24.3.4.2"
+              otp: "24.3.4.10"
           - pair:
               elixir: "1.13"
               otp: "25.1"
             lint: lint
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - uses: erlef/setup-beam@main
         with:
@@ -29,7 +29,7 @@ jobs:
           elixir-version: ${{matrix.pair.elixir}}
           version-type: strict
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
         with:
           path: deps
           key: mix-deps-${{ hashFiles('**/mix.lock') }}
