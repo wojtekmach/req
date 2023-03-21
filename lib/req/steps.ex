@@ -561,7 +561,7 @@ defmodule Req.Steps do
 
   Connecting with built-in CA store (requires OTP 25+):
 
-      iex> Req.get!(url, connect_options: [cacerts: :public_key.cacerts_get()])
+      iex> Req.get!(url, connect_options: [transport_opts: [cacerts: :public_key.cacerts_get()]])
 
   """
   @doc step: :request
