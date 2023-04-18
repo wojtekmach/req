@@ -941,6 +941,10 @@ defmodule Req do
           %DateTime{} = datetime ->
             datetime |> DateTime.shift_zone!("Etc/UTC") |> Req.Steps.format_http_datetime()
 
+          %NaiveDateTime{} = datetime ->
+            IO.warn("setting header to %NaiveDateTime{} is deprecated, use %DateTime{} instead")
+            Req.Steps.format_http_datetime(datetime)
+
           _ ->
             String.Chars.to_string(value)
         end
