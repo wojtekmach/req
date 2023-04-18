@@ -1106,6 +1106,8 @@ defmodule Req.Steps do
     * `:max_redirects` - the maximum number of redirects, defaults to `10`.
       If the limit is reached, an error is raised.
 
+    * `:redirect_log_level` - the log level to emit follow_redirects logs at. Can also be set to `false` to disable logging
+      these messsages. Default to `:debug` if not specified.
 
   ## Examples
 
@@ -1118,6 +1120,13 @@ defmodule Req.Steps do
       # 23:08:00.068 [debug] follow_redirects: redirecting to /relative-redirect/2
       # 23:08:00.206 [debug] follow_redirects: redirecting to /relative-redirect/1
       ** (RuntimeError) too many redirects (3)
+
+      iex> Req.get!("http://api.github.com", redirect_log_level: false)
+      200
+
+      iex> Req.get!("http://api.github.com", redirect_log_level: :warn)
+      # 23:24:11.670 [warning]  follow_redirects: redirecting to https://api.github.com/
+      200
 
   """
   @doc step: :response
@@ -1151,7 +1160,9 @@ defmodule Req.Steps do
 
   defp build_redirect_request(request, response) do
     {_, location} = List.keyfind(response.headers, "location", 0)
-    Logger.debug(["follow_redirects: redirecting to ", location])
+
+    log_level = Map.get(request.options, :redirect_log_level, :debug)
+    log_redirect(log_level, location)
 
     location_trusted = Map.get(request.options, :location_trusted)
 
@@ -1162,6 +1173,15 @@ defmodule Req.Steps do
     |> remove_credentials_if_untrusted(location_trusted, location_url)
     |> put_redirect_request_method()
     |> put_redirect_location(location_url)
+  end
+
+  defp log_redirect(false, _location), do: :ok
+
+  defp log_redirect(level, location) do
+    Logger.log(level, [
+      "follow_redirects: redirecting to ",
+      location
+    ])
   end
 
   defp put_redirect_location(request, location_url) do
