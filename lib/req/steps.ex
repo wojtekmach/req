@@ -460,8 +460,13 @@ defmodule Req.Steps do
   defp put_if_modified_since(request, cache_path) do
     case File.stat(cache_path) do
       {:ok, stat} ->
-        datetime = stat.mtime |> NaiveDateTime.from_erl!() |> format_http_datetime()
-        Req.Request.put_new_header(request, "if-modified-since", datetime)
+        http_datetime_string =
+          stat.mtime
+          |> NaiveDateTime.from_erl!()
+          |> DateTime.from_naive!("Etc/UTC")
+          |> format_http_datetime()
+
+        Req.Request.put_new_header(request, "if-modified-since", http_datetime_string)
 
       _ ->
         request
