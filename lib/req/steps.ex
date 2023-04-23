@@ -543,9 +543,13 @@ defmodule Req.Steps do
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket
-    
-    * `:finch_request` - a function to modify the built Finch request before execution. This function takes a 
-     Finch request and returns a Finch request. If not provided, the finch request will not be modified
+
+    * `:finch_request` - a function to modify the built Finch request before execution. This function takes
+      a Finch request and returns a Finch request. If not provided, the Finch request will not be modified.
+
+    * `:finch_exec_request` - a function that executes the request. This function takes a Finch request,
+      a Finch name, and Finch options and returns a `%Req.Response{}` struct indicating success, or an
+      exception indicating an error. Defaults to using a function wrapping `Finch.request/3`.
 
   ## Examples
 
@@ -581,19 +585,9 @@ defmodule Req.Steps do
     finch_options =
       request.options |> Map.take([:receive_timeout, :pool_timeout]) |> Enum.to_list()
 
-    case Finch.request(finch_request, finch_name, finch_options) do
-      {:ok, response} ->
-        response = %Req.Response{
-          status: response.status,
-          headers: response.headers,
-          body: response.body
-        }
+    response_or_error = exec_finch_request(finch_request, finch_name, finch_options, request)
 
-        {request, response}
-
-      {:error, exception} ->
-        {request, exception}
-    end
+    {request, response_or_error}
   end
 
   defp finch_name(request) do
@@ -674,6 +668,26 @@ defmodule Req.Steps do
     case Map.fetch(request.options, :finch_request) do
       {:ok, fun} -> fun.(finch_request)
       :error -> finch_request
+    end
+  end
+
+  defp exec_finch_request(finch_request, finch_name, finch_options, request) do
+    case Map.fetch(request.options, :finch_exec_request) do
+      {:ok, fun} ->
+        fun.(finch_request, finch_name, finch_options)
+
+      :error ->
+        case Finch.request(finch_request, finch_name, finch_options) do
+          {:ok, response} ->
+            %Req.Response{
+              status: response.status,
+              headers: response.headers,
+              body: response.body
+            }
+
+          {:error, exception} ->
+            exception
+        end
     end
   end
 
