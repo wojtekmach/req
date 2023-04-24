@@ -1106,8 +1106,9 @@ defmodule Req.Steps do
     * `:max_redirects` - the maximum number of redirects, defaults to `10`.
       If the limit is reached, an error is raised.
 
-    * `:redirect_log_level` - the log level to emit follow_redirects logs at. Can also be set to `false` to disable logging
-      these messsages. Default to `:debug` if not specified.
+    * `:redirect_log_level` - the log level to emit redirect logs at. Can
+      also be set to `false` to disable logging these messsages. Defaults
+      to `:debug`.
 
   ## Examples
 
@@ -1124,8 +1125,8 @@ defmodule Req.Steps do
       iex> Req.get!("http://api.github.com", redirect_log_level: false)
       200
 
-      iex> Req.get!("http://api.github.com", redirect_log_level: :warn)
-      # 23:24:11.670 [warning]  follow_redirects: redirecting to https://api.github.com/
+      iex> Req.get!("http://api.github.com", redirect_log_level: :error)
+      # 23:24:11.670 [error]  follow_redirects: redirecting to https://api.github.com/
       200
 
   """

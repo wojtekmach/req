@@ -751,7 +751,7 @@ defmodule Req.StepsTest do
            end) =~ "[debug] follow_redirects: redirecting to #{no_scheme}/ok"
   end
 
-  test "follow_redirects: redirect_log_level, set to :warn", c do
+  test "follow_redirects: redirect_log_level, set to :error", c do
     "http:" <> no_scheme = c.url
 
     Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
@@ -763,8 +763,8 @@ defmodule Req.StepsTest do
     end)
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(c.url <> "/redirect", redirect_log_level: :warn).status == 200
-           end) =~ "[warning] follow_redirects: redirecting to #{no_scheme}/ok"
+             assert Req.get!(c.url <> "/redirect", redirect_log_level: :error).status == 200
+           end) =~ "[error] follow_redirects: redirecting to #{no_scheme}/ok"
   end
 
   test "follow_redirects: redirect_log_level, disabled", c do
