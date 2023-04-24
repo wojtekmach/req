@@ -1273,7 +1273,7 @@ defmodule Req.StepsTest do
     Task.async(fn ->
       assert Req.request(req) == {:error, %Mint.TransportError{reason: :timeout}}
     end)
-    |> Task.await(100)
+    |> Task.await(1000)
   end
 
   test "run_finch: :connect_options :protocol", c do
