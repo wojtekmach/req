@@ -30,8 +30,13 @@ defmodule Req.Response do
   @doc """
   Returns a new response.
   """
-  @spec new(options :: keyword()) :: t()
-  def new(options \\ []) do
+  @spec new(options :: keyword() | map() | struct()) :: t()
+  def new(options \\ [])
+
+  def new(options) when is_list(options), do: new(Map.new(options))
+
+  def new(options) do
+    options = Map.take(options, [:status, :headers, :body])
     struct!(__MODULE__, options)
   end
 

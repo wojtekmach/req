@@ -85,7 +85,6 @@ defmodule Req do
           :plug,
           :finch,
           :finch_request,
-          :finch_exec_request,
           :connect_options,
           :receive_timeout,
           :pool_timeout,
