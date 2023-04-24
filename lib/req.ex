@@ -73,6 +73,7 @@ defmodule Req do
           :extract,
           :output,
           :follow_redirects,
+          :redirect_log_level,
           :location_trusted,
           :max_redirects,
           :retry,
