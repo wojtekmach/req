@@ -1106,9 +1106,8 @@ defmodule Req.Steps do
     * `:max_redirects` - the maximum number of redirects, defaults to `10`.
       If the limit is reached, an error is raised.
 
-    * `:redirect_log_level` - the log level to emit redirect logs at. Can
-      also be set to `false` to disable logging these messsages. Defaults
-      to `:debug`.
+    * `:redirect_log_level` - the log level to emit redirect logs at. Can also be set
+      to `false` to disable logging these messsages. Defaults to `:debug`.
 
   ## Examples
 
@@ -1279,9 +1278,9 @@ defmodule Req.Steps do
       If the response is HTTP 429 and contains the `retry-after` header, the value of the header is used to
       determine the next retry delay.
 
-    * `:retry_log_level` - the log level to emit retry logs at. Can also be set to `false` to disable logging 
-      these messsages. Default to `:error` if not specified.
-      
+    * `:retry_log_level` - the log level to emit retry logs at. Can also be set to `false` to disable
+      logging these messsages. Defaults to `:error`.
+
     * `:max_retries` - maximum number of retry attempts, defaults to `3` (for a total of `4`
       requests to the server, including the initial one.)
 
