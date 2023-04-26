@@ -1229,10 +1229,10 @@ defmodule Req.StepsTest do
 
     pid = self()
 
-    fun = fn finch_request, finch_name, finch_opts ->
+    fun = fn req, finch_request, finch_name, finch_opts ->
       {:ok, resp} = Finch.request(finch_request, finch_name, finch_opts)
       send(pid, resp)
-      %Req.Response{status: resp.status, headers: resp.headers, body: "finch_request"}
+      {req, %Req.Response{status: resp.status, headers: resp.headers, body: "finch_request"}}
     end
 
     assert Req.get!(c.url <> "/ok", finch_request: fun).body == "finch_request"
@@ -1240,10 +1240,20 @@ defmodule Req.StepsTest do
   end
 
   test "run_finch: :finch_request error", c do
-    fun = fn _finch_request, _finch_name, _finch_opts -> %ArgumentError{message: "exec error"} end
+    fun = fn req, _finch_request, _finch_name, _finch_opts ->
+      {req, %ArgumentError{message: "exec error"}}
+    end
 
     assert_raise ArgumentError, "exec error", fn ->
       Req.get!(c.url, finch_request: fun, retry: :never)
+    end
+  end
+
+  test "run-finch: :finch_request with invalid return", c do
+    fun = fn _, _, _, _ -> :ok end
+
+    assert_raise RuntimeError, ~r"expected adapter to return \{request, response\}", fn ->
+      Req.get!(c.url, finch_request: fun)
     end
   end
 

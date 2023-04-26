@@ -544,12 +544,17 @@ defmodule Req.Steps do
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket
 
-    * `:finch_request` - a function that takes 3 arguments and executes the request. It must accept
-      a Finch request, a Finch name, and Finch options, and return a `%Req.Response{}` struct
-      indicating success or an exception indicating an error. Defaults to using a function wrapping
-      `Finch.request/3`. (Deprecation warning: this function can also take 1 argument, in which
-      case it should accept and return a Finch request, but this usage will be removed in a future
-      release.)
+    * `:finch_request` - a function that executes the Finch request and converts the result into
+      a Req {request, response} or {request, exception}. If not passed, the request will be run
+      using `Finch.request/3`. The function should accept 4 arguments:
+
+        * `request` - the `%Req.Request{}` struct
+
+        * `finch_request` - the Finch request
+
+        * `finch_name` - the Finch name
+
+        * `finch_options` - the Finch options
 
   ## Examples
 
@@ -584,9 +589,32 @@ defmodule Req.Steps do
     finch_options =
       request.options |> Map.take([:receive_timeout, :pool_timeout]) |> Enum.to_list()
 
-    response_or_error = run_finch_request(finch_request, finch_name, finch_options, request)
+    run_finch(request, finch_request, finch_name, finch_options)
+  end
 
-    {request, response_or_error}
+  defp run_finch(request, finch_request, finch_name, finch_options) do
+    case Map.fetch(request.options, :finch_request) do
+      {:ok, fun} when is_function(fun, 4) ->
+        fun.(request, finch_request, finch_name, finch_options)
+
+      {:ok, deprecated_fun} when is_function(deprecated_fun, 1) ->
+        IO.warn(
+          "passing a :finch_request function accepting a single argument is deprecated. " <>
+            "See Req.Steps.run_finch/1 for more information."
+        )
+
+        {request, run_finch_request(deprecated_fun.(finch_request), finch_name, finch_options)}
+
+      :error ->
+        {request, run_finch_request(finch_request, finch_name, finch_options)}
+    end
+  end
+
+  defp run_finch_request(finch_request, finch_name, finch_options) do
+    case Finch.request(finch_request, finch_name, finch_options) do
+      {:ok, response} -> Req.Response.new(response)
+      {:error, exception} -> exception
+    end
   end
 
   defp finch_name(request) do
@@ -660,31 +688,6 @@ defmodule Req.Steps do
           true ->
             Req.Finch
         end
-    end
-  end
-
-  defp run_finch_request(finch_request, finch_name, finch_options, request) do
-    case Map.fetch(request.options, :finch_request) do
-      {:ok, fun} when is_function(fun, 3) ->
-        fun.(finch_request, finch_name, finch_options)
-
-      {:ok, deprecated_fun} when is_function(deprecated_fun, 1) ->
-        IO.warn(
-          ":finch_request fun accepting a single argument is deprecated. " <>
-            "See Req.Steps.run_finch/1 for more information."
-        )
-
-        run_finch_request(deprecated_fun.(finch_request), finch_name, finch_options)
-
-      :error ->
-        run_finch_request(finch_request, finch_name, finch_options)
-    end
-  end
-
-  defp run_finch_request(finch_request, finch_name, finch_options) do
-    case Finch.request(finch_request, finch_name, finch_options) do
-      {:ok, response} -> Req.Response.new(response)
-      {:error, exception} -> exception
     end
   end
 
