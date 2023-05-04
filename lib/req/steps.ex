@@ -577,6 +577,29 @@ defmodule Req.Steps do
 
       iex> Req.get!(url, connect_options: [transport_opts: [cacerts: :public_key.cacerts_get()]])
 
+  Stream response body:
+
+      fun = fn request, finch_request, finch_name, finch_options ->
+        fun = fn
+          {:status, status}, response ->
+            %{response | status: status}
+
+          {:headers, headers}, response ->
+            %{response | headers: headers}
+
+          {:data, data}, response ->
+            IO.puts(data)
+            response
+        end
+
+        case Finch.stream(finch_request, finch_name, Req.Response.new(), fun, finch_options) do
+          {:ok, response} -> {request, response}
+          {:error, exception} -> {request, exception}
+        end
+      end
+
+      Req.get!("https://httpbin.org/stream/10", finch_request: fun)
+
   """
   @doc step: :request
   def run_finch(request) do
