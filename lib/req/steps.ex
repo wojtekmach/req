@@ -543,9 +543,18 @@ defmodule Req.Steps do
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket
-    
-    * `:finch_request` - a function to modify the built Finch request before execution. This function takes a 
-     Finch request and returns a Finch request. If not provided, the finch request will not be modified
+
+    * `:finch_request` - a function that executes the Finch request and converts the result into
+      a Req {request, response} or {request, exception}. If not passed, the request will be run
+      using `Finch.request/3`. The function should accept 4 arguments:
+
+        * `request` - the `%Req.Request{}` struct
+
+        * `finch_request` - the Finch request
+
+        * `finch_name` - the Finch name
+
+        * `finch_options` - the Finch options
 
   ## Examples
 
@@ -576,23 +585,35 @@ defmodule Req.Steps do
     finch_request =
       Finch.build(request.method, request.url, request.headers, request.body)
       |> Map.replace!(:unix_socket, request.options[:unix_socket])
-      |> update_finch_request(request)
 
     finch_options =
       request.options |> Map.take([:receive_timeout, :pool_timeout]) |> Enum.to_list()
 
+    run_finch(request, finch_request, finch_name, finch_options)
+  end
+
+  defp run_finch(request, finch_request, finch_name, finch_options) do
+    case Map.fetch(request.options, :finch_request) do
+      {:ok, fun} when is_function(fun, 4) ->
+        fun.(request, finch_request, finch_name, finch_options)
+
+      {:ok, deprecated_fun} when is_function(deprecated_fun, 1) ->
+        IO.warn(
+          "passing a :finch_request function accepting a single argument is deprecated. " <>
+            "See Req.Steps.run_finch/1 for more information."
+        )
+
+        {request, run_finch_request(deprecated_fun.(finch_request), finch_name, finch_options)}
+
+      :error ->
+        {request, run_finch_request(finch_request, finch_name, finch_options)}
+    end
+  end
+
+  defp run_finch_request(finch_request, finch_name, finch_options) do
     case Finch.request(finch_request, finch_name, finch_options) do
-      {:ok, response} ->
-        response = %Req.Response{
-          status: response.status,
-          headers: response.headers,
-          body: response.body
-        }
-
-        {request, response}
-
-      {:error, exception} ->
-        {request, exception}
+      {:ok, response} -> Req.Response.new(response)
+      {:error, exception} -> exception
     end
   end
 
@@ -667,13 +688,6 @@ defmodule Req.Steps do
           true ->
             Req.Finch
         end
-    end
-  end
-
-  defp update_finch_request(finch_request, request) do
-    case Map.fetch(request.options, :finch_request) do
-      {:ok, fun} -> fun.(finch_request)
-      :error -> finch_request
     end
   end
 

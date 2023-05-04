@@ -29,9 +29,26 @@ defmodule Req.Response do
 
   @doc """
   Returns a new response.
+
+  Expects a keyword list, map, or struct containing the response keys.
+
+  ## Example
+
+      iex> Req.Response.new(status: 200, body: "body")
+      %Req.Response{status: 200, headers: [], body: "body"}
+
+      iex> finch_response = %Finch.Response{status: 200}
+      iex> Req.Response.new(finch_response)
+      %Req.Response{status: 200, headers: [], body: ""}
+
   """
-  @spec new(options :: keyword()) :: t()
-  def new(options \\ []) do
+  @spec new(options :: keyword() | map() | struct()) :: t()
+  def new(options \\ [])
+
+  def new(options) when is_list(options), do: new(Map.new(options))
+
+  def new(options) do
+    options = Map.take(options, [:status, :headers, :body])
     struct!(__MODULE__, options)
   end
 
