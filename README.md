@@ -175,7 +175,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 [`Req.request/1`]: https://hexdocs.pm/req/Req.html#request/1
-[`Req.new/1`]:    https://hexdocs.pm/req/Req.html#get!/2
+[`Req.new/1`]:     https://hexdocs.pm/req/Req.html#new/1
 [`Req.get!/2`]:    https://hexdocs.pm/req/Req.html#get!/2
 [`Req.post!/2`]:   https://hexdocs.pm/req/Req.html#post!/2
 [`Req.Request`]:   https://hexdocs.pm/req/Req.Request.html
