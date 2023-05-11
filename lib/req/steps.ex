@@ -809,10 +809,14 @@ defmodule Req.Steps do
   | br            | `:brotli.decode/1` (if [brotli] is installed)   |
   | zstd          | `:ezstd.decompress/1` (if [ezstd] is installed) |
 
+  ## Options
+
+    * `:raw` - if set to `true`, disables response body decompression. Defaults to `false`.
+
   ## Examples
 
       iex> response = Req.get!("https://httpbin.org/gzip")
-      iex> response.headers |> List.keyfind("content-encoding", 0)
+      iex> List.keyfind(response.headers, "content-encoding", 0)
       {"content-encoding", "gzip"}
       iex> response.body["gzipped"]
       true
@@ -967,6 +971,8 @@ defmodule Req.Steps do
 
     * `:extract` - if set to a path, extracts archives (tar, zip, etc) into the
       given directory and sets the response body to the list of extracted filenames.
+
+    * `:raw` - if set to `true`, disables response body decoding. Defaults to `false`.
 
   ## Examples
 
