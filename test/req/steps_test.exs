@@ -1287,13 +1287,10 @@ defmodule Req.StepsTest do
   end
 
   test "run_finch: :connect_options :timeout" do
-    {:ok, listen_sock} = :gen_tcp.listen(0, [:binary])
-    {:ok, port} = :inet.port(listen_sock)
-
     req =
       Req.new(
-        url: "http://localhost:#{port}",
-        connect_options: [timeout: 1],
+        url: "https://github.com",
+        connect_options: [timeout: 0],
         retry: false
       )
 
