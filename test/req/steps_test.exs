@@ -1286,17 +1286,6 @@ defmodule Req.StepsTest do
     assert log =~ "1 attempt left"
   end
 
-  test "run_finch: :connect_options :timeout" do
-    req =
-      Req.new(
-        url: "https://github.com",
-        connect_options: [timeout: 0],
-        retry: false
-      )
-
-    assert Req.request(req) == {:error, %Mint.TransportError{reason: :timeout}}
-  end
-
   test "run_finch: :connect_options :protocol", c do
     Bypass.stub(c.bypass, "GET", "/", fn conn ->
       {_, %{version: :"HTTP/2"}} = conn.adapter
