@@ -237,7 +237,7 @@ defmodule Req do
     request(%{request | method: :get}, options)
   end
 
-  def get(url, options) do
+  def get(url, options) when is_binary(url) or is_struct(url, URI) do
     request([method: :get, url: URI.parse(url)] ++ options)
   end
 
@@ -296,7 +296,7 @@ defmodule Req do
     request(%{request | method: :head}, options)
   end
 
-  def head(url, options) do
+  def head(url, options) when is_binary(url) or is_struct(url, URI) do
     request([method: :head, url: URI.parse(url)] ++ options)
   end
 
@@ -421,7 +421,7 @@ defmodule Req do
     request(%{request | method: :post}, options)
   end
 
-  def post(url, options) do
+  def post(url, options) when is_binary(url) or is_struct(url, URI) do
     request([method: :post, url: URI.parse(url)] ++ options)
   end
 
@@ -489,7 +489,7 @@ defmodule Req do
     request(%{request | method: :put}, options)
   end
 
-  def put(url, options) do
+  def put(url, options) when is_binary(url) or is_struct(url, URI) do
     if Keyword.keyword?(options) do
       request([method: :put, url: URI.parse(url)] ++ options)
     else
@@ -552,7 +552,7 @@ defmodule Req do
     request(%{request | method: :patch}, options)
   end
 
-  def patch(url, options) do
+  def patch(url, options) when is_binary(url) or is_struct(url, URI) do
     request([method: :patch, url: url] ++ options)
   end
 
@@ -610,7 +610,7 @@ defmodule Req do
     request(%{request | method: :delete}, options)
   end
 
-  def delete(url, options) do
+  def delete(url, options) when is_binary(url) or is_struct(url, URI) do
     request([method: :delete, url: url] ++ options)
   end
 
@@ -788,7 +788,7 @@ defmodule Req do
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket
-    
+
     * `:finch_request` - a function to modify the built Finch request before execution. This function takes a 
        Finch request and returns a Finch request. If not provided, the finch request will not be modified
 
