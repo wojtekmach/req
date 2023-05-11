@@ -344,6 +344,14 @@ defmodule Req.StepsTest do
     assert Req.get!(c.url).body == %{"a" => 1}
   end
 
+  test "decode_body: json with custom options", c do
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      json(conn, 200, %{a: 1})
+    end)
+
+    assert Req.get!(c.url, decode_json: [keys: :atoms]).body == %{a: 1}
+  end
+
   @tag :tmp_dir
   test "decode_body: with output", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
@@ -1201,7 +1209,7 @@ defmodule Req.StepsTest do
     assert Req.request!(plug: plug, json: %{a: 1}).body == "ok"
   end
 
-  test "run_finch: :finch_request with arity 1 (deprecated)", c do
+  test "run_finch: :finch_request", c do
     Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
       Plug.Conn.send_resp(conn, 200, "ok")
     end)
@@ -1213,48 +1221,8 @@ defmodule Req.StepsTest do
       request
     end
 
-    warning =
-      ExUnit.CaptureIO.capture_io(:stderr, fn ->
-        assert Req.get!(c.url <> "/ok", finch_request: fun).body == "ok"
-      end)
-
-    assert warning =~ "deprecated"
+    assert Req.get!(c.url <> "/ok", finch_request: fun).body == "ok"
     assert_received %Finch.Request{}
-  end
-
-  test "run_finch: :finch_request", c do
-    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
-
-    pid = self()
-
-    fun = fn req, finch_request, finch_name, finch_opts ->
-      {:ok, resp} = Finch.request(finch_request, finch_name, finch_opts)
-      send(pid, resp)
-      {req, %Req.Response{status: resp.status, headers: resp.headers, body: "finch_request"}}
-    end
-
-    assert Req.get!(c.url <> "/ok", finch_request: fun).body == "finch_request"
-    assert_received %Finch.Response{body: "ok"}
-  end
-
-  test "run_finch: :finch_request error", c do
-    fun = fn req, _finch_request, _finch_name, _finch_opts ->
-      {req, %ArgumentError{message: "exec error"}}
-    end
-
-    assert_raise ArgumentError, "exec error", fn ->
-      Req.get!(c.url, finch_request: fun, retry: :never)
-    end
-  end
-
-  test "run-finch: :finch_request with invalid return", c do
-    fun = fn _, _, _, _ -> :ok end
-
-    assert_raise RuntimeError, ~r"expected adapter to return \{request, response\}", fn ->
-      Req.get!(c.url, finch_request: fun)
-    end
   end
 
   test "run_finch: pool timeout", c do

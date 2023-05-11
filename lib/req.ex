@@ -70,6 +70,7 @@ defmodule Req do
           :compressed,
           :raw,
           :decode_body,
+          :decode_json,
           :extract,
           :output,
           :follow_redirects,
@@ -710,6 +711,8 @@ defmodule Req do
 
     * `:decode_body` - if set to `false`, disables automatic response body decoding.
       Defaults to `true`.
+
+    * `:decode_json` - options to pass to `Jason.decode!/2`, defaults to `[]`.
 
     * `:extract` - if set to a path, extracts archives (tar, zip, etc) into the
       given directory and sets the response body to the list of extracted filenames.

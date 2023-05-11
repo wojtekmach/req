@@ -952,7 +952,7 @@ defmodule Req.Steps do
 
   | Format   | Decoder                                                           |
   | -------- | ----------------------------------------------------------------- |
-  | json     | `Jason.decode!/1`                                                 |
+  | json     | `Jason.decode!/2`                                                 |
   | gzip     | `:zlib.gunzip/1`                                                  |
   | tar, tgz | `:erl_tar.extract/2`                                              |
   | zip      | `:zip.unzip/2`                                                    |
@@ -962,6 +962,8 @@ defmodule Req.Steps do
 
     * `:decode_body` - if set to `false`, disables automatic response body decoding.
       Defaults to `true`.
+
+    * `:decode_json` - options to pass to `Jason.decode!/2`, defaults to `[]`.
 
     * `:extract` - if set to a path, extracts archives (tar, zip, etc) into the
       given directory and sets the response body to the list of extracted filenames.
@@ -1011,7 +1013,8 @@ defmodule Req.Steps do
   end
 
   defp decode_body({request, response}, format, _extract_dir) when format in ~w(json json-api) do
-    {request, update_in(response.body, &Jason.decode!/1)}
+    options = Map.get(request.options, :decode_json, [])
+    {request, update_in(response.body, &Jason.decode!(&1, options))}
   end
 
   defp decode_body({request, response}, "gz", _extract_dir) do
