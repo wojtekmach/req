@@ -47,8 +47,8 @@ jobs:
       - run: mix compile --warnings-as-errors
         if: ${{ matrix.lint }}
 
-      - run: mix test
+      - run: mix test --trace
         if: ${{ ! matrix.lint }}
 
-      - run: mix test --warnings-as-errors
+      - run: mix test --trace --warnings-as-errors
         if: ${{ matrix.lint }}
