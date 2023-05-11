@@ -1256,7 +1256,7 @@ defmodule Req.StepsTest do
     end
   end
 
-  test "run_finch: receive timeout", c do
+  test "run_finch: :receive_timeout", c do
     pid = self()
 
     Bypass.stub(c.bypass, "GET", "/", fn conn ->
@@ -1293,14 +1293,11 @@ defmodule Req.StepsTest do
     req =
       Req.new(
         url: "http://localhost:#{port}",
-        connect_options: [timeout: 0],
-        retry: :never
+        connect_options: [timeout: 1],
+        retry: false
       )
 
-    Task.async(fn ->
-      assert Req.request(req) == {:error, %Mint.TransportError{reason: :timeout}}
-    end)
-    |> Task.await(1000)
+    assert Req.request(req) == {:error, %Mint.TransportError{reason: :timeout}}
   end
 
   test "run_finch: :connect_options :protocol", c do
