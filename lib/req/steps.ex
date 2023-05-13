@@ -1217,7 +1217,7 @@ defmodule Req.Steps do
     request
     |> remove_params()
     |> remove_credentials_if_untrusted(location_trusted, location_url)
-    |> put_redirect_request_method()
+    |> put_redirect_request_method(response.status)
     |> put_redirect_location(location_url)
   end
 
@@ -1234,9 +1234,9 @@ defmodule Req.Steps do
     put_in(request.url, location_url)
   end
 
-  defp put_redirect_request_method(request) when request.status in 307..308, do: request
+  defp put_redirect_request_method(request, status) when status in 307..308, do: request
 
-  defp put_redirect_request_method(request), do: %{request | method: :get}
+  defp put_redirect_request_method(request, _), do: %{request | method: :get}
 
   defp remove_credentials_if_untrusted(request, true, _), do: request
 
