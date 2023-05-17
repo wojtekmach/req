@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v0.3.7 (2023-05-18)
+
+  * Deprecate setting headers to `%NaiveDateTime{}`, always use `%DateTime{}`.
+  * [`decode_body`]: Add `:decode_json` option
+  * [`follow_redirects`]: Add `:redirect_log_level`
+  * [`follow_redirects`]: Preserve HTTP method on 307/308 redirects
+  * [`run_finch`]: Allow `:finch_request` to perform the underlying request. This deprecates
+    passing 1-arity function `f(finch_request)` in favour of 4-arity
+    `f(request, finch_request, finch_name, finch_options)`.
+
 ## v0.3.6 (2023-03-06)
 
   * [`run_finch`]: Fix setting `:hostname` option
