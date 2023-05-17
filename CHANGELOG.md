@@ -446,6 +446,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
   * Initial release
 
+[`auth`]:               https://hexdocs.pm/req/Req.Steps.html#auth/1
 [`cache`]:              https://hexdocs.pm/req/Req.Steps.html#cache/1
 [`compress_body`]:      https://hexdocs.pm/req/Req.Steps.html#compress_body/1
 [`compressed`]:         https://hexdocs.pm/req/Req.Steps.html#compressed/1
