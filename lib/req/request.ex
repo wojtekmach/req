@@ -46,7 +46,8 @@ defmodule Req.Request do
           # ...
         )
 
-      Req.Request.run!(req).body["description"]
+      {req, resp} = Req.Request.run_request(req)
+      resp.body["description"]
       #=> "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
 
   By putting the request pipeline yourself you have precise control of exactly what is running and in what order.
@@ -89,7 +90,7 @@ defmodule Req.Request do
   The request, along with the response or error, will go through response or
   error steps, respectively.
 
-  Nothing is actually executed until we run the pipeline with `Req.Request.run/1`.
+  Nothing is actually executed until we run the pipeline with `Req.Request.run_request/1`.
 
   ### Request steps
 
@@ -644,36 +645,44 @@ defmodule Req.Request do
     update_in(request.registered_options, &MapSet.union(&1, MapSet.new(options)))
   end
 
-  @doc """
-  Runs a request pipeline.
-
-  Returns `{:ok, response}` or `{:error, exception}`.
-  """
+  @doc deprecated: "Use Req.Request.request/1 instead"
   def run(request) do
-    run_request(request)
-  end
+    case run_request(request) do
+      {_request, %Req.Response{} = response} ->
+        {:ok, response}
 
-  @doc """
-  Runs a request pipeline and returns a response or raises an error.
-
-  See `run/1` for more information.
-  """
-  def run!(request) do
-    case run(request) do
-      {:ok, response} -> response
-      {:error, exception} -> raise exception
+      {_request, exception} ->
+        {:error, exception}
     end
   end
 
-  defp run_request(%{current_request_steps: [step | rest]} = request) do
+  @doc deprecated: "Use Req.Request.request/1 instead"
+  def run!(request) do
+    case run_request(request) do
+      {_request, %Req.Response{} = response} ->
+        response
+
+      {_request, exception} ->
+        raise exception
+    end
+  end
+
+  @doc """
+  Runs the request pipeline.
+
+  Returns `{request, response}` or `{request, exception}`.
+  """
+  def run_request(request)
+
+  def run_request(%{current_request_steps: [step | rest]} = request) do
     step = Keyword.fetch!(request.request_steps, step)
 
     case step.(request) do
       %Req.Request{} = request ->
         run_request(%{request | current_request_steps: rest})
 
-      {%Req.Request{halted: true}, response_or_exception} ->
-        result(response_or_exception)
+      {%Req.Request{halted: true} = request, response_or_exception} ->
+        {request, response_or_exception}
 
       {request, %Req.Response{} = response} ->
         run_response(request, response)
@@ -683,7 +692,7 @@ defmodule Req.Request do
     end
   end
 
-  defp run_request(%{current_request_steps: []} = request) do
+  def run_request(%{current_request_steps: []} = request) do
     case request.adapter.(request) do
       {request, %Req.Response{} = response} ->
         run_response(request, response)
@@ -700,53 +709,39 @@ defmodule Req.Request do
   defp run_response(request, response) do
     steps = request.response_steps
 
-    {_request, response_or_exception} =
-      Enum.reduce_while(steps, {request, response}, fn step, {request, response} ->
-        case run_step(step, {request, response}) do
-          {%Req.Request{halted: true} = request, response_or_exception} ->
-            {:halt, {request, response_or_exception}}
+    Enum.reduce_while(steps, {request, response}, fn step, {request, response} ->
+      case run_step(step, {request, response}) do
+        {%Req.Request{halted: true} = request, response_or_exception} ->
+          {:halt, {request, response_or_exception}}
 
-          {request, %Req.Response{} = response} ->
-            {:cont, {request, response}}
+        {request, %Req.Response{} = response} ->
+          {:cont, {request, response}}
 
-          {request, %{__exception__: true} = exception} ->
-            {:halt, run_error(request, exception)}
-        end
-      end)
-
-    result(response_or_exception)
+        {request, %{__exception__: true} = exception} ->
+          {:halt, run_error(request, exception)}
+      end
+    end)
   end
 
   defp run_error(request, exception) do
     steps = request.error_steps
 
-    {_request, response_or_exception} =
-      Enum.reduce_while(steps, {request, exception}, fn step, {request, exception} ->
-        case run_step(step, {request, exception}) do
-          {%Req.Request{halted: true} = request, response_or_exception} ->
-            {:halt, {request, response_or_exception}}
+    Enum.reduce_while(steps, {request, exception}, fn step, {request, exception} ->
+      case run_step(step, {request, exception}) do
+        {%Req.Request{halted: true} = request, response_or_exception} ->
+          {:halt, {request, response_or_exception}}
 
-          {request, %{__exception__: true} = exception} ->
-            {:cont, {request, exception}}
+        {request, %{__exception__: true} = exception} ->
+          {:cont, {request, exception}}
 
-          {request, %Req.Response{} = response} ->
-            {:halt, run_response(request, response)}
-        end
-      end)
-
-    result(response_or_exception)
+        {request, %Req.Response{} = response} ->
+          {:halt, run_response(request, response)}
+      end
+    end)
   end
 
   defp run_step({name, step}, state) when is_atom(name) and is_function(step, 1) do
     step.(state)
-  end
-
-  defp result(%Req.Response{} = response) do
-    {:ok, response}
-  end
-
-  defp result(%{__exception__: true} = exception) do
-    {:error, exception}
   end
 
   @doc false
