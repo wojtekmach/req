@@ -36,608 +36,7 @@ defmodule Req do
   @doc """
   Returns a new request struct with built-in steps.
 
-  See `request/1` for a list of available options. See `Req.Request` module documentation
-  for more information on the underlying request struct.
-
-  ## Examples
-
-      iex> req = Req.new(url: "https://elixir-lang.org")
-      iex> req.method
-      :get
-      iex> URI.to_string(req.url)
-      "https://elixir-lang.org"
-
-  """
-  @spec new(options :: keyword()) :: Req.Request.t()
-  def new(options \\ []) do
-    options = Keyword.merge(default_options(), options)
-    {plugins, options} = Keyword.pop(options, :plugins, [])
-
-    %Req.Request{
-      registered_options:
-        MapSet.new([
-          :user_agent,
-          :compressed,
-          :range,
-          :http_errors,
-          :base_url,
-          :params,
-          :path_params,
-          :auth,
-          :form,
-          :json,
-          :compress_body,
-          :compressed,
-          :raw,
-          :decode_body,
-          :decode_json,
-          :extract,
-          :output,
-          :follow_redirects,
-          :redirect_log_level,
-          :location_trusted,
-          :max_redirects,
-          :retry,
-          :retry_delay,
-          :retry_log_level,
-          :max_retries,
-          :cache,
-          :cache_dir,
-          :plug,
-          :finch,
-          :finch_request,
-          :connect_options,
-          :receive_timeout,
-          :pool_timeout,
-          :unix_socket
-        ])
-    }
-    |> update(options)
-    |> Req.Request.prepend_request_steps(
-      put_user_agent: &Req.Steps.put_user_agent/1,
-      compressed: &Req.Steps.compressed/1,
-      encode_body: &Req.Steps.encode_body/1,
-      put_base_url: &Req.Steps.put_base_url/1,
-      auth: &Req.Steps.auth/1,
-      put_params: &Req.Steps.put_params/1,
-      put_path_params: &Req.Steps.put_path_params/1,
-      put_range: &Req.Steps.put_range/1,
-      cache: &Req.Steps.cache/1,
-      put_plug: &Req.Steps.put_plug/1,
-      compress_body: &Req.Steps.compress_body/1
-    )
-    |> Req.Request.prepend_response_steps(
-      retry: &Req.Steps.retry/1,
-      follow_redirects: &Req.Steps.follow_redirects/1,
-      decompress_body: &Req.Steps.decompress_body/1,
-      decode_body: &Req.Steps.decode_body/1,
-      handle_http_errors: &Req.Steps.handle_http_errors/1,
-      output: &Req.Steps.output/1
-    )
-    |> Req.Request.prepend_error_steps(retry: &Req.Steps.retry/1)
-    |> run_plugins(plugins)
-  end
-
-  @doc """
-  Updates a request struct.
-
-  See `request/1` for a list of available options. See `Req.Request` module documentation
-  for more information on the underlying request struct.
-
-  ## Examples
-
-      iex> req = Req.new(base_url: "https://httpbin.org")
-      iex> req = Req.update(req, auth: {"alice", "secret"})
-      iex> req.options
-      %{auth: {"alice", "secret"}, base_url: "https://httpbin.org"}
-
-  Passing `:headers` will automatically encode and merge them:
-
-      iex> req = Req.new(headers: [point_x: 1])
-      iex> req = Req.update(req, headers: [point_y: 2])
-      iex> req.headers
-      [{"point-x", "1"}, {"point-y", "2"}]
-
-  """
-  @spec update(Req.Request.t(), options :: keyword()) :: Req.Request.t()
-  def update(%Req.Request{} = request, options) when is_list(options) do
-    request_option_names = [:method, :url, :headers, :body, :adapter]
-
-    {request_options, options} = Keyword.split(options, request_option_names)
-
-    registered =
-      MapSet.union(
-        request.registered_options,
-        MapSet.new(request_option_names)
-      )
-
-    Req.Request.validate_options(options, registered)
-
-    request_options =
-      if request_options[:headers] do
-        update_in(request_options[:headers], &encode_headers/1)
-      else
-        request_options
-      end
-
-    request =
-      Map.merge(request, Map.new(request_options), fn
-        :url, _, url ->
-          URI.parse(url)
-
-        :headers, old, new ->
-          old ++ new
-
-        _, _, value ->
-          value
-      end)
-
-    request = update_in(request.options, &Map.merge(&1, Map.new(options)))
-
-    if request.options[:output] do
-      update_in(request.options, &Map.put(&1, :decode_body, false))
-    else
-      request
-    end
-  end
-
-  @doc """
-  Makes a GET request.
-
-  See `request/1` for a list of supported options.
-
-  ## Examples
-
-  With URL:
-
-      iex> Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
-      "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
-
-  With request struct:
-
-      iex> req = Req.new(base_url: "https://api.github.com")
-      iex> Req.get!(req, url: "/repos/elixir-lang/elixir").status
-      200
-
-  """
-  @spec get!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def get!(url_or_request, options \\ []) do
-    case get(url_or_request, options) do
-      {:ok, response} -> response
-      {:error, exception} -> raise exception
-    end
-  end
-
-  @doc """
-  Makes a GET request.
-
-  See `request/1` for a list of supported options.
-
-  ## Examples
-
-  With URL:
-
-      iex> {:ok, res} = Req.get("https://api.github.com/repos/elixir-lang/elixir")
-      iex> res.body["description"]
-      "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
-
-  With request struct:
-
-      iex> req = Req.new(base_url: "https://api.github.com")
-      iex> {:ok, res} = Req.get(req, url: "/repos/elixir-lang/elixir")
-      iex> res.status
-      200
-
-  """
-  @spec get(url() | Req.Request.t(), options :: keyword()) ::
-          {:ok, Req.Response.t()} | {:error, Exception.t()}
-  def get(url_or_request, options \\ [])
-
-  def get(%Req.Request{} = request, options) do
-    request(%{request | method: :get}, options)
-  end
-
-  def get(url, options) when is_binary(url) or is_struct(url, URI) do
-    request([method: :get, url: URI.parse(url)] ++ options)
-  end
-
-  @doc """
-  Makes a HEAD request.
-
-  See `request/1` for a list of supported options.
-
-  ## Examples
-
-  With URL:
-
-      iex> Req.head!("https://httpbin.org/status/201").status
-      201
-
-  With request struct:
-
-      iex> req = Req.new(base_url: "https://httpbin.org")
-      iex> Req.head!(req, url: "/status/201").status
-      201
-
-  """
-  @spec head!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def head!(url_or_request, options \\ []) do
-    case head(url_or_request, options) do
-      {:ok, response} -> response
-      {:error, exception} -> raise exception
-    end
-  end
-
-  @doc """
-  Makes a HEAD request.
-
-  See `request/1` for a list of supported options.
-
-  ## Examples
-
-  With URL:
-
-      iex> {:ok, res} = Req.head("https://httpbin.org/status/201")
-      iex> res.status
-      201
-
-  With request struct:
-
-      iex> req = Req.new(base_url: "https://httpbin.org")
-      iex> {:ok, res} = Req.head(req, url: "/status/201")
-      iex> res.status
-      201
-
-  """
-  @spec head(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def head(url_or_request, options \\ [])
-
-  def head(%Req.Request{} = request, options) do
-    request(%{request | method: :head}, options)
-  end
-
-  def head(url, options) when is_binary(url) or is_struct(url, URI) do
-    request([method: :head, url: URI.parse(url)] ++ options)
-  end
-
-  @doc """
-  Makes a POST request.
-
-  See `request/1` for a list of supported options.
-
-  ## Examples
-
-  With URL:
-
-      iex> Req.post!("https://httpbin.org/anything", body: "hello!").body["data"]
-      "hello!"
-
-      iex> Req.post!("https://httpbin.org/anything", form: [x: 1]).body["form"]
-      %{"x" => "1"}
-
-      iex> Req.post!("https://httpbin.org/anything", json: %{x: 2}).body["json"]
-      %{"x" => 2}
-
-  With request struct:
-
-      iex> req = Req.new(url: "https://httpbin.org/anything")
-      iex> Req.post!(req, body: "hello!").body["data"]
-      "hello!"
-  """
-  @spec post!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def post!(url_or_request, options \\ []) do
-    if Keyword.keyword?(options) do
-      case post(url_or_request, options) do
-        {:ok, response} -> response
-        {:error, exception} -> raise exception
-      end
-    else
-      case options do
-        {:form, data} ->
-          IO.warn(
-            "Req.post!(url, {:form, data}) is deprecated in favour of " <>
-              "Req.post!(url, form: data)"
-          )
-
-          request!(method: :post, url: URI.parse(url_or_request), form: data)
-
-        {:json, data} ->
-          IO.warn(
-            "Req.post!(url, {:json, data}) is deprecated in favour of " <>
-              "Req.post!(url, json: data)"
-          )
-
-          request!(method: :post, url: URI.parse(url_or_request), json: data)
-
-        data ->
-          IO.warn("Req.post!(url, body) is deprecated in favour of Req.post!(url, body: body)")
-          request!(method: :post, url: URI.parse(url_or_request), body: data)
-      end
-    end
-  end
-
-  @doc false
-  def post!(url, body, options) do
-    case body do
-      {:form, data} ->
-        IO.warn(
-          "Req.post!(url, {:form, data}, options) is deprecated in favour of " <>
-            "Req.post!(url, [form: data] ++ options)"
-        )
-
-        request!([method: :post, url: URI.parse(url), form: data] ++ options)
-
-      {:json, data} ->
-        IO.warn(
-          "Req.post!(url, {:json, data}) is deprecated in favour of " <>
-            "Req.post!(url, [json: data] ++ options)"
-        )
-
-        request!([method: :post, url: URI.parse(url), json: data] ++ options)
-
-      data ->
-        IO.warn(
-          "Req.post!(url, body) is deprecated in favour of " <>
-            "Req.post!(url, [body: body] ++ options)"
-        )
-
-        request!([method: :post, url: URI.parse(url), body: data] ++ options)
-    end
-  end
-
-  @doc """
-  Makes a POST request.
-
-  See `request/1` for a list of supported options.
-
-  ## Examples
-
-  With URL:
-
-      iex> {:ok, res} = Req.post("https://httpbin.org/anything", body: "hello!")
-      iex> res.body["data"]
-      "hello!"
-
-      iex> {:ok, res} = Req.post("https://httpbin.org/anything", form: [x: 1])
-      iex> res.body["form"]
-      %{"x" => "1"}
-
-      iex> {:ok, res} = Req.post("https://httpbin.org/anything", json: %{x: 2})
-      iex> res.body["json"]
-      %{"x" => 2}
-
-  With request struct:
-
-      iex> req = Req.new(url: "https://httpbin.org/anything")
-      iex> {:ok, res} = Req.post(req, body: "hello!")
-      iex> res.body["data"]
-      "hello!"
-  """
-  @spec post(url() | Req.Request.t(), options :: keyword()) ::
-          {:ok, Req.Response.t()} | {:error, Exception.t()}
-  def post(url_or_request, options \\ [])
-
-  def post(%Req.Request{} = request, options) do
-    request(%{request | method: :post}, options)
-  end
-
-  def post(url, options) when is_binary(url) or is_struct(url, URI) do
-    request([method: :post, url: URI.parse(url)] ++ options)
-  end
-
-  @doc """
-  Makes a PUT request.
-
-  See `request/1` for a list of supported options.
-
-  ## Examples
-
-  With URL:
-
-      iex> Req.put!("https://httpbin.org/anything", body: "hello!").body["data"]
-      "hello!"
-
-  With request struct:
-
-      iex> req = Req.new(url: "https://httpbin.org/anything")
-      iex> Req.put!(req, body: "hello!").body["data"]
-      "hello!"
-  """
-  @spec put!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def put!(url_or_request, options \\ []) do
-    case put(url_or_request, options) do
-      {:ok, response} -> response
-      {:error, exception} -> raise exception
-    end
-  end
-
-  @doc false
-  def put!(%URI{} = url, {type, _} = body, options) when type in [:form, :json] do
-    IO.warn(
-      "Req.put!(url, {:#{type}, #{type}}, options) is deprecated in favour of " <>
-        "Req.put!(url, [#{type}: #{type}] ++ options)"
-    )
-
-    request!([method: :put, url: url, body: body] ++ options)
-  end
-
-  @doc """
-  Makes a PUT request.
-
-  See `request/1` for a list of supported options.
-
-  ## Examples
-
-  With URL:
-
-      iex> {:ok, res} = Req.put("https://httpbin.org/anything", body: "hello!")
-      iex> res.body["data"]
-      "hello!"
-
-  With request struct:
-
-      iex> req = Req.new(url: "https://httpbin.org/anything")
-      iex> {:ok, res} = Req.put(req, body: "hello!")
-      iex> res.body["data"]
-      "hello!"
-  """
-  @spec put(url() | Req.Request.t(), options :: keyword()) ::
-          {:ok, Req.Response.t()} | {:error, Exception.t()}
-  def put(url_or_request, options \\ [])
-
-  def put(%Req.Request{} = request, options) do
-    request(%{request | method: :put}, options)
-  end
-
-  def put(url, options) when is_binary(url) or is_struct(url, URI) do
-    if Keyword.keyword?(options) do
-      request([method: :put, url: URI.parse(url)] ++ options)
-    else
-      IO.warn("Req.put!(url, body) is deprecated in favour of Req.put!(url, body: body)")
-      request(url: URI.parse(url), body: options)
-    end
-  end
-
-  @doc """
-  Makes a PATCH request.
-
-  See `request/1` for a list of supported options.
-
-  ## Examples
-
-  With URL:
-
-      iex> Req.patch!("https://httpbin.org/anything", body: "hello!").body["data"]
-      "hello!"
-
-  With request struct:
-
-      iex> req = Req.new(url: "https://httpbin.org/anything")
-      iex> Req.patch!(req, body: "hello!").body["data"]
-      "hello!"
-  """
-  @spec patch!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def patch!(url_or_request, options \\ []) do
-    case patch(url_or_request, options) do
-      {:ok, response} -> response
-      {:error, exception} -> raise exception
-    end
-  end
-
-  @doc """
-  Makes a PATCH request.
-
-  See `request/1` for a list of supported options.
-
-  ## Examples
-
-  With URL:
-
-      iex> {:ok, res} = Req.patch("https://httpbin.org/anything", body: "hello!")
-      iex> res.body["data"]
-      "hello!"
-
-  With request struct:
-
-      iex> req = Req.new(url: "https://httpbin.org/anything")
-      iex> {:ok, res} = Req.patch(req, body: "hello!")
-      iex> res.body["data"]
-      "hello!"
-  """
-  @spec patch(url() | Req.Request.t(), options :: keyword()) ::
-          {:ok, Req.Response.t()} | {:error, Exception.t()}
-  def patch(url_or_request, options \\ [])
-
-  def patch(%Req.Request{} = request, options) do
-    request(%{request | method: :patch}, options)
-  end
-
-  def patch(url, options) when is_binary(url) or is_struct(url, URI) do
-    request([method: :patch, url: url] ++ options)
-  end
-
-  @doc """
-  Makes a DELETE request.
-
-  See `request/1` for a list of supported options.
-
-  ## Examples
-
-  With URL:
-
-      iex> Req.delete!("https://httpbin.org/anything").body["method"]
-      "DELETE"
-
-  With request struct:
-
-      iex> req = Req.new(url: "https://httpbin.org/anything")
-      iex> Req.delete!(req).body["method"]
-      "DELETE"
-  """
-  @spec delete!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def delete!(url_or_request, options \\ []) do
-    case delete(url_or_request, options) do
-      {:ok, response} -> response
-      {:error, exception} -> raise exception
-    end
-  end
-
-  @doc """
-  Makes a DELETE request.
-
-  See `request/1` for a list of supported options.
-
-  ## Examples
-
-  With URL:
-
-      iex> {:ok, res} = Req.delete("https://httpbin.org/anything")
-      iex> res.body["method"]
-      "DELETE"
-
-  With request struct:
-
-      iex> req = Req.new(url: "https://httpbin.org/anything")
-      iex> {:ok, res} = Req.delete(req)
-      iex> res.body["method"]
-      "DELETE"
-  """
-  @spec delete(url() | Req.Request.t(), options :: keyword()) ::
-          {:ok, Req.Response.t()} | {:error, Exception.t()}
-  def delete(url_or_request, options \\ [])
-
-  def delete(%Req.Request{} = request, options) do
-    request(%{request | method: :delete}, options)
-  end
-
-  def delete(url, options) when is_binary(url) or is_struct(url, URI) do
-    request([method: :delete, url: url] ++ options)
-  end
-
-  @doc """
-  Makes an HTTP request.
-
-  `request/1` and `request/2` functions give three ways of making requests:
-
-    1. With a list of options, for example:
-
-       ```
-       iex> Req.request(url: url)
-       ```
-
-    2. With a request struct, for example:
-
-       ```
-       iex> Req.new(url: url) |> Req.request()
-       ```
-
-    3. With a request struct and more options, for example:
-
-       ```
-       iex> Req.new(base_url: base_url) |> Req.request(url: url)
-       ```
-
-  This function as well as all the other ones in this module accept the same set of options described below.
+  See `Req.Request` module documentation for more information on the underlying request struct.
 
   ## Options
 
@@ -794,6 +193,596 @@ defmodule Req do
 
   ## Examples
 
+      iex> req = Req.new(url: "https://elixir-lang.org")
+      iex> req.method
+      :get
+      iex> URI.to_string(req.url)
+      "https://elixir-lang.org"
+
+  With mock adapter:
+
+      iex> mock = fn request ->
+      ...>   {request, Req.Response.new(status: 200, body: "it works!")}
+      ...> end
+      iex>
+      iex> req = Req.new(adapter: mock)
+      iex> Req.get!(req).body
+      "it works!"
+
+  """
+  @spec new(options :: keyword()) :: Req.Request.t()
+  def new(options \\ []) do
+    options = Keyword.merge(default_options(), options)
+    {plugins, options} = Keyword.pop(options, :plugins, [])
+
+    %Req.Request{
+      registered_options:
+        MapSet.new([
+          :user_agent,
+          :compressed,
+          :range,
+          :http_errors,
+          :base_url,
+          :params,
+          :path_params,
+          :auth,
+          :form,
+          :json,
+          :compress_body,
+          :compressed,
+          :raw,
+          :decode_body,
+          :decode_json,
+          :extract,
+          :output,
+          :follow_redirects,
+          :redirect_log_level,
+          :location_trusted,
+          :max_redirects,
+          :retry,
+          :retry_delay,
+          :retry_log_level,
+          :max_retries,
+          :cache,
+          :cache_dir,
+          :plug,
+          :finch,
+          :finch_request,
+          :connect_options,
+          :receive_timeout,
+          :pool_timeout,
+          :unix_socket
+        ])
+    }
+    |> update(options)
+    |> Req.Request.prepend_request_steps(
+      put_user_agent: &Req.Steps.put_user_agent/1,
+      compressed: &Req.Steps.compressed/1,
+      encode_body: &Req.Steps.encode_body/1,
+      put_base_url: &Req.Steps.put_base_url/1,
+      auth: &Req.Steps.auth/1,
+      put_params: &Req.Steps.put_params/1,
+      put_path_params: &Req.Steps.put_path_params/1,
+      put_range: &Req.Steps.put_range/1,
+      cache: &Req.Steps.cache/1,
+      put_plug: &Req.Steps.put_plug/1,
+      compress_body: &Req.Steps.compress_body/1
+    )
+    |> Req.Request.prepend_response_steps(
+      retry: &Req.Steps.retry/1,
+      follow_redirects: &Req.Steps.follow_redirects/1,
+      decompress_body: &Req.Steps.decompress_body/1,
+      decode_body: &Req.Steps.decode_body/1,
+      handle_http_errors: &Req.Steps.handle_http_errors/1,
+      output: &Req.Steps.output/1
+    )
+    |> Req.Request.prepend_error_steps(retry: &Req.Steps.retry/1)
+    |> run_plugins(plugins)
+  end
+
+  @doc """
+  Updates a request struct.
+
+  See `new/1` for a list of available options. Also see `Req.Request` module documentation
+  for more information on the underlying request struct.
+
+  ## Examples
+
+      iex> req = Req.new(base_url: "https://httpbin.org")
+      iex> req = Req.update(req, auth: {"alice", "secret"})
+      iex> req.options
+      %{auth: {"alice", "secret"}, base_url: "https://httpbin.org"}
+
+  Passing `:headers` will automatically encode and merge them:
+
+      iex> req = Req.new(headers: [point_x: 1])
+      iex> req = Req.update(req, headers: [point_y: 2])
+      iex> req.headers
+      [{"point-x", "1"}, {"point-y", "2"}]
+
+  """
+  @spec update(Req.Request.t(), options :: keyword()) :: Req.Request.t()
+  def update(%Req.Request{} = request, options) when is_list(options) do
+    request_option_names = [:method, :url, :headers, :body, :adapter]
+
+    {request_options, options} = Keyword.split(options, request_option_names)
+
+    registered =
+      MapSet.union(
+        request.registered_options,
+        MapSet.new(request_option_names)
+      )
+
+    Req.Request.validate_options(options, registered)
+
+    request_options =
+      if request_options[:headers] do
+        update_in(request_options[:headers], &encode_headers/1)
+      else
+        request_options
+      end
+
+    request =
+      Map.merge(request, Map.new(request_options), fn
+        :url, _, url ->
+          URI.parse(url)
+
+        :headers, old, new ->
+          old ++ new
+
+        _, _, value ->
+          value
+      end)
+
+    request = update_in(request.options, &Map.merge(&1, Map.new(options)))
+
+    if request.options[:output] do
+      update_in(request.options, &Map.put(&1, :decode_body, false))
+    else
+      request
+    end
+  end
+
+  @doc """
+  Makes a GET request.
+
+  See `new/1` for a list of available options.
+
+  ## Examples
+
+  With URL:
+
+      iex> Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
+      "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+
+  With request struct:
+
+      iex> req = Req.new(base_url: "https://api.github.com")
+      iex> Req.get!(req, url: "/repos/elixir-lang/elixir").status
+      200
+
+  """
+  @spec get!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  def get!(url_or_request, options \\ []) do
+    case get(url_or_request, options) do
+      {:ok, response} -> response
+      {:error, exception} -> raise exception
+    end
+  end
+
+  @doc """
+  Makes a GET request.
+
+  See `new/1` for a list of available options.
+
+  ## Examples
+
+  With URL:
+
+      iex> {:ok, res} = Req.get("https://api.github.com/repos/elixir-lang/elixir")
+      iex> res.body["description"]
+      "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+
+  With request struct:
+
+      iex> req = Req.new(base_url: "https://api.github.com")
+      iex> {:ok, res} = Req.get(req, url: "/repos/elixir-lang/elixir")
+      iex> res.status
+      200
+
+  """
+  @spec get(url() | Req.Request.t(), options :: keyword()) ::
+          {:ok, Req.Response.t()} | {:error, Exception.t()}
+  def get(url_or_request, options \\ [])
+
+  def get(%Req.Request{} = request, options) do
+    request(%{request | method: :get}, options)
+  end
+
+  def get(url, options) when is_binary(url) or is_struct(url, URI) do
+    request([method: :get, url: URI.parse(url)] ++ options)
+  end
+
+  @doc """
+  Makes a HEAD request.
+
+  See `new/1` for a list of available options.
+
+  ## Examples
+
+  With URL:
+
+      iex> Req.head!("https://httpbin.org/status/201").status
+      201
+
+  With request struct:
+
+      iex> req = Req.new(base_url: "https://httpbin.org")
+      iex> Req.head!(req, url: "/status/201").status
+      201
+
+  """
+  @spec head!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  def head!(url_or_request, options \\ []) do
+    case head(url_or_request, options) do
+      {:ok, response} -> response
+      {:error, exception} -> raise exception
+    end
+  end
+
+  @doc """
+  Makes a HEAD request.
+
+  See `new/1` for a list of available options.
+
+  ## Examples
+
+  With URL:
+
+      iex> {:ok, res} = Req.head("https://httpbin.org/status/201")
+      iex> res.status
+      201
+
+  With request struct:
+
+      iex> req = Req.new(base_url: "https://httpbin.org")
+      iex> {:ok, res} = Req.head(req, url: "/status/201")
+      iex> res.status
+      201
+
+  """
+  @spec head(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  def head(url_or_request, options \\ [])
+
+  def head(%Req.Request{} = request, options) do
+    request(%{request | method: :head}, options)
+  end
+
+  def head(url, options) when is_binary(url) or is_struct(url, URI) do
+    request([method: :head, url: URI.parse(url)] ++ options)
+  end
+
+  @doc """
+  Makes a POST request.
+
+  See `new/1` for a list of available options.
+
+  ## Examples
+
+  With URL:
+
+      iex> Req.post!("https://httpbin.org/anything", body: "hello!").body["data"]
+      "hello!"
+
+      iex> Req.post!("https://httpbin.org/anything", form: [x: 1]).body["form"]
+      %{"x" => "1"}
+
+      iex> Req.post!("https://httpbin.org/anything", json: %{x: 2}).body["json"]
+      %{"x" => 2}
+
+  With request struct:
+
+      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> Req.post!(req, body: "hello!").body["data"]
+      "hello!"
+  """
+  @spec post!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  def post!(url_or_request, options \\ []) do
+    if Keyword.keyword?(options) do
+      case post(url_or_request, options) do
+        {:ok, response} -> response
+        {:error, exception} -> raise exception
+      end
+    else
+      case options do
+        {:form, data} ->
+          IO.warn(
+            "Req.post!(url, {:form, data}) is deprecated in favour of " <>
+              "Req.post!(url, form: data)"
+          )
+
+          request!(method: :post, url: URI.parse(url_or_request), form: data)
+
+        {:json, data} ->
+          IO.warn(
+            "Req.post!(url, {:json, data}) is deprecated in favour of " <>
+              "Req.post!(url, json: data)"
+          )
+
+          request!(method: :post, url: URI.parse(url_or_request), json: data)
+
+        data ->
+          IO.warn("Req.post!(url, body) is deprecated in favour of Req.post!(url, body: body)")
+          request!(method: :post, url: URI.parse(url_or_request), body: data)
+      end
+    end
+  end
+
+  @doc false
+  def post!(url, body, options) do
+    case body do
+      {:form, data} ->
+        IO.warn(
+          "Req.post!(url, {:form, data}, options) is deprecated in favour of " <>
+            "Req.post!(url, [form: data] ++ options)"
+        )
+
+        request!([method: :post, url: URI.parse(url), form: data] ++ options)
+
+      {:json, data} ->
+        IO.warn(
+          "Req.post!(url, {:json, data}) is deprecated in favour of " <>
+            "Req.post!(url, [json: data] ++ options)"
+        )
+
+        request!([method: :post, url: URI.parse(url), json: data] ++ options)
+
+      data ->
+        IO.warn(
+          "Req.post!(url, body) is deprecated in favour of " <>
+            "Req.post!(url, [body: body] ++ options)"
+        )
+
+        request!([method: :post, url: URI.parse(url), body: data] ++ options)
+    end
+  end
+
+  @doc """
+  Makes a POST request.
+
+  See `new/1` for a list of available options.
+
+  ## Examples
+
+  With URL:
+
+      iex> {:ok, res} = Req.post("https://httpbin.org/anything", body: "hello!")
+      iex> res.body["data"]
+      "hello!"
+
+      iex> {:ok, res} = Req.post("https://httpbin.org/anything", form: [x: 1])
+      iex> res.body["form"]
+      %{"x" => "1"}
+
+      iex> {:ok, res} = Req.post("https://httpbin.org/anything", json: %{x: 2})
+      iex> res.body["json"]
+      %{"x" => 2}
+
+  With request struct:
+
+      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> {:ok, res} = Req.post(req, body: "hello!")
+      iex> res.body["data"]
+      "hello!"
+  """
+  @spec post(url() | Req.Request.t(), options :: keyword()) ::
+          {:ok, Req.Response.t()} | {:error, Exception.t()}
+  def post(url_or_request, options \\ [])
+
+  def post(%Req.Request{} = request, options) do
+    request(%{request | method: :post}, options)
+  end
+
+  def post(url, options) when is_binary(url) or is_struct(url, URI) do
+    request([method: :post, url: URI.parse(url)] ++ options)
+  end
+
+  @doc """
+  Makes a PUT request.
+
+  See `new/1` for a list of available options.
+
+  ## Examples
+
+  With URL:
+
+      iex> Req.put!("https://httpbin.org/anything", body: "hello!").body["data"]
+      "hello!"
+
+  With request struct:
+
+      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> Req.put!(req, body: "hello!").body["data"]
+      "hello!"
+  """
+  @spec put!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  def put!(url_or_request, options \\ []) do
+    case put(url_or_request, options) do
+      {:ok, response} -> response
+      {:error, exception} -> raise exception
+    end
+  end
+
+  @doc false
+  def put!(%URI{} = url, {type, _} = body, options) when type in [:form, :json] do
+    IO.warn(
+      "Req.put!(url, {:#{type}, #{type}}, options) is deprecated in favour of " <>
+        "Req.put!(url, [#{type}: #{type}] ++ options)"
+    )
+
+    request!([method: :put, url: url, body: body] ++ options)
+  end
+
+  @doc """
+  Makes a PUT request.
+
+  See `new/1` for a list of available options.
+
+  ## Examples
+
+  With URL:
+
+      iex> {:ok, res} = Req.put("https://httpbin.org/anything", body: "hello!")
+      iex> res.body["data"]
+      "hello!"
+
+  With request struct:
+
+      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> {:ok, res} = Req.put(req, body: "hello!")
+      iex> res.body["data"]
+      "hello!"
+  """
+  @spec put(url() | Req.Request.t(), options :: keyword()) ::
+          {:ok, Req.Response.t()} | {:error, Exception.t()}
+  def put(url_or_request, options \\ [])
+
+  def put(%Req.Request{} = request, options) do
+    request(%{request | method: :put}, options)
+  end
+
+  def put(url, options) when is_binary(url) or is_struct(url, URI) do
+    if Keyword.keyword?(options) do
+      request([method: :put, url: URI.parse(url)] ++ options)
+    else
+      IO.warn("Req.put!(url, body) is deprecated in favour of Req.put!(url, body: body)")
+      request(url: URI.parse(url), body: options)
+    end
+  end
+
+  @doc """
+  Makes a PATCH request.
+
+  See `new/1` for a list of available options.
+
+  ## Examples
+
+  With URL:
+
+      iex> Req.patch!("https://httpbin.org/anything", body: "hello!").body["data"]
+      "hello!"
+
+  With request struct:
+
+      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> Req.patch!(req, body: "hello!").body["data"]
+      "hello!"
+  """
+  @spec patch!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  def patch!(url_or_request, options \\ []) do
+    case patch(url_or_request, options) do
+      {:ok, response} -> response
+      {:error, exception} -> raise exception
+    end
+  end
+
+  @doc """
+  Makes a PATCH request.
+
+  See `new/1` for a list of available options.
+
+  ## Examples
+
+  With URL:
+
+      iex> {:ok, res} = Req.patch("https://httpbin.org/anything", body: "hello!")
+      iex> res.body["data"]
+      "hello!"
+
+  With request struct:
+
+      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> {:ok, res} = Req.patch(req, body: "hello!")
+      iex> res.body["data"]
+      "hello!"
+  """
+  @spec patch(url() | Req.Request.t(), options :: keyword()) ::
+          {:ok, Req.Response.t()} | {:error, Exception.t()}
+  def patch(url_or_request, options \\ [])
+
+  def patch(%Req.Request{} = request, options) do
+    request(%{request | method: :patch}, options)
+  end
+
+  def patch(url, options) when is_binary(url) or is_struct(url, URI) do
+    request([method: :patch, url: url] ++ options)
+  end
+
+  @doc """
+  Makes a DELETE request.
+
+  See `new/1` for a list of available options.
+
+  ## Examples
+
+  With URL:
+
+      iex> Req.delete!("https://httpbin.org/anything").body["method"]
+      "DELETE"
+
+  With request struct:
+
+      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> Req.delete!(req).body["method"]
+      "DELETE"
+  """
+  @spec delete!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  def delete!(url_or_request, options \\ []) do
+    case delete(url_or_request, options) do
+      {:ok, response} -> response
+      {:error, exception} -> raise exception
+    end
+  end
+
+  @doc """
+  Makes a DELETE request.
+
+  See `new/1` for a list of available options.
+
+  ## Examples
+
+  With URL:
+
+      iex> {:ok, res} = Req.delete("https://httpbin.org/anything")
+      iex> res.body["method"]
+      "DELETE"
+
+  With request struct:
+
+      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> {:ok, res} = Req.delete(req)
+      iex> res.body["method"]
+      "DELETE"
+  """
+  @spec delete(url() | Req.Request.t(), options :: keyword()) ::
+          {:ok, Req.Response.t()} | {:error, Exception.t()}
+  def delete(url_or_request, options \\ [])
+
+  def delete(%Req.Request{} = request, options) do
+    request(%{request | method: :delete}, options)
+  end
+
+  def delete(url, options) when is_binary(url) or is_struct(url, URI) do
+    request([method: :delete, url: url] ++ options)
+  end
+
+  @doc """
+  Makes an HTTP request.
+
+  See `new/1` for a list of availale options.
+
+  ## Examples
+
   With options keywords list:
 
       iex> {:ok, response} = Req.request(url: "https://api.github.com/repos/elixir-lang/elixir")
@@ -808,24 +797,6 @@ defmodule Req do
       iex> {:ok, response} = Req.request(req)
       iex> response.status
       200
-
-  With request struct and options:
-
-      iex> req = Req.new(base_url: "https://api.github.com")
-      iex> {:ok, response} = Req.request(req, url: "/repos/elixir-lang/elixir")
-      iex> response.status
-      200
-
-  With mock adapter:
-
-      iex> adapter = fn request ->
-      ...>   response = %Req.Response{status: 200, body: "it works!"}
-      ...>   {request, response}
-      ...> end
-      iex>
-      iex> {:ok, response} = Req.request(adapter: adapter, url: "http://example")
-      iex> response.body
-      "it works!"
   """
   @spec request(Req.Request.t() | keyword()) :: {:ok, Req.Response.t()} | {:error, Exception.t()}
   def request(request_or_options)
@@ -841,7 +812,14 @@ defmodule Req do
   @doc """
   Makes an HTTP request.
 
-  See `request/1` for more information.
+  See `new/1` for a list of availale options.
+
+  ## Examples
+
+      iex> req = Req.new(base_url: "https://api.github.com")
+      iex> {:ok, response} = Req.request(req, url: "/repos/elixir-lang/elixir")
+      iex> response.status
+      200
   """
   @spec request(Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
@@ -867,11 +845,19 @@ defmodule Req do
   @doc """
   Makes an HTTP request and returns a response or raises an error.
 
-  See `request/1` for more information.
+  See `new/1` for a list of available options.
 
   ## Examples
 
+  With options keywords list:
+
       iex> Req.request!(url: "https://api.github.com/repos/elixir-lang/elixir").status
+      200
+
+  With request struct:
+
+      iex> req = Req.new(url: "https://api.github.com/repos/elixir-lang/elixir")
+      iex> Req.request!(req).status
       200
   """
   @spec request!(Req.Request.t() | keyword()) :: Req.Response.t()
@@ -885,7 +871,7 @@ defmodule Req do
   @doc """
   Makes an HTTP request and returns a response or raises an error.
 
-  See `request/1` for more information.
+  See `new/1` for a list of available options.
 
   ## Examples
 
