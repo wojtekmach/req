@@ -82,13 +82,16 @@ defmodule Req do
 
         * `string` - sets to this value;
 
-        * `{username, password}` - uses Basic HTTP authentication;
+        * `{username, password}` - uses Basic HTTP authentication.
 
-        * `{:bearer, token}` - uses Bearer HTTP authentication;
+        * `{:bearer, token}` - uses Bearer HTTP authentication.
 
-        * `:netrc` - load credentials from the default .netrc file;
+        * `:netrc` - load credentials from the default .netrc file.
 
-        * `{:netrc, path}` - load credentials from `path`
+        * `{:netrc, path}` - load credentials from `path`.
+
+    * `:redact_auth` - if set to `true`, when `Req.Request` struct is inspected, authentication credentials
+      are redacted. Defaults to `true`.
 
   Request body options:
 

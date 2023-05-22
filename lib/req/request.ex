@@ -791,12 +791,40 @@ defmodule Req.Request do
       sep = color(",", :map, opts)
       close = color("}", :map, opts)
 
+      {headers, options} =
+        if Map.get(request.options, :redact_auth, true) do
+          headers =
+            for {name, value} <- request.headers do
+              if name in ["authorization", "Authorization"] do
+                {name, "[redacted]"}
+              else
+                {name, value}
+              end
+            end
+
+          options =
+            case request.options do
+              %{auth: {:bearer, _bearer}} ->
+                %{request.options | auth: {:bearer, "[redacted]"}}
+
+              %{auth: {_username, _password}} ->
+                %{request.options | auth: {["redacted"], "[redacted]"}}
+
+              _ ->
+                request.options
+            end
+
+          {headers, options}
+        else
+          {request.headers, request.options}
+        end
+
       list = [
         method: request.method,
         url: request.url,
-        headers: request.headers,
+        headers: headers,
         body: request.body,
-        options: request.options,
+        options: options,
         registered_options: request.registered_options,
         halted: request.halted,
         adapter: request.adapter,
