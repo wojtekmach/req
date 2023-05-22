@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v0.3.8 (2023-05-22)
+
+  * Add `:redact_auth` option to redact auth credentials, defaults to `true`.
+  * Soft-deprecate `Req.Request.run,run!` in favour of [`Req.Request.run_request/1`].
+
 ## v0.3.7 (2023-05-18)
 
   * Deprecate setting headers to `%NaiveDateTime{}`, always use `%DateTime{}`.
@@ -446,20 +451,21 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
   * Initial release
 
-[`auth`]:               https://hexdocs.pm/req/Req.Steps.html#auth/1
-[`cache`]:              https://hexdocs.pm/req/Req.Steps.html#cache/1
-[`compress_body`]:      https://hexdocs.pm/req/Req.Steps.html#compress_body/1
-[`compressed`]:         https://hexdocs.pm/req/Req.Steps.html#compressed/1
-[`decode_body`]:        https://hexdocs.pm/req/Req.Steps.html#decode_body/1
-[`decompress_body`]:    https://hexdocs.pm/req/Req.Steps.html#decompress_body/1
-[`encode_body`]:        https://hexdocs.pm/req/Req.Steps.html#encode_body/1
-[`follow_redirects`]:   https://hexdocs.pm/req/Req.Steps.html#follow_redirects/1
-[`handle_http_errors`]: https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
-[`output`]:             https://hexdocs.pm/req/Req.Steps.html#output/1
-[`put_base_url`]:       https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
-[`put_params`]:         https://hexdocs.pm/req/Req.Steps.html#put_params/1
-[`put_path_params`]:    https://hexdocs.pm/req/Req.Steps.html#put_path_params/1
-[`put_plug`]:           https://hexdocs.pm/req/Req.Steps.html#put_plug/1
-[`put_user_agent`]:     https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
-[`retry`]:              https://hexdocs.pm/req/Req.Steps.html#retry/1
-[`run_finch`]:          https://hexdocs.pm/req/Req.Steps.html#run_finch/1
+[`auth`]:                      https://hexdocs.pm/req/Req.Steps.html#auth/1
+[`cache`]:                     https://hexdocs.pm/req/Req.Steps.html#cache/1
+[`compress_body`]:             https://hexdocs.pm/req/Req.Steps.html#compress_body/1
+[`compressed`]:                https://hexdocs.pm/req/Req.Steps.html#compressed/1
+[`decode_body`]:               https://hexdocs.pm/req/Req.Steps.html#decode_body/1
+[`decompress_body`]:           https://hexdocs.pm/req/Req.Steps.html#decompress_body/1
+[`encode_body`]:               https://hexdocs.pm/req/Req.Steps.html#encode_body/1
+[`follow_redirects`]:          https://hexdocs.pm/req/Req.Steps.html#follow_redirects/1
+[`handle_http_errors`]:        https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
+[`output`]:                    https://hexdocs.pm/req/Req.Steps.html#output/1
+[`put_base_url`]:              https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
+[`put_params`]:                https://hexdocs.pm/req/Req.Steps.html#put_params/1
+[`put_path_params`]:           https://hexdocs.pm/req/Req.Steps.html#put_path_params/1
+[`put_plug`]:                  https://hexdocs.pm/req/Req.Steps.html#put_plug/1
+[`put_user_agent`]:            https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
+[`retry`]:                     https://hexdocs.pm/req/Req.Steps.html#retry/1
+[`run_finch`]:                 https://hexdocs.pm/req/Req.Steps.html#run_finch/1
+[`Req.Request.run_request/1`]: https://hexdocs.pm/req/Req.Request.html#run_request/1
