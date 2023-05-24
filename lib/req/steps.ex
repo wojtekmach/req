@@ -1205,7 +1205,9 @@ defmodule Req.Steps do
   end
 
   defp build_redirect_request(request, response) do
-    {_, location} = List.keyfind(response.headers, "location", 0)
+    location = with {_, location} <- List.keyfind(response.headers, "location", 0) do
+      URI.encode(location)
+    end
 
     log_level = Map.get(request.options, :redirect_log_level, :debug)
     log_redirect(log_level, location)

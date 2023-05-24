@@ -575,6 +575,20 @@ defmodule Req.StepsTest do
            end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
   end
 
+  test "follow_redirects: url encode location", c do
+    Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+      redirect(conn, 302, c.url <> "/url encode")
+    end)
+
+    Bypass.expect(c.bypass, "GET", "/url%20encode", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    assert ExUnit.CaptureLog.capture_log(fn ->
+             assert Req.get!(c.url <> "/redirect").status == 200
+           end) =~ "[debug] follow_redirects: redirecting to #{c.url}/url%20encode"
+  end
+
   test "follow_redirects: relative", c do
     Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
       location =
