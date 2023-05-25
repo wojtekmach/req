@@ -805,9 +805,10 @@ defmodule Req.Steps do
   | Format        | Decoder                                         |
   | ------------- | ----------------------------------------------- |
   | gzip, x-gzip  | `:zlib.gunzip/1`                                |
-  | zip           | `:zlib.unzip/1`                                 |
+  | deflate       | `:zlib.unzip/1`                                 |
   | br            | `:brotli.decode/1` (if [brotli] is installed)   |
   | zstd          | `:ezstd.decompress/1` (if [ezstd] is installed) |
+  | identity      | Returns data as is                              |
 
   ## Options
 
