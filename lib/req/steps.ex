@@ -349,12 +349,12 @@ defmodule Req.Steps do
 
       path ->
         Regex.replace(~r/:([a-zA-Z]{1}[\w_]*)/, path, fn match, key ->
-          case Map.fetch(params, String.to_existing_atom(key)) do
-            {:ok, value} ->
-              value |> to_string() |> URI.encode()
-
-            :error ->
+          case params[String.to_existing_atom(key)] do
+            nil ->
               match
+
+            value ->
+              value |> to_string() |> URI.encode()
           end
         end)
     end)
