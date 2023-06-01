@@ -219,8 +219,8 @@ defmodule Req.StepsTest do
   end
 
   test "put_path_params" do
-    req = Req.new(url: "http://foo/:id", path_params: [id: 1]) |> Req.Request.prepare()
-    assert URI.to_string(req.url) == "http://foo/1"
+    req = Req.new(url: "http://foo/:id", path_params: [id: "abc|def"]) |> Req.Request.prepare()
+    assert URI.to_string(req.url) == "http://foo/abc%7Cdef"
   end
 
   test "put_range" do

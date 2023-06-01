@@ -351,6 +351,7 @@ defmodule Req.Steps do
         Regex.replace(~r/:([a-zA-Z]{1}[\w_]*)/, path, fn match, key ->
           to_string(params[String.to_existing_atom(key)] || match)
         end)
+        |> URI.encode()
     end)
   end
 
