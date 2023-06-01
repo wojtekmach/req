@@ -349,7 +349,13 @@ defmodule Req.Steps do
 
       path ->
         Regex.replace(~r/:([a-zA-Z]{1}[\w_]*)/, path, fn match, key ->
-          to_string(params[String.to_existing_atom(key)] || match)
+          case params[String.to_existing_atom(key)] do
+            nil ->
+              match
+
+            value ->
+              value |> to_string() |> URI.encode()
+          end
         end)
     end)
   end
