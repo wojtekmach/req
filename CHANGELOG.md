@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.3.9 (2023-06-08)
+
+  * [`put_path_params`]: URI-encode path params
+
 ## v0.3.8 (2023-05-22)
 
   * Add `:redact_auth` option to redact auth credentials, defaults to `true`.
