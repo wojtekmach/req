@@ -847,11 +847,10 @@ defmodule Req.Steps do
   @doc step: :response
   def decompress_body(request_response)
 
-  def decompress_body({request, %{body: ""} = response}) do
-    {request, response}
-  end
-
-  def decompress_body({request, response}) when request.options.raw == true do
+  def decompress_body({request, response})
+      when request.options.raw == true or
+             response.body == "" or
+             not is_binary(response.body) do
     {request, response}
   end
 
