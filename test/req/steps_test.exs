@@ -1223,133 +1223,135 @@ defmodule Req.StepsTest do
     assert Req.request!(plug: plug, json: %{a: 1}).body == "ok"
   end
 
-  test "run_finch: :finch_request", c do
-    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
-
-    pid = self()
-
-    fun = fn req, finch_request, finch_name, finch_opts ->
-      {:ok, resp} = Finch.request(finch_request, finch_name, finch_opts)
-      send(pid, resp)
-      {req, %Req.Response{status: resp.status, headers: resp.headers, body: "finch_request"}}
-    end
-
-    assert Req.get!(c.url <> "/ok", finch_request: fun).body == "finch_request"
-    assert_received %Finch.Response{body: "ok"}
-  end
-
-  test "run_finch: :finch_request error", c do
-    fun = fn req, _finch_request, _finch_name, _finch_opts ->
-      {req, %ArgumentError{message: "exec error"}}
-    end
-
-    assert_raise ArgumentError, "exec error", fn ->
-      Req.get!(c.url, finch_request: fun, retry: :never)
-    end
-  end
-
-  test "run-finch: :finch_request with invalid return", c do
-    fun = fn _, _, _, _ -> :ok end
-
-    assert_raise RuntimeError, ~r"expected adapter to return \{request, response\}", fn ->
-      Req.get!(c.url, finch_request: fun)
-    end
-  end
-
-  test "run_finch: pool timeout", c do
-    Bypass.stub(c.bypass, "GET", "/", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
-
-    options = [pool_timeout: 0]
-
-    assert_raise RuntimeError, ~r/unable to provide a connection within the timeout/, fn ->
-      Req.get!(c.url, options)
-    end
-  end
-
-  test "run_finch: :receive_timeout", c do
-    pid = self()
-
-    Bypass.stub(c.bypass, "GET", "/", fn conn ->
-      send(pid, :ping)
-      Process.sleep(10)
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
-
-    options = [receive_timeout: 0, retry_delay: 10]
-
-    log =
-      ExUnit.CaptureLog.capture_log(fn ->
-        assert {:error, %Mint.TransportError{reason: :timeout}} =
-                 Req.request([method: :get, url: c.url] ++ options)
-
-        assert_receive :ping
-        assert_receive :ping
-        assert_receive :ping
-        assert_receive :ping
-        refute_receive _
+  describe "run_finch" do
+    test ":finch_request", c do
+      Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "ok")
       end)
 
-    refute log =~ "4 attempts left"
+      pid = self()
 
-    assert log =~ "3 attempts left"
-    assert log =~ "2 attempts left"
-    assert log =~ "1 attempt left"
-  end
+      fun = fn req, finch_request, finch_name, finch_opts ->
+        {:ok, resp} = Finch.request(finch_request, finch_name, finch_opts)
+        send(pid, resp)
+        {req, %Req.Response{status: resp.status, headers: resp.headers, body: "finch_request"}}
+      end
 
-  test "run_finch: :connect_options :protocol", c do
-    Bypass.stub(c.bypass, "GET", "/", fn conn ->
-      {_, %{version: :"HTTP/2"}} = conn.adapter
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
-
-    req = Req.new(url: c.url, connect_options: [protocol: :http2])
-    assert Req.request!(req).body == "ok"
-  end
-
-  test "run_finch: :connect_options :proxy", c do
-    Bypass.expect(c.bypass, "GET", "/foo/bar", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
-
-    # Bypass will forward request to itself
-    # Not quite a proper forward proxy server, but good enough
-    test_proxy = {:http, "localhost", c.bypass.port, []}
-
-    req = Req.new(base_url: c.url, connect_options: [proxy: test_proxy])
-    assert Req.request!(req, url: "/foo/bar").body == "ok"
-  end
-
-  test "run_finch: :connect_options :hostname", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      assert Plug.Conn.get_req_header(conn, "host") == ["example.com:#{c.bypass.port}"]
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
-
-    req = Req.new(base_url: c.url, connect_options: [hostname: "example.com"])
-    assert Req.request!(req).body == "ok"
-  end
-
-  test "run_finch: :connect_options :transport_opts", c do
-    req = Req.new(connect_options: [transport_opts: [cacertfile: "bad.pem"]])
-
-    assert_raise File.Error, ~r/could not read file "bad.pem"/, fn ->
-      Req.request!(req, url: "https://localhost:#{c.bypass.port}")
+      assert Req.get!(c.url <> "/ok", finch_request: fun).body == "finch_request"
+      assert_received %Finch.Response{body: "ok"}
     end
-  end
 
-  test "run_finch: :connect_options bad option", c do
-    assert_raise ArgumentError, "unknown option :timeou. Did you mean :timeout?", fn ->
-      Req.get!(c.url, connect_options: [timeou: 0])
+    test ":finch_request error", c do
+      fun = fn req, _finch_request, _finch_name, _finch_opts ->
+        {req, %ArgumentError{message: "exec error"}}
+      end
+
+      assert_raise ArgumentError, "exec error", fn ->
+        Req.get!(c.url, finch_request: fun, retry: :never)
+      end
     end
-  end
 
-  test "run_finch: :finch and :connect_options" do
-    assert_raise ArgumentError, "cannot set both :finch and :connect_options", fn ->
-      Req.request!(finch: MyFinch, connect_options: [timeout: 0])
+    test ":finch_request with invalid return", c do
+      fun = fn _, _, _, _ -> :ok end
+
+      assert_raise RuntimeError, ~r"expected adapter to return \{request, response\}", fn ->
+        Req.get!(c.url, finch_request: fun)
+      end
+    end
+
+    test "pool timeout", c do
+      Bypass.stub(c.bypass, "GET", "/", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+      options = [pool_timeout: 0]
+
+      assert_raise RuntimeError, ~r/unable to provide a connection within the timeout/, fn ->
+        Req.get!(c.url, options)
+      end
+    end
+
+    test ":receive_timeout", c do
+      pid = self()
+
+      Bypass.stub(c.bypass, "GET", "/", fn conn ->
+        send(pid, :ping)
+        Process.sleep(10)
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+      options = [receive_timeout: 0, retry_delay: 10]
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:error, %Mint.TransportError{reason: :timeout}} =
+                   Req.request([method: :get, url: c.url] ++ options)
+
+          assert_receive :ping
+          assert_receive :ping
+          assert_receive :ping
+          assert_receive :ping
+          refute_receive _
+        end)
+
+      refute log =~ "4 attempts left"
+
+      assert log =~ "3 attempts left"
+      assert log =~ "2 attempts left"
+      assert log =~ "1 attempt left"
+    end
+
+    test ":connect_options :protocol", c do
+      Bypass.stub(c.bypass, "GET", "/", fn conn ->
+        {_, %{version: :"HTTP/2"}} = conn.adapter
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+      req = Req.new(url: c.url, connect_options: [protocol: :http2])
+      assert Req.request!(req).body == "ok"
+    end
+
+    test ":connect_options :proxy", c do
+      Bypass.expect(c.bypass, "GET", "/foo/bar", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+      # Bypass will forward request to itself
+      # Not quite a proper forward proxy server, but good enough
+      test_proxy = {:http, "localhost", c.bypass.port, []}
+
+      req = Req.new(base_url: c.url, connect_options: [proxy: test_proxy])
+      assert Req.request!(req, url: "/foo/bar").body == "ok"
+    end
+
+    test ":connect_options :hostname", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        assert Plug.Conn.get_req_header(conn, "host") == ["example.com:#{c.bypass.port}"]
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+      req = Req.new(base_url: c.url, connect_options: [hostname: "example.com"])
+      assert Req.request!(req).body == "ok"
+    end
+
+    test ":connect_options :transport_opts", c do
+      req = Req.new(connect_options: [transport_opts: [cacertfile: "bad.pem"]])
+
+      assert_raise File.Error, ~r/could not read file "bad.pem"/, fn ->
+        Req.request!(req, url: "https://localhost:#{c.bypass.port}")
+      end
+    end
+
+    test ":connect_options bad option", c do
+      assert_raise ArgumentError, "unknown option :timeou. Did you mean :timeout?", fn ->
+        Req.get!(c.url, connect_options: [timeou: 0])
+      end
+    end
+
+    test ":finch and :connect_options" do
+      assert_raise ArgumentError, "cannot set both :finch and :connect_options", fn ->
+        Req.request!(finch: MyFinch, connect_options: [timeout: 0])
+      end
     end
   end
 
