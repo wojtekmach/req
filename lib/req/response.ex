@@ -3,6 +3,7 @@ defmodule Req.Response do
   The response struct.
 
   Fields:
+    * `:ok` - contains a Boolean stating whether the response was successful (status in the range 200-299) or not.
 
     * `:status` - the HTTP status code
 
@@ -16,6 +17,7 @@ defmodule Req.Response do
   """
 
   @type t() :: %__MODULE__{
+          ok: boolean(),
           status: non_neg_integer(),
           headers: [{binary(), binary()}],
           body: binary() | term(),
@@ -48,7 +50,10 @@ defmodule Req.Response do
   def new(options) when is_list(options), do: new(Map.new(options))
 
   def new(options) do
-    options = Map.take(options, [:status, :headers, :body])
+    options =
+      options
+      |> Map.take([:status, :headers, :body])
+      |> Map.put(:ok, options[:status] in 200..299)
     struct!(__MODULE__, options)
   end
 
@@ -141,4 +146,18 @@ defmodule Req.Response do
       when is_binary(key) and is_binary(value) do
     %{response | headers: List.keystore(response.headers, key, 0, {key, value})}
   end
+
+  @doc """
+  Returns a ok-error tuple response when the response is successful or not.
+
+  ## Examples
+
+      iex> Req.Response.to_tuple(%Req.Response{ok: true})
+      {:ok, %Req.Response{ok: true}}
+
+      iex> Req.Response.to_tuple(%Req.Response{ok: false})
+      {:error, %Req.Response{ok: false}}
+  """
+  def to_tuple(%Req.Response{ok: true} = response), do: {:ok, response}
+  def to_tuple(%Req.Response{ok: false} = response), do: {:error, response}
 end
