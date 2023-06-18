@@ -285,8 +285,7 @@ defmodule Req.Steps do
     * `:form` - if set, encodes the request body as form data (using `URI.encode_query/1`).
 
     * `:json` - if set, encodes the request body as JSON (using `Jason.encode_to_iodata!/1`), sets
-                the `accept` header to `application/json`, and the `content-type`
-                header to `application/json`.
+      the `accept` header to `application/json`, and the `content-type` header to `application/json`.
 
   ## Examples
 
