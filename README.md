@@ -14,29 +14,29 @@ Req is a batteries-included HTTP client for Elixir.
 
   * Request body compression and automatic response body decompression (via [`compress_body`], [`compressed`], and [`decompress_body`] steps). Supports gzip, deflate, brotli and zstd decompression.
 
-  * Request body encoding and automatic response body decoding (via [`encode_body`] and [`decode_body`] steps)
+  * Request body encoding and automatic response body decoding (via [`encode_body`] and [`decode_body`] steps.)
 
-  * Encode params as query string (via [`put_params`] step)
+  * Encode params as query string (via [`put_params`] step.)
 
-  * Basic, bearer, and `.netrc` authentication (via [`auth`] step)
+  * Basic, bearer, and `.netrc` authentication (via [`auth`] step.)
 
-  * Range requests (via [`put_range`]) step)
+  * Range requests (via [`put_range`]) step.)
 
-  * Follows redirects (via [`follow_redirects`] step)
+  * Follows redirects (via [`follow_redirects`] step.)
 
-  * Retries on errors (via [`retry`] step)
+  * Retries on errors (via [`retry`] step.)
 
-  * Raise on 4xx/5xx errors (via [`handle_http_errors`] step)
+  * Raise on 4xx/5xx errors (via [`handle_http_errors`] step.)
 
-  * Basic HTTP caching (via [`cache`] step)
+  * Basic HTTP caching (via [`cache`] step.)
 
-  * Setting base URL (via [`put_base_url`] step)
+  * Setting base URL (via [`put_base_url`] step.)
 
-  * Templated request paths (via [`put_path_params`] step)
+  * Templated request paths (via [`put_path_params`] step.)
 
-  * Running against a plug (via [`put_plug`] step)
+  * Running against a plug (via [`put_plug`] step.)
 
-  * Pluggable adapters. By default, Req uses [Finch] (via [`run_finch`] step).
+  * Pluggable adapters. By default, Req uses [Finch] (via [`run_finch`] step.)
 
 ## Usage
 
@@ -47,8 +47,8 @@ Mix.install([
   {:req, "~> 0.3.0"}
 ])
 
-Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
-#=> "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
+#=> "Req is a batteries-included HTTP client for Elixir."
 ```
 
 If you want to use Req in a Mix project, you can add the above dependency to your `mix.exs`.

@@ -16,14 +16,14 @@ defmodule Req do
 
   Making a GET request with `Req.get!/1`:
 
-      iex> Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
-      "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+      iex> Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
+      "Req is a batteries-included HTTP client for Elixir."
 
   Same, but by explicitly building request struct first:
 
       iex> req = Req.new(base_url: "https://api.github.com")
-      iex> Req.get!(req, url: "/repos/elixir-lang/elixir").body["description"]
-      "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+      iex> Req.get!(req, url: "/repos/wojtekmach/req").body["description"]
+      "Req is a batteries-included HTTP client for Elixir."
 
   Making a POST request with `Req.post!/2`:
 
@@ -51,7 +51,7 @@ defmodule Req do
       The headers are automatically encoded using these rules:
 
         * atom header names are turned into strings, replacing `_` with `-`. For example,
-          `:user_agent` becomes `"user-agent"`
+          `:user_agent` becomes `"user-agent"`.
 
         * string header names are left as is. Because header keys are case-insensitive
           in both HTTP/1.1 and HTTP/2, it is recommended for header keys to be in
@@ -67,20 +67,21 @@ defmodule Req do
   Additional URL options:
 
     * `:base_url` - if set, the request URL is prepended with this base URL (via
-      [`put_base_url`](`Req.Steps.put_base_url/1`) step).
+      [`put_base_url`](`Req.Steps.put_base_url/1`) step.)
 
     * `:params` - if set, appends parameters to the request query string (via
-      [`put_params`](`Req.Steps.put_params/1`) step).
+      [`put_params`](`Req.Steps.put_params/1`) step.)
 
     * `:path_params` - if set, uses a templated request path (via
-      [`put_path_params`](`Req.Steps.put_path_params/1`) step).
+      [`put_path_params`](`Req.Steps.put_path_params/1`) step.)
 
   Authentication options:
 
-    * `:auth` - sets request authentication (via [`auth`](`Req.Steps.auth/1`) step).
+    * `:auth` - sets request authentication (via [`auth`](`Req.Steps.auth/1`) step.)
+
       Can be one of:
 
-        * `string` - sets to this value;
+        * `string` - sets to this value.
 
         * `{username, password}` - uses Basic HTTP authentication.
 
@@ -95,21 +96,21 @@ defmodule Req do
 
   Request body options:
 
-    * `:form` - if set, encodes the request body as form data ([`encode_body`](`Req.Steps.encode_body/1`) step).
+    * `:form` - if set, encodes the request body as form data ([`encode_body`](`Req.Steps.encode_body/1`) step.)
 
-    * `:json` - if set, encodes the request body as JSON ([`encode_body`](`Req.Steps.encode_body/1`) step).
+    * `:json` - if set, encodes the request body as JSON ([`encode_body`](`Req.Steps.encode_body/1`) step.)
 
-    * `:compress_body` - if set to `true`, compresses the request body using gzip (via [`compress_body`](`Req.Steps.compress_body/1`) step).
+    * `:compress_body` - if set to `true`, compresses the request body using gzip (via [`compress_body`](`Req.Steps.compress_body/1`) step.)
       Defaults to `false`.
 
   Response body options:
 
     * `:compressed` - if set to `true`, asks the server to return compressed response.
-      (via [`compressed`](`Req.Steps.compressed/1`) step). Defaults to `true`.
+      (via [`compressed`](`Req.Steps.compressed/1`) step.) Defaults to `true`.
 
     * `:raw` - if set to `true`, disables automatic body decompression
       ([`decompress_body`](`Req.Steps.decompress_body/1`) step) and decoding
-      ([`decode_body`](`Req.Steps.decode_body/1`) step). Defaults to `false`.
+      ([`decode_body`](`Req.Steps.decode_body/1`) step.) Defaults to `false`.
 
     * `:decode_body` - if set to `false`, disables automatic response body decoding.
       Defaults to `true`.
@@ -175,24 +176,23 @@ defmodule Req do
 
         * `:protocol` - the HTTP protocol to use, defaults to `:http1`.
 
-        * `:hostname` - Mint explicit hostname
+        * `:hostname` - Mint explicit hostname.
 
-        * `:transport_opts` - Mint transport options
+        * `:transport_opts` - Mint transport options.
 
-        * `:proxy_headers` - Mint proxy headers
+        * `:proxy_headers` - Mint proxy headers.
 
         * `:proxy` - Mint HTTP/1 proxy settings, a `{schema, address, port, options}` tuple.
 
-        * `:client_settings` - Mint HTTP/2 client settings
+        * `:client_settings` - Mint HTTP/2 client settings.
 
     * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
 
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
-    * `:unix_socket` - if set, connect through the given UNIX domain socket
+    * `:unix_socket` - if set, connect through the given UNIX domain socket.
 
-    * `:finch_request` - a function to modify the built Finch request before execution. This function takes a 
-       Finch request and returns a Finch request. If not provided, the finch request will not be modified
+    * `:finch_request` - a function that executes the Finch request, defaults to using `Finch.request/3`.
 
   ## Examples
 
@@ -355,8 +355,8 @@ defmodule Req do
 
   With URL:
 
-      iex> Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
-      "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+      iex> Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
+      "Req is a batteries-included HTTP client for Elixir."
 
   With request struct:
 
@@ -382,9 +382,9 @@ defmodule Req do
 
   With URL:
 
-      iex> {:ok, res} = Req.get("https://api.github.com/repos/elixir-lang/elixir")
+      iex> {:ok, res} = Req.get("https://api.github.com/repos/wojtekmach/req")
       iex> res.body["description"]
-      "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+      "Req is a batteries-included HTTP client for Elixir."
 
   With request struct:
 
@@ -788,11 +788,11 @@ defmodule Req do
 
   With options keywords list:
 
-      iex> {:ok, response} = Req.request(url: "https://api.github.com/repos/elixir-lang/elixir")
+      iex> {:ok, response} = Req.request(url: "https://api.github.com/repos/wojtekmach/req")
       iex> response.status
       200
       iex> response.body["description"]
-      "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+      "Req is a batteries-included HTTP client for Elixir."
 
   With request struct:
 

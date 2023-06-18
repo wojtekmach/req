@@ -550,9 +550,9 @@ defmodule Req.Steps do
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket
 
-    * `:finch_request` - a function that executes the Finch request and converts the result into
-      a Req {request, response} or {request, exception}. If not passed, the request will be run
-      using `Finch.request/3`. The function should accept 4 arguments:
+    * `:finch_request` - a function that executes the Finch request, defaults to using `Finch.request/3`.
+
+      The function should accept 4 arguments:
 
         * `request` - the `%Req.Request{}` struct
 
@@ -561,6 +561,8 @@ defmodule Req.Steps do
         * `finch_name` - the Finch name
 
         * `finch_options` - the Finch options
+
+      And it should return either `{request, response}` or `{request, exception}`.
 
   ## Examples
 
