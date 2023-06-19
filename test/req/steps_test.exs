@@ -246,37 +246,74 @@ defmodule Req.StepsTest do
 
   ## Response steps
 
-  test "decompress_body: gzip", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      conn
-      |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
-      |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
-    end)
+  describe "decompress_body" do
+    test "gzip", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
+        |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
+      end)
 
-    assert Req.get!(c.url).body == "foo"
-  end
+      assert Req.get!(c.url).body == "foo"
+    end
 
-  test "decompress_body: brotli", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      {:ok, body} = :brotli.encode("foo")
+    test "multiple codecs", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "gzip, deflate")
+        |> Plug.Conn.send_resp(200, "foo" |> :zlib.gzip() |> :zlib.zip())
+      end)
 
-      conn
-      |> Plug.Conn.put_resp_header("content-encoding", "br")
-      |> Plug.Conn.send_resp(200, body)
-    end)
+      assert Req.get!(c.url).body == "foo"
+    end
 
-    assert Req.get!(c.url).body == "foo"
-  end
+    test "multiple codecs with multiple headers" do
+      {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, active: false)
+      {:ok, port} = :inet.port(listen_socket)
 
-  @tag :capture_log
-  test "decompress_body: zstd", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      conn
-      |> Plug.Conn.put_resp_header("content-encoding", "zstd")
-      |> Plug.Conn.send_resp(200, :ezstd.compress("foo"))
-    end)
+      Task.start_link(fn ->
+        {:ok, socket} = :gen_tcp.accept(listen_socket)
+        assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
 
-    assert Req.get!(c.url).body == "foo"
+        body = "foo" |> :zlib.gzip() |> :zlib.zip()
+
+        data = """
+        HTTP/1.1 200 OK
+        content-encoding: gzip
+        content-encoding: deflate
+        content-length: #{byte_size(body)}
+
+        #{body}
+        """
+
+        :ok = :gen_tcp.send(socket, data)
+      end)
+
+      assert Req.get!("http://localhost:#{port}").body == "foo"
+    end
+
+    test "brotli", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        {:ok, body} = :brotli.encode("foo")
+
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "br")
+        |> Plug.Conn.send_resp(200, body)
+      end)
+
+      assert Req.get!(c.url).body == "foo"
+    end
+
+    @tag :capture_log
+    test "zstd", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "zstd")
+        |> Plug.Conn.send_resp(200, :ezstd.compress("foo"))
+      end)
+
+      assert Req.get!(c.url).body == "foo"
+    end
   end
 
   @tag :tmp_dir

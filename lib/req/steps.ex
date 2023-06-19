@@ -1487,25 +1487,18 @@ defmodule Req.Steps do
   ## Utilities
 
   defp get_content_encoding_header(headers) do
-    if value = get_header(headers, "content-encoding") do
-      value
-      |> String.downcase()
-      |> String.split(",", trim: true)
-      |> Stream.map(&String.trim/1)
-      |> Enum.reverse()
-    else
-      []
-    end
-  end
-
-  defp get_header(headers, name) do
-    Enum.find_value(headers, nil, fn {key, value} ->
-      if String.downcase(key) == name do
+    headers
+    |> Enum.flat_map(fn {name, value} ->
+      if String.downcase(name) == "content-encoding" do
         value
+        |> String.downcase()
+        |> String.split(",", trim: true)
+        |> Stream.map(&String.trim/1)
       else
-        nil
+        []
       end
     end)
+    |> Enum.reverse()
   end
 
   defp cache_path(cache_dir, request) do
