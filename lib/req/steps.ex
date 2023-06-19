@@ -862,7 +862,9 @@ defmodule Req.Steps do
   | _other_       | Returns data as is                              |
 
   This step updates the following headers to reflect the changes:
-  - `content-length` is set to the length of the decompressed body
+
+    * `content-length` is set to the length of the decompressed body
+    * `content-encoding` is removed
 
   ## Options
 
@@ -911,6 +913,7 @@ defmodule Req.Steps do
       response =
         %Req.Response{response | body: decompressed_body}
         |> Req.Response.put_header("content-length", decompressed_content_length)
+        |> Req.Response.delete_header("content-encoding")
 
       {request, response}
     end
