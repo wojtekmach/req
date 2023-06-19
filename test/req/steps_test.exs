@@ -296,6 +296,24 @@ defmodule Req.StepsTest do
 
       assert Req.get!(c.url).body == "foo"
     end
+
+    test "recalculate content-length when decompressing", c do
+      body = "foo"
+      gzipped_body = :zlib.gzip(body)
+
+      assert byte_size(body) != byte_size(gzipped_body)
+
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
+        |> Plug.Conn.put_resp_header("content-length", gzipped_body |> byte_size() |> to_string())
+        |> Plug.Conn.send_resp(200, gzipped_body)
+      end)
+
+      response = Req.get!(c.url)
+
+      assert content_length(response) == byte_size(body)
+    end
   end
 
   describe "output" do
@@ -1335,5 +1353,13 @@ defmodule Req.StepsTest do
       end
 
     Plug.Conn.send_resp(conn, status, Jason.encode_to_iodata!(data))
+  end
+
+  defp content_length(response) do
+    {"content-length", content_length_str} = List.keyfind!(response.headers, "content-length", 0)
+
+    {content_length, _remainder} = Integer.parse(content_length_str)
+
+    content_length
   end
 end
