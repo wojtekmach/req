@@ -314,6 +314,17 @@ defmodule Req.StepsTest do
       [content_length] = Req.Response.get_header(response, "content-length")
       assert String.to_integer(content_length) == byte_size(body)
     end
+
+    test "content-encoding header is deleted after decompress", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
+        |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
+      end)
+
+      response = Req.get!(c.url).body
+      refute List.keyfind(response.headers, "content-encoding", 0)
+    end
   end
 
   describe "output" do
