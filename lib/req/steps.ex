@@ -857,7 +857,14 @@ defmodule Req.Steps do
 
   def decompress_body({request, response}) do
     compression_algorithms = get_content_encoding_header(response.headers)
-    {request, update_in(response.body, &decompress_body(&1, compression_algorithms))}
+    decompressed_body = decompress_body(response.body, compression_algorithms)
+    decompressed_content_length = decompressed_body |> byte_size() |> to_string()
+
+    response =
+      %Req.Response{response | body: decompressed_body}
+      |> Req.Response.put_header("content-length", decompressed_content_length)
+
+    {request, response}
   end
 
   defp decompress_body(body, algorithms) do
