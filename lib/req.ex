@@ -117,9 +117,6 @@ defmodule Req do
 
     * `:decode_json` - options to pass to `Jason.decode!/2`, defaults to `[]`.
 
-    * `:extract` - if set to a path, extracts archives (tar, zip, etc) into the
-      given directory and sets the response body to the list of extracted filenames.
-
     * `:output` - if set, writes the response body to a file (via
       [`output`](`Req.Steps.output/1`) step). Can be set to a string path or an atom
       `:remote_name` which would use the remote name as the filename in the current working
@@ -236,7 +233,6 @@ defmodule Req do
           :raw,
           :decode_body,
           :decode_json,
-          :extract,
           :output,
           :follow_redirects,
           :redirect_log_level,

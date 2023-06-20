@@ -976,9 +976,6 @@ defmodule Req.Steps do
 
     * `:decode_json` - options to pass to `Jason.decode!/2`, defaults to `[]`.
 
-    * `:extract` - if set to a path, extracts archives (tar, zip, etc) into the
-      given directory and sets the response body to the list of extracted filenames.
-
     * `:raw` - if set to `true`, disables response body decoding. Defaults to `false`.
 
   ## Examples
@@ -994,11 +991,6 @@ defmodule Req.Steps do
       iex> response = Req.get!("https://httpbin.org/gzip")
       ...> response.body["gzipped"]
       true
-
-  Extract zip to a directory:
-
-      iex> Req.get!("https://github.com/wojtekmach/req/archive/refs/tags/v0.3.5.zip", extract: ".").body
-      [..., "./req-0.3.5/README.md", "./req-0.3.5/lib/req.ex", ...]
 
   [nimble_csv]: https://hex.pm/packages/nimble_csv
   """
@@ -1022,69 +1014,34 @@ defmodule Req.Steps do
   end
 
   def decode_body({request, response}) do
-    decode_body({request, response}, format(request, response), request.options[:extract])
+    decode_body({request, response}, format(request, response))
   end
 
-  defp decode_body({request, response}, format, _extract_dir) when format in ~w(json json-api) do
+  defp decode_body({request, response}, format) when format in ~w(json json-api) do
     options = Map.get(request.options, :decode_json, [])
     {request, update_in(response.body, &Jason.decode!(&1, options))}
   end
 
-  defp decode_body({request, response}, "gz", _extract_dir) do
+  defp decode_body({request, response}, "gz") do
     {request, update_in(response.body, &:zlib.gunzip/1)}
   end
 
-  defp decode_body({request, response}, "tar", extract_dir) when is_binary(extract_dir) do
-    with_tmp_path(fn path ->
-      File.write!(path, response.body)
-
-      {:ok, t} = :erl_tar.open(path, [:read, :compressed])
-      {:ok, filenames} = :erl_tar.table(t)
-      extract_dir = Path.expand(extract_dir)
-      filenames = Enum.map(filenames, &Path.join(extract_dir, &1))
-      :ok = :erl_tar.close(t)
-
-      :ok = :erl_tar.extract(path, cwd: extract_dir)
-      {request, put_in(response.body, filenames)}
-    end)
-  end
-
-  defp decode_body({request, response}, "tar", _extract_dir) do
+  defp decode_body({request, response}, "tar") do
     {:ok, files} = :erl_tar.extract({:binary, response.body}, [:memory])
     {request, put_in(response.body, files)}
   end
 
-  defp decode_body({request, response}, "tgz", extract_dir) when is_binary(extract_dir) do
-    with_tmp_path(fn path ->
-      File.write!(path, response.body)
-
-      {:ok, t} = :erl_tar.open(path, [:read, :compressed])
-      {:ok, filenames} = :erl_tar.table(t)
-      extract_dir = Path.expand(extract_dir)
-      filenames = Enum.map(filenames, &Path.join(extract_dir, &1))
-      :ok = :erl_tar.close(t)
-
-      :ok = :erl_tar.extract(path, [:compressed, cwd: extract_dir])
-      {request, put_in(response.body, filenames)}
-    end)
-  end
-
-  defp decode_body({request, response}, "tgz", _extract_dir) do
+  defp decode_body({request, response}, "tgz") do
     {:ok, files} = :erl_tar.extract({:binary, response.body}, [:memory, :compressed])
     {request, put_in(response.body, files)}
   end
 
-  defp decode_body({request, response}, "zip", extract_dir) when is_binary(extract_dir) do
-    {:ok, filenames} = :zip.extract(response.body, cwd: extract_dir)
-    {request, put_in(response.body, filenames)}
-  end
-
-  defp decode_body({request, response}, "zip", _extract_dir) do
+  defp decode_body({request, response}, "zip") do
     {:ok, files} = :zip.extract(response.body, [:memory])
     {request, put_in(response.body, files)}
   end
 
-  defp decode_body({request, response}, "csv", _extract_dir) do
+  defp decode_body({request, response}, "csv") do
     if nimble_csv_loaded?() do
       options = [skip_headers: false]
       {request, update_in(response.body, &NimbleCSV.RFC4180.parse_string(&1, options))}
@@ -1093,7 +1050,7 @@ defmodule Req.Steps do
     end
   end
 
-  defp decode_body({request, response}, _format, _extract_dir) do
+  defp decode_body({request, response}, _format) do
     {request, response}
   end
 
@@ -1554,16 +1511,6 @@ defmodule Req.Steps do
 
       {:error, reason} ->
         raise "could not parse \"Retry-After\" header #{datetime} - #{reason}"
-    end
-  end
-
-  defp with_tmp_path(fun) do
-    tmp_path = Path.join(System.tmp_dir!(), "req_tmp_#{System.pid()}_#{System.unique_integer()}")
-
-    try do
-      fun.(tmp_path)
-    after
-      File.rm(tmp_path)
     end
   end
 end
