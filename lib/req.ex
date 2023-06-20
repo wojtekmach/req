@@ -487,62 +487,9 @@ defmodule Req do
   """
   @spec post!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
   def post!(url_or_request, options \\ []) do
-    if Keyword.keyword?(options) do
-      case post(url_or_request, options) do
-        {:ok, response} -> response
-        {:error, exception} -> raise exception
-      end
-    else
-      case options do
-        {:form, data} ->
-          IO.warn(
-            "Req.post!(url, {:form, data}) is deprecated in favour of " <>
-              "Req.post!(url, form: data)"
-          )
-
-          request!(method: :post, url: URI.parse(url_or_request), form: data)
-
-        {:json, data} ->
-          IO.warn(
-            "Req.post!(url, {:json, data}) is deprecated in favour of " <>
-              "Req.post!(url, json: data)"
-          )
-
-          request!(method: :post, url: URI.parse(url_or_request), json: data)
-
-        data ->
-          IO.warn("Req.post!(url, body) is deprecated in favour of Req.post!(url, body: body)")
-          request!(method: :post, url: URI.parse(url_or_request), body: data)
-      end
-    end
-  end
-
-  @doc false
-  def post!(url, body, options) do
-    case body do
-      {:form, data} ->
-        IO.warn(
-          "Req.post!(url, {:form, data}, options) is deprecated in favour of " <>
-            "Req.post!(url, [form: data] ++ options)"
-        )
-
-        request!([method: :post, url: URI.parse(url), form: data] ++ options)
-
-      {:json, data} ->
-        IO.warn(
-          "Req.post!(url, {:json, data}) is deprecated in favour of " <>
-            "Req.post!(url, [json: data] ++ options)"
-        )
-
-        request!([method: :post, url: URI.parse(url), json: data] ++ options)
-
-      data ->
-        IO.warn(
-          "Req.post!(url, body) is deprecated in favour of " <>
-            "Req.post!(url, [body: body] ++ options)"
-        )
-
-        request!([method: :post, url: URI.parse(url), body: data] ++ options)
+    case post(url_or_request, options) do
+      {:ok, response} -> response
+      {:error, exception} -> raise exception
     end
   end
 
@@ -612,16 +559,6 @@ defmodule Req do
     end
   end
 
-  @doc false
-  def put!(%URI{} = url, {type, _} = body, options) when type in [:form, :json] do
-    IO.warn(
-      "Req.put!(url, {:#{type}, #{type}}, options) is deprecated in favour of " <>
-        "Req.put!(url, [#{type}: #{type}] ++ options)"
-    )
-
-    request!([method: :put, url: url, body: body] ++ options)
-  end
-
   @doc """
   Makes a PUT request.
 
@@ -651,12 +588,7 @@ defmodule Req do
   end
 
   def put(url, options) when is_binary(url) or is_struct(url, URI) do
-    if Keyword.keyword?(options) do
-      request([method: :put, url: URI.parse(url)] ++ options)
-    else
-      IO.warn("Req.put!(url, body) is deprecated in favour of Req.put!(url, body: body)")
-      request(url: URI.parse(url), body: options)
-    end
+    request([method: :put, url: URI.parse(url)] ++ options)
   end
 
   @doc """
@@ -829,16 +761,6 @@ defmodule Req do
     |> Req.update(options)
     |> run_plugins(plugins)
     |> Req.Request.run()
-  end
-
-  @doc false
-  def request(method, url, options) do
-    IO.warn(
-      "Req.request(method, url, options) is deprecated in favour of " <>
-        "Req.request!([method: method, url: url] ++ options)"
-    )
-
-    request([method: method, url: URI.parse(url)] ++ options)
   end
 
   @doc """
