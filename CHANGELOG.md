@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v0.3.10 (2023-06-20)
+
+  * [`decompress_body`]: No-op on non-binary response body
+  * [`decompress_body`]: Support multiple `content-encoding` headers
+  * [`decode_body`]: Remove `:extract` option
+  * Remove deprecated `Req.post!(url, body)` and similar functions
+
 ## v0.3.9 (2023-06-08)
 
   * [`put_path_params`]: URI-encode path params
