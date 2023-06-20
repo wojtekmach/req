@@ -22,12 +22,12 @@ defmodule Req.Request do
 
   Most Req users would use it like this:
 
-      Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
-      #=> "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+      Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
+      #=> "Req is a batteries-included HTTP client for Elixir."
 
   Here is the equivalent using the low-level API:
 
-      url = "https://api.github.com/repos/elixir-lang/elixir"
+      url = "https://api.github.com/repos/wojtekmach/req"
 
       req =
         %Req.Request{method: :get, url: url}
@@ -48,7 +48,7 @@ defmodule Req.Request do
 
       {req, resp} = Req.Request.run_request(req)
       resp.body["description"]
-      #=> "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+      #=> "Req is a batteries-included HTTP client for Elixir."
 
   By putting the request pipeline yourself you have precise control of exactly what is running and in what order.
 
@@ -303,8 +303,8 @@ defmodule Req.Request do
         end
       end
 
-      Req.get!("https://api.github.com/repos/elixir-lang/elixir", adapter: hackney).body["description"]
-      "Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+      Req.get!("https://api.github.com/repos/wojtekmach/req", adapter: hackney).body["description"]
+      #=> "Req is a batteries-included HTTP client for Elixir."
   """
 
   @type t() :: %Req.Request{
