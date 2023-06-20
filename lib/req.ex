@@ -345,6 +345,12 @@ defmodule Req do
   @doc """
   Makes a GET request.
 
+  `request` can be one of:
+
+    * a `String` or `URI`;
+    * a `Keyword` options;
+    * a `Req.Request` struct
+
   See `new/1` for a list of available options.
 
   ## Examples
@@ -354,6 +360,11 @@ defmodule Req do
       iex> Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
       "Req is a batteries-included HTTP client for Elixir."
 
+  With options:
+
+      iex> Req.get!(url: "https://api.github.com/repos/wojtekmach/req").status
+      200
+
   With request struct:
 
       iex> req = Req.new(base_url: "https://api.github.com")
@@ -361,9 +372,9 @@ defmodule Req do
       200
 
   """
-  @spec get!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def get!(url_or_request, options \\ []) do
-    case get(url_or_request, options) do
+  @spec get!(url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  def get!(request, options \\ []) do
+    case get(request, options) do
       {:ok, response} -> response
       {:error, exception} -> raise exception
     end
@@ -378,24 +389,34 @@ defmodule Req do
 
   With URL:
 
-      iex> {:ok, res} = Req.get("https://api.github.com/repos/wojtekmach/req")
-      iex> res.body["description"]
+      iex> {:ok, resp} = Req.get("https://api.github.com/repos/wojtekmach/req")
+      iex> resp.body["description"]
       "Req is a batteries-included HTTP client for Elixir."
+
+  With options:
+
+      iex> {:ok, resp} = Req.get!(url: "https://api.github.com/repos/wojtekmach/req")
+      iex> resp.status
+      200
 
   With request struct:
 
       iex> req = Req.new(base_url: "https://api.github.com")
-      iex> {:ok, res} = Req.get(req, url: "/repos/elixir-lang/elixir")
-      iex> res.status
+      iex> {:ok, resp} = Req.get(req, url: "/repos/elixir-lang/elixir")
+      iex> resp.status
       200
 
   """
   @spec get(url() | Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
-  def get(url_or_request, options \\ [])
+  def get(request, options \\ [])
 
   def get(%Req.Request{} = request, options) do
     request(%{request | method: :get}, options)
+  end
+
+  def get(options1, options2) when is_list(options1) do
+    request([method: :get] ++ options1 ++ options2)
   end
 
   def get(url, options) when is_binary(url) or is_struct(url, URI) do
@@ -404,6 +425,12 @@ defmodule Req do
 
   @doc """
   Makes a HEAD request.
+
+  `request` can be one of:
+
+    * a `String` or `URI`;
+    * a `Keyword` options;
+    * a `Req.Request` struct
 
   See `new/1` for a list of available options.
 
@@ -414,16 +441,20 @@ defmodule Req do
       iex> Req.head!("https://httpbin.org/status/201").status
       201
 
+  With options:
+
+      iex> Req.head!(url: "https://httpbin.org/status/201").status
+      201
+
   With request struct:
 
       iex> req = Req.new(base_url: "https://httpbin.org")
       iex> Req.head!(req, url: "/status/201").status
       201
-
   """
-  @spec head!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def head!(url_or_request, options \\ []) do
-    case head(url_or_request, options) do
+  @spec head!(url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  def head!(request, options \\ []) do
+    case head(request, options) do
       {:ok, response} -> response
       {:error, exception} -> raise exception
     end
@@ -432,29 +463,45 @@ defmodule Req do
   @doc """
   Makes a HEAD request.
 
+  `request` can be one of:
+
+    * a `String` or `URI`;
+    * a `Keyword` options;
+    * a `Req.Request` struct
+
   See `new/1` for a list of available options.
 
   ## Examples
 
   With URL:
 
-      iex> {:ok, res} = Req.head("https://httpbin.org/status/201")
-      iex> res.status
+      iex> {:ok, resp} = Req.head("https://httpbin.org/status/201")
+      iex> resp.status
+      201
+
+  With options:
+
+      iex> {:ok, resp} = Req.head(url: "https://httpbin.org/status/201")
+      iex> resp.status
       201
 
   With request struct:
 
       iex> req = Req.new(base_url: "https://httpbin.org")
-      iex> {:ok, res} = Req.head(req, url: "/status/201")
-      iex> res.status
+      iex> {:ok, resp} = Req.head(req, url: "/status/201")
+      iex> resp.status
       201
 
   """
-  @spec head(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  @spec head(url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
   def head(url_or_request, options \\ [])
 
   def head(%Req.Request{} = request, options) do
     request(%{request | method: :head}, options)
+  end
+
+  def head(options1, options2) when is_list(options1) do
+    request([method: :head] ++ options1 ++ options2)
   end
 
   def head(url, options) when is_binary(url) or is_struct(url, URI) do
@@ -463,6 +510,12 @@ defmodule Req do
 
   @doc """
   Makes a POST request.
+
+  `request` can be one of:
+
+    * a `String` or `URI`;
+    * a `Keyword` options;
+    * a `Req.Request` struct
 
   See `new/1` for a list of available options.
 
@@ -479,15 +532,20 @@ defmodule Req do
       iex> Req.post!("https://httpbin.org/anything", json: %{x: 2}).body["json"]
       %{"x" => 2}
 
+  With options:
+
+      iex> Req.post!(url: "https://httpbin.org/anything", body: "hello!").body["data"]
+      "hello!"
+
   With request struct:
 
       iex> req = Req.new(url: "https://httpbin.org/anything")
       iex> Req.post!(req, body: "hello!").body["data"]
       "hello!"
   """
-  @spec post!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def post!(url_or_request, options \\ []) do
-    case post(url_or_request, options) do
+  @spec post!(url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  def post!(request, options \\ []) do
+    case post(request, options) do
       {:ok, response} -> response
       {:error, exception} -> raise exception
     end
@@ -496,37 +554,53 @@ defmodule Req do
   @doc """
   Makes a POST request.
 
+  `request` can be one of:
+
+    * a `String` or `URI`;
+    * a `Keyword` options;
+    * a `Req.Request` struct
+
   See `new/1` for a list of available options.
 
   ## Examples
 
   With URL:
 
-      iex> {:ok, res} = Req.post("https://httpbin.org/anything", body: "hello!")
-      iex> res.body["data"]
+      iex> {:ok, resp} = Req.post("https://httpbin.org/anything", body: "hello!")
+      iex> resp.body["data"]
       "hello!"
 
-      iex> {:ok, res} = Req.post("https://httpbin.org/anything", form: [x: 1])
-      iex> res.body["form"]
+      iex> {:ok, resp} = Req.post("https://httpbin.org/anything", form: [x: 1])
+      iex> resp.body["form"]
       %{"x" => "1"}
 
-      iex> {:ok, res} = Req.post("https://httpbin.org/anything", json: %{x: 2})
-      iex> res.body["json"]
+      iex> {:ok, resp} = Req.post("https://httpbin.org/anything", json: %{x: 2})
+      iex> resp.body["json"]
       %{"x" => 2}
+
+  With options:
+
+      iex> {:ok, resp} = Req.post(url: "https://httpbin.org/anything", body: "hello!")
+      iex> resp.body["data"]
+      "hello!"
 
   With request struct:
 
       iex> req = Req.new(url: "https://httpbin.org/anything")
-      iex> {:ok, res} = Req.post(req, body: "hello!")
-      iex> res.body["data"]
+      iex> {:ok, resp} = Req.post(req, body: "hello!")
+      iex> resp.body["data"]
       "hello!"
   """
   @spec post(url() | Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
-  def post(url_or_request, options \\ [])
+  def post(request, options \\ [])
 
   def post(%Req.Request{} = request, options) do
     request(%{request | method: :post}, options)
+  end
+
+  def post(options1, options2) when is_list(options1) do
+    request([method: :post] ++ options1 ++ options2)
   end
 
   def post(url, options) when is_binary(url) or is_struct(url, URI) do
@@ -535,6 +609,12 @@ defmodule Req do
 
   @doc """
   Makes a PUT request.
+
+  `request` can be one of:
+
+    * a `String` or `URI`;
+    * a `Keyword` options;
+    * a `Req.Request` struct
 
   See `new/1` for a list of available options.
 
@@ -545,15 +625,20 @@ defmodule Req do
       iex> Req.put!("https://httpbin.org/anything", body: "hello!").body["data"]
       "hello!"
 
+  With options:
+
+      iex> Req.put!(url: "https://httpbin.org/anything", body: "hello!").body["data"]
+      "hello!"
+
   With request struct:
 
       iex> req = Req.new(url: "https://httpbin.org/anything")
       iex> Req.put!(req, body: "hello!").body["data"]
       "hello!"
   """
-  @spec put!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def put!(url_or_request, options \\ []) do
-    case put(url_or_request, options) do
+  @spec put!(url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  def put!(request, options \\ []) do
+    case put(request, options) do
       {:ok, response} -> response
       {:error, exception} -> raise exception
     end
@@ -562,29 +647,45 @@ defmodule Req do
   @doc """
   Makes a PUT request.
 
+  `request` can be one of:
+
+    * a `String` or `URI`;
+    * a `Keyword` options;
+    * a `Req.Request` struct
+
   See `new/1` for a list of available options.
 
   ## Examples
 
   With URL:
 
-      iex> {:ok, res} = Req.put("https://httpbin.org/anything", body: "hello!")
-      iex> res.body["data"]
+      iex> {:ok, resp} = Req.put("https://httpbin.org/anything", body: "hello!")
+      iex> resp.body["data"]
+      "hello!"
+
+  With options:
+
+      iex> {:ok, resp} = Req.put(url: "https://httpbin.org/anything", body: "hello!")
+      iex> resp.body["data"]
       "hello!"
 
   With request struct:
 
       iex> req = Req.new(url: "https://httpbin.org/anything")
-      iex> {:ok, res} = Req.put(req, body: "hello!")
-      iex> res.body["data"]
+      iex> {:ok, resp} = Req.put(req, body: "hello!")
+      iex> resp.body["data"]
       "hello!"
   """
   @spec put(url() | Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
-  def put(url_or_request, options \\ [])
+  def put(request, options \\ [])
 
   def put(%Req.Request{} = request, options) do
     request(%{request | method: :put}, options)
+  end
+
+  def put(options1, options2) when is_list(options1) do
+    request([method: :put] ++ options1 ++ options2)
   end
 
   def put(url, options) when is_binary(url) or is_struct(url, URI) do
@@ -593,6 +694,12 @@ defmodule Req do
 
   @doc """
   Makes a PATCH request.
+
+  `request` can be one of:
+
+    * a `String` or `URI`;
+    * a `Keyword` options;
+    * a `Req.Request` struct
 
   See `new/1` for a list of available options.
 
@@ -603,15 +710,20 @@ defmodule Req do
       iex> Req.patch!("https://httpbin.org/anything", body: "hello!").body["data"]
       "hello!"
 
+  With options:
+
+      iex> Req.patch!(url: "https://httpbin.org/anything", body: "hello!").body["data"]
+      "hello!"
+
   With request struct:
 
       iex> req = Req.new(url: "https://httpbin.org/anything")
       iex> Req.patch!(req, body: "hello!").body["data"]
       "hello!"
   """
-  @spec patch!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def patch!(url_or_request, options \\ []) do
-    case patch(url_or_request, options) do
+  @spec patch!(url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  def patch!(request, options \\ []) do
+    case patch(request, options) do
       {:ok, response} -> response
       {:error, exception} -> raise exception
     end
@@ -620,21 +732,33 @@ defmodule Req do
   @doc """
   Makes a PATCH request.
 
+  `request` can be one of:
+
+    * a `String` or `URI`;
+    * a `Keyword` options;
+    * a `Req.Request` struct
+
   See `new/1` for a list of available options.
 
   ## Examples
 
   With URL:
 
-      iex> {:ok, res} = Req.patch("https://httpbin.org/anything", body: "hello!")
-      iex> res.body["data"]
+      iex> {:ok, resp} = Req.patch("https://httpbin.org/anything", body: "hello!")
+      iex> resp.body["data"]
+      "hello!"
+
+  With options:
+
+      iex> {:ok, resp} = Req.patch(url: "https://httpbin.org/anything", body: "hello!")
+      iex> resp.body["data"]
       "hello!"
 
   With request struct:
 
       iex> req = Req.new(url: "https://httpbin.org/anything")
-      iex> {:ok, res} = Req.patch(req, body: "hello!")
-      iex> res.body["data"]
+      iex> {:ok, resp} = Req.patch(req, body: "hello!")
+      iex> resp.body["data"]
       "hello!"
   """
   @spec patch(url() | Req.Request.t(), options :: keyword()) ::
@@ -645,12 +769,22 @@ defmodule Req do
     request(%{request | method: :patch}, options)
   end
 
+  def patch(options1, options2) when is_list(options1) do
+    request([method: :patch] ++ options1 ++ options2)
+  end
+
   def patch(url, options) when is_binary(url) or is_struct(url, URI) do
     request([method: :patch, url: url] ++ options)
   end
 
   @doc """
   Makes a DELETE request.
+
+  `request` can be one of:
+
+    * a `String` or `URI`;
+    * a `Keyword` options;
+    * a `Req.Request` struct
 
   See `new/1` for a list of available options.
 
@@ -661,15 +795,20 @@ defmodule Req do
       iex> Req.delete!("https://httpbin.org/anything").body["method"]
       "DELETE"
 
+  With options:
+
+      iex> Req.delete!(url: "https://httpbin.org/anything").body["method"]
+      "DELETE"
+
   With request struct:
 
       iex> req = Req.new(url: "https://httpbin.org/anything")
       iex> Req.delete!(req).body["method"]
       "DELETE"
   """
-  @spec delete!(url() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def delete!(url_or_request, options \\ []) do
-    case delete(url_or_request, options) do
+  @spec delete!(url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  def delete!(request, options \\ []) do
+    case delete(request, options) do
       {:ok, response} -> response
       {:error, exception} -> raise exception
     end
@@ -678,29 +817,45 @@ defmodule Req do
   @doc """
   Makes a DELETE request.
 
+  `request` can be one of:
+
+    * a `String` or `URI`;
+    * a `Keyword` options;
+    * a `Req.Request` struct
+
   See `new/1` for a list of available options.
 
   ## Examples
 
   With URL:
 
-      iex> {:ok, res} = Req.delete("https://httpbin.org/anything")
-      iex> res.body["method"]
+      iex> {:ok, resp} = Req.delete("https://httpbin.org/anything")
+      iex> resp.body["method"]
+      "DELETE"
+
+  With options:
+
+      iex> {:ok, resp} = Req.delete(url: "https://httpbin.org/anything")
+      iex> resp.body["method"]
       "DELETE"
 
   With request struct:
 
       iex> req = Req.new(url: "https://httpbin.org/anything")
-      iex> {:ok, res} = Req.delete(req)
-      iex> res.body["method"]
+      iex> {:ok, resp} = Req.delete(req)
+      iex> resp.body["method"]
       "DELETE"
   """
-  @spec delete(url() | Req.Request.t(), options :: keyword()) ::
+  @spec delete(url() | keyword() | Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
-  def delete(url_or_request, options \\ [])
+  def delete(request, options \\ [])
 
   def delete(%Req.Request{} = request, options) do
     request(%{request | method: :delete}, options)
+  end
+
+  def delete(options1, options2) when is_list(options1) do
+    request([method: :delete] ++ options1 ++ options2)
   end
 
   def delete(url, options) when is_binary(url) or is_struct(url, URI) do
@@ -709,6 +864,11 @@ defmodule Req do
 
   @doc """
   Makes an HTTP request.
+
+  `request` can be one of:
+
+    * a `Keyword` options;
+    * a `Req.Request` struct
 
   See `new/1` for a list of availale options.
 
