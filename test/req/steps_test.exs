@@ -10,201 +10,183 @@ defmodule Req.StepsTest do
 
   ## Request steps
 
-  test "put_base_url", c do
-    Bypass.expect(c.bypass, "GET", "", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
+  describe "put_base_url" do
+    test "it works", c do
+      Bypass.expect(c.bypass, "GET", "", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
 
-    assert Req.get!("/", base_url: c.url).body == "ok"
-    assert Req.get!("", base_url: c.url).body == "ok"
+      assert Req.get!("/", base_url: c.url).body == "ok"
+      assert Req.get!("", base_url: c.url).body == "ok"
 
-    req = Req.new(base_url: c.url)
-    assert Req.get!(req, url: "/").body == "ok"
-    assert Req.get!(req, url: "").body == "ok"
+      req = Req.new(base_url: c.url)
+      assert Req.get!(req, url: "/").body == "ok"
+      assert Req.get!(req, url: "").body == "ok"
+    end
+
+    test "with absolute url", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+      assert Req.get!(c.url, base_url: "ignored").body == "ok"
+    end
+
+    test "with base path", c do
+      Bypass.expect(c.bypass, "GET", "/api/v2/foo", fn conn ->
+        assert conn.request_path == "/api/v2/foo"
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+      assert Req.get!("/foo", base_url: c.url <> "/api/v2", retry: :never).body == "ok"
+      assert Req.get!("foo", base_url: c.url <> "/api/v2").body == "ok"
+      assert Req.get!("/foo", base_url: c.url <> "/api/v2/").body == "ok"
+      assert Req.get!("foo", base_url: c.url <> "/api/v2/").body == "ok"
+      assert Req.get!("", base_url: c.url <> "/api/v2/foo").body == "ok"
+    end
   end
 
-  test "put_base_url: with absolute url", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
+  describe "auth" do
+    test "string" do
+      req = Req.new(auth: "foo") |> Req.Request.prepare()
 
-    assert Req.get!(c.url, base_url: "ignored").body == "ok"
-  end
+      assert List.keyfind(req.headers, "authorization", 0) == {"authorization", "foo"}
+    end
 
-  test "put_base_url: with base path", c do
-    Bypass.expect(c.bypass, "GET", "/api/v2/foo", fn conn ->
-      assert conn.request_path == "/api/v2/foo"
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
+    test "basic" do
+      req = Req.new(auth: {"foo", "bar"}) |> Req.Request.prepare()
 
-    assert Req.get!("/foo", base_url: c.url <> "/api/v2", retry: :never).body == "ok"
-    assert Req.get!("foo", base_url: c.url <> "/api/v2").body == "ok"
-    assert Req.get!("/foo", base_url: c.url <> "/api/v2/").body == "ok"
-    assert Req.get!("foo", base_url: c.url <> "/api/v2/").body == "ok"
-    assert Req.get!("", base_url: c.url <> "/api/v2/foo").body == "ok"
-  end
+      assert List.keyfind(req.headers, "authorization", 0) ==
+               {"authorization", "Basic #{Base.encode64("foo:bar")}"}
+    end
 
-  test "auth: string" do
-    req = Req.new(auth: "foo") |> Req.Request.prepare()
+    test "bearer" do
+      req = Req.new(auth: {:bearer, "abcd"}) |> Req.Request.prepare()
 
-    assert List.keyfind(req.headers, "authorization", 0) == {"authorization", "foo"}
-  end
+      assert List.keyfind(req.headers, "authorization", 0) ==
+               {"authorization", "Bearer abcd"}
+    end
 
-  test "auth: basic" do
-    req = Req.new(auth: {"foo", "bar"}) |> Req.Request.prepare()
+    @tag :tmp_dir
+    test ":netrc", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        expected = "Basic " <> Base.encode64("foo:bar")
 
-    assert List.keyfind(req.headers, "authorization", 0) ==
-             {"authorization", "Basic #{Base.encode64("foo:bar")}"}
-  end
+        case Plug.Conn.get_req_header(conn, "authorization") do
+          [^expected] ->
+            Plug.Conn.send_resp(conn, 200, "ok")
 
-  test "auth: bearer" do
-    req = Req.new(auth: {:bearer, "abcd"}) |> Req.Request.prepare()
+          _ ->
+            Plug.Conn.send_resp(conn, 401, "unauthorized")
+        end
+      end)
 
-    assert List.keyfind(req.headers, "authorization", 0) ==
-             {"authorization", "Bearer abcd"}
-  end
+      old_netrc = System.get_env("NETRC")
 
-  @tag :tmp_dir
-  test "auth: :netrc", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      expected = "Basic " <> Base.encode64("foo:bar")
+      System.put_env("NETRC", "#{c.tmp_dir}/.netrc")
 
-      case Plug.Conn.get_req_header(conn, "authorization") do
-        [^expected] ->
-          Plug.Conn.send_resp(conn, 200, "ok")
+      File.write!("#{c.tmp_dir}/.netrc", """
+      machine localhost
+      login foo
+      password bar
+      """)
 
-        _ ->
-          Plug.Conn.send_resp(conn, 401, "unauthorized")
+      assert Req.get!(c.url, auth: :netrc).status == 200
+
+      System.put_env("NETRC", "#{c.tmp_dir}/tabs")
+
+      File.write!("#{c.tmp_dir}/tabs", """
+      machine localhost
+           login foo
+           password bar
+      """)
+
+      assert Req.get!(c.url, auth: :netrc).status == 200
+
+      System.put_env("NETRC", "#{c.tmp_dir}/single_line")
+
+      File.write!("#{c.tmp_dir}/single_line", """
+      machine otherhost
+      login meat
+      password potatoes
+      machine localhost login foo password bar
+      """)
+
+      assert Req.get!(c.url, auth: :netrc).status == 200
+
+      if old_netrc, do: System.put_env("NETRC", old_netrc), else: System.delete_env("NETRC")
+    end
+
+    @tag :tmp_dir
+    test "{:netrc, path}", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        expected = "Basic " <> Base.encode64("foo:bar")
+
+        case Plug.Conn.get_req_header(conn, "authorization") do
+          [^expected] ->
+            Plug.Conn.send_resp(conn, 200, "ok")
+
+          _ ->
+            Plug.Conn.send_resp(conn, 401, "unauthorized")
+        end
+      end)
+
+      assert_raise RuntimeError, "error reading .netrc file: no such file or directory", fn ->
+        Req.get!(c.url, auth: {:netrc, "non_existent_file"})
       end
-    end)
 
-    old_netrc = System.get_env("NETRC")
+      File.write!("#{c.tmp_dir}/custom_netrc", """
+      machine localhost
+      login foo
+      password bar
+      """)
 
-    System.put_env("NETRC", "#{c.tmp_dir}/.netrc")
+      assert Req.get!(c.url, auth: {:netrc, c.tmp_dir <> "/custom_netrc"}).status == 200
 
-    File.write!("#{c.tmp_dir}/.netrc", """
-    machine localhost
-    login foo
-    password bar
-    """)
+      File.write!("#{c.tmp_dir}/wrong_netrc", """
+      machine localhost
+      login bad
+      password bad
+      """)
 
-    assert Req.get!(c.url, auth: :netrc).status == 200
+      assert Req.get!(c.url, auth: {:netrc, "#{c.tmp_dir}/wrong_netrc"}).status == 401
 
-    System.put_env("NETRC", "#{c.tmp_dir}/tabs")
+      File.write!("#{c.tmp_dir}/empty_netrc", "")
 
-    File.write!("#{c.tmp_dir}/tabs", """
-    machine localhost
-         login foo
-         password bar
-    """)
-
-    assert Req.get!(c.url, auth: :netrc).status == 200
-
-    System.put_env("NETRC", "#{c.tmp_dir}/single_line")
-
-    File.write!("#{c.tmp_dir}/single_line", """
-    machine otherhost
-    login meat
-    password potatoes
-    machine localhost login foo password bar
-    """)
-
-    assert Req.get!(c.url, auth: :netrc).status == 200
-
-    if old_netrc, do: System.put_env("NETRC", old_netrc), else: System.delete_env("NETRC")
-  end
-
-  @tag :tmp_dir
-  test "auth: {:netrc, path}", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      expected = "Basic " <> Base.encode64("foo:bar")
-
-      case Plug.Conn.get_req_header(conn, "authorization") do
-        [^expected] ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-
-        _ ->
-          Plug.Conn.send_resp(conn, 401, "unauthorized")
+      assert_raise RuntimeError, ".netrc file is empty", fn ->
+        Req.get!(c.url, auth: {:netrc, "#{c.tmp_dir}/empty_netrc"})
       end
-    end)
 
-    assert_raise RuntimeError, "error reading .netrc file: no such file or directory", fn ->
-      Req.get!(c.url, auth: {:netrc, "non_existent_file"})
-    end
+      File.write!("#{c.tmp_dir}/bad_netrc", """
+      bad
+      """)
 
-    File.write!("#{c.tmp_dir}/custom_netrc", """
-    machine localhost
-    login foo
-    password bar
-    """)
-
-    assert Req.get!(c.url, auth: {:netrc, c.tmp_dir <> "/custom_netrc"}).status == 200
-
-    File.write!("#{c.tmp_dir}/wrong_netrc", """
-    machine localhost
-    login bad
-    password bad
-    """)
-
-    assert Req.get!(c.url, auth: {:netrc, "#{c.tmp_dir}/wrong_netrc"}).status == 401
-
-    File.write!("#{c.tmp_dir}/empty_netrc", "")
-
-    assert_raise RuntimeError, ".netrc file is empty", fn ->
-      Req.get!(c.url, auth: {:netrc, "#{c.tmp_dir}/empty_netrc"})
-    end
-
-    File.write!("#{c.tmp_dir}/bad_netrc", """
-    bad
-    """)
-
-    assert_raise RuntimeError, "error parsing .netrc file", fn ->
-      Req.get!(c.url, auth: {:netrc, "#{c.tmp_dir}/bad_netrc"})
+      assert_raise RuntimeError, "error parsing .netrc file", fn ->
+        Req.get!(c.url, auth: {:netrc, "#{c.tmp_dir}/bad_netrc"})
+      end
     end
   end
 
-  test "default options", c do
-    pid = self()
+  describe "encode_body" do
+    test "json", c do
+      Bypass.expect(c.bypass, "POST", "/", fn conn ->
+        assert {:ok, ~s|{"a":1}|, conn} = Plug.Conn.read_body(conn)
+        assert ["application/json"] = Plug.Conn.get_req_header(conn, "accept")
+        assert ["application/json"] = Plug.Conn.get_req_header(conn, "content-type")
 
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      send(pid, {:params, conn.params})
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
+        Plug.Conn.send_resp(conn, 200, "")
+      end)
 
-    Req.default_options(params: %{"foo" => "bar"})
-    Req.get!(c.url)
-    assert_received {:params, %{"foo" => "bar"}}
-  after
-    Application.put_env(:req, :default_options, [])
-  end
+      Req.post!(c.url, json: %{a: 1})
+    end
 
-  test "default_headers", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      [user_agent] = Plug.Conn.get_req_header(conn, "user-agent")
-      Plug.Conn.send_resp(conn, 200, user_agent)
-    end)
+    test "form" do
+      req = Req.new(form: [a: 1]) |> Req.Request.prepare()
+      assert req.body == "a=1"
 
-    assert "req/" <> _ = Req.get!(c.url).body
-  end
-
-  test "encode_body: json", c do
-    Bypass.expect(c.bypass, "POST", "/", fn conn ->
-      assert {:ok, ~s|{"a":1}|, conn} = Plug.Conn.read_body(conn)
-      assert ["application/json"] = Plug.Conn.get_req_header(conn, "accept")
-      assert ["application/json"] = Plug.Conn.get_req_header(conn, "content-type")
-
-      Plug.Conn.send_resp(conn, 200, "")
-    end)
-
-    Req.post!(c.url, json: %{a: 1})
-  end
-
-  test "encode_body: form" do
-    req = Req.new(form: [a: 1]) |> Req.Request.prepare()
-    assert req.body == "a=1"
-
-    req = Req.new(form: %{a: 1}) |> Req.Request.prepare()
-    assert req.body == "a=1"
+      req = Req.new(form: %{a: 1}) |> Req.Request.prepare()
+      assert req.body == "a=1"
+    end
   end
 
   test "put_params" do
@@ -316,194 +298,198 @@ defmodule Req.StepsTest do
     end
   end
 
-  @tag :tmp_dir
-  test "output: path (compressed)", c do
-    Bypass.expect_once(c.bypass, "GET", "/foo.txt", fn conn ->
-      conn
-      |> Plug.Conn.put_resp_header("content-encoding", "gzip")
-      |> Plug.Conn.send_resp(200, :zlib.gzip("bar"))
-    end)
+  describe "output" do
+    @tag :tmp_dir
+    test "path (compressed)", c do
+      Bypass.expect_once(c.bypass, "GET", "/foo.txt", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "gzip")
+        |> Plug.Conn.send_resp(200, :zlib.gzip("bar"))
+      end)
 
-    response = Req.get!(c.url <> "/foo.txt", output: c.tmp_dir <> "/foo.txt")
-    assert response.body == ""
-    assert File.read!(c.tmp_dir <> "/foo.txt") == "bar"
-  end
+      response = Req.get!(c.url <> "/foo.txt", output: c.tmp_dir <> "/foo.txt")
+      assert response.body == ""
+      assert File.read!(c.tmp_dir <> "/foo.txt") == "bar"
+    end
 
-  test "output: :remote_name", c do
-    Bypass.expect_once(c.bypass, "GET", "/directory/does/not/matter/foo.txt", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "bar")
-    end)
+    test ":remote_name", c do
+      Bypass.expect_once(c.bypass, "GET", "/directory/does/not/matter/foo.txt", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "bar")
+      end)
 
-    response = Req.get!(c.url <> "/directory/does/not/matter/foo.txt", output: :remote_name)
-    assert response.body == ""
-    assert File.read!("foo.txt") == "bar"
-  after
-    File.rm("foo.txt")
-  end
+      response = Req.get!(c.url <> "/directory/does/not/matter/foo.txt", output: :remote_name)
+      assert response.body == ""
+      assert File.read!("foo.txt") == "bar"
+    after
+      File.rm("foo.txt")
+    end
 
-  test "output: disables decoding", c do
-    Bypass.expect_once(c.bypass, "GET", "/foo.json", fn conn ->
-      json(conn, 200, %{a: 1})
-    end)
+    test "disables decoding", c do
+      Bypass.expect_once(c.bypass, "GET", "/foo.json", fn conn ->
+        json(conn, 200, %{a: 1})
+      end)
 
-    response = Req.get!(c.url <> "/foo.json", output: :remote_name)
-    assert response.body == ""
-    assert File.read!("foo.json") == ~s|{"a":1}|
-  after
-    File.rm("foo.json")
-  end
+      response = Req.get!(c.url <> "/foo.json", output: :remote_name)
+      assert response.body == ""
+      assert File.read!("foo.json") == ~s|{"a":1}|
+    after
+      File.rm("foo.json")
+    end
 
-  test "output: empty filename", c do
-    Bypass.expect_once(c.bypass, "GET", "", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "body contents")
-    end)
+    test "empty filename", c do
+      Bypass.expect_once(c.bypass, "GET", "", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "body contents")
+      end)
 
-    assert_raise RuntimeError, "cannot write to file \"\"", fn ->
-      Req.get!(c.url, output: :remote_name)
+      assert_raise RuntimeError, "cannot write to file \"\"", fn ->
+        Req.get!(c.url, output: :remote_name)
+      end
     end
   end
 
-  test "decode_body: json", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      json(conn, 200, %{a: 1})
-    end)
+  describe "decode_body" do
+    test "json", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        json(conn, 200, %{a: 1})
+      end)
 
-    assert Req.get!(c.url).body == %{"a" => 1}
-  end
+      assert Req.get!(c.url).body == %{"a" => 1}
+    end
 
-  test "decode_body: json-api", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      conn
-      |> Plug.Conn.put_resp_header("content-type", "application/vnd.api+json; charset=utf-8")
-      |> json(200, %{a: 1})
-    end)
+    test "json-api", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-type", "application/vnd.api+json; charset=utf-8")
+        |> json(200, %{a: 1})
+      end)
 
-    assert Req.get!(c.url).body == %{"a" => 1}
-  end
+      assert Req.get!(c.url).body == %{"a" => 1}
+    end
 
-  test "decode_body: json with custom options", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      json(conn, 200, %{a: 1})
-    end)
+    test "json with custom options", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        json(conn, 200, %{a: 1})
+      end)
 
-    assert Req.get!(c.url, decode_json: [keys: :atoms]).body == %{a: 1}
-  end
+      assert Req.get!(c.url, decode_json: [keys: :atoms]).body == %{a: 1}
+    end
 
-  @tag :tmp_dir
-  test "decode_body: with output", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      json(conn, 200, %{a: 1})
-    end)
+    @tag :tmp_dir
+    test "with output", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        json(conn, 200, %{a: 1})
+      end)
 
-    assert Req.get!(c.url, output: c.tmp_dir <> "/a.json").body == ""
-    assert File.read!(c.tmp_dir <> "/a.json") == ~s|{"a":1}|
-  end
+      assert Req.get!(c.url, output: c.tmp_dir <> "/a.json").body == ""
+      assert File.read!(c.tmp_dir <> "/a.json") == ~s|{"a":1}|
+    end
 
-  test "decode_body: gzip", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      conn
-      |> Plug.Conn.put_resp_content_type("application/x-gzip", nil)
-      |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
-    end)
+    test "gzip", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/x-gzip", nil)
+        |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
+      end)
 
-    assert Req.get!(c.url).body == "foo"
-  end
+      assert Req.get!(c.url).body == "foo"
+    end
 
-  @tag :tmp_dir
-  test "decode_body: tar (content-type)", c do
-    files = [{~c"foo.txt", "bar"}]
+    @tag :tmp_dir
+    test "tar (content-type)", c do
+      files = [{~c"foo.txt", "bar"}]
 
-    path = ~c"#{c.tmp_dir}/foo.tar"
-    :ok = :erl_tar.create(path, files)
-    tar = File.read!(path)
+      path = ~c"#{c.tmp_dir}/foo.tar"
+      :ok = :erl_tar.create(path, files)
+      tar = File.read!(path)
 
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      conn
-      |> Plug.Conn.put_resp_content_type("application/x-tar")
-      |> Plug.Conn.send_resp(200, tar)
-    end)
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/x-tar")
+        |> Plug.Conn.send_resp(200, tar)
+      end)
 
-    assert Req.get!(c.url).body == files
-  end
+      assert Req.get!(c.url).body == files
+    end
 
-  @tag :tmp_dir
-  test "decode_body: tar (path)", c do
-    files = [{~c"foo.txt", "bar"}]
+    @tag :tmp_dir
+    test "tar (path)", c do
+      files = [{~c"foo.txt", "bar"}]
 
-    path = ~c"#{c.tmp_dir}/foo.tar"
-    :ok = :erl_tar.create(path, files)
-    tar = File.read!(path)
+      path = ~c"#{c.tmp_dir}/foo.tar"
+      :ok = :erl_tar.create(path, files)
+      tar = File.read!(path)
 
-    Bypass.expect(c.bypass, "GET", "/foo.tar", fn conn ->
-      conn
-      |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
-      |> Plug.Conn.send_resp(200, tar)
-    end)
+      Bypass.expect(c.bypass, "GET", "/foo.tar", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+        |> Plug.Conn.send_resp(200, tar)
+      end)
 
-    assert Req.get!(c.url <> "/foo.tar").body == files
-  end
+      assert Req.get!(c.url <> "/foo.tar").body == files
+    end
 
-  @tag :tmp_dir
-  test "decode_body: tar.gz (path)", c do
-    files = [{~c"foo.txt", "bar"}]
+    @tag :tmp_dir
+    test "tar.gz (path)", c do
+      files = [{~c"foo.txt", "bar"}]
 
-    path = ~c"#{c.tmp_dir}/foo.tar"
-    :ok = :erl_tar.create(path, files, [:compressed])
-    tar = File.read!(path)
+      path = ~c"#{c.tmp_dir}/foo.tar"
+      :ok = :erl_tar.create(path, files, [:compressed])
+      tar = File.read!(path)
 
-    Bypass.expect(c.bypass, "GET", "/foo.tar.gz", fn conn ->
-      conn
-      |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
-      |> Plug.Conn.send_resp(200, tar)
-    end)
+      Bypass.expect(c.bypass, "GET", "/foo.tar.gz", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+        |> Plug.Conn.send_resp(200, tar)
+      end)
 
-    assert Req.get!(c.url <> "/foo.tar.gz").body == files
-  end
+      assert Req.get!(c.url <> "/foo.tar.gz").body == files
+    end
 
-  test "decode_body: zip (content-type)", c do
-    files = [{~c"foo.txt", "bar"}]
+    test "zip (content-type)", c do
+      files = [{~c"foo.txt", "bar"}]
 
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      {:ok, {~c"foo.zip", data}} = :zip.create(~c"foo.zip", files, [:memory])
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        {:ok, {~c"foo.zip", data}} = :zip.create(~c"foo.zip", files, [:memory])
 
-      conn
-      |> Plug.Conn.put_resp_content_type("application/zip", nil)
-      |> Plug.Conn.send_resp(200, data)
-    end)
+        conn
+        |> Plug.Conn.put_resp_content_type("application/zip", nil)
+        |> Plug.Conn.send_resp(200, data)
+      end)
 
-    assert Req.get!(c.url).body == files
-  end
+      assert Req.get!(c.url).body == files
+    end
 
-  test "decode_body: zip (path)", c do
-    files = [{~c"foo.txt", "bar"}]
+    test "zip (path)", c do
+      files = [{~c"foo.txt", "bar"}]
 
-    Bypass.expect(c.bypass, "GET", "/foo.zip", fn conn ->
-      {:ok, {~c"foo.zip", data}} = :zip.create(~c"foo.zip", files, [:memory])
+      Bypass.expect(c.bypass, "GET", "/foo.zip", fn conn ->
+        {:ok, {~c"foo.zip", data}} = :zip.create(~c"foo.zip", files, [:memory])
 
-      conn
-      |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
-      |> Plug.Conn.send_resp(200, data)
-    end)
+        conn
+        |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+        |> Plug.Conn.send_resp(200, data)
+      end)
 
-    assert Req.get!(c.url <> "/foo.zip").body == files
-  end
+      assert Req.get!(c.url <> "/foo.zip").body == files
+    end
 
-  test "decode_body: csv", c do
-    csv = [
-      ["x", "y"],
-      ["1", "2"],
-      ["3", "4"]
-    ]
+    test "csv", c do
+      csv = [
+        ["x", "y"],
+        ["1", "2"],
+        ["3", "4"]
+      ]
 
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      data = NimbleCSV.RFC4180.dump_to_iodata(csv)
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        data = NimbleCSV.RFC4180.dump_to_iodata(csv)
 
-      conn
-      |> Plug.Conn.put_resp_content_type("text/csv")
-      |> Plug.Conn.send_resp(200, data)
-    end)
+        conn
+        |> Plug.Conn.put_resp_content_type("text/csv")
+        |> Plug.Conn.send_resp(200, data)
+      end)
 
-    assert Req.get!(c.url).body == csv
+      assert Req.get!(c.url).body == csv
+    end
   end
 
   test "decompress and decode" do
@@ -540,264 +526,266 @@ defmodule Req.StepsTest do
            }
   end
 
-  test "follow_redirects: absolute", c do
-    Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
-      redirect(conn, 302, c.url <> "/ok")
-    end)
-
-    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
-
-    assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(c.url <> "/redirect").status == 200
-           end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
-  end
-
-  test "follow_redirects: relative", c do
-    Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
-      location =
-        case conn.query_string do
-          nil -> "/ok"
-          string -> "/ok?" <> string
-        end
-
-      redirect(conn, 302, location)
-    end)
-
-    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-      Plug.Conn.send_resp(conn, 200, conn.query_string)
-    end)
-
-    assert ExUnit.CaptureLog.capture_log(fn ->
-             response = Req.get!(c.url <> "/redirect")
-             assert response.status == 200
-             assert response.body == ""
-           end) =~ "[debug] follow_redirects: redirecting to /ok"
-
-    assert ExUnit.CaptureLog.capture_log(fn ->
-             response = Req.get!(c.url <> "/redirect?a=1")
-             assert response.status == 200
-             assert response.body == "a=1"
-           end) =~ "[debug] follow_redirects: redirecting to /ok?a=1"
-  end
-
-  test "follow_redirects: 301..303", c do
-    Bypass.expect(c.bypass, "POST", "/redirect", fn conn ->
-      redirect(conn, 301, c.url <> "/ok")
-    end)
-
-    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
-
-    assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.post!(c.url <> "/redirect", body: "body").status == 200
-           end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
-  end
-
-  test "follow_redirects: 307..308", c do
-    Bypass.expect(c.bypass, "POST", "/redirect", fn conn ->
-      redirect(conn, 307, c.url <> "/ok")
-    end)
-
-    Bypass.expect(c.bypass, "POST", "/ok", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
-
-    assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.post!(c.url <> "/redirect", body: "body").status == 200
-           end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
-  end
-
-  test "follow_redirects: auth same host", c do
-    auth_header = {"authorization", "Basic " <> Base.encode64("foo:bar")}
-
-    Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
-      assert auth_header in conn.req_headers
-      redirect(conn, 302, c.url <> "/auth")
-    end)
-
-    Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
-      assert auth_header in conn.req_headers
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
-
-    assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(c.url <> "/redirect", auth: {"foo", "bar"}).status == 200
-           end) =~ "[debug] follow_redirects: redirecting to #{c.url}/auth"
-  end
-
-  test "follow_redirects: auth location trusted" do
-    adapter = fn request ->
-      case request.url.host do
-        "original" ->
-          assert List.keyfind(request.headers, "authorization", 0)
-
-          response = %Req.Response{
-            status: 301,
-            headers: [{"location", "http://untrusted"}],
-            body: "redirecting"
-          }
-
-          {request, response}
-
-        "untrusted" ->
-          assert List.keyfind(request.headers, "authorization", 0)
-
-          response = %Req.Response{
-            status: 200,
-            headers: [],
-            body: "bad things"
-          }
-
-          {request, response}
-      end
-    end
-
-    assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!("http://original",
-                      adapter: adapter,
-                      auth: {"authorization", "credentials"},
-                      location_trusted: true
-                    ).status == 200
-           end) =~ "[debug] follow_redirects: redirecting to http://untrusted"
-  end
-
-  test "follow_redirects/2: auth different host" do
-    adapter = untrusted_redirect_adapter(:host, "trusted", "untrusted")
-
-    assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!("http://trusted",
-                      adapter: adapter,
-                      auth: {"authorization", "credentials"}
-                    ).status == 200
-           end) =~ "[debug] follow_redirects: redirecting to http://untrusted"
-  end
-
-  test "follow_redirects/2: auth different port" do
-    adapter = untrusted_redirect_adapter(:port, 12345, 23456)
-
-    assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!("http://trusted:12345",
-                      adapter: adapter,
-                      auth: {"authorization", "credentials"}
-                    ).status == 200
-           end) =~ "[debug] follow_redirects: redirecting to http://trusted:23456"
-  end
-
-  test "follow_redirects/2: auth different scheme" do
-    adapter = untrusted_redirect_adapter(:scheme, "http", "https")
-
-    assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!("http://trusted",
-                      adapter: adapter,
-                      auth: {"authorization", "credentials"}
-                    ).status == 200
-           end) =~ "[debug] follow_redirects: redirecting to https://trusted"
-  end
-
-  test "follow_redirects: skip params", c do
-    Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
-      redirect(conn, 302, c.url <> "/ok")
-    end)
-
-    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-      assert conn.query_string == ""
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
-
-    assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(c.url <> "/redirect", params: [a: 1]).status == 200
-           end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
-  end
-
-  test "follow_redirects: max redirects", c do
-    pid = self()
-
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      send(pid, :ping)
-      redirect(conn, 302, c.url)
-    end)
-
-    captured_log =
-      ExUnit.CaptureLog.capture_log(fn ->
-        assert_raise RuntimeError, "too many redirects (3)", fn ->
-          Req.get!(c.url, max_redirects: 3)
-        end
+  describe "follow_redirects" do
+    test "absolute", c do
+      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+        redirect(conn, 302, c.url <> "/ok")
       end)
 
-    assert_receive :ping
-    assert_receive :ping
-    assert_receive :ping
-    assert_receive :ping
-    refute_receive _
+      Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
 
-    assert captured_log =~ "follow_redirects: redirecting to " <> c.url
-  end
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert Req.get!(c.url <> "/redirect").status == 200
+             end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
+    end
 
-  test "follow_redirects: redirect_log_level, default to :debug", c do
-    "http:" <> no_scheme = c.url
+    test "relative", c do
+      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+        location =
+          case conn.query_string do
+            nil -> "/ok"
+            string -> "/ok?" <> string
+          end
 
-    Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
-      redirect(conn, 302, "#{no_scheme}/ok")
-    end)
+        redirect(conn, 302, location)
+      end)
 
-    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
+      Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+        Plug.Conn.send_resp(conn, 200, conn.query_string)
+      end)
 
-    assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(c.url <> "/redirect").status == 200
-           end) =~ "[debug] follow_redirects: redirecting to #{no_scheme}/ok"
-  end
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               response = Req.get!(c.url <> "/redirect")
+               assert response.status == 200
+               assert response.body == ""
+             end) =~ "[debug] follow_redirects: redirecting to /ok"
 
-  test "follow_redirects: redirect_log_level, set to :error", c do
-    "http:" <> no_scheme = c.url
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               response = Req.get!(c.url <> "/redirect?a=1")
+               assert response.status == 200
+               assert response.body == "a=1"
+             end) =~ "[debug] follow_redirects: redirecting to /ok?a=1"
+    end
 
-    Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
-      redirect(conn, 302, "#{no_scheme}/ok")
-    end)
+    test "301..303", c do
+      Bypass.expect(c.bypass, "POST", "/redirect", fn conn ->
+        redirect(conn, 301, c.url <> "/ok")
+      end)
 
-    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
+      Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
 
-    assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(c.url <> "/redirect", redirect_log_level: :error).status == 200
-           end) =~ "[error] follow_redirects: redirecting to #{no_scheme}/ok"
-  end
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert Req.post!(c.url <> "/redirect", body: "body").status == 200
+             end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
+    end
 
-  test "follow_redirects: redirect_log_level, disabled", c do
-    "http:" <> no_scheme = c.url
+    test "307..308", c do
+      Bypass.expect(c.bypass, "POST", "/redirect", fn conn ->
+        redirect(conn, 307, c.url <> "/ok")
+      end)
 
-    Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
-      redirect(conn, 302, "#{no_scheme}/ok")
-    end)
+      Bypass.expect(c.bypass, "POST", "/ok", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
 
-    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert Req.post!(c.url <> "/redirect", body: "body").status == 200
+             end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
+    end
 
-    assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(c.url <> "/redirect", redirect_log_level: false).status == 200
-           end) =~ ""
-  end
+    test "auth same host", c do
+      auth_header = {"authorization", "Basic " <> Base.encode64("foo:bar")}
 
-  test "follow_redirects: inherit scheme", c do
-    "http:" <> no_scheme = c.url
+      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+        assert auth_header in conn.req_headers
+        redirect(conn, 302, c.url <> "/auth")
+      end)
 
-    Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
-      redirect(conn, 302, "#{no_scheme}/ok")
-    end)
+      Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
+        assert auth_header in conn.req_headers
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
 
-    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert Req.get!(c.url <> "/redirect", auth: {"foo", "bar"}).status == 200
+             end) =~ "[debug] follow_redirects: redirecting to #{c.url}/auth"
+    end
 
-    assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(c.url <> "/redirect").status == 200
-           end) =~ "[debug] follow_redirects: redirecting to #{no_scheme}/ok"
+    test "auth location trusted" do
+      adapter = fn request ->
+        case request.url.host do
+          "original" ->
+            assert List.keyfind(request.headers, "authorization", 0)
+
+            response = %Req.Response{
+              status: 301,
+              headers: [{"location", "http://untrusted"}],
+              body: "redirecting"
+            }
+
+            {request, response}
+
+          "untrusted" ->
+            assert List.keyfind(request.headers, "authorization", 0)
+
+            response = %Req.Response{
+              status: 200,
+              headers: [],
+              body: "bad things"
+            }
+
+            {request, response}
+        end
+      end
+
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert Req.get!("http://original",
+                        adapter: adapter,
+                        auth: {"authorization", "credentials"},
+                        location_trusted: true
+                      ).status == 200
+             end) =~ "[debug] follow_redirects: redirecting to http://untrusted"
+    end
+
+    test "auth different host" do
+      adapter = untrusted_redirect_adapter(:host, "trusted", "untrusted")
+
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert Req.get!("http://trusted",
+                        adapter: adapter,
+                        auth: {"authorization", "credentials"}
+                      ).status == 200
+             end) =~ "[debug] follow_redirects: redirecting to http://untrusted"
+    end
+
+    test "auth different port" do
+      adapter = untrusted_redirect_adapter(:port, 12345, 23456)
+
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert Req.get!("http://trusted:12345",
+                        adapter: adapter,
+                        auth: {"authorization", "credentials"}
+                      ).status == 200
+             end) =~ "[debug] follow_redirects: redirecting to http://trusted:23456"
+    end
+
+    test "auth different scheme" do
+      adapter = untrusted_redirect_adapter(:scheme, "http", "https")
+
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert Req.get!("http://trusted",
+                        adapter: adapter,
+                        auth: {"authorization", "credentials"}
+                      ).status == 200
+             end) =~ "[debug] follow_redirects: redirecting to https://trusted"
+    end
+
+    test "skip params", c do
+      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+        redirect(conn, 302, c.url <> "/ok")
+      end)
+
+      Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+        assert conn.query_string == ""
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert Req.get!(c.url <> "/redirect", params: [a: 1]).status == 200
+             end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
+    end
+
+    test "max redirects", c do
+      pid = self()
+
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        send(pid, :ping)
+        redirect(conn, 302, c.url)
+      end)
+
+      captured_log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert_raise RuntimeError, "too many redirects (3)", fn ->
+            Req.get!(c.url, max_redirects: 3)
+          end
+        end)
+
+      assert_receive :ping
+      assert_receive :ping
+      assert_receive :ping
+      assert_receive :ping
+      refute_receive _
+
+      assert captured_log =~ "follow_redirects: redirecting to " <> c.url
+    end
+
+    test "redirect_log_level, default to :debug", c do
+      "http:" <> no_scheme = c.url
+
+      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+        redirect(conn, 302, "#{no_scheme}/ok")
+      end)
+
+      Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert Req.get!(c.url <> "/redirect").status == 200
+             end) =~ "[debug] follow_redirects: redirecting to #{no_scheme}/ok"
+    end
+
+    test "redirect_log_level, set to :error", c do
+      "http:" <> no_scheme = c.url
+
+      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+        redirect(conn, 302, "#{no_scheme}/ok")
+      end)
+
+      Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert Req.get!(c.url <> "/redirect", redirect_log_level: :error).status == 200
+             end) =~ "[error] follow_redirects: redirecting to #{no_scheme}/ok"
+    end
+
+    test "redirect_log_level, disabled", c do
+      "http:" <> no_scheme = c.url
+
+      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+        redirect(conn, 302, "#{no_scheme}/ok")
+      end)
+
+      Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert Req.get!(c.url <> "/redirect", redirect_log_level: false).status == 200
+             end) =~ ""
+    end
+
+    test "inherit scheme", c do
+      "http:" <> no_scheme = c.url
+
+      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+        redirect(conn, 302, "#{no_scheme}/ok")
+      end)
+
+      Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert Req.get!(c.url <> "/redirect").status == 200
+             end) =~ "[debug] follow_redirects: redirecting to #{no_scheme}/ok"
+    end
   end
 
   defp redirect(conn, status, url) do
@@ -841,269 +829,271 @@ defmodule Req.StepsTest do
 
   ## Error steps
 
-  @tag :capture_log
-  test "retry: eventually successful - function", c do
-    adapter = fn request ->
-      request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
-      attempt = request.private.attempt
+  describe "retry" do
+    @tag :capture_log
+    test "eventually successful - function", c do
+      adapter = fn request ->
+        request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
+        attempt = request.private.attempt
 
-      response =
-        case attempt do
-          0 ->
-            Req.Response.new(status: 500, body: "oops")
+        response =
+          case attempt do
+            0 ->
+              Req.Response.new(status: 500, body: "oops")
 
-          1 ->
-            Req.Response.new(status: 500, body: "oops")
+            1 ->
+              Req.Response.new(status: 500, body: "oops")
 
-          2 ->
-            Req.Response.new(status: 500, body: "oops")
+            2 ->
+              Req.Response.new(status: 500, body: "oops")
 
-          3 ->
-            Req.Response.new(status: 200, body: "ok")
-        end
+            3 ->
+              Req.Response.new(status: 200, body: "ok")
+          end
 
-      {request, response}
+        {request, response}
+      end
+
+      request =
+        Req.new(adapter: adapter, url: c.url, retry_delay: &Integer.pow(2, &1))
+        |> Req.Request.prepend_response_steps(
+          foo: fn {request, response} ->
+            {request, update_in(response.body, &(&1 <> " - updated"))}
+          end
+        )
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          response = Req.get!(request)
+          assert response.body == "ok - updated"
+        end)
+
+      assert log =~ "will retry in 1ms, 3 attempts left"
+      assert log =~ "will retry in 2ms, 2 attempts left"
+      assert log =~ "will retry in 4ms, 1 attempt left"
     end
 
-    request =
-      Req.new(adapter: adapter, url: c.url, retry_delay: &Integer.pow(2, &1))
-      |> Req.Request.prepend_response_steps(
-        foo: fn {request, response} ->
-          {request, update_in(response.body, &(&1 <> " - updated"))}
-        end
-      )
+    @tag :capture_log
+    test "eventually successful - integer", c do
+      adapter = fn request ->
+        request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
+        attempt = request.private.attempt
 
-    log =
-      ExUnit.CaptureLog.capture_log(fn ->
-        response = Req.get!(request)
-        assert response.body == "ok - updated"
+        response =
+          case attempt do
+            0 ->
+              Req.Response.new(status: 500, body: "oops")
+
+            1 ->
+              Req.Response.new(status: 500, body: "oops")
+
+            2 ->
+              Req.Response.new(status: 200, body: "ok")
+          end
+
+        {request, response}
+      end
+
+      request =
+        Req.new(adapter: adapter, url: c.url, retry_delay: 1)
+        |> Req.Request.prepend_response_steps(
+          foo: fn {request, response} ->
+            {request, update_in(response.body, &(&1 <> " - updated"))}
+          end
+        )
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          response = Req.get!(request)
+          assert response.body == "ok - updated"
+        end)
+
+      assert log =~ "will retry in 1ms, 2 attempts left"
+      assert log =~ "will retry in 1ms, 2 attempts left"
+    end
+
+    @tag :capture_log
+    test "default log_level", c do
+      adapter = fn request ->
+        request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
+        attempt = request.private.attempt
+
+        response =
+          case attempt do
+            0 ->
+              Req.Response.new(status: 500, body: "oops")
+
+            1 ->
+              Req.Response.new(status: 200, body: "ok")
+          end
+
+        {request, response}
+      end
+
+      request = Req.new(adapter: adapter, url: c.url, retry_delay: 1)
+      log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
+
+      assert String.match?(
+               log,
+               ~r/\[error\][[:blank:]]+retry: got response with status 500, will retry in 1ms, 3 attempts left/u
+             )
+    end
+
+    @tag :capture_log
+    test "custom log_level", c do
+      adapter = fn request ->
+        request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
+        attempt = request.private.attempt
+
+        response =
+          case attempt do
+            0 ->
+              Req.Response.new(status: 500, body: "oops")
+
+            1 ->
+              Req.Response.new(status: 200, body: "ok")
+          end
+
+        {request, response}
+      end
+
+      request = Req.new(adapter: adapter, url: c.url, retry_delay: 1, retry_log_level: :info)
+      log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
+
+      assert String.match?(
+               log,
+               ~r/\[info\][[:blank:]]+retry: got response with status 500, will retry in 1ms, 3 attempts left/u
+             )
+    end
+
+    @tag :capture_log
+    test "logging disabled", c do
+      adapter = fn request ->
+        request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
+        attempt = request.private.attempt
+
+        response =
+          case attempt do
+            0 ->
+              Req.Response.new(status: 500, body: "oops")
+
+            1 ->
+              Req.Response.new(status: 200, body: "ok")
+          end
+
+        {request, response}
+      end
+
+      request = Req.new(adapter: adapter, url: c.url, retry_delay: 1, retry_log_level: false)
+      log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
+      assert log == ""
+    end
+
+    @tag :capture_log
+    @tag timeout: 1000
+    test "retry_delay" do
+      adapter = fn request ->
+        request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
+        attempt = request.private.attempt
+
+        response =
+          case attempt do
+            0 -> Req.Response.new(status: 429) |> retry_after(0)
+            1 -> Req.Response.new(status: 429) |> retry_after(DateTime.utc_now())
+            2 -> Req.Response.new(status: 200, body: "ok")
+          end
+
+        {request, response}
+      end
+
+      assert Req.request!(adapter: adapter, retry_delay: 10000).body == "ok"
+    end
+
+    defp retry_after(r, value), do: Req.Response.put_header(r, "retry-after", retry_after(value))
+    defp retry_after(integer) when is_integer(integer), do: to_string(integer)
+    defp retry_after(%DateTime{} = dt), do: Req.Steps.format_http_datetime(dt)
+
+    @tag :capture_log
+    test "always failing", c do
+      pid = self()
+
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        send(pid, :ping)
+        Plug.Conn.send_resp(conn, 500, "oops")
       end)
 
-    assert log =~ "will retry in 1ms, 3 attempts left"
-    assert log =~ "will retry in 2ms, 2 attempts left"
-    assert log =~ "will retry in 4ms, 1 attempt left"
-  end
+      request =
+        Req.new(url: c.url, retry_delay: 1)
+        |> Req.Request.prepend_response_steps(
+          foo: fn {request, response} ->
+            {request, update_in(response.body, &(&1 <> " - updated"))}
+          end
+        )
 
-  @tag :capture_log
-  test "retry: eventually successful - integer", c do
-    adapter = fn request ->
-      request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
-      attempt = request.private.attempt
-
-      response =
-        case attempt do
-          0 ->
-            Req.Response.new(status: 500, body: "oops")
-
-          1 ->
-            Req.Response.new(status: 500, body: "oops")
-
-          2 ->
-            Req.Response.new(status: 200, body: "ok")
-        end
-
-      {request, response}
+      assert Req.get!(request).body == "oops - updated"
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      refute_received _
     end
 
-    request =
-      Req.new(adapter: adapter, url: c.url, retry_delay: 1)
-      |> Req.Request.prepend_response_steps(
-        foo: fn {request, response} ->
-          {request, update_in(response.body, &(&1 <> " - updated"))}
-        end
-      )
+    test "never", c do
+      pid = self()
 
-    log =
-      ExUnit.CaptureLog.capture_log(fn ->
-        response = Req.get!(request)
-        assert response.body == "ok - updated"
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        send(pid, :ping)
+        Plug.Conn.send_resp(conn, 500, "oops")
       end)
 
-    assert log =~ "will retry in 1ms, 2 attempts left"
-    assert log =~ "will retry in 1ms, 2 attempts left"
-  end
+      request = Req.new(url: c.url, retry: :never)
 
-  @tag :capture_log
-  test "retry: default log_level", c do
-    adapter = fn request ->
-      request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
-      attempt = request.private.attempt
-
-      response =
-        case attempt do
-          0 ->
-            Req.Response.new(status: 500, body: "oops")
-
-          1 ->
-            Req.Response.new(status: 200, body: "ok")
-        end
-
-      {request, response}
+      assert Req.get!(request).status == 500
+      assert_received :ping
+      refute_received _
     end
 
-    request = Req.new(adapter: adapter, url: c.url, retry_delay: 1)
-    log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
+    @tag :capture_log
+    test "custom function", c do
+      pid = self()
 
-    assert String.match?(
-             log,
-             ~r/\[error\][[:blank:]]+retry: got response with status 500, will retry in 1ms, 3 attempts left/u
-           )
-  end
+      Bypass.expect(c.bypass, "POST", "/", fn conn ->
+        send(pid, :ping)
+        Plug.Conn.send_resp(conn, 500, "oops")
+      end)
 
-  @tag :capture_log
-  test "retry: custom log_level", c do
-    adapter = fn request ->
-      request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
-      attempt = request.private.attempt
+      fun = fn response ->
+        assert response.status == 500
+        true
+      end
 
-      response =
-        case attempt do
-          0 ->
-            Req.Response.new(status: 500, body: "oops")
+      request = Req.new(url: c.url, retry: fun, retry_delay: 1)
 
-          1 ->
-            Req.Response.new(status: 200, body: "ok")
-        end
-
-      {request, response}
+      assert Req.post!(request).status == 500
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      refute_received _
     end
 
-    request = Req.new(adapter: adapter, url: c.url, retry_delay: 1, retry_log_level: :info)
-    log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
+    @tag :capture_log
+    test "does not re-encode params", c do
+      pid = self()
 
-    assert String.match?(
-             log,
-             ~r/\[info\][[:blank:]]+retry: got response with status 500, will retry in 1ms, 3 attempts left/u
-           )
-  end
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        assert conn.query_string == "a=1&b=2"
+        send(pid, :ping)
+        Plug.Conn.send_resp(conn, 500, "oops")
+      end)
 
-  @tag :capture_log
-  test "retry: logging disabled", c do
-    adapter = fn request ->
-      request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
-      attempt = request.private.attempt
-
-      response =
-        case attempt do
-          0 ->
-            Req.Response.new(status: 500, body: "oops")
-
-          1 ->
-            Req.Response.new(status: 200, body: "ok")
-        end
-
-      {request, response}
+      assert Req.get!(c.url, params: [a: 1, b: 2], retry_delay: 1).status == 500
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      refute_received _
     end
-
-    request = Req.new(adapter: adapter, url: c.url, retry_delay: 1, retry_log_level: false)
-    log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
-    assert log == ""
-  end
-
-  @tag :capture_log
-  @tag timeout: 1000
-  test "retry: retry-after" do
-    adapter = fn request ->
-      request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
-      attempt = request.private.attempt
-
-      response =
-        case attempt do
-          0 -> Req.Response.new(status: 429) |> retry_after(0)
-          1 -> Req.Response.new(status: 429) |> retry_after(DateTime.utc_now())
-          2 -> Req.Response.new(status: 200, body: "ok")
-        end
-
-      {request, response}
-    end
-
-    assert Req.request!(adapter: adapter, retry_delay: 10000).body == "ok"
-  end
-
-  defp retry_after(r, value), do: Req.Response.put_header(r, "retry-after", retry_after(value))
-  defp retry_after(integer) when is_integer(integer), do: to_string(integer)
-  defp retry_after(%DateTime{} = dt), do: Req.Steps.format_http_datetime(dt)
-
-  @tag :capture_log
-  test "retry: always failing", c do
-    pid = self()
-
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      send(pid, :ping)
-      Plug.Conn.send_resp(conn, 500, "oops")
-    end)
-
-    request =
-      Req.new(url: c.url, retry_delay: 1)
-      |> Req.Request.prepend_response_steps(
-        foo: fn {request, response} ->
-          {request, update_in(response.body, &(&1 <> " - updated"))}
-        end
-      )
-
-    assert Req.get!(request).body == "oops - updated"
-    assert_received :ping
-    assert_received :ping
-    assert_received :ping
-    assert_received :ping
-    refute_received _
-  end
-
-  test "retry: never", c do
-    pid = self()
-
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      send(pid, :ping)
-      Plug.Conn.send_resp(conn, 500, "oops")
-    end)
-
-    request = Req.new(url: c.url, retry: :never)
-
-    assert Req.get!(request).status == 500
-    assert_received :ping
-    refute_received _
-  end
-
-  @tag :capture_log
-  test "retry: custom function", c do
-    pid = self()
-
-    Bypass.expect(c.bypass, "POST", "/", fn conn ->
-      send(pid, :ping)
-      Plug.Conn.send_resp(conn, 500, "oops")
-    end)
-
-    fun = fn response ->
-      assert response.status == 500
-      true
-    end
-
-    request = Req.new(url: c.url, retry: fun, retry_delay: 1)
-
-    assert Req.post!(request).status == 500
-    assert_received :ping
-    assert_received :ping
-    assert_received :ping
-    assert_received :ping
-    refute_received _
-  end
-
-  @tag :capture_log
-  test "retry: does not re-encode params", c do
-    pid = self()
-
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      assert conn.query_string == "a=1&b=2"
-      send(pid, :ping)
-      Plug.Conn.send_resp(conn, 500, "oops")
-    end)
-
-    assert Req.get!(c.url, params: [a: 1, b: 2], retry_delay: 1).status == 500
-    assert_received :ping
-    assert_received :ping
-    assert_received :ping
-    assert_received :ping
-    refute_received _
   end
 
   @tag :tmp_dir
