@@ -866,6 +866,7 @@ defmodule Req.Steps do
     response =
       %Req.Response{response | body: decompressed_body}
       |> Req.Response.put_header("content-length", decompressed_content_length)
+      |> Req.Response.delete_header("content-encoding")
 
     {request, response}
   end
