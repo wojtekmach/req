@@ -862,7 +862,7 @@ defmodule Req.Steps do
   | _other_       | Returns data as is                              |
 
   This step updates the following headers to reflect the changes:
-  - `content-legnth` is set to the length of the decompressed body
+  - `content-length` is set to the length of the decompressed body
 
   ## Options
 
