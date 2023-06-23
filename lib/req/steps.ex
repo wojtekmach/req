@@ -861,6 +861,9 @@ defmodule Req.Steps do
   | zstd          | `:ezstd.decompress/1` (if [ezstd] is installed) |
   | _other_       | Returns data as is                              |
 
+  This step updates the following headers to reflect the changes:
+  - `content-legnth` is set to the length of the decompressed body
+
   ## Options
 
     * `:raw` - if set to `true`, disables response body decompression. Defaults to `false`.
