@@ -385,8 +385,8 @@ defmodule Req.StepsTest do
       end)
 
       response = Req.get!(c.url)
-
-      assert content_length(response) == byte_size(body)
+      [content_length] = Req.Response.get_header(response, "content-length")
+      assert String.to_integer(content_length) == byte_size(body)
     end
   end
 
@@ -1512,13 +1512,5 @@ defmodule Req.StepsTest do
       end
 
     Plug.Conn.send_resp(conn, status, Jason.encode_to_iodata!(data))
-  end
-
-  defp content_length(response) do
-    {"content-length", content_length_str} = List.keyfind!(response.headers, "content-length", 0)
-
-    {content_length, _remainder} = Integer.parse(content_length_str)
-
-    content_length
   end
 end
