@@ -141,4 +141,33 @@ defmodule Req.Response do
       when is_binary(key) and is_binary(value) do
     %{response | headers: List.keystore(response.headers, key, 0, {key, value})}
   end
+
+  @doc """
+  Deletes the header given by `key`
+
+  All occurences of the header are delete, in case the header is repeated multiple times.
+
+  ## Examples
+
+      iex> response.headers
+      [
+        {"cache-control", "max-age=600"},
+        {"content-type", "text/html"},
+        {"Cache-Control", "no-transform"}
+      ]
+      iex> Req.Response.delete_header(response, "cache-control").headers
+      [{"content-type", "text/html"}]
+
+  """
+  def delete_header(%Req.Response{} = response, key) when is_binary(key) do
+    %Req.Response{
+      response
+      | headers:
+          for(
+            {name, value} <- response.headers,
+            String.downcase(name) != String.downcase(key),
+            do: {name, value}
+          )
+    }
+  end
 end
