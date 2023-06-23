@@ -819,6 +819,7 @@ defmodule Req.Steps do
 
   This step updates the following headers to reflect the changes:
   - `content-length` is set to the length of the decompressed body
+  - `content-encoding` is deleted
 
   ## Options
 
