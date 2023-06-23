@@ -322,8 +322,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
       end)
 
-      response = Req.get!(c.url).body
-      refute List.keyfind(response.headers, "content-encoding", 0)
+      refute List.keyfind(Req.get!(c.url).headers, "content-encoding", 0)
     end
   end
 
