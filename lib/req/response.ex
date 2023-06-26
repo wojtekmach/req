@@ -27,6 +27,14 @@ defmodule Req.Response do
             body: "",
             private: %{}
 
+  @doc false
+  def fetch(response, key) when is_binary(key) do
+    case get_header(response, key) do
+      [value] -> {:ok, value}
+      [] -> :error
+    end
+  end
+
   @doc """
   Returns a new response.
 
