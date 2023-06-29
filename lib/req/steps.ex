@@ -208,15 +208,15 @@ defmodule Req.Steps do
   body. Notice the body starts with `<<31, 139>>` (`<<0x1F, 0x8B>>`), the "magic bytes" for gzip:
 
       iex> response = Req.get!("https://elixir-lang.org", raw: true)
-      iex> response.headers |> List.keyfind("content-encoding", 0)
-      {"content-encoding", "gzip"}
+      iex> response["content-encoding"]
+      "gzip"
       iex> response.body |> binary_part(0, 2)
       <<31, 139>>
 
   Now, let's pass `compressed: false` and notice the raw body was not compressed:
 
       iex> response = Req.get!("https://elixir-lang.org", raw: true, compressed: false)
-      iex> response.headers |> List.keyfind("content-encoding", 0)
+      iex> response["content-encoding"]
       nil
       iex> response.body |> binary_part(0, 15)
       "<!DOCTYPE html>"
@@ -408,8 +408,8 @@ defmodule Req.Steps do
       206
       iex> response.body
       "abcd"
-      iex> List.keyfind(response.headers, "content-range", 0)
-      {"content-range", "bytes 0-3/100"}
+      iex> response["content-range"]
+      "bytes 0-3/100"
   """
   @doc step: :request
   def put_range(%{options: %{range: range}} = request) when is_binary(range) do
@@ -824,8 +824,8 @@ defmodule Req.Steps do
   ## Examples
 
       iex> response = Req.get!("https://httpbin.org/gzip")
-      iex> List.keyfind(response.headers, "content-encoding", 0)
-      {"content-encoding", "gzip"}
+      iex> response["content-encoding"]
+      "gzip"
       iex> response.body["gzipped"]
       true
 
@@ -837,8 +837,8 @@ defmodule Req.Steps do
       ])
 
       response = Req.get!("https://httpbin.org/brotli")
-      response.headers |> List.keyfind("content-encoding", 0)
-      #=> {"content-encoding", "br"}
+      response["content-encoding"]
+      #=> "br"
       response.body["brotli"]
       #=> true
 
