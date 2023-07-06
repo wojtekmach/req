@@ -645,7 +645,7 @@ defmodule Req.Request do
     update_in(request.registered_options, &MapSet.union(&1, MapSet.new(options)))
   end
 
-  @doc deprecated: "Use Req.Request.request/1 instead"
+  @doc deprecated: "Use Req.Request.run_request/1 instead"
   def run(request) do
     case run_request(request) do
       {_request, %Req.Response{} = response} ->
@@ -656,7 +656,7 @@ defmodule Req.Request do
     end
   end
 
-  @doc deprecated: "Use Req.Request.request/1 instead"
+  @doc deprecated: "Use Req.Request.run_request/1 instead"
   def run!(request) do
     case run_request(request) do
       {_request, %Req.Response{} = response} ->
