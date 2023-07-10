@@ -341,6 +341,39 @@ defmodule Req.Request do
             current_request_steps: []
 
   @doc """
+  Returns a new request struct.
+
+  ## Options
+
+    * `:method` - the request method, defaults to `:get`.
+
+    * `:url` - the request URL.
+
+    * `:headers` - the request headers, defaults to `[]`.
+
+    * `:body` - the request body, defaults to `nil`.
+
+    * `:adapter` - the request adapter, defaults to calling [`run_finch`](`Req.Steps.run_finch/1`).
+
+  ## Examples
+
+      iex> req = Req.Request.new(url: "https://httpbin.org/status/201")
+      iex> {:ok, request, response} = Req.Request.request(req)
+      iex> request.url.host
+      "httpbin.org"
+      iex> response.status
+      201
+  """
+  def new(options) do
+    options =
+      options
+      |> Keyword.validate!([:method, :url, :headers, :body, :adapter])
+      |> Keyword.update(:url, URI.new!(""), &URI.new!/1)
+
+    struct!(__MODULE__, options)
+  end
+
+  @doc """
   Gets the value for a specific private `key`.
   """
   def get_private(request, key, default \\ nil) when is_atom(key) do
@@ -664,6 +697,31 @@ defmodule Req.Request do
 
       {_request, exception} ->
         raise exception
+    end
+  end
+
+  @doc """
+  Runs the requet pipeline.
+
+  Returns `{:ok, request, response}` or `{:error, request, exception}`.
+
+  ## Examples
+
+
+      iex> req = Req.Request.new(url: "https://httpbin.org/status/201")
+      iex> {:ok, request, response} = Req.Request.request(req)
+      iex> request.url.host
+      "httpbin.org"
+      iex> response.status
+      201
+  """
+  def request(request) do
+    case run_request(request) do
+      {request, %Req.Response{} = response} ->
+        {:ok, request, response}
+
+      {request, exception} ->
+        {:error, request, exception}
     end
   end
 
