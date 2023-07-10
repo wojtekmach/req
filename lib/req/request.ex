@@ -357,12 +357,12 @@ defmodule Req.Request do
 
   ## Examples
 
-      iex> req = Req.Request.new(url: "https://httpbin.org/status/201")
+      iex> req = Req.Request.new(url: "https://api.github.com/repos/wojtekmach/req")
       iex> {:ok, request, response} = Req.Request.request(req)
       iex> request.url.host
-      "httpbin.org"
+      "api.github.com"
       iex> response.status
-      201
+      200
   """
   def new(options) do
     options =
@@ -708,12 +708,12 @@ defmodule Req.Request do
   ## Examples
 
 
-      iex> req = Req.Request.new(url: "https://httpbin.org/status/201")
+      iex> req = Req.Request.new(url: "https://api.github.com/repos/wojtekmach/req")
       iex> {:ok, request, response} = Req.Request.request(req)
       iex> request.url.host
-      "httpbin.org"
+      "api.github.com"
       iex> response.status
-      201
+      200
   """
   def request(request) do
     case run_request(request) do
