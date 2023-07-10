@@ -32,6 +32,7 @@ defmodule Req.Response do
     case get_header(response, key) do
       [value] -> {:ok, value}
       [] -> :error
+      _ -> raise "multiple values for header #{key}, use Req.Response.get_header/2 instead"
     end
   end
 
