@@ -240,6 +240,7 @@ defmodule Req do
           :max_redirects,
           :retry,
           :retry_delay,
+          :retry_after_filter,
           :retry_log_level,
           :max_retries,
           :cache,

@@ -1285,8 +1285,19 @@ defmodule Req.Steps do
       number of milliseconds to sleep before making another attempt.
       Defaults to a simple exponential backoff: 1s, 2s, 4s, 8s, ...
 
-      If the response is HTTP 429 and contains the `retry-after` header, the value of the header is used to
-      determine the next retry delay.
+      If the response is HTTP 429 (or it meets a filter criterion - _see the `:retry_after_filter`
+      option_) and contains the `retry-after` header, the value of the header is used to determine
+      the next retry delay.
+
+    * `:retry_after_filter` can be one of the following:
+
+        * a status code or an `Enumerable` of status codes to check against in `:retry_delay` _instead_ of
+          the HTTP 429
+
+        * a 1-arity function returning boolean that takes the response and verifies if the response
+          meets the condition for `:retry_delay`.
+
+      If not provided, the HTTP 429 will be used as the criterion for the `:retry_delay`.
 
     * `:retry_log_level` - the log level to emit retry logs at. Can also be set to `false` to disable
       logging these messsages. Defaults to `:error`.
@@ -1371,10 +1382,14 @@ defmodule Req.Steps do
     end
   end
 
-  defp get_retry_delay(request, %Req.Response{status: 429} = response, retry_count) do
-    case Req.Response.get_header(response, "retry-after") do
-      [delay] ->
-        {request, retry_delay_in_ms(delay)}
+  defp get_retry_delay(request, %Req.Response{} = response, retry_count) do
+    with retry_after_filter = Map.get(request.options, :retry_after_filter, 429),
+         true <- use_retry_after_header?(response, retry_after_filter),
+         [delay] <- Req.Response.get_header(response, "retry-after") do
+      {request, retry_delay_in_ms(delay)}
+    else
+      false ->
+        calculate_retry_delay(request, retry_count)
 
       [] ->
         calculate_retry_delay(request, retry_count)
@@ -1383,6 +1398,24 @@ defmodule Req.Steps do
 
   defp get_retry_delay(request, _response, retry_count) do
     calculate_retry_delay(request, retry_count)
+  end
+
+  defp use_retry_after_header?(response, retry_after_filter) do
+    cond do
+      is_integer(retry_after_filter) ->
+        response.status == retry_after_filter
+
+      is_function(retry_after_filter) ->
+        !!retry_after_filter.(response)
+
+      Enumerable.impl_for(retry_after_filter) ->
+        response.status in retry_after_filter
+
+      true ->
+        raise ArgumentError,
+              "expected :retry_after_filter to be an HTTP status code integer, a thereof or a 1-arity function, " <>
+                "got: #{inspect(retry_after_filter)}"
+    end
   end
 
   defp calculate_retry_delay(request, retry_count) do
