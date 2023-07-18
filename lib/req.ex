@@ -903,7 +903,7 @@ defmodule Req do
   @doc """
   Makes an HTTP request.
 
-  See `new/1` for a list of availale options.
+  See `new/1` for a list of available options.
 
   ## Examples
 
