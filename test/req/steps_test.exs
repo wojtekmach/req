@@ -864,7 +864,7 @@ defmodule Req.StepsTest do
 
       log =
         ExUnit.CaptureLog.capture_log(fn ->
-          {:ok, request, response} = Req.Request.request(request)
+          {request, response} = Req.Request.run_request(request)
           assert request.private.req_retry_count == 3
           assert response.body == "ok - updated"
         end)

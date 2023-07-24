@@ -30,7 +30,7 @@ defmodule Req.Request do
       url = "https://api.github.com/repos/wojtekmach/req"
 
       req =
-        %Req.Request{method: :get, url: url}
+        Req.Request.new(method: :get, url: url)
         |> Req.Request.append_request_steps(
           put_user_agent: &Req.Steps.put_user_agent/1,
           # ...
@@ -358,7 +358,7 @@ defmodule Req.Request do
   ## Examples
 
       iex> req = Req.Request.new(url: "https://api.github.com/repos/wojtekmach/req")
-      iex> {:ok, request, response} = Req.Request.request(req)
+      iex> {request, response} = Req.Request.run_request(req)
       iex> request.url.host
       "api.github.com"
       iex> response.status
@@ -678,7 +678,7 @@ defmodule Req.Request do
     update_in(request.registered_options, &MapSet.union(&1, MapSet.new(options)))
   end
 
-  @doc deprecated: "Use Req.Request.request/1 instead"
+  @doc deprecated: "Use Req.Request.run_request/1 instead"
   def run(request) do
     case run_request(request) do
       {_request, %Req.Response{} = response} ->
@@ -689,7 +689,7 @@ defmodule Req.Request do
     end
   end
 
-  @doc deprecated: "Use Req.Request.request/1 instead"
+  @doc deprecated: "Use Req.Request.run_request/1 instead"
   def run!(request) do
     case run_request(request) do
       {_request, %Req.Response{} = response} ->
@@ -701,34 +701,18 @@ defmodule Req.Request do
   end
 
   @doc """
-  Runs the requet pipeline.
+  Runs the request pipeline.
 
-  Returns `{:ok, request, response}` or `{:error, request, exception}`.
+  Returns `{request, response}` or `{request, exception}`.
 
   ## Examples
 
-
       iex> req = Req.Request.new(url: "https://api.github.com/repos/wojtekmach/req")
-      iex> {:ok, request, response} = Req.Request.request(req)
+      iex> {request, response} = Req.Request.run_request(req)
       iex> request.url.host
       "api.github.com"
       iex> response.status
       200
-  """
-  def request(request) do
-    case run_request(request) do
-      {request, %Req.Response{} = response} ->
-        {:ok, request, response}
-
-      {request, exception} ->
-        {:error, request, exception}
-    end
-  end
-
-  @doc """
-  Runs the request pipeline.
-
-  Returns `{request, response}` or `{request, exception}`.
   """
   def run_request(request)
 

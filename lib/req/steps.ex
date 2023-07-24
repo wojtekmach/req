@@ -1364,7 +1364,7 @@ defmodule Req.Steps do
       log_retry(response_or_exception, retry_count, max_retries, delay, log_level)
       Process.sleep(delay)
       request = Req.Request.put_private(request, :req_retry_count, retry_count + 1)
-      {_, request, response_or_exception} = Req.Request.request(request)
+      {request, response_or_exception} = Req.Request.run_request(request)
       {Req.Request.halt(request), response_or_exception}
     else
       {request, response_or_exception}
