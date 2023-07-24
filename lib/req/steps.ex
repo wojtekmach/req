@@ -413,11 +413,11 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def put_range(%{options: %{range: range}} = request) when is_binary(range) do
-    Req.Request.put_header(request, "range", range)
+    Req.Request.put_header(request, "content-range", range)
   end
 
   def put_range(%{options: %{range: first..last}} = request) do
-    Req.Request.put_header(request, "range", "bytes=#{first}-#{last}")
+    Req.Request.put_header(request, "content-range", "bytes=#{first}-#{last}")
   end
 
   def put_range(request) do
