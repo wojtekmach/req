@@ -4,7 +4,7 @@
 
   * Support `Req.get(options)`, `Req.post(options)`, etc
   * Add [`Req.Request.new/1`]
-  * `retry`: Fix returning correct `private.req_retry_count`
+  * [`retry`]: Fix returning correct `private.req_retry_count`
 
 ## v0.3.10 (2023-06-20)
 
