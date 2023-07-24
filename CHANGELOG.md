@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.3.11 (2023-07-24)
+
+  * Support `Req.get(options)`, `Req.post(options)`, etc
+  * Add [`Req.Request.new/1`]
+  * `retry`: Fix returning correct `private.req_retry_count`
+
 ## v0.3.10 (2023-06-20)
 
   * [`decompress_body`]: No-op on non-binary response body
@@ -479,4 +485,5 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`put_user_agent`]:            https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
 [`retry`]:                     https://hexdocs.pm/req/Req.Steps.html#retry/1
 [`run_finch`]:                 https://hexdocs.pm/req/Req.Steps.html#run_finch/1
+[`Req.Request.new/1`]:         https://hexdocs.pm/req/Req.Request.html#new/1
 [`Req.Request.run_request/1`]: https://hexdocs.pm/req/Req.Request.html#run_request/1
