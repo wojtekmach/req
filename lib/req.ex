@@ -383,6 +383,12 @@ defmodule Req do
   @doc """
   Makes a GET request.
 
+  `request` can be one of:
+
+    * a `String` or `URI`;
+    * a `Keyword` options;
+    * a `Req.Request` struct
+
   See `new/1` for a list of available options.
 
   ## Examples
@@ -407,7 +413,7 @@ defmodule Req do
       200
 
   """
-  @spec get(url() | Req.Request.t(), options :: keyword()) ::
+  @spec get(url() | keyword() | Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
   def get(request, options \\ [])
 
@@ -591,7 +597,7 @@ defmodule Req do
       iex> resp.body["data"]
       "hello!"
   """
-  @spec post(url() | Req.Request.t(), options :: keyword()) ::
+  @spec post(url() | keyword() | Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
   def post(request, options \\ [])
 
@@ -676,7 +682,7 @@ defmodule Req do
       iex> resp.body["data"]
       "hello!"
   """
-  @spec put(url() | Req.Request.t(), options :: keyword()) ::
+  @spec put(url() | keyword() | Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
   def put(request, options \\ [])
 
@@ -761,7 +767,7 @@ defmodule Req do
       iex> resp.body["data"]
       "hello!"
   """
-  @spec patch(url() | Req.Request.t(), options :: keyword()) ::
+  @spec patch(url() | keyword() | Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
   def patch(url_or_request, options \\ [])
 
