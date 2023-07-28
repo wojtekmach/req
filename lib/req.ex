@@ -876,7 +876,7 @@ defmodule Req do
     * a `Keyword` options;
     * a `Req.Request` struct
 
-  See `new/1` for a list of availale options.
+  See `new/1` for a list of available options.
 
   ## Examples
 
