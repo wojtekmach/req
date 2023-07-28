@@ -27,7 +27,41 @@ defmodule Req.Response do
             body: "",
             private: %{}
 
-  @doc false
+  @behaviour Access
+
+  @doc """
+  Fetches a header from the response.
+
+  Supports the Access protocol to allow usage such as response["key"].
+  Only string keys are supported, so passing any other type of key will
+  raise a `FunctionClauseError`.
+
+  ## Examples
+
+      iex> response = Req.Response.new()
+      iex> |> Req.Response.put_header("content-type", "application/json")
+      iex> response["content-type"]
+      "application/json"
+
+      iex> response = Req.Response.new()
+      iex> response["content-type"]
+      nil
+
+      iex> response = Req.Response.new(%{
+      ...>   status: 200,
+      ...>   headers: [
+      ...>     {"content-encoding", "gzip"},
+      ...>     {"content-encoding", "deflate"},
+      ...>     {"content-length", "20"}
+      ...>   ],
+      ...>   body: "foo",
+      ...>   private: %{}
+      ...> })
+      iex> response["content-encoding"]
+      ** (RuntimeError) multiple values for header content-encoding, use Req.Response.get_header/2 instead
+
+  """
+  @impl Access
   def fetch(response, key) when is_binary(key) do
     case get_header(response, key) do
       [value] -> {:ok, value}
@@ -35,6 +69,12 @@ defmodule Req.Response do
       _ -> raise "multiple values for header #{key}, use Req.Response.get_header/2 instead"
     end
   end
+
+  @impl Access
+  defdelegate get_and_update(data, key, function), to: Map
+
+  @impl Access
+  defdelegate pop(data, key), to: Map
 
   @doc """
   Returns a new response.
