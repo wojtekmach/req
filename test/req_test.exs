@@ -1,6 +1,8 @@
 defmodule ReqTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   doctest Req,
     only: [
       new: 1,
@@ -44,6 +46,115 @@ defmodule ReqTest do
     Req.get!(req, url: c.url, headers: [x_a: 2])
     assert_receive {:headers, headers}
     assert headers == [{"x-a", "1, 2"}]
+  end
+
+  test "validation header raises if option was not supported",
+       c do
+    headers = [{:x_Invalid, "any value"}, {"NotValid", "whoops!"}]
+
+    assert_raise(ArgumentError, "Value :anything not valid for option :invalid_header_keys", fn ->
+      Req.new(invalid_header_keys: :anything, url: c.url, headers: headers)
+      |> Req.get!()
+    end)
+  end
+
+  test "header validation defaults to a warning if invalid header key is not sent", c do
+    pid = self()
+
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      headers =
+        Enum.filter(conn.req_headers, fn {name, _} -> String.contains?(name, ["foo", "bar"]) end)
+
+      send(pid, {:headers, headers})
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    headers = [{:x_Foo, "some value"}, {"Bar", 911}]
+
+    {_result, log} =
+      with_log(fn ->
+        Req.new(url: c.url, headers: headers)
+        |> Req.get!()
+      end)
+
+    expected_headers = [{"x-foo", "some value"}, {"bar", "911"}]
+
+    assert_receive {:headers, headers}
+
+    header_set = MapSet.new(headers)
+
+    assert Enum.all?(expected_headers, &MapSet.member?(header_set, &1))
+
+    assert log =~ ~r/is not lowercase/
+  end
+
+  test "header validation warns if option set and invalid header key sent", c do
+    pid = self()
+
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      headers = Enum.filter(conn.req_headers, fn {name, _} -> String.contains?(name, "valid") end)
+
+      send(pid, {:headers, headers})
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    headers = [{:x_Invalid, "any value"}, {"NotValid", "whoops!"}]
+
+    {_result, log} =
+      with_log(fn ->
+        Req.new(invalid_header_keys: :warn, url: c.url, headers: headers)
+        |> Req.get!()
+      end)
+
+    expected_headers = [{"x-invalid", "any value"}, {"notvalid", "whoops!"}]
+
+    assert_receive {:headers, headers}
+
+    header_set = MapSet.new(headers)
+
+    assert Enum.all?(expected_headers, &MapSet.member?(header_set, &1))
+
+    assert log =~ ~r/is not lowercase/
+  end
+
+  test "header validation doesn't warn if option :ignore set and invalid header key sent",
+       c do
+    pid = self()
+
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      headers = Enum.filter(conn.req_headers, fn {name, _} -> String.contains?(name, "valid") end)
+
+      send(pid, {:headers, headers})
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    headers = [{:x_Invalid, "any value"}, {"NotValid", "whoops!"}]
+
+    {_result, log} =
+      with_log(fn ->
+        Req.new(invalid_header_keys: :ignore, url: c.url, headers: headers)
+        |> Req.get!()
+      end)
+
+    expected_headers = [{"x-invalid", "any value"}, {"notvalid", "whoops!"}]
+
+    assert_receive {:headers, headers}
+
+    header_set = MapSet.new(headers)
+
+    assert Enum.all?(expected_headers, &MapSet.member?(header_set, &1))
+
+    refute log =~ ~r/is not lowercase/
+  end
+
+  test "header validation raises if option :raise set and invalid header key sent",
+       c do
+    headers = [{:x_Invalid, "any value"}, {"NotValid", "whoops!"}]
+
+    assert_raise(RuntimeError, ~r/[x_Invalid|NotValid]/, fn ->
+      Req.new(invalid_header_keys: :raise, url: c.url, headers: headers)
+      |> Req.get!()
+    end)
   end
 
   test "redact" do

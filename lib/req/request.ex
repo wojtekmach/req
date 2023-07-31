@@ -307,6 +307,8 @@ defmodule Req.Request do
       #=> "Req is a batteries-included HTTP client for Elixir."
   """
 
+  require Logger
+
   @type t() :: %Req.Request{
           method: atom(),
           url: URI.t(),
@@ -590,6 +592,15 @@ defmodule Req.Request do
   it is recommended for header keys to be in lowercase, to avoid sending
   duplicate keys in a request.
 
+  Request header options which may be set on `Req.new/1`:
+
+    * `:invalid_header_keys`. This option will have the following values which are used to validate the
+      keys of the request headers;
+
+      * `:warn` - the default if the option is omitted
+      * `:raise` - raises a `RuntimeError` is a header key is invalid
+      * `:ignore` - ignores checking the header keys for validity
+
   Additionally, requests with mixed-case headers served over HTTP/2 are not
   considered valid by common clients, resulting in dropped requests.
 
@@ -600,10 +611,50 @@ defmodule Req.Request do
       iex> req.headers
       [{"accept", "application/json"}]
 
+  Passing no value for the `:invalid_header_keys` options prints a warning
+  [warning] Request header "Accept" is not lowercase.
+
+      iex> req = Req.new()
+      iex> req = Req.Request.put_header(req, "Accept", "application/json")
+      iex> req.headers
+      [{"Accept", "application/json"}]
+
+  Passing :warn for the `:invalid_header_keys` options prints a warning
+  [warning] Request header "Accept" is not lowercase.
+
+      iex> req = Req.new()
+      iex> req = Req.Request.put_header(req, "Accept", "application/json")
+      iex> req.headers
+      [{"Accept", "application/json"}]
+
+  Passing :warn for the `:invalid_header_keys` options prints a warning
+  [warning] Request header "Accept" is not lowercase.
+
+      iex> req = Req.new(invalid_header_keys: :warn)
+      iex> req = Req.Request.put_header(req, "Accept", "application/json")
+      iex> req.headers
+      [{"Accept", "application/json"}]
+
+  Passing :ignore for the `:invalid_header_keys` options doesn't print a warning
+
+      iex> req = Req.new(invalid_header_keys: :warn)
+      iex> req = Req.Request.put_header(req, "Accept", "application/json")
+      iex> req.headers
+      [{"Accept", "application/json"}]
+
+  Passing :raise for the `:invalid_header_keys` raises a RuntimeError
+
+      iex> req = Req.new(invalid_header_keys: :raise)
+      iex> req = Req.Request.put_header(req, "Accept", "application/json")
+      iex> req.headers
+      ** (RuntimeError) The request header Accept is invalid due to not being lowercase.
   """
   @spec put_header(t(), binary(), binary()) :: t()
   def put_header(%Req.Request{} = request, key, value)
       when is_binary(key) and is_binary(value) do
+    invalid_key_action = Map.get(request.options, :invalid_header_keys, :warn)
+    validate_header_key(key, invalid_key_action)
+
     %{request | headers: List.keystore(request.headers, key, 0, {key, value})}
   end
 
@@ -791,6 +842,12 @@ defmodule Req.Request do
     validate_options(options, request.registered_options)
   end
 
+  def validate_options([{:invalid_header_keys, value} | _rest], _registered)
+      when value not in [:warn, :raise, :ignore] do
+    raise ArgumentError,
+          "Value #{inspect(value)} not valid for option #{inspect(:invalid_header_keys)}"
+  end
+
   def validate_options([{name, _value} | rest], registered) do
     if name in registered do
       validate_options(rest, registered)
@@ -818,6 +875,23 @@ defmodule Req.Request do
   defp max_similar(option, registered, {_, current} = best) do
     score = String.jaro_distance(option, registered)
     if score < current, do: best, else: {option, score}
+  end
+
+  @doc false
+  def validate_header_key(key, invalid_key_action) do
+    if Regex.match?(~r/[A-Z]./, key) do
+      case invalid_key_action do
+        :raise ->
+          raise ~s(The request header #{key} is invalid due to not being lowercase.)
+
+        :warn ->
+          message = ~s(Request header #{inspect(key)} is not lowercase.)
+          Logger.warn(message)
+
+        :ignore ->
+          :noop
+      end
+    end
   end
 
   defimpl Inspect do

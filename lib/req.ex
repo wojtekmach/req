@@ -30,7 +30,6 @@ defmodule Req do
       iex> Req.post!("https://httpbin.org/post", form: [comments: "hello!"]).body["form"]
       %{"comments" => "hello!"}
   """
-
   @type url() :: URI.t() | String.t()
 
   @doc """
@@ -55,7 +54,12 @@ defmodule Req do
 
         * string header names are left as is. Because header keys are case-insensitive
           in both HTTP/1.1 and HTTP/2, it is recommended for header keys to be in
-          lowercase, to avoid sending duplicate keys in a request.
+          lowercase, to avoid sending duplicate keys in a request. This can be controlled
+          by an additional option, `:invalid_header_keys`. This option will have the
+          following values
+            * `:warn` - the default if the option is omitted
+            * `:raise` - raises a `RuntimeError` is a header key is invalid
+            * `:ignore` - ignores checking the header keys for validity
 
         * `DateTime` header values are encoded as "HTTP date". Otherwise,
           the header value is encoded with `String.Chars.to_string/1`.
@@ -63,6 +67,15 @@ defmodule Req do
       If you set `:headers` options both in `Req.new/1` and `request/2`, the header lists are merged.
 
     * `:body` - the request body.
+
+  Request header options:
+
+    * `:invalid_header_keys`. This option will have the following values which are used to validate the
+      keys of the request headers;
+
+            * `:warn` - the default if the option is omitted
+            * `:raise` - raises a `RuntimeError` is a header key is invalid
+            * `:ignore` - ignores checking the header keys for validity
 
   Additional URL options:
 
@@ -250,7 +263,8 @@ defmodule Req do
           :connect_options,
           :receive_timeout,
           :pool_timeout,
-          :unix_socket
+          :unix_socket,
+          :invalid_header_keys
         ])
     }
     |> update(options)
@@ -316,7 +330,8 @@ defmodule Req do
 
     request_options =
       if request_options[:headers] do
-        update_in(request_options[:headers], &encode_headers/1)
+        invalid_key_action = Keyword.get(options, :invalid_header_keys, :warn)
+        update_in(request_options[:headers], &encode_headers(&1, invalid_key_action))
       else
         request_options
       end
@@ -1002,7 +1017,7 @@ defmodule Req do
     Application.put_env(:req, :default_options, options)
   end
 
-  defp encode_headers(headers) do
+  defp encode_headers(headers, invalid_key_action) do
     for {name, value} <- headers do
       name =
         case name do
@@ -1012,6 +1027,8 @@ defmodule Req do
           binary when is_binary(binary) ->
             binary
         end
+
+      Req.Request.validate_header_key(name, invalid_key_action)
 
       value =
         case value do
