@@ -886,7 +886,7 @@ defmodule Req.Request do
 
         :warn ->
           message = ~s(Request header #{inspect(key)} is not lowercase.)
-          Logger.warn(message)
+          Logger.warning(message)
 
         :ignore ->
           :noop
