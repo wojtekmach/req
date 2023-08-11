@@ -190,7 +190,6 @@ defmodule Req.Steps do
   Supported formats:
 
     * `gzip`
-    * `deflate`
     * `br` (if [brotli] is installed)
     * `zstd` (if [ezstd] is installed)
 
@@ -272,7 +271,7 @@ defmodule Req.Steps do
   end
 
   defp supported_accept_encoding do
-    value = "gzip, deflate"
+    value = "gzip"
     value = if brotli_loaded?(), do: "br, " <> value, else: value
     if ezstd_loaded?(), do: "zstd, " <> value, else: value
   end
@@ -812,7 +811,6 @@ defmodule Req.Steps do
   | Format        | Decoder                                         |
   | ------------- | ----------------------------------------------- |
   | gzip, x-gzip  | `:zlib.gunzip/1`                                |
-  | deflate       | `:zlib.unzip/1`                                 |
   | br            | `:brotli.decode/1` (if [brotli] is installed)   |
   | zstd          | `:ezstd.decompress/1` (if [ezstd] is installed) |
   | identity      | Returns data as is                              |
@@ -866,10 +864,6 @@ defmodule Req.Steps do
 
   defp decompress_with_algorithm(gzip, body) when gzip in ["gzip", "x-gzip"] do
     :zlib.gunzip(body)
-  end
-
-  defp decompress_with_algorithm("deflate", body) do
-    :zlib.unzip(body)
   end
 
   defp decompress_with_algorithm("br", body) do

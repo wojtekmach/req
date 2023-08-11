@@ -242,8 +242,8 @@ defmodule Req.StepsTest do
     test "multiple codecs", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         conn
-        |> Plug.Conn.put_resp_header("content-encoding", "gzip, deflate")
-        |> Plug.Conn.send_resp(200, "foo" |> :zlib.gzip() |> :zlib.zip())
+        |> Plug.Conn.put_resp_header("content-encoding", "gzip, zstd")
+        |> Plug.Conn.send_resp(200, "foo" |> :zlib.gzip() |> :ezstd.compress())
       end)
 
       assert Req.get!(c.url).body == "foo"
@@ -257,12 +257,12 @@ defmodule Req.StepsTest do
         {:ok, socket} = :gen_tcp.accept(listen_socket)
         assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
 
-        body = "foo" |> :zlib.gzip() |> :zlib.zip()
+        body = "foo" |> :zlib.gzip() |> :ezstd.compress()
 
         data = """
         HTTP/1.1 200 OK
         content-encoding: gzip
-        content-encoding: deflate
+        content-encoding: zstd
         content-length: #{byte_size(body)}
 
         #{body}

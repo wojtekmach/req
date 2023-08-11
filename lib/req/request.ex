@@ -218,7 +218,7 @@ defmodule Req.Request do
 
       Req.get!(req, url: "https://httpbin.org/json", print_headers: true).status
       # Outputs:
-      # > accept-encoding: br, gzip, deflate
+      # > accept-encoding: br, gzip
       # > user-agent: req/0.3.0-dev
       # < date: Wed, 11 May 2022 11:10:47 GMT
       # < content-type: application/json
@@ -228,7 +228,7 @@ defmodule Req.Request do
       req = Req.new() |> PrintHeaders.attach(print_headers: true)
       Req.get!(req, url: "https://httpbin.org/json").status
       # Outputs:
-      # > accept-encoding: br, gzip, deflate
+      # > accept-encoding: br, gzip
       # ...
       200
 

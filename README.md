@@ -12,7 +12,7 @@ Req is a batteries-included HTTP client for Elixir.
 
   * Extensibility via request, response, and error steps.
 
-  * Request body compression and automatic response body decompression (via [`compress_body`], [`compressed`], and [`decompress_body`] steps). Supports gzip, deflate, brotli and zstd decompression.
+  * Request body compression and automatic response body decompression (via [`compress_body`], [`compressed`], and [`decompress_body`] steps). Supports gzip, brotli, and zstd decompression.
 
   * Request body encoding and automatic response body decoding (via [`encode_body`] and [`decode_body`] steps.)
 
