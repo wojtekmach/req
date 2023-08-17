@@ -288,7 +288,17 @@ defmodule Req do
   end
 
   defp new(url, options) when is_binary(url) or (is_struct(url, URI) and is_list(options)) do
-    new([url: URI.parse(url)] ++ options)
+    new([url: url] ++ options)
+  end
+
+  defp new(request, options) when is_list(options) do
+    raise ArgumentError,
+          "expected 1nd argument to be a request, got: #{inspect(request)}"
+  end
+
+  defp new(_request, options) do
+    raise ArgumentError,
+          "expected 2nd argument to be an options keywords list, got: #{inspect(options)}"
   end
 
   @doc """
@@ -842,39 +852,10 @@ defmodule Req do
       200
   """
   @doc type: :request
-  @spec request(Req.Request.t() | keyword()) :: {:ok, Req.Response.t()} | {:error, Exception.t()}
-  def request(request_or_options)
-
-  def request(%Req.Request{} = request) do
-    request(request, [])
-  end
-
-  def request(options) do
-    request(Req.new(options), [])
-  end
-
-  @doc """
-  Makes an HTTP request and returns a response or raises an error.
-
-  See `new/1` for a list of available options.
-
-  ## Examples
-
-      iex> req = Req.new(base_url: "https://api.github.com")
-      iex> {:ok, response} = Req.request(req, url: "/repos/elixir-lang/elixir")
-      iex> response.status
-      200
-  """
-  @doc type: :request
-  @spec request(Req.Request.t(), options :: keyword()) ::
+  @spec request(request :: Req.Request.t() | keyword(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
-  def request(request, options) when is_list(options) do
-    {plugins, options} = Keyword.pop(options, :plugins, [])
-
-    request
-    |> Req.update(options)
-    |> run_plugins(plugins)
-    |> Req.Request.run()
+  def request(request, options \\ []) do
+    Req.Request.run(new(request, options))
   end
 
   @doc """
@@ -896,28 +877,8 @@ defmodule Req do
       200
   """
   @doc type: :request
-  @spec request!(Req.Request.t() | keyword()) :: Req.Response.t()
-  def request!(request_or_options) do
-    case request(request_or_options) do
-      {:ok, response} -> response
-      {:error, exception} -> raise exception
-    end
-  end
-
-  @doc """
-  Makes an HTTP request and returns a response or raises an error.
-
-  See `new/1` for a list of available options.
-
-  ## Examples
-
-      iex> req = Req.new(base_url: "https://api.github.com")
-      iex> Req.request!(req, url: "/repos/elixir-lang/elixir").status
-      200
-  """
-  @doc type: :request
-  @spec request!(Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def request!(request, options) do
+  @spec request!(request :: Req.Request.t() | keyword(), options :: keyword()) :: Req.Response.t()
+  def request!(request, options \\ []) do
     case request(request, options) do
       {:ok, response} -> response
       {:error, exception} -> raise exception
