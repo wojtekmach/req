@@ -70,9 +70,10 @@ defmodule Req.MixProject do
       source_url: @source_url,
       source_ref: "v#{@version}",
       groups_for_functions: [
-        "Request steps": &(&1[:step] == :request),
-        "Response steps": &(&1[:step] == :response),
-        "Error steps": &(&1[:step] == :error)
+        "Request Steps": &(&1[:step] == :request),
+        "Response Steps": &(&1[:step] == :response),
+        "Error Steps": &(&1[:step] == :error),
+        "Making Requests": &(&1[:type] == :request)
       ],
       extras: [
         "README.md",
