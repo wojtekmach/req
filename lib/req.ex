@@ -279,6 +279,18 @@ defmodule Req do
     |> run_plugins(plugins)
   end
 
+  defp new(%Req.Request{} = request, options) when is_list(options) do
+    Req.update(request, options)
+  end
+
+  defp new(options1, options2) when is_list(options1) and is_list(options2) do
+    new(options1 ++ options2)
+  end
+
+  defp new(url, options) when is_binary(url) or (is_struct(url, URI) and is_list(options)) do
+    new([url: URI.parse(url)] ++ options)
+  end
+
   @doc """
   Updates a request struct.
 
@@ -378,18 +390,8 @@ defmodule Req do
   @doc type: :request
   @spec get(url() | keyword() | Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
-  def get(request, options \\ [])
-
-  def get(%Req.Request{} = request, options) do
-    request(%{request | method: :get}, options)
-  end
-
-  def get(options1, options2) when is_list(options1) do
-    request([method: :get] ++ options1 ++ options2)
-  end
-
-  def get(url, options) when is_binary(url) or is_struct(url, URI) do
-    request([method: :get, url: URI.parse(url)] ++ options)
+  def get(request, options \\ []) do
+    request(%{new(request, options) | method: :get})
   end
 
   @doc """
@@ -425,10 +427,7 @@ defmodule Req do
   @doc type: :request
   @spec get!(url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
   def get!(request, options \\ []) do
-    case get(request, options) do
-      {:ok, response} -> response
-      {:error, exception} -> raise exception
-    end
+    request!(%{new(request, options) | method: :get})
   end
 
   @doc """
@@ -466,18 +465,8 @@ defmodule Req do
   """
   @doc type: :request
   @spec head(url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
-  def head(url_or_request, options \\ [])
-
-  def head(%Req.Request{} = request, options) do
-    request(%{request | method: :head}, options)
-  end
-
-  def head(options1, options2) when is_list(options1) do
-    request([method: :head] ++ options1 ++ options2)
-  end
-
-  def head(url, options) when is_binary(url) or is_struct(url, URI) do
-    request([method: :head, url: URI.parse(url)] ++ options)
+  def head(request, options \\ []) do
+    request(%{new(request, options) | method: :head})
   end
 
   @doc """
@@ -512,10 +501,7 @@ defmodule Req do
   @doc type: :request
   @spec head!(url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
   def head!(request, options \\ []) do
-    case head(request, options) do
-      {:ok, response} -> response
-      {:error, exception} -> raise exception
-    end
+    request!(%{new(request, options) | method: :head})
   end
 
   @doc """
@@ -561,18 +547,8 @@ defmodule Req do
   @doc type: :request
   @spec post(url() | keyword() | Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
-  def post(request, options \\ [])
-
-  def post(%Req.Request{} = request, options) do
-    request(%{request | method: :post}, options)
-  end
-
-  def post(options1, options2) when is_list(options1) do
-    request([method: :post] ++ options1 ++ options2)
-  end
-
-  def post(url, options) when is_binary(url) or is_struct(url, URI) do
-    request([method: :post, url: URI.parse(url)] ++ options)
+  def post(request, options \\ []) do
+    request(%{new(request, options) | method: :post})
   end
 
   @doc """
@@ -613,10 +589,7 @@ defmodule Req do
   @doc type: :request
   @spec post!(url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
   def post!(request, options \\ []) do
-    case post(request, options) do
-      {:ok, response} -> response
-      {:error, exception} -> raise exception
-    end
+    request!(%{new(request, options) | method: :post})
   end
 
   @doc """
@@ -654,18 +627,8 @@ defmodule Req do
   @doc type: :request
   @spec put(url() | keyword() | Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
-  def put(request, options \\ [])
-
-  def put(%Req.Request{} = request, options) do
-    request(%{request | method: :put}, options)
-  end
-
-  def put(options1, options2) when is_list(options1) do
-    request([method: :put] ++ options1 ++ options2)
-  end
-
-  def put(url, options) when is_binary(url) or is_struct(url, URI) do
-    request([method: :put, url: URI.parse(url)] ++ options)
+  def put(request, options \\ []) do
+    request(%{new(request, options) | method: :put})
   end
 
   @doc """
@@ -700,10 +663,7 @@ defmodule Req do
   @doc type: :request
   @spec put!(url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
   def put!(request, options \\ []) do
-    case put(request, options) do
-      {:ok, response} -> response
-      {:error, exception} -> raise exception
-    end
+    request!(%{new(request, options) | method: :put})
   end
 
   @doc """
@@ -741,18 +701,8 @@ defmodule Req do
   @doc type: :request
   @spec patch(url() | keyword() | Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
-  def patch(url_or_request, options \\ [])
-
-  def patch(%Req.Request{} = request, options) do
-    request(%{request | method: :patch}, options)
-  end
-
-  def patch(options1, options2) when is_list(options1) do
-    request([method: :patch] ++ options1 ++ options2)
-  end
-
-  def patch(url, options) when is_binary(url) or is_struct(url, URI) do
-    request([method: :patch, url: url] ++ options)
+  def patch(request, options \\ []) do
+    request(%{new(request, options) | method: :patch})
   end
 
   @doc """
@@ -787,10 +737,7 @@ defmodule Req do
   @doc type: :request
   @spec patch!(url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
   def patch!(request, options \\ []) do
-    case patch(request, options) do
-      {:ok, response} -> response
-      {:error, exception} -> raise exception
-    end
+    request!(%{new(request, options) | method: :patch})
   end
 
   @doc """
@@ -828,18 +775,8 @@ defmodule Req do
   @doc type: :request
   @spec delete(url() | keyword() | Req.Request.t(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
-  def delete(request, options \\ [])
-
-  def delete(%Req.Request{} = request, options) do
-    request(%{request | method: :delete}, options)
-  end
-
-  def delete(options1, options2) when is_list(options1) do
-    request([method: :delete] ++ options1 ++ options2)
-  end
-
-  def delete(url, options) when is_binary(url) or is_struct(url, URI) do
-    request([method: :delete, url: url] ++ options)
+  def delete(request, options \\ []) do
+    request(%{new(request, options) | method: :delete})
   end
 
   @doc """
@@ -874,10 +811,7 @@ defmodule Req do
   @doc type: :request
   @spec delete!(url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
   def delete!(request, options \\ []) do
-    case delete(request, options) do
-      {:ok, response} -> response
-      {:error, exception} -> raise exception
-    end
+    request!(%{new(request, options) | method: :delete})
   end
 
   @doc """
