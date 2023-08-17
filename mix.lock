@@ -1,5 +1,5 @@
 %{
-  "brotli": {:hex, :brotli, "0.3.1", "72b4f4d2c02d31ee9a62e87f33f33e3a4b24b3e78649d60786f5285b940a2992", [:rebar3], [], "hexpm", "cba6f04cc34015523d7dccf5b980ee596560dcc898d6a520e42fd0e8e737b4d8"},
+  "brotli": {:hex, :brotli, "0.3.2", "59cf45a399098516f1d34f70d8e010e5c9bf326659d3ef34c7cc56793339002b", [:rebar3], [], "hexpm", "9ec3ef9c753f80d0c657b4905193c55e5198f169fa1d1c044d8601d4d931a2ad"},
   "bypass": {:hex, :bypass, "2.1.0", "909782781bf8e20ee86a9cabde36b259d44af8b9f38756173e8f5e2e1fabb9b1", [:mix], [{:plug, "~> 1.7", [hex: :plug, repo: "hexpm", optional: false]}, {:plug_cowboy, "~> 2.0", [hex: :plug_cowboy, repo: "hexpm", optional: false]}, {:ranch, "~> 1.3", [hex: :ranch, repo: "hexpm", optional: false]}], "hexpm", "d9b5df8fa5b7a6efa08384e9bbecfe4ce61c77d28a4282f79e02f1ef78d96b80"},
   "castore": {:hex, :castore, "1.0.1", "240b9edb4e9e94f8f56ab39d8d2d0a57f49e46c56aced8f873892df8ff64ff5a", [:mix], [], "hexpm", "b4951de93c224d44fac71614beabd88b71932d0b1dea80d2f80fb9044e01bbb3"},
   "cowboy": {:hex, :cowboy, "2.9.0", "865dd8b6607e14cf03282e10e934023a1bd8be6f6bacf921a7e2a96d800cd452", [:make, :rebar3], [{:cowlib, "2.11.0", [hex: :cowlib, repo: "hexpm", optional: false]}, {:ranch, "1.8.0", [hex: :ranch, repo: "hexpm", optional: false]}], "hexpm", "2c729f934b4e1aa149aff882f57c6372c15399a20d54f65c8d67bef583021bde"},
