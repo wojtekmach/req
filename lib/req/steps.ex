@@ -231,7 +231,7 @@ defmodule Req.Steps do
 
       response = Req.get!("https://httpbin.org/anything")
       response.body["headers"]["Accept-Encoding"]
-      #=> "zstd, br, gzip, deflate"
+      #=> "zstd, br, gzip"
 
   [brotli]: https://hex.pm/packages/brotli
   [ezstd]: https://hex.pm/packages/ezstd
