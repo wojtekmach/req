@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## HEAD
+
+  * Fix typespecs for some functions
+  * [`decompress_body`]: Remove support for `deflate` compression
+  * [`Req.request/2`]: Improve error message on invalid arguments
+
 ## v0.3.11 (2023-07-24)
 
   * Support `Req.get(options)`, `Req.post(options)`, etc
@@ -485,5 +491,6 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`put_user_agent`]:            https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
 [`retry`]:                     https://hexdocs.pm/req/Req.Steps.html#retry/1
 [`run_finch`]:                 https://hexdocs.pm/req/Req.Steps.html#run_finch/1
+[`Req.request/2`]:             https://hexdocs.pm/req/Req.html#request/2
 [`Req.Request.new/1`]:         https://hexdocs.pm/req/Req.Request.html#new/1
 [`Req.Request.run_request/1`]: https://hexdocs.pm/req/Req.Request.html#run_request/1
