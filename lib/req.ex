@@ -287,7 +287,7 @@ defmodule Req do
     new(options1 ++ options2)
   end
 
-  defp new(url, options) when is_binary(url) or (is_struct(url, URI) and is_list(options)) do
+  defp new(url, options) when (is_binary(url) or is_struct(url, URI)) and is_list(options) do
     new([url: url] ++ options)
   end
 
