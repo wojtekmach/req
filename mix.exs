@@ -26,7 +26,9 @@ defmodule Req.MixProject do
           NimbleCSV.RFC4180,
           Plug.Test,
           :brotli,
-          :ezstd
+          :ezstd,
+          # TODO: Remove on next Finch release
+          Finch
         ]
       ]
     ]
@@ -35,7 +37,7 @@ defmodule Req.MixProject do
   def application do
     [
       mod: {Req.Application, []},
-      extra_applications: [:logger]
+      extra_applications: [:logger, :inets]
     ]
   end
 
@@ -52,7 +54,7 @@ defmodule Req.MixProject do
 
   defp deps do
     [
-      {:finch, "~> 0.9"},
+      {:finch, "~> 0.9", finch_opts()},
       {:mime, "~> 1.6 or ~> 2.0"},
       {:jason, "~> 1.0"},
       {:nimble_csv, "~> 1.0", optional: true},
@@ -62,6 +64,14 @@ defmodule Req.MixProject do
       {:bypass, "~> 2.1", only: :test},
       {:ex_doc, ">= 0.0.0", only: :docs}
     ]
+  end
+
+  defp finch_opts do
+    if path = System.get_env("FINCH_PATH") do
+      [path: path]
+    else
+      []
+    end
   end
 
   defp docs do
