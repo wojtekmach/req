@@ -845,7 +845,7 @@ defmodule Req.Request do
                 %{request.options | auth: {:bearer, "[redacted]"}}
 
               %{auth: {_username, _password}} ->
-                %{request.options | auth: {["redacted"], "[redacted]"}}
+                %{request.options | auth: {"[redacted]", "[redacted]"}}
 
               _ ->
                 request.options

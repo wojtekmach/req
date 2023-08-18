@@ -49,6 +49,8 @@ defmodule ReqTest do
   test "redact" do
     assert inspect(Req.new(auth: {:bearer, "foo"})) =~ ~s|auth: {:bearer, "[redacted]"}|
 
+    assert inspect(Req.new(auth: {"foo", "bar"})) =~ ~s|auth: {"[redacted]", "[redacted]"}|
+
     assert inspect(Req.new(headers: [authorization: "bearer foo"])) =~
              ~s|{"authorization", "[redacted]"}|
   end
