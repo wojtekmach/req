@@ -249,7 +249,6 @@ defmodule Req.StepsTest do
       assert Req.get!(c.url).body == "foo"
     end
 
-    @tag :otp24
     test "multiple codecs with multiple headers" do
       {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, active: false)
       {:ok, port} = :inet.port(listen_socket)
@@ -275,7 +274,6 @@ defmodule Req.StepsTest do
       assert Req.get!("http://localhost:#{port}").body == "foo"
     end
 
-    @tag :otp24
     test "brotli", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         {:ok, body} = :brotli.encode("foo")
