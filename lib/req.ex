@@ -326,8 +326,10 @@ defmodule Req do
 
       iex> req = Req.new(base_url: "https://httpbin.org")
       iex> req = Req.update(req, auth: {"alice", "secret"})
-      iex> req.options
-      %{auth: {"alice", "secret"}, base_url: "https://httpbin.org"}
+      iex> req.options[:base_url]
+      "https://httpbin.org"
+      iex> req.options[:auth]
+      {"alice", "secret"}
 
   Passing `:headers` will automatically encode and merge them:
 
