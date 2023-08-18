@@ -847,9 +847,9 @@ defmodule Req.Steps do
   def decompress_body(request_response)
 
   def decompress_body({request, response})
-      when request.options.raw == true or
-             response.body == "" or
-             not is_binary(response.body) do
+      when response.body == "" or
+             not is_binary(response.body) or
+             request.options.raw == true do
     {request, response}
   end
 

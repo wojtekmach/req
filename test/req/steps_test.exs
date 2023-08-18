@@ -307,6 +307,16 @@ defmodule Req.StepsTest do
       assert Req.Response.get_header(resp, "content-encoding") == ["unknown"]
       assert resp.body == <<1, 2, 3>>
     end
+
+    test "HEAD request", c do
+      Bypass.expect(c.bypass, "HEAD", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "gzip")
+        |> Plug.Conn.send_resp(200, "")
+      end)
+
+      assert Req.head!(c.url).body == ""
+    end
   end
 
   describe "output" do
