@@ -32,6 +32,8 @@ jobs:
       - uses: actions/cache@v3
         with:
           path: deps
+          # ezstd and brotli are compiling native objects to deps/x/_build, not _build,
+          # so we need to cache per OTP
           key: mix-otp-${{ matrix.pair.otp }}-deps-${{ hashFiles('**/mix.lock') }}
 
       - run: mix deps.get
