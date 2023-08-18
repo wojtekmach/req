@@ -25,14 +25,16 @@ jobs:
 
       - uses: erlef/setup-beam@main
         with:
-          otp-version: ${{matrix.pair.otp}}
-          elixir-version: ${{matrix.pair.elixir}}
+          otp-version: ${{ matrix.pair.otp }}
+          elixir-version: ${{ matrix.pair.elixir }}
           version-type: strict
 
       - uses: actions/cache@v3
         with:
           path: deps
-          key: mix-deps-${{ hashFiles('**/mix.lock') }}
+          # ezstd and brotli are compiling native objects to deps/x/_build, not _build,
+          # so we need to cache per OTP
+          key: mix-otp-${{ matrix.pair.otp }}-deps-${{ hashFiles('**/mix.lock') }}
 
       - run: mix deps.get
 
