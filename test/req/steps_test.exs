@@ -194,7 +194,8 @@ defmodule Req.StepsTest do
       req =
         Req.new(
           url: c.url,
-          body: {:stream, Stream.duplicate("foo", 3)}
+          # TODO: use Stream.duplicate("foo", 3) when we require Elixir 1.14
+          body: {:stream, ["foo"] |> Stream.cycle() |> Stream.take(3)}
         )
 
       assert Req.post!(req).body == "foofoofoo"
@@ -270,7 +271,8 @@ defmodule Req.StepsTest do
         Req.new(
           url: c.url,
           method: :post,
-          body: {:stream, Stream.duplicate("foo", 3)},
+          # TODO: use Stream.duplicate("foo", 3) when we require Elixir 1.14
+          body: {:stream, ["foo"] |> Stream.cycle() |> Stream.take(3)},
           compress_body: true
         )
 
@@ -1307,7 +1309,8 @@ defmodule Req.StepsTest do
             {:ok, body, conn} = Plug.Conn.read_body(conn)
             Plug.Conn.send_resp(conn, 200, body)
           end,
-          body: {:stream, Stream.duplicate("foo", 3)}
+          # TODO: use Stream.duplicate("foo", 3) when we require Elixir 1.14
+          body: {:stream, ["foo"] |> Stream.cycle() |> Stream.take(3)}
         )
 
       assert Req.request!(req).body == "foofoofoo"

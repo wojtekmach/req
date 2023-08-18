@@ -68,8 +68,6 @@ defmodule Req.Request do
 
         * `{:stream, enumerable}`
 
-        * `nil`
-
     * `:options` - the options to be used by steps. See ["Options"](#module-options) section below
       for more information.
 
