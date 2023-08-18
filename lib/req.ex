@@ -29,6 +29,12 @@ defmodule Req do
 
       iex> Req.post!("https://httpbin.org/post", form: [comments: "hello!"]).body["form"]
       %{"comments" => "hello!"}
+
+  Stream request body:
+
+      iex> stream = Stream.duplicate("foo", 3)
+      iex> Req.post!("https://httpbin.org/post", body: {:stream, stream}).body["data"]
+      "foofoofoo"
   """
 
   @type url() :: URI.t() | String.t()
@@ -63,6 +69,12 @@ defmodule Req do
       If you set `:headers` options both in `Req.new/1` and `request/2`, the header lists are merged.
 
     * `:body` - the request body.
+
+      Can be one of:
+
+        * `iodata`
+
+        * `{:stream, enumerable}`
 
   Additional URL options:
 

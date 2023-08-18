@@ -62,6 +62,14 @@ defmodule Req.Request do
 
     * `:body` - the HTTP request body
 
+      Can be one of:
+
+        * `iodata`
+
+        * `{:stream, enumerable}`
+
+        * `nil`
+
     * `:options` - the options to be used by steps. See ["Options"](#module-options) section below
       for more information.
 
@@ -311,7 +319,7 @@ defmodule Req.Request do
           method: atom(),
           url: URI.t(),
           headers: [{binary(), binary()}],
-          body: iodata() | nil,
+          body: iodata() | {:stream, Enumerable.t()} | nil,
           options: map(),
           registered_options: MapSet.t(),
           halted: boolean(),

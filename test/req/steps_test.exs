@@ -168,6 +168,38 @@ defmodule Req.StepsTest do
   end
 
   describe "encode_body" do
+    # neither `body: data` nor `body: {:stream, data}` is used by the step but testing these
+    # here for locality
+    test "body", c do
+      Bypass.expect(c.bypass, "POST", "/", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        Plug.Conn.send_resp(conn, 200, body)
+      end)
+
+      req =
+        Req.new(
+          url: c.url,
+          body: "foo"
+        )
+
+      assert Req.post!(req).body == "foo"
+    end
+
+    test "body stream", c do
+      Bypass.expect(c.bypass, "POST", "/", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        Plug.Conn.send_resp(conn, 200, body)
+      end)
+
+      req =
+        Req.new(
+          url: c.url,
+          body: {:stream, Stream.duplicate("foo", 3)}
+        )
+
+      assert Req.post!(req).body == "foofoofoo"
+    end
+
     test "json", c do
       Bypass.expect(c.bypass, "POST", "/", fn conn ->
         assert {:ok, ~s|{"a":1}|, conn} = Plug.Conn.read_body(conn)
@@ -217,13 +249,33 @@ defmodule Req.StepsTest do
              {"range", "bytes=0-20"}
   end
 
-  test "compress_body" do
-    req = Req.new(method: :post, json: %{a: 1}) |> Req.Request.prepare()
-    assert Jason.decode!(req.body) == %{"a" => 1}
+  describe "compress_body" do
+    test "request" do
+      req = Req.new(method: :post, json: %{a: 1}) |> Req.Request.prepare()
+      assert Jason.decode!(req.body) == %{"a" => 1}
 
-    req = Req.new(method: :post, json: %{a: 1}, compress_body: true) |> Req.Request.prepare()
-    assert :zlib.gunzip(req.body) |> Jason.decode!() == %{"a" => 1}
-    assert List.keyfind(req.headers, "content-encoding", 0) == {"content-encoding", "gzip"}
+      req = Req.new(method: :post, json: %{a: 1}, compress_body: true) |> Req.Request.prepare()
+      assert :zlib.gunzip(req.body) |> Jason.decode!() == %{"a" => 1}
+      assert List.keyfind(req.headers, "content-encoding", 0) == {"content-encoding", "gzip"}
+    end
+
+    test "stream", c do
+      Bypass.expect(c.bypass, "POST", "/", fn conn ->
+        assert {:ok, body, conn} = Plug.Conn.read_body(conn)
+        body = :zlib.gunzip(body)
+        Plug.Conn.send_resp(conn, 200, body)
+      end)
+
+      req =
+        Req.new(
+          url: c.url,
+          method: :post,
+          body: {:stream, Stream.duplicate("foo", 3)},
+          compress_body: true
+        )
+
+      assert Req.post!(req).body == "foofoofoo"
+    end
   end
 
   ## Response steps
@@ -1237,14 +1289,29 @@ defmodule Req.StepsTest do
     refute_received _
   end
 
-  test "put_plug" do
-    plug = fn conn ->
-      {:ok, body, conn} = Plug.Conn.read_body(conn)
-      assert body == ~s|{"a":1}|
-      Plug.Conn.send_resp(conn, 200, "ok")
+  describe "put_plug" do
+    test "request" do
+      plug = fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        assert body == ~s|{"a":1}|
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end
+
+      assert Req.request!(plug: plug, json: %{a: 1}).body == "ok"
     end
 
-    assert Req.request!(plug: plug, json: %{a: 1}).body == "ok"
+    test "request stream" do
+      req =
+        Req.new(
+          plug: fn conn ->
+            {:ok, body, conn} = Plug.Conn.read_body(conn)
+            Plug.Conn.send_resp(conn, 200, body)
+          end,
+          body: {:stream, Stream.duplicate("foo", 3)}
+        )
+
+      assert Req.request!(req).body == "foofoofoo"
+    end
   end
 
   describe "run_finch" do
