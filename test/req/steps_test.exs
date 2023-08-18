@@ -286,7 +286,6 @@ defmodule Req.StepsTest do
       assert Req.get!(c.url).body == "foo"
     end
 
-    @tag :capture_log
     test "zstd", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         conn
@@ -295,6 +294,18 @@ defmodule Req.StepsTest do
       end)
 
       assert Req.get!(c.url).body == "foo"
+    end
+
+    test "unknown codec", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "unknown")
+        |> Plug.Conn.send_resp(200, <<1, 2, 3>>)
+      end)
+
+      resp = Req.get!(c.url)
+      assert Req.Response.get_header(resp, "content-encoding") == ["unknown"]
+      assert resp.body == <<1, 2, 3>>
     end
   end
 

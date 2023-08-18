@@ -813,7 +813,7 @@ defmodule Req.Steps do
   | gzip, x-gzip  | `:zlib.gunzip/1`                                |
   | br            | `:brotli.decode/1` (if [brotli] is installed)   |
   | zstd          | `:ezstd.decompress/1` (if [ezstd] is installed) |
-  | identity      | Returns data as is                              |
+  | _other_       | Returns data as is                              |
 
   ## Options
 
@@ -887,8 +887,8 @@ defmodule Req.Steps do
     body
   end
 
-  defp decompress_with_algorithm(algorithm, _body) do
-    raise("unsupported decompression algorithm: #{inspect(algorithm)}")
+  defp decompress_with_algorithm(_algorithm, body) do
+    body
   end
 
   defmacrop nimble_csv_loaded? do
