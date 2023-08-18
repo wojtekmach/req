@@ -25,14 +25,14 @@ jobs:
 
       - uses: erlef/setup-beam@main
         with:
-          otp-version: ${{matrix.pair.otp}}
-          elixir-version: ${{matrix.pair.elixir}}
+          otp-version: ${{ matrix.pair.otp }}
+          elixir-version: ${{ matrix.pair.elixir }}
           version-type: strict
 
       - uses: actions/cache@v3
         with:
           path: deps
-          key: mix-deps-${{ hashFiles('**/mix.lock') }}
+          key: mix-otp-${{ matrix.pair.otp }}-deps-${{ hashFiles('**/mix.lock') }}
 
       - run: mix deps.get
 
