@@ -3,8 +3,9 @@
 ## HEAD
 
   * Fix typespecs for some functions
-  * [`decompress_body`]: Remove support for `deflate` compression
   * [`Req.request/2`]: Improve error message on invalid arguments
+  * [`decompress_body`]: Remove support for `deflate` compression
+  * [`decompress_body`]: Don't crash on unknown codec
 
 ## v0.3.11 (2023-07-24)
 
