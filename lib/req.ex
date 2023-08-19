@@ -327,6 +327,13 @@ defmodule Req do
       iex> req = Req.update(req, headers: [authorization: "bearer bar"])
       iex> req.headers
       [{"authorization", "bearer bar"}]
+
+  Similarly to headers, `:params` are merged too:
+
+      iex> req = Req.new(url: "https://httpbin.org/anything", params: [a: 1, b: 1])
+      iex> req = Req.update(req, params: [a: 2])
+      iex> Req.get!(req).body["args"]
+      %{"a" => "2", "b" => "1"}
   """
   @spec update(Req.Request.t(), options :: keyword()) :: Req.Request.t()
   def update(%Req.Request{} = request, options) when is_list(options) do
@@ -358,7 +365,16 @@ defmodule Req do
           %{acc | name => value}
       end)
 
-    update_in(request.options, &Map.merge(&1, Map.new(options)))
+    update_in(
+      request.options,
+      &Map.merge(&1, Map.new(options), fn
+        :params, old, new ->
+          Keyword.merge(old, new)
+
+        _, _, new ->
+          new
+      end)
+    )
   end
 
   @doc """
