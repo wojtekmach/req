@@ -27,15 +27,6 @@ defmodule Req.Response do
             body: "",
             private: %{}
 
-  @doc false
-  def fetch(response, key) when is_binary(key) do
-    case get_header(response, key) do
-      [value] -> {:ok, value}
-      [] -> :error
-      _ -> raise "multiple values for header #{key}, use Req.Response.get_header/2 instead"
-    end
-  end
-
   @doc """
   Returns a new response.
 
