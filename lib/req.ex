@@ -357,11 +357,7 @@ defmodule Req do
 
     request = update_in(request.options, &Map.merge(&1, Map.new(options)))
 
-    if request.options[:output] do
-      update_in(request.options, &Map.put(&1, :decode_body, false))
-    else
-      request
-    end
+    request
   end
 
   @doc """

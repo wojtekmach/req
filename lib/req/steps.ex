@@ -1007,6 +1007,10 @@ defmodule Req.Steps do
     {request, response}
   end
 
+  def decode_body({request, response}) when request.options.output != nil do
+    {request, response}
+  end
+
   def decode_body({request, response}) do
     decode_body({request, response}, format(request, response))
   end
