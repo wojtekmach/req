@@ -40,10 +40,10 @@ defmodule ReqTest do
     assert_receive {:headers, headers}
     assert headers == [{"x-a", "1, 2"}]
 
-    req = Req.new(headers: [x_a: 1])
+    req = Req.new(headers: [x_a: 1, x_b: 1])
     Req.get!(req, url: c.url, headers: [x_a: 2])
     assert_receive {:headers, headers}
-    assert headers == [{"x-a", "1, 2"}]
+    assert headers == [{"x-a", "2"}, {"x-b", "1"}]
   end
 
   test "redact" do

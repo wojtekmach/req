@@ -321,6 +321,12 @@ defmodule Req do
       iex> req.headers
       [{"point-x", "1"}, {"point-y", "2"}]
 
+  The same header names are overwritten however:
+
+      iex> req = Req.new(headers: [authorization: "bearer foo"])
+      iex> req = Req.update(req, headers: [authorization: "bearer bar"])
+      iex> req.headers
+      [{"authorization", "bearer bar"}]
   """
   @spec update(Req.Request.t(), options :: keyword()) :: Req.Request.t()
   def update(%Req.Request{} = request, options) when is_list(options) do
@@ -336,28 +342,23 @@ defmodule Req do
 
     Req.Request.validate_options(options, registered)
 
-    request_options =
-      if request_options[:headers] do
-        update_in(request_options[:headers], &encode_headers/1)
-      else
-        request_options
-      end
-
     request =
-      Map.merge(request, Map.new(request_options), fn
-        :url, _, url ->
-          URI.parse(url)
+      Enum.reduce(request_options, request, fn
+        {:url, url}, acc ->
+          put_in(acc.url, URI.parse(url))
 
-        :headers, old, new ->
-          old ++ new
+        {:headers, new_headers}, acc ->
+          update_in(acc.headers, fn old_headers ->
+            new_headers = encode_headers(new_headers)
+            new_header_names = Enum.map(new_headers, &elem(&1, 0))
+            Enum.reject(old_headers, &(elem(&1, 0) in new_header_names)) ++ new_headers
+          end)
 
-        _, _, value ->
-          value
+        {name, value}, acc ->
+          %{acc | name => value}
       end)
 
-    request = update_in(request.options, &Map.merge(&1, Map.new(options)))
-
-    request
+    update_in(request.options, &Map.merge(&1, Map.new(options)))
   end
 
   @doc """
