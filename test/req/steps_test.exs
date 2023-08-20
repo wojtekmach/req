@@ -1341,10 +1341,9 @@ defmodule Req.StepsTest do
       end
     end
 
-    test ":inet6", c do
+    test ":inet6" do
       start_supervised!(
-        {Plug.Cowboy,
-         scheme: :http, plug: ExamplePlug, ref: ExamplePlug.IPv4, port: 0, net: :inet4}
+        {Plug.Cowboy, scheme: :http, plug: ExamplePlug, ref: ExamplePlug.IPv4, port: 0}
       )
 
       start_supervised!(
