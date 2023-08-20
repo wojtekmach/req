@@ -648,8 +648,14 @@ defmodule Req.Steps do
   def run_finch(request) do
     finch_name = finch_name(request)
 
+    request_headers =
+      for {name, values} <- request.headers,
+          value <- values do
+        {name, value}
+      end
+
     finch_request =
-      Finch.build(request.method, request.url, request.headers, request.body)
+      Finch.build(request.method, request.url, request_headers, request.body)
       |> Map.replace!(:unix_socket, request.options[:unix_socket])
 
     finch_options =
@@ -809,7 +815,7 @@ defmodule Req.Steps do
   end
 
   defp run_plug(request) do
-    body =
+    req_body =
       case request.body do
         nil ->
           ""
@@ -821,16 +827,23 @@ defmodule Req.Steps do
           IO.iodata_to_binary(iodata)
       end
 
+    req_headers =
+      for {name, values} <- request.headers,
+          value <- values do
+        {name, value}
+      end
+
     conn =
-      Plug.Test.conn(request.method, request.url, body)
-      |> Map.replace!(:req_headers, request.headers)
+      Plug.Test.conn(request.method, request.url, req_body)
+      |> Map.replace!(:req_headers, req_headers)
       |> call_plug(request.options[:plug])
 
-    response = %Req.Response{
-      status: conn.status,
-      headers: conn.resp_headers,
-      body: conn.resp_body
-    }
+    response =
+      Req.Response.new(
+        status: conn.status,
+        headers: conn.resp_headers,
+        body: conn.resp_body
+      )
 
     {request, response}
   end
@@ -1131,14 +1144,18 @@ defmodule Req.Steps do
   end
 
   defp format(request, response) do
-    with {_, content_type} <- List.keyfind(response.headers, "content-type", 0) do
-      # remove ` || ` when we require Elixir v1.13
-      path = request.url.path || ""
+    case Req.Response.get_header(response, "content-type") do
+      [content_type] ->
+        # TODO: remove ` || ` when we require Elixir v1.13
+        path = request.url.path || ""
 
-      case extensions(content_type, path) do
-        [ext | _] -> ext
-        [] -> nil
-      end
+        case extensions(content_type, path) do
+          [ext | _] -> ext
+          [] -> nil
+        end
+
+      [] ->
+        []
     end
   end
 
@@ -1245,7 +1262,7 @@ defmodule Req.Steps do
   end
 
   defp build_redirect_request(request, response) do
-    {_, location} = List.keyfind(response.headers, "location", 0)
+    [location] = Req.Response.get_header(response, "location")
 
     log_level = Req.Request.get_option(request, :redirect_log_level, :debug)
     log_redirect(log_level, location)

@@ -242,11 +242,11 @@ defmodule Req.RequestTest do
 
     authorization = "Basic " <> Base.encode64("foo:bar")
 
-    assert [
-             {"user-agent", "req/" <> _},
-             {"accept-encoding", "zstd, br, gzip"},
-             {"authorization", ^authorization}
-           ] = request.headers
+    assert %{
+             "user-agent" => ["req/" <> _],
+             "accept-encoding" => ["zstd, br, gzip"],
+             "authorization" => [^authorization]
+           } = request.headers
   end
 
   ## Helpers

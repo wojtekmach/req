@@ -50,21 +50,19 @@ defmodule Req.StepsTest do
     test "string" do
       req = Req.new(auth: "foo") |> Req.Request.prepare()
 
-      assert List.keyfind(req.headers, "authorization", 0) == {"authorization", "foo"}
+      assert req.headers["authorization"] == ["foo"]
     end
 
     test "basic" do
       req = Req.new(auth: {"foo", "bar"}) |> Req.Request.prepare()
 
-      assert List.keyfind(req.headers, "authorization", 0) ==
-               {"authorization", "Basic #{Base.encode64("foo:bar")}"}
+      assert req.headers["authorization"] == ["Basic #{Base.encode64("foo:bar")}"]
     end
 
     test "bearer" do
       req = Req.new(auth: {:bearer, "abcd"}) |> Req.Request.prepare()
 
-      assert List.keyfind(req.headers, "authorization", 0) ==
-               {"authorization", "Bearer abcd"}
+      assert req.headers["authorization"] == ["Bearer abcd"]
     end
 
     @tag :tmp_dir
@@ -240,14 +238,10 @@ defmodule Req.StepsTest do
 
   test "put_range" do
     req = Req.new(range: "bytes=0-10") |> Req.Request.prepare()
-
-    assert List.keyfind(req.headers, "range", 0) ==
-             {"range", "bytes=0-10"}
+    assert req.headers["range"] == ["bytes=0-10"]
 
     req = Req.new(range: 0..20) |> Req.Request.prepare()
-
-    assert List.keyfind(req.headers, "range", 0) ==
-             {"range", "bytes=0-20"}
+    assert req.headers["range"] == ["bytes=0-20"]
   end
 
   describe "compress_body" do
@@ -257,7 +251,7 @@ defmodule Req.StepsTest do
 
       req = Req.new(method: :post, json: %{a: 1}, compress_body: true) |> Req.Request.prepare()
       assert :zlib.gunzip(req.body) |> Jason.decode!() == %{"a" => 1}
-      assert List.keyfind(req.headers, "content-encoding", 0) == {"content-encoding", "gzip"}
+      assert req.headers["content-encoding"] == ["gzip"]
     end
 
     test "stream", c do
@@ -723,24 +717,25 @@ defmodule Req.StepsTest do
       adapter = fn request ->
         case request.url.host do
           "original" ->
-            assert List.keyfind(request.headers, "authorization", 0)
+            assert request.headers["authorization"]
 
-            response = %Req.Response{
-              status: 301,
-              headers: [{"location", "http://untrusted"}],
-              body: "redirecting"
-            }
+            response =
+              Req.Response.new(
+                status: 301,
+                headers: %{"location" => ["http://untrusted"]},
+                body: "redirecting"
+              )
 
             {request, response}
 
           "untrusted" ->
-            assert List.keyfind(request.headers, "authorization", 0)
+            assert request.headers["authorization"]
 
-            response = %Req.Response{
-              status: 200,
-              headers: [],
-              body: "bad things"
-            }
+            response =
+              Req.Response.new(
+                status: 200,
+                body: "bad things"
+              )
 
             {request, response}
         end
@@ -902,29 +897,30 @@ defmodule Req.StepsTest do
     fn request ->
       case Map.get(request.url, component) do
         ^original_value ->
-          assert List.keyfind(request.headers, "authorization", 0)
+          assert request.headers["authorization"]
 
           new_url =
             request.url
             |> Map.put(component, updated_value)
             |> to_string()
 
-          response = %Req.Response{
-            status: 301,
-            headers: [{"location", new_url}],
-            body: "redirecting"
-          }
+          response =
+            Req.Response.new(
+              status: 301,
+              headers: %{"location" => [new_url]},
+              body: "redirecting"
+            )
 
           {request, response}
 
         ^updated_value ->
-          refute List.keyfind(request.headers, "authorization", 0)
+          refute request.headers["authorization"]
 
-          response = %Req.Response{
-            status: 200,
-            headers: [],
-            body: "bad things"
-          }
+          response =
+            Req.Response.new(
+              status: 200,
+              body: "bad things"
+            )
 
           {request, response}
       end
@@ -1402,7 +1398,7 @@ defmodule Req.StepsTest do
       fun = fn req, finch_request, finch_name, finch_opts ->
         {:ok, resp} = Finch.request(finch_request, finch_name, finch_opts)
         send(pid, resp)
-        {req, %Req.Response{status: resp.status, headers: resp.headers, body: "finch_request"}}
+        {req, Req.Response.new(status: resp.status, headers: resp.headers, body: "finch_request")}
       end
 
       assert Req.get!(c.url <> "/ok", finch_request: fun).body == "finch_request"

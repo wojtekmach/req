@@ -320,7 +320,7 @@ defmodule Req.Request do
   @type t() :: %Req.Request{
           method: atom(),
           url: URI.t(),
-          headers: [{binary(), binary()}],
+          headers: %{binary() => [binary()]},
           body: iodata() | {:stream, Enumerable.t()} | nil,
           options: options(),
           halted: boolean(),
@@ -338,7 +338,7 @@ defmodule Req.Request do
 
   defstruct method: :get,
             url: URI.parse(""),
-            headers: [],
+            headers: %{},
             body: nil,
             options: %{},
             halted: false,
@@ -379,6 +379,11 @@ defmodule Req.Request do
       options
       |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
       |> Keyword.update(:url, URI.new!(""), &URI.new!/1)
+      |> Keyword.update(:headers, %{}, fn headers ->
+        Map.new(headers, fn {key, value} ->
+          {key, List.wrap(value)}
+        end)
+      end)
       |> Keyword.update(:options, %{}, &Map.new/1)
 
     struct!(__MODULE__, options)
@@ -654,31 +659,36 @@ defmodule Req.Request do
       iex> req = Req.new(headers: [{"accept", "application/json"}])
       iex> Req.Request.get_header(req, "accept")
       ["application/json"]
+      iex> Req.Request.get_header(req, "x-unknown")
+      []
 
   """
   @spec get_header(t(), binary()) :: [binary()]
   def get_header(%Req.Request{} = request, name) when is_binary(name) do
     name = Req.__ensure_header_downcase__(name)
-    for {^name, value} <- request.headers, do: value
+    Map.get(request.headers, name, [])
   end
 
   @doc """
-  Adds a new request header `name` if not present, otherwise replaces the
-  previous value of that header with `value`.
+  Sets the header `key` to `value`.
+
+  The value can be a binary or a list of binaries,
+
+  If the header was previously set, its value is overwritten.
 
   ## Examples
 
       iex> req = Req.new()
       iex> req = Req.Request.put_header(req, "accept", "application/json")
       iex> req.headers
-      [{"accept", "application/json"}]
+      %{"accept" => ["application/json"]}
 
   """
   @spec put_header(t(), binary(), binary()) :: t()
   def put_header(%Req.Request{} = request, name, value)
       when is_binary(name) and is_binary(value) do
     name = Req.__ensure_header_downcase__(name)
-    update_in(request.headers, &List.keystore(&1, name, 0, {name, value}))
+    put_in(request.headers[name], List.wrap(value))
   end
 
   @doc """
@@ -691,7 +701,7 @@ defmodule Req.Request do
       iex> req = Req.new()
       iex> req = Req.Request.put_headers(req, [{"accept", "text/html"}, {"accept-encoding", "gzip"}])
       iex> req.headers
-      [{"accept", "text/html"}, {"accept-encoding", "gzip"}]
+      %{"accept" => ["text/html"], "accept-encoding" => ["gzip"]}
   """
   @spec put_headers(t(), [{binary(), binary()}]) :: t()
   def put_headers(%Req.Request{} = request, headers) do
@@ -712,18 +722,12 @@ defmodule Req.Request do
       ...>   |> Req.Request.put_new_header("accept", "application/json")
       ...>   |> Req.Request.put_new_header("accept", "application/html")
       iex> req.headers
-      [{"accept", "application/json"}]
+      %{"accept" => ["application/json"]}
   """
   @spec put_new_header(t(), binary(), binary()) :: t()
   def put_new_header(%Req.Request{} = request, name, value)
-      when is_binary(name) and is_binary(value) do
-    case get_header(request, name) do
-      [] ->
-        put_header(request, name, value)
-
-      _ ->
-        request
-    end
+      when is_binary(name) and (is_binary(value) or is_list(value)) do
+    update_in(request.headers, &Map.put_new(&1, name, List.wrap(value)))
   end
 
   @doc """
@@ -741,17 +745,8 @@ defmodule Req.Request do
 
   """
   def delete_header(%Req.Request{} = request, name) when is_binary(name) do
-    name_to_delete = Req.__ensure_header_downcase__(name)
-
-    %Req.Request{
-      request
-      | headers:
-          for(
-            {name, value} <- request.headers,
-            name != name_to_delete,
-            do: {name, value}
-          )
-    }
+    name = Req.__ensure_header_downcase__(name)
+    update_in(request.headers, &Map.delete(&1, name))
   end
 
   @doc """
@@ -933,11 +928,12 @@ defmodule Req.Request do
       {headers, options} =
         if Req.Request.get_option(request, :redact_auth, true) do
           headers =
-            for {name, value} <- request.headers do
-              if name in ["authorization", "Authorization"] do
-                {name, "[redacted]"}
+            for {name, values} <- request.headers, into: %{} do
+              if Req.__ensure_header_downcase__(name) do
+                [_] = values
+                {name, ["[redacted]"]}
               else
-                {name, value}
+                {name, values}
               end
             end
 

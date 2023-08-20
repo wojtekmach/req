@@ -113,7 +113,9 @@ defmodule Req.HttpcTest do
     httpc_url = request.url |> URI.to_string() |> String.to_charlist()
 
     httpc_headers =
-      for {name, value} <- request.headers do
+      for {name, values} <- request.headers,
+          # TODO: values will always be a list on Req 1.0
+          value <- List.wrap(values) do
         {String.to_charlist(name), String.to_charlist(value)}
       end
 
