@@ -183,6 +183,8 @@ defmodule Req do
 
         * `:client_settings` - Mint HTTP/2 client settings.
 
+    * `:inet6` - if set to true, uses IPv6. Defaults to `false`.
+
     * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
 
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
@@ -248,6 +250,7 @@ defmodule Req do
           :finch,
           :finch_request,
           :connect_options,
+          :inet6,
           :receive_timeout,
           :pool_timeout,
           :unix_socket

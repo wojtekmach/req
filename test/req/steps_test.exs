@@ -1333,6 +1333,43 @@ defmodule Req.StepsTest do
       end
     end
 
+    defmodule ExamplePlug do
+      def init(options), do: options
+
+      def call(conn, []) do
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end
+    end
+
+    test ":inet6", c do
+      start_supervised!(
+        {Plug.Cowboy,
+         scheme: :http, plug: ExamplePlug, ref: ExamplePlug.IPv4, port: 0, net: :inet4}
+      )
+
+      start_supervised!(
+        {Plug.Cowboy,
+         scheme: :http,
+         plug: ExamplePlug,
+         ref: ExamplePlug.IPv6,
+         port: 0,
+         net: :inet6,
+         ipv6_v6only: true}
+      )
+
+      ipv4_port = :ranch.get_port(ExamplePlug.IPv4)
+      ipv6_port = :ranch.get_port(ExamplePlug.IPv6)
+
+      req = Req.new(url: "http://localhost:#{ipv4_port}")
+      assert Req.request!(req).body == "ok"
+
+      req = Req.new(url: "http://localhost:#{ipv4_port}", inet6: true)
+      assert Req.request!(req).body == "ok"
+
+      req = Req.new(url: "http://localhost:#{ipv6_port}", inet6: true)
+      assert Req.request!(req).body == "ok"
+    end
+
     test ":connect_options bad option", c do
       assert_raise ArgumentError, "unknown option :timeou. Did you mean :timeout?", fn ->
         Req.get!(c.url, connect_options: [timeou: 0])

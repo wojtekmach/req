@@ -542,11 +542,14 @@ defmodule Req.Steps do
 
         * `:client_settings` - Mint HTTP/2 client settings, see `Mint.HTTP.connect/4` for more information.
 
+    * `:inet6` - if set to true, uses IPv6. Defaults to `false`. This is a shortcut for
+      setting `connect_options: [transport_opts: [inet6: true]]`.
+
     * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
 
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
-    * `:unix_socket` - if set, connect through the given UNIX domain socket
+    * `:unix_socket` - if set, connect through the given UNIX domain socket.
 
     * `:finch_request` - a function that executes the Finch request, defaults to using `Finch.request/3`.
 
@@ -656,66 +659,67 @@ defmodule Req.Steps do
         name
 
       :error ->
-        cond do
-          options = request.options[:connect_options] ->
-            Req.Request.validate_options(
-              options,
-              MapSet.new([
-                :timeout,
-                :protocol,
-                :transport_opts,
-                :proxy_headers,
-                :proxy,
-                :client_settings,
-                :hostname
-              ])
-            )
+        connect_options = request.options[:connect_options] || []
+        inet6_options = if request.options[:inet6], do: [inet6: true], else: []
 
-            hostname_opts = Keyword.take(options, [:hostname])
+        if connect_options != [] || inet6_options != [] do
+          Req.Request.validate_options(
+            connect_options,
+            MapSet.new([
+              :timeout,
+              :protocol,
+              :transport_opts,
+              :proxy_headers,
+              :proxy,
+              :client_settings,
+              :hostname
+            ])
+          )
 
-            transport_opts = [
-              transport_opts:
-                Keyword.merge(
-                  Keyword.take(options, [:timeout]),
-                  Keyword.get(options, :transport_opts, [])
-                )
-            ]
+          hostname_opts = Keyword.take(connect_options, [:hostname])
 
-            proxy_headers_opts = Keyword.take(options, [:proxy_headers])
-            proxy_opts = Keyword.take(options, [:proxy])
-            client_settings_opts = Keyword.take(options, [:client_settings])
+          transport_opts = [
+            transport_opts:
+              Keyword.merge(
+                Keyword.take(connect_options, [:timeout]) ++ inet6_options,
+                Keyword.get(connect_options, :transport_opts, [])
+              )
+          ]
 
-            pool_opts = [
-              conn_opts:
-                hostname_opts ++
-                  transport_opts ++
-                  proxy_headers_opts ++
-                  proxy_opts ++
-                  client_settings_opts,
-              protocol: options[:protocol] || :http1
-            ]
+          proxy_headers_opts = Keyword.take(connect_options, [:proxy_headers])
+          proxy_opts = Keyword.take(connect_options, [:proxy])
+          client_settings_opts = Keyword.take(connect_options, [:client_settings])
 
-            name =
-              options
-              |> :erlang.term_to_binary()
-              |> :erlang.md5()
-              |> Base.url_encode64(padding: false)
+          pool_opts = [
+            conn_opts:
+              hostname_opts ++
+                transport_opts ++
+                proxy_headers_opts ++
+                proxy_opts ++
+                client_settings_opts,
+            protocol: connect_options[:protocol] || :http1
+          ]
 
-            name = Module.concat(Req.FinchSupervisor, "Pool_#{name}")
+          name =
+            [connect_options, inet6_options]
+            |> :erlang.term_to_binary()
+            |> :erlang.md5()
+            |> Base.url_encode64(padding: false)
 
-            case DynamicSupervisor.start_child(
-                   Req.FinchSupervisor,
-                   {Finch, name: name, pools: %{default: pool_opts}}
-                 ) do
-              {:ok, _} ->
-                name
+          name = Module.concat(Req.FinchSupervisor, "Pool_#{name}")
 
-              {:error, {:already_started, _}} ->
-                name
-            end
+          case DynamicSupervisor.start_child(
+                 Req.FinchSupervisor,
+                 {Finch, name: name, pools: %{default: pool_opts}}
+               ) do
+            {:ok, _} ->
+              name
 
-          true ->
-            Req.Finch
+            {:error, {:already_started, _}} ->
+              name
+          end
+        else
+          Req.Finch
         end
     end
   end
