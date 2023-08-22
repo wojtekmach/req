@@ -38,7 +38,7 @@ defmodule Req.StepsTest do
         Plug.Conn.send_resp(conn, 200, "ok")
       end)
 
-      assert Req.get!("/foo", base_url: c.url <> "/api/v2", retry: :never).body == "ok"
+      assert Req.get!("/foo", base_url: c.url <> "/api/v2", retry: false).body == "ok"
       assert Req.get!("foo", base_url: c.url <> "/api/v2").body == "ok"
       assert Req.get!("/foo", base_url: c.url <> "/api/v2/").body == "ok"
       assert Req.get!("foo", base_url: c.url <> "/api/v2/").body == "ok"
@@ -1060,7 +1060,40 @@ defmodule Req.StepsTest do
       refute_received _
     end
 
-    test "never", c do
+    @tag :capture_log
+    test "retry: :safe_transient does not retry on POST", c do
+      pid = self()
+
+      Bypass.expect(c.bypass, "POST", "/", fn conn ->
+        send(pid, :ping)
+        Plug.Conn.send_resp(conn, 500, "oops")
+      end)
+
+      request = Req.new(url: c.url, retry: :safe_transient, max_retries: 10)
+
+      assert Req.post!(request).status == 500
+      assert_received :ping
+      refute_received _
+    end
+
+    @tag :capture_log
+    test "retry: :transient retries on POST", c do
+      pid = self()
+
+      Bypass.expect(c.bypass, "POST", "/", fn conn ->
+        send(pid, :ping)
+        Plug.Conn.send_resp(conn, 500, "oops")
+      end)
+
+      request = Req.new(url: c.url, retry: :transient, retry_delay: 1, max_retries: 1)
+
+      assert Req.post!(request).status == 500
+      assert_received :ping
+      assert_received :ping
+      refute_received _
+    end
+
+    test "retry: false", c do
       pid = self()
 
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
@@ -1068,7 +1101,7 @@ defmodule Req.StepsTest do
         Plug.Conn.send_resp(conn, 500, "oops")
       end)
 
-      request = Req.new(url: c.url, retry: :never)
+      request = Req.new(url: c.url, retry: false)
 
       assert Req.get!(request).status == 500
       assert_received :ping
@@ -1238,7 +1271,7 @@ defmodule Req.StepsTest do
       end
 
       assert_raise ArgumentError, "exec error", fn ->
-        Req.get!(c.url, finch_request: fun, retry: :never)
+        Req.get!(c.url, finch_request: fun, retry: false)
       end
     end
 

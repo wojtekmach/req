@@ -1276,12 +1276,15 @@ defmodule Req.Steps do
 
     * `:retry` - can be one of the following:
 
-        * `:safe` (default) - retry GET/HEAD requests on HTTP 408/429/5xx responses or exceptions
+        * `:safe_transient` (default) - retry safe (GET/HEAD) requests on HTTP 408/429/500/502/503/504 responses
+          or exceptions with reason :timeout/:econnrefused.
+
+        * `:transient` - same as `:safe_transient` except retries all HTTP methods (POST, DELETE, etc.)
 
         * `fun` - a 1-arity function that accepts either a `Req.Response` or an exception struct
-          and returns boolean whether to retry
+          and returns boolean whether to retry.
 
-        * `false` - never retry
+        * `false` - never retry.
 
     * `:retry_delay` - a function that receives the retry count (starting at 0) and returns the delay, the
       number of milliseconds to sleep before making another attempt.
@@ -1318,42 +1321,60 @@ defmodule Req.Steps do
   def retry(request_response_or_error)
 
   def retry({request, response_or_exception}) do
-    case Map.get(request.options, :retry, :safe) do
-      :safe ->
-        if request.method in [:get, :head] do
-          case response_or_exception do
-            %Req.Response{status: status} when status in [408, 429] or status in 500..599 ->
-              retry(request, response_or_exception)
+    retry? =
+      case Map.get(request.options, :retry, :safe_transient) do
+        :safe_transient ->
+          safe_transient?(request, response_or_exception)
 
-            %Req.Response{} ->
-              {request, response_or_exception}
+        :transient ->
+          transient?(response_or_exception)
 
-            %{__exception__: true} ->
-              retry(request, response_or_exception)
-          end
-        else
-          {request, response_or_exception}
-        end
+        false ->
+          false
 
-      # TODO: Deprecate in v0.4
-      :never ->
-        {request, response_or_exception}
+        fun when is_function(fun) ->
+          fun.(response_or_exception)
 
-      false ->
-        {request, response_or_exception}
+        :safe ->
+          IO.warn("setting `retry: :safe` is deprecated in favour of `retry: :safe_transient`")
+          safe_transient?(request, response_or_exception)
 
-      fun when is_function(fun) ->
-        if fun.(response_or_exception) do
-          retry(request, response_or_exception)
-        else
-          {request, response_or_exception}
-        end
+        :never ->
+          IO.warn("setting `retry: :never` is deprecated in favour of `retry: false`")
+          false
 
-      other ->
-        raise ArgumentError,
-              "expected :retry to be :safe, false, or a 1-arity function, " <>
-                "got: #{inspect(other)}"
+        other ->
+          raise ArgumentError,
+                "expected :retry to be :safe_transient, :transient, false, or a 1-arity function, " <>
+                  "got: #{inspect(other)}"
+      end
+
+    if retry? do
+      retry(request, response_or_exception)
+    else
+      {request, response_or_exception}
     end
+  end
+
+  defp safe_transient?(request, response_or_exception) do
+    request.method in [:get, :head] and transient?(response_or_exception)
+  end
+
+  defp transient?(%Req.Response{status: status}) when status in [408, 429, 500, 502, 503, 504] do
+    true
+  end
+
+  defp transient?(%Req.Response{}) do
+    false
+  end
+
+  defp transient?(%{__exception__: true, reason: reason})
+       when reason in [:timeout, :econnrefused] do
+    true
+  end
+
+  defp transient?(%{__exception__: true}) do
+    false
   end
 
   defp retry(request, response_or_exception) do

@@ -3,13 +3,34 @@
 ## HEAD
 
   * Fix typespecs for some functions
+
   * [`decompress_body`]: Remove support for `deflate` compression
+
   * [`decompress_body`]: Don't crash on unknown codec
+
   * [`decompress_body`]: Fix handling HEAD requests
+
   * [`run_finch`]: Add `:inet6` option
+
+  * [`retry`]: Support `retry: :safe_transient` which retries HTTP 408/429/500/502/503/504
+    or exceptions with :reason set to :timeout/:econnrefused.
+
+    `:safe_transient` is the new default retry mode. (Previously we retried on 408/429/5xx and
+    _any_ exception.)
+
+  * [`retry`]: Support `retry: :transient` which is the same as `:safe_transient` except
+    it retries on all HTTP methods
+
+  * [`retry`]: Deprecate `retry: :safe` in favour of `retry: :safe_transient`
+
+  * [`retry`]: Deprecate `retry: :never` in favour of `retry: false`
+
   * [`Req.request/2`]: Improve error message on invalid arguments
+
   * [`Req.update/2`]: Do not duplicate headers
+
   * [`Req.update/2`]: Merge `:params`
+
   * [`Req.Request`]: Fix displaying redacted basic authentication
 
 ## v0.3.11 (2023-07-24)
