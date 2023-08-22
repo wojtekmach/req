@@ -333,10 +333,10 @@ defmodule Req do
 
   Similarly to headers, `:params` are merged too:
 
-      iex> req = Req.new(url: "https://httpbin.org/anything", params: [a: 1, b: 1])
-      iex> req = Req.update(req, params: [a: 2])
-      iex> Req.get!(req).body["args"]
-      %{"a" => "2", "b" => "1"}
+      req = Req.new(url: "https://httpbin.org/anything", params: [a: 1, b: 1])
+      req = Req.update(req, params: [a: 2])
+      Req.get!(req).body["args"]
+      #=> %{"a" => "2", "b" => "1"}
   """
   @spec update(Req.Request.t(), options :: keyword()) :: Req.Request.t()
   def update(%Req.Request{} = request, options) when is_list(options) do
