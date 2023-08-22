@@ -3,9 +3,14 @@
 ## HEAD
 
   * Fix typespecs for some functions
-  * [`Req.request/2`]: Improve error message on invalid arguments
   * [`decompress_body`]: Remove support for `deflate` compression
   * [`decompress_body`]: Don't crash on unknown codec
+  * [`decompress_body`]: Fix handling HEAD requests
+  * [`run_finch`]: Add `:inet6` option
+  * [`Req.request/2`]: Improve error message on invalid arguments
+  * [`Req.update/2`]: Do not duplicate headers
+  * [`Req.update/2`]: Merge `:params`
+  * [`Req.Request`]: Fix displaying redacted basic authentication
 
 ## v0.3.11 (2023-07-24)
 
@@ -493,5 +498,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`retry`]:                     https://hexdocs.pm/req/Req.Steps.html#retry/1
 [`run_finch`]:                 https://hexdocs.pm/req/Req.Steps.html#run_finch/1
 [`Req.request/2`]:             https://hexdocs.pm/req/Req.html#request/2
+[`Req.update/2`]:              https://hexdocs.pm/req/Req.html#update/2
+[`Req.Request`]:               https://hexdocs.pm/req/Req.Request.html
 [`Req.Request.new/1`]:         https://hexdocs.pm/req/Req.Request.html#new/1
 [`Req.Request.run_request/1`]: https://hexdocs.pm/req/Req.Request.html#run_request/1
