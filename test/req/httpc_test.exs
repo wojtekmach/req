@@ -50,12 +50,7 @@ defmodule Req.HttpcTest do
         Plug.Conn.send_resp(conn, 200, body)
       end)
 
-      req =
-        Req.update(req,
-          body: {:stream, Stream.take(["foo", "foo", "foo"], 2)}
-        )
-
-      resp = Req.post!(req)
+      resp = Req.post!(req, body: {:stream, Stream.take(["foo", "foo", "foo"], 2)})
       assert resp.status == 200
       assert resp.body == "foofoo"
     end
