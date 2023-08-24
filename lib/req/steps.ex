@@ -95,7 +95,7 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def auth(request) do
-    auth(request, Map.get(request.options, :auth))
+    auth(request, request.options[:auth])
   end
 
   defp auth(request, nil) do
@@ -180,7 +180,7 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def put_user_agent(request) do
-    user_agent = Map.get(request.options, :user_agent, @user_agent)
+    user_agent = Req.Request.get_option(request, :user_agent, @user_agent)
     Req.Request.put_new_header(request, "user-agent", user_agent)
   end
 
@@ -238,14 +238,11 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def compressed(request) do
-    case Map.fetch(request.options, :compressed) do
-      :error ->
+    case Req.Request.get_option(request, :compressed, true) do
+      true ->
         Req.Request.put_new_header(request, "accept-encoding", supported_accept_encoding())
 
-      {:ok, true} ->
-        Req.Request.put_new_header(request, "accept-encoding", supported_accept_encoding())
-
-      {:ok, false} ->
+      false ->
         request
     end
   end
@@ -327,7 +324,7 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def put_path_params(request) do
-    put_path_params(request, Map.get(request.options, :path_params, []))
+    put_path_params(request, Req.Request.get_option(request, :path_params, []))
   end
 
   defp put_path_params(request, []) do
@@ -373,7 +370,7 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def put_params(request) do
-    put_params(request, Map.get(request.options, :params, []))
+    put_params(request, Req.Request.get_option(request, :params, []))
   end
 
   defp put_params(request, []) do
@@ -450,7 +447,7 @@ defmodule Req.Steps do
   @doc step: :request
   def cache(request) do
     if request.options[:cache] do
-      dir = Map.get(request.options, :cache_dir) || :filename.basedir(:user_cache, ~c"req")
+      dir = request.options[:cache_dir] || :filename.basedir(:user_cache, ~c"req")
       cache_path = cache_path(dir, request)
 
       request
@@ -662,11 +659,11 @@ defmodule Req.Steps do
   end
 
   defp run_finch(request, finch_request, finch_name, finch_options) do
-    case Map.fetch(request.options, :finch_request) do
-      {:ok, fun} when is_function(fun, 4) ->
+    case request.options[:finch_request] do
+      fun when is_function(fun, 4) ->
         fun.(request, finch_request, finch_name, finch_options)
 
-      {:ok, deprecated_fun} when is_function(deprecated_fun, 1) ->
+      deprecated_fun when is_function(deprecated_fun, 1) ->
         IO.warn(
           "passing a :finch_request function accepting a single argument is deprecated. " <>
             "See Req.Steps.run_finch/1 for more information."
@@ -674,7 +671,7 @@ defmodule Req.Steps do
 
         {request, run_finch_request(deprecated_fun.(finch_request), finch_name, finch_options)}
 
-      :error ->
+      nil ->
         {request, run_finch_request(finch_request, finch_name, finch_options)}
     end
   end
@@ -687,77 +684,75 @@ defmodule Req.Steps do
   end
 
   defp finch_name(request) do
-    case Map.fetch(request.options, :finch) do
-      {:ok, name} ->
-        if request.options[:connect_options] do
-          raise ArgumentError, "cannot set both :finch and :connect_options"
+    if name = request.options[:finch] do
+      if request.options[:connect_options] do
+        raise ArgumentError, "cannot set both :finch and :connect_options"
+      end
+
+      name
+    else
+      connect_options = request.options[:connect_options] || []
+      inet6_options = if request.options[:inet6], do: [inet6: true], else: []
+
+      if connect_options != [] || inet6_options != [] do
+        Req.Request.validate_options(
+          connect_options,
+          MapSet.new([
+            :timeout,
+            :protocol,
+            :transport_opts,
+            :proxy_headers,
+            :proxy,
+            :client_settings,
+            :hostname
+          ])
+        )
+
+        hostname_opts = Keyword.take(connect_options, [:hostname])
+
+        transport_opts = [
+          transport_opts:
+            Keyword.merge(
+              Keyword.take(connect_options, [:timeout]) ++ inet6_options,
+              Keyword.get(connect_options, :transport_opts, [])
+            )
+        ]
+
+        proxy_headers_opts = Keyword.take(connect_options, [:proxy_headers])
+        proxy_opts = Keyword.take(connect_options, [:proxy])
+        client_settings_opts = Keyword.take(connect_options, [:client_settings])
+
+        pool_opts = [
+          conn_opts:
+            hostname_opts ++
+              transport_opts ++
+              proxy_headers_opts ++
+              proxy_opts ++
+              client_settings_opts,
+          protocol: connect_options[:protocol] || :http1
+        ]
+
+        name =
+          [connect_options, inet6_options]
+          |> :erlang.term_to_binary()
+          |> :erlang.md5()
+          |> Base.url_encode64(padding: false)
+
+        name = Module.concat(Req.FinchSupervisor, "Pool_#{name}")
+
+        case DynamicSupervisor.start_child(
+               Req.FinchSupervisor,
+               {Finch, name: name, pools: %{default: pool_opts}}
+             ) do
+          {:ok, _} ->
+            name
+
+          {:error, {:already_started, _}} ->
+            name
         end
-
-        name
-
-      :error ->
-        connect_options = request.options[:connect_options] || []
-        inet6_options = if request.options[:inet6], do: [inet6: true], else: []
-
-        if connect_options != [] || inet6_options != [] do
-          Req.Request.validate_options(
-            connect_options,
-            MapSet.new([
-              :timeout,
-              :protocol,
-              :transport_opts,
-              :proxy_headers,
-              :proxy,
-              :client_settings,
-              :hostname
-            ])
-          )
-
-          hostname_opts = Keyword.take(connect_options, [:hostname])
-
-          transport_opts = [
-            transport_opts:
-              Keyword.merge(
-                Keyword.take(connect_options, [:timeout]) ++ inet6_options,
-                Keyword.get(connect_options, :transport_opts, [])
-              )
-          ]
-
-          proxy_headers_opts = Keyword.take(connect_options, [:proxy_headers])
-          proxy_opts = Keyword.take(connect_options, [:proxy])
-          client_settings_opts = Keyword.take(connect_options, [:client_settings])
-
-          pool_opts = [
-            conn_opts:
-              hostname_opts ++
-                transport_opts ++
-                proxy_headers_opts ++
-                proxy_opts ++
-                client_settings_opts,
-            protocol: connect_options[:protocol] || :http1
-          ]
-
-          name =
-            [connect_options, inet6_options]
-            |> :erlang.term_to_binary()
-            |> :erlang.md5()
-            |> Base.url_encode64(padding: false)
-
-          name = Module.concat(Req.FinchSupervisor, "Pool_#{name}")
-
-          case DynamicSupervisor.start_child(
-                 Req.FinchSupervisor,
-                 {Finch, name: name, pools: %{default: pool_opts}}
-               ) do
-            {:ok, _} ->
-              name
-
-            {:error, {:already_started, _}} ->
-              name
-          end
-        else
-          Req.Finch
-        end
+      else
+        Req.Finch
+      end
     end
   end
 
@@ -829,7 +824,7 @@ defmodule Req.Steps do
     conn =
       Plug.Test.conn(request.method, request.url, body)
       |> Map.replace!(:req_headers, request.headers)
-      |> call_plug(request.options.plug)
+      |> call_plug(request.options[:plug])
 
     response = %Req.Response{
       status: conn.status,
@@ -898,15 +893,17 @@ defmodule Req.Steps do
   def decompress_body(request_response)
 
   def decompress_body({request, response})
-      when response.body == "" or
-             not is_binary(response.body) or
-             request.options.raw == true do
+      when response.body == "" or not is_binary(response.body) do
     {request, response}
   end
 
   def decompress_body({request, response}) do
-    compression_algorithms = get_content_encoding_header(response.headers)
-    {request, update_in(response.body, &decompress_body(&1, compression_algorithms))}
+    if request.options[:raw] do
+      {request, response}
+    else
+      compression_algorithms = get_content_encoding_header(response.headers)
+      {request, update_in(response.body, &decompress_body(&1, compression_algorithms))}
+    end
   end
 
   defp decompress_body(body, algorithms) do
@@ -979,7 +976,7 @@ defmodule Req.Steps do
   def output(request_response)
 
   def output({request, response}) do
-    output({request, response}, Map.get(request.options, :output))
+    output({request, response}, request.options[:output])
   end
 
   defp output(request_response, nil) do
@@ -1013,6 +1010,9 @@ defmodule Req.Steps do
   | tar, tgz | `:erl_tar.extract/2`                                              |
   | zip      | `:zip.unzip/2`                                                    |
   | csv      | `NimbleCSV.RFC4180.parse_string/2` (if [nimble_csv] is installed) |
+
+  If response body is not a binary, in other words it has been transformed by
+  another step, it is left as is.
 
   ## Request Options
 
@@ -1050,24 +1050,18 @@ defmodule Req.Steps do
     {request, response}
   end
 
-  def decode_body({request, response}) when request.options.raw == true do
-    {request, response}
-  end
-
-  def decode_body({request, response}) when request.options.decode_body == false do
-    {request, response}
-  end
-
-  def decode_body({request, response}) when request.options.output != nil do
-    {request, response}
-  end
-
   def decode_body({request, response}) do
-    decode_body({request, response}, format(request, response))
+    if request.options[:raw] == true or
+         request.options[:decode_body] == false or
+         request.options[:output] do
+      {request, response}
+    else
+      decode_body({request, response}, format(request, response))
+    end
   end
 
   defp decode_body({request, response}, format) when format in ~w(json json-api) do
-    options = Map.get(request.options, :decode_json, [])
+    options = Req.Request.get_option(request, :decode_json, [])
     {request, update_in(response.body, &Jason.decode!(&1, options))}
   end
 
@@ -1191,44 +1185,45 @@ defmodule Req.Steps do
   @doc step: :response
   def follow_redirects(request_response)
 
-  def follow_redirects({request, response}) when request.options.follow_redirects == false do
-    {request, response}
-  end
+  def follow_redirects({request, response}) do
+    cond do
+      !Req.Request.get_option(request, :follow_redirects, true) ->
+        {request, response}
 
-  def follow_redirects({request, %{status: status} = response})
-      when status in [301, 302, 303, 307, 308] do
-    max_redirects = Map.get(request.options, :max_redirects, 10)
-    redirect_count = Req.Request.get_private(request, :req_redirect_count, 0)
+      response.status in [301, 302, 303, 307, 308] ->
+        max_redirects = Req.Request.get_option(request, :max_redirects, 10)
+        redirect_count = Req.Request.get_private(request, :req_redirect_count, 0)
 
-    if redirect_count < max_redirects do
-      request =
-        request
-        |> build_redirect_request(response)
-        |> Req.Request.put_private(:req_redirect_count, redirect_count + 1)
+        if redirect_count < max_redirects do
+          request =
+            request
+            |> build_redirect_request(response)
+            |> Req.Request.put_private(:req_redirect_count, redirect_count + 1)
 
-      {_, result} = Req.Request.run(request)
-      {Req.Request.halt(request), result}
-    else
-      raise "too many redirects (#{max_redirects})"
+          {_, result} = Req.Request.run(request)
+          {Req.Request.halt(request), result}
+        else
+          raise "too many redirects (#{max_redirects})"
+        end
+
+      true ->
+        {request, response}
     end
-  end
-
-  def follow_redirects(other) do
-    other
   end
 
   defp build_redirect_request(request, response) do
     {_, location} = List.keyfind(response.headers, "location", 0)
 
-    log_level = Map.get(request.options, :redirect_log_level, :debug)
+    log_level = Req.Request.get_option(request, :redirect_log_level, :debug)
     log_redirect(log_level, location)
 
-    location_trusted = Map.get(request.options, :location_trusted)
+    location_trusted = request.options[:location_trusted]
 
     location_url = URI.merge(request.url, URI.parse(location))
 
     request
-    |> remove_params()
+    # assume put_params step already run so remove :params option so it's not applied again
+    |> Req.Request.delete_option(:params)
     |> remove_credentials_if_untrusted(location_trusted, location_url)
     |> put_redirect_request_method(response.status)
     |> put_redirect_location(location_url)
@@ -1264,12 +1259,8 @@ defmodule Req.Steps do
 
   defp remove_credentials(request) do
     headers = List.keydelete(request.headers, "authorization", 0)
-    request = update_in(request.options, &Map.delete(&1, :auth))
+    request = Req.Request.delete_option(request, :auth)
     %{request | headers: headers}
-  end
-
-  defp remove_params(request) do
-    update_in(request.options, &Map.delete(&1, :params))
   end
 
   @doc """
@@ -1427,8 +1418,8 @@ defmodule Req.Steps do
   defp retry(request, response_or_exception) do
     retry_count = Req.Request.get_private(request, :req_retry_count, 0)
     {request, delay} = get_retry_delay(request, response_or_exception, retry_count)
-    max_retries = Map.get(request.options, :max_retries, 3)
-    log_level = Map.get(request.options, :retry_log_level, :error)
+    max_retries = Req.Request.get_option(request, :max_retries, 3)
+    log_level = Req.Request.get_option(request, :retry_log_level, :error)
 
     if retry_count < max_retries do
       log_retry(response_or_exception, retry_count, max_retries, delay, log_level)
@@ -1456,7 +1447,7 @@ defmodule Req.Steps do
   end
 
   defp calculate_retry_delay(request, retry_count) do
-    case Map.get(request.options, :retry_delay, &exp_backoff/1) do
+    case Req.Request.get_option(request, :retry_delay, &exp_backoff/1) do
       delay when is_integer(delay) ->
         {request, delay}
 

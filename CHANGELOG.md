@@ -33,6 +33,26 @@
 
   * [`Req.Request`]: Fix displaying redacted basic authentication
 
+  * Make `request.registered_options` internal representation private.
+
+  * Make `request.options` internal representation private.
+
+    Currently `request.options` field is a map but it may change in the future.
+    One possible future change is using keywords lists internally which would
+    allow, for example, `Req.new(params: [a: 1]) |> Req.update(params: [b: 2])`
+    to keep duplicate `:params` in `request.options` which would then allow to
+    decide the duplicate key semantics on a per-step basis. And so, for example,
+    [`put_params`] would _merge_ params but most steps would simply use the
+    first value.
+
+    To have some room for manoeuvre in the future we should stop pattern
+    matching on `request.options`. Calling `request.options[key]`,
+    `put_in(request.options[key], value)`, and
+    `update_in(request.options[key], fun)` _is_ allowed.
+    New functions [`Req.Request.get_option/3`] and
+    [`Req.Request.delete_option/1`] have been added for additional ways to
+    manipulate the internal representation.
+
 ## v0.3.11 (2023-07-24)
 
   * Support `Req.get(options)`, `Req.post(options)`, etc
@@ -523,3 +543,5 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Request`]:               https://hexdocs.pm/req/Req.Request.html
 [`Req.Request.new/1`]:         https://hexdocs.pm/req/Req.Request.html#new/1
 [`Req.Request.run_request/1`]: https://hexdocs.pm/req/Req.Request.html#run_request/1
+[`Req.Request.get_option/3`]:  https://hexdocs.pm/req/Req.Request.html#get_option/3
+[`Req.Request.delete_option/2`]: https://hexdocs.pm/req/Req.Request.html#delete_option/2

@@ -54,6 +54,8 @@ defmodule Req.Request do
 
   ## The Request Struct
 
+  Public fields are:
+
     * `:method` - the HTTP request method
 
     * `:url` - the HTTP request URL
@@ -68,8 +70,10 @@ defmodule Req.Request do
 
         * `{:stream, enumerable}`
 
-    * `:options` - the options to be used by steps. See ["Options"](#module-options) section below
-      for more information.
+    * `:options` - the options to be used by steps. The exact representation of options is private.
+      Calling `request.options[key]`, `put_in(request.options[key], value)`, and
+      `update_in(request.options[key], fun)` is allowed. `get_option/3` and `delete_option/2`
+      are also available for additional ways to manipulate the internal representation.
 
     * `:halted` - whether the request pipeline is halted. See `halt/1`
 
@@ -83,8 +87,8 @@ defmodule Req.Request do
     * `:error_steps` - the list of error steps
 
     * `:private` - a map reserved for libraries and frameworks to use.
-      Prefix the keys with the name of your project to avoid any future
-      conflicts. Only accepts `t:atom/0` keys.
+      The keys must be atoms. Prefix the keys with the name of your project
+      to avoid any future conflicts. The `req_` prefix is reserved for Req.
 
   ## Steps
 
@@ -318,8 +322,7 @@ defmodule Req.Request do
           url: URI.t(),
           headers: [{binary(), binary()}],
           body: iodata() | {:stream, Enumerable.t()} | nil,
-          options: map(),
-          registered_options: MapSet.t(),
+          options: options(),
           halted: boolean(),
           adapter: request_step(),
           request_steps: [{name :: atom(), request_step()}],
@@ -331,6 +334,7 @@ defmodule Req.Request do
   @typep request_step() :: fun()
   @typep response_step() :: fun()
   @typep error_step() :: fun()
+  @typep options() :: term()
 
   defstruct method: :get,
             url: URI.parse(""),
@@ -373,10 +377,46 @@ defmodule Req.Request do
   def new(options) do
     options =
       options
-      |> Keyword.validate!([:method, :url, :headers, :body, :adapter])
+      |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
       |> Keyword.update(:url, URI.new!(""), &URI.new!/1)
+      |> Keyword.update(:options, %{}, &Map.new/1)
 
     struct!(__MODULE__, options)
+  end
+
+  @doc """
+  Gets the value for the option `key`.
+
+  ## Examples
+
+      iex> req = Req.Request.new(options: [a: 1])
+      iex> Req.Request.get_option(req, :a)
+      1
+      iex> Req.Request.get_option(req, :b)
+      nil
+      iex> Req.Request.get_option(req, :b, 0)
+      0
+  """
+  @spec get_option(t(), atom(), term()) :: t()
+  def get_option(request, key, default \\ nil) when is_atom(key) do
+    Map.get(request.options, key, default)
+  end
+
+  @doc """
+  Deletes the given option `key`.
+
+  ## Examples
+
+      iex> req = Req.Request.new(options: [a: 1])
+      iex> Req.Request.get_option(req, :a)
+      1
+      iex> req = Req.Request.delete_option(req, :a)
+      iex> Req.Request.get_option(req, :a)
+      nil
+  """
+  @spec delete_option(t(), atom()) :: t()
+  def delete_option(request, key) when is_atom(key) do
+    update_in(request.options, &Map.delete(&1, key))
   end
 
   @doc """
@@ -546,8 +586,12 @@ defmodule Req.Request do
 
       iex> req = Req.new(auth: {"alice", "secret"}, http_errors: :raise)
       iex> req = Req.Request.merge_options(req, auth: {:bearer, "abcd"}, base_url: "https://example.com")
-      iex> req.options
-      %{auth: {:bearer, "abcd"}, base_url: "https://example.com", http_errors: :raise}
+      iex> req.options[:auth]
+      {:bearer, "abcd"}
+      iex> req.options[:http_errors]
+      :raise
+      iex> req.options[:base_url]
+      "https://example.com"
   """
   @spec merge_options(t(), keyword()) :: t()
   def merge_options(%Req.Request{} = request, options) when is_list(options) do
@@ -835,7 +879,7 @@ defmodule Req.Request do
       close = color("}", :map, opts)
 
       {headers, options} =
-        if Map.get(request.options, :redact_auth, true) do
+        if Req.Request.get_option(request, :redact_auth, true) do
           headers =
             for {name, value} <- request.headers do
               if name in ["authorization", "Authorization"] do
