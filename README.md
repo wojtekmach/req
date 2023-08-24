@@ -16,6 +16,8 @@ Req is a batteries-included HTTP client for Elixir.
 
   * Request body encoding and automatic response body decoding (via [`encode_body`] and [`decode_body`] steps.)
 
+  * Request body streaming
+
   * Encode params as query string (via [`put_params`] step.)
 
   * Basic, bearer, and `.netrc` authentication (via [`auth`] step.)
@@ -52,6 +54,13 @@ Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
 ```
 
 If you want to use Req in a Mix project, you can add the above dependency to your `mix.exs`.
+
+Here's an example POST request (which sends data as `application/x-www-form-urlencoded`):
+
+```elixir
+iex> Req.post!("https://httpbin.org/post", form: [comments: "hello!"]).body["form"]
+%{"comments" => "hello!"}
+```
 
 If you are planning to make several similar requests, you can build up a request struct with
 desired common options and re-use it:

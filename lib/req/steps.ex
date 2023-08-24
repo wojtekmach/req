@@ -504,12 +504,49 @@ defmodule Req.Steps do
   @doc step: :request
   def compress_body(request) do
     if request.options[:compress_body] do
+      body =
+        case request.body do
+          {:stream, enumerable} ->
+            {:stream, gzip_stream(enumerable)}
+
+          iodata ->
+            :zlib.gzip(iodata)
+        end
+
       request
-      |> Map.update!(:body, &:zlib.gzip/1)
+      |> Map.replace!(:body, body)
       |> Req.Request.put_header("content-encoding", "gzip")
     else
       request
     end
+  end
+
+  defp gzip_stream(enumerable) do
+    eof = make_ref()
+
+    enumerable
+    |> Stream.concat([eof])
+    |> Stream.transform(
+      fn ->
+        z = :zlib.open()
+        # https://github.com/erlang/otp/blob/OTP-26.0/erts/preloaded/src/zlib.erl#L551
+        :ok = :zlib.deflateInit(z, :default, :deflated, 16 + 15, 8, :default)
+        z
+      end,
+      fn
+        ^eof, z ->
+          buf = :zlib.deflate(z, [], :finish)
+          {buf, z}
+
+        data, z ->
+          buf = :zlib.deflate(z, data)
+          {buf, z}
+      end,
+      fn z ->
+        :ok = :zlib.deflateEnd(z)
+        :ok = :zlib.close(z)
+      end
+    )
   end
 
   @doc """
@@ -777,7 +814,17 @@ defmodule Req.Steps do
   end
 
   defp run_plug(request) do
-    body = IO.iodata_to_binary(request.body || "")
+    body =
+      case request.body do
+        nil ->
+          ""
+
+        {:stream, enumerable} ->
+          enumerable |> Enum.to_list() |> IO.iodata_to_binary()
+
+        iodata ->
+          IO.iodata_to_binary(iodata)
+      end
 
     conn =
       Plug.Test.conn(request.method, request.url, body)
