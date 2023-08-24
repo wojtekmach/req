@@ -414,10 +414,21 @@ defmodule Req.Request do
       iex> req = Req.Request.new(options: [a: 1])
       iex> Req.Request.fetch_option!(req, :a)
       1
+      iex> Req.Request.fetch_option!(req, :b)
+      ** (KeyError) option :b is not set
   """
   @spec fetch_option!(t(), atom()) :: term()
   def fetch_option!(request, key) when is_atom(key) do
-    Map.fetch!(request.options, key)
+    case Map.fetch(request.options, key) do
+      {:ok, value} ->
+        value
+
+      :error ->
+        raise KeyError,
+          term: request.options,
+          key: key,
+          message: "option #{inspect(key)} is not set"
+    end
   end
 
   @doc """
