@@ -49,9 +49,9 @@
     matching on `request.options`. Calling `request.options[key]`,
     `put_in(request.options[key], value)`, and
     `update_in(request.options[key], fun)` _is_ allowed.
-    New functions [`Req.Request.get_option/3`] and
-    [`Req.Request.delete_option/1`] have been added for additional ways to
-    manipulate the internal representation.
+    New functions [`Req.Request.get_option/3`],
+    [`Req.Request.fetch_option!/2`], and [`Req.Request.delete_option/1`] have been
+    added for additional ways to manipulate the internal representation.
 
 ## v0.3.11 (2023-07-24)
 
@@ -544,4 +544,5 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Request.new/1`]:         https://hexdocs.pm/req/Req.Request.html#new/1
 [`Req.Request.run_request/1`]: https://hexdocs.pm/req/Req.Request.html#run_request/1
 [`Req.Request.get_option/3`]:  https://hexdocs.pm/req/Req.Request.html#get_option/3
+[`Req.Request.fetch_option!/2`]: https://hexdocs.pm/req/Req.Request.html#fetch_option!/2
 [`Req.Request.delete_option/2`]: https://hexdocs.pm/req/Req.Request.html#delete_option/2
