@@ -372,7 +372,13 @@ defmodule Req do
 
         {:headers, new_headers}, acc ->
           update_in(acc.headers, fn old_headers ->
-            Map.merge(old_headers, encode_headers(new_headers))
+            if unquote(Req.MixProject.legacy_headers_as_lists?()) do
+              new_headers = encode_headers(new_headers)
+              new_header_names = Enum.map(new_headers, &elem(&1, 0))
+              Enum.reject(old_headers, &(elem(&1, 0) in new_header_names)) ++ new_headers
+            else
+              Map.merge(old_headers, encode_headers(new_headers))
+            end
           end)
 
         {name, value}, acc ->
@@ -940,23 +946,31 @@ defmodule Req do
     Application.put_env(:req, :default_options, options)
   end
 
-  defp encode_headers(headers) do
-    Enum.reduce(headers, %{}, fn {name, value}, acc ->
-      Map.update(
-        acc,
-        encode_header_name(name),
-        encode_header_values(List.wrap(value)),
-        &(&1 ++ encode_header_values(List.wrap(value)))
-      )
-    end)
-  end
+  if Req.MixProject.legacy_headers_as_lists?() do
+    defp encode_headers(headers) do
+      for {name, value} <- headers do
+        {encode_header_name(name), encode_header_value(value)}
+      end
+    end
+  else
+    defp encode_headers(headers) do
+      Enum.reduce(headers, %{}, fn {name, value}, acc ->
+        Map.update(
+          acc,
+          encode_header_name(name),
+          encode_header_values(List.wrap(value)),
+          &(&1 ++ encode_header_values(List.wrap(value)))
+        )
+      end)
+    end
 
-  defp encode_header_values([value | rest]) do
-    [encode_header_value(value) | encode_header_values(rest)]
-  end
+    defp encode_header_values([value | rest]) do
+      [encode_header_value(value) | encode_header_values(rest)]
+    end
 
-  defp encode_header_values([]) do
-    []
+    defp encode_header_values([]) do
+      []
+    end
   end
 
   defp encode_header_name(name) when is_atom(name) do

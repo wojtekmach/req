@@ -35,7 +35,11 @@ defmodule ReqTest do
     assert headers == [{"x-a", "1"}, {"x-b", "Fri, 01 Jan 2021 09:00:00 GMT"}]
 
     req = Req.new(headers: [x_a: 1, x_a: 2])
-    assert req.headers == %{"x-a" => ["1", "2"]}
+
+    unless Req.MixProject.legacy_headers_as_lists?() do
+      assert req.headers == %{"x-a" => ["1", "2"]}
+    end
+
     Req.get!(req, url: c.url)
     assert_receive {:headers, headers}
     assert headers == [{"x-a", "1, 2"}]
@@ -51,7 +55,12 @@ defmodule ReqTest do
 
     assert inspect(Req.new(auth: {"foo", "bar"})) =~ ~s|auth: {"[redacted]", "[redacted]"}|
 
-    assert inspect(Req.new(headers: [authorization: "bearer foo"])) =~
-             ~s|"authorization" => ["[redacted]"]|
+    if Req.MixProject.legacy_headers_as_lists?() do
+      assert inspect(Req.new(headers: [authorization: "bearer foo"])) =~
+               ~s|{"authorization", "[redacted]"}|
+    else
+      assert inspect(Req.new(headers: [authorization: "bearer foo"])) =~
+               ~s|"authorization" => ["[redacted]"]|
+    end
   end
 end

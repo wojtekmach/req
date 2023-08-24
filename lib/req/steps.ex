@@ -649,9 +649,13 @@ defmodule Req.Steps do
     finch_name = finch_name(request)
 
     request_headers =
-      for {name, values} <- request.headers,
-          value <- values do
-        {name, value}
+      if unquote(Req.MixProject.legacy_headers_as_lists?()) do
+        request.headers
+      else
+        for {name, values} <- request.headers,
+            value <- values do
+          {name, value}
+        end
       end
 
     finch_request =
@@ -828,9 +832,13 @@ defmodule Req.Steps do
       end
 
     req_headers =
-      for {name, values} <- request.headers,
-          value <- values do
-        {name, value}
+      if unquote(Req.MixProject.legacy_headers_as_lists?()) do
+        request.headers
+      else
+        for {name, values} <- request.headers,
+            value <- values do
+          {name, value}
+        end
       end
 
     conn =

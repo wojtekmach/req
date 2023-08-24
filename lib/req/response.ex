@@ -23,7 +23,7 @@ defmodule Req.Response do
         }
 
   defstruct status: 200,
-            headers: %{},
+            headers: if(Req.MixProject.legacy_headers_as_lists?(), do: [], else: %{}),
             body: "",
             private: %{}
 
@@ -47,20 +47,27 @@ defmodule Req.Response do
 
   def new(options) when is_list(options), do: new(Map.new(options))
 
-  def new(options) do
-    options =
-      Map.take(options, [:status, :headers, :body])
-      |> Map.update(:headers, %{}, fn
-        map when is_map(map) ->
-          map
+  if Req.MixProject.legacy_headers_as_lists?() do
+    def new(options) do
+      options = Map.take(options, [:status, :headers, :body])
+      struct!(__MODULE__, options)
+    end
+  else
+    def new(options) do
+      options =
+        Map.take(options, [:status, :headers, :body])
+        |> Map.update(:headers, %{}, fn
+          map when is_map(map) ->
+            map
 
-        list when is_list(list) ->
-          Enum.reduce(list, %{}, fn {name, value}, acc ->
-            Map.update(acc, name, [value], &(&1 ++ [value]))
-          end)
-      end)
+          list when is_list(list) ->
+            Enum.reduce(list, %{}, fn {name, value}, acc ->
+              Map.update(acc, name, [value], &(&1 ++ [value]))
+            end)
+        end)
 
-    struct!(__MODULE__, options)
+      struct!(__MODULE__, options)
+    end
   end
 
   @doc """
@@ -133,9 +140,19 @@ defmodule Req.Response do
       ["application/json"]
   """
   @spec get_header(t(), binary()) :: [binary()]
-  def get_header(%Req.Response{} = response, name) when is_binary(name) do
-    name = Req.__ensure_header_downcase__(name)
-    Map.get(response.headers, name, [])
+  if Req.MixProject.legacy_headers_as_lists?() do
+    def get_header(%Req.Response{} = response, name) when is_binary(name) do
+      name = Req.__ensure_header_downcase__(name)
+
+      for {^name, value} <- response.headers do
+        value
+      end
+    end
+  else
+    def get_header(%Req.Response{} = response, name) when is_binary(name) do
+      name = Req.__ensure_header_downcase__(name)
+      Map.get(response.headers, name, [])
+    end
   end
 
   @doc """
@@ -149,10 +166,18 @@ defmodule Req.Response do
       [{"content-type", "application/json"}]
   """
   @spec put_header(t(), binary(), binary()) :: t()
-  def put_header(%Req.Response{} = response, name, value)
-      when is_binary(name) and is_binary(value) do
-    name = Req.__ensure_header_downcase__(name)
-    put_in(response.headers[name], List.wrap(value))
+  if Req.MixProject.legacy_headers_as_lists?() do
+    def put_header(%Req.Response{} = response, name, value)
+        when is_binary(name) and is_binary(value) do
+      name = Req.__ensure_header_downcase__(name)
+      %{response | headers: List.keystore(response.headers, name, 0, {name, value})}
+    end
+  else
+    def put_header(%Req.Response{} = response, name, value)
+        when is_binary(name) and is_binary(value) do
+      name = Req.__ensure_header_downcase__(name)
+      put_in(response.headers[name], List.wrap(value))
+    end
   end
 
   @doc """

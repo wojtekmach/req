@@ -81,4 +81,8 @@ defmodule Req.MixProject do
       ]
     ]
   end
+
+  def legacy_headers_as_lists? do
+    Application.get_env(:req, :legacy_headers_as_lists, false)
+  end
 end

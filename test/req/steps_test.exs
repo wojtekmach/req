@@ -50,19 +50,19 @@ defmodule Req.StepsTest do
     test "string" do
       req = Req.new(auth: "foo") |> Req.Request.prepare()
 
-      assert req.headers["authorization"] == ["foo"]
+      assert Req.Request.get_header(req, "authorization") == ["foo"]
     end
 
     test "basic" do
       req = Req.new(auth: {"foo", "bar"}) |> Req.Request.prepare()
 
-      assert req.headers["authorization"] == ["Basic #{Base.encode64("foo:bar")}"]
+      assert Req.Request.get_header(req, "authorization") == ["Basic #{Base.encode64("foo:bar")}"]
     end
 
     test "bearer" do
       req = Req.new(auth: {:bearer, "abcd"}) |> Req.Request.prepare()
 
-      assert req.headers["authorization"] == ["Bearer abcd"]
+      assert Req.Request.get_header(req, "authorization") == ["Bearer abcd"]
     end
 
     @tag :tmp_dir
@@ -238,10 +238,10 @@ defmodule Req.StepsTest do
 
   test "put_range" do
     req = Req.new(range: "bytes=0-10") |> Req.Request.prepare()
-    assert req.headers["range"] == ["bytes=0-10"]
+    assert Req.Request.get_header(req, "range") == ["bytes=0-10"]
 
     req = Req.new(range: 0..20) |> Req.Request.prepare()
-    assert req.headers["range"] == ["bytes=0-20"]
+    assert Req.Request.get_header(req, "range") == ["bytes=0-20"]
   end
 
   describe "compress_body" do
@@ -251,7 +251,7 @@ defmodule Req.StepsTest do
 
       req = Req.new(method: :post, json: %{a: 1}, compress_body: true) |> Req.Request.prepare()
       assert :zlib.gunzip(req.body) |> Jason.decode!() == %{"a" => 1}
-      assert req.headers["content-encoding"] == ["gzip"]
+      assert Req.Request.get_header(req, "content-encoding") == ["gzip"]
     end
 
     test "stream", c do
@@ -717,19 +717,19 @@ defmodule Req.StepsTest do
       adapter = fn request ->
         case request.url.host do
           "original" ->
-            assert request.headers["authorization"]
+            assert [_] = Req.Request.get_header(request, "authorization")
 
             response =
               Req.Response.new(
                 status: 301,
-                headers: %{"location" => ["http://untrusted"]},
+                headers: [{"location", "http://untrusted"}],
                 body: "redirecting"
               )
 
             {request, response}
 
           "untrusted" ->
-            assert request.headers["authorization"]
+            assert [_] = Req.Request.get_header(request, "authorization")
 
             response =
               Req.Response.new(
@@ -897,7 +897,7 @@ defmodule Req.StepsTest do
     fn request ->
       case Map.get(request.url, component) do
         ^original_value ->
-          assert request.headers["authorization"]
+          assert [_] = Req.Request.get_header(request, "authorization")
 
           new_url =
             request.url
@@ -907,14 +907,14 @@ defmodule Req.StepsTest do
           response =
             Req.Response.new(
               status: 301,
-              headers: %{"location" => [new_url]},
+              headers: [{"location", new_url}],
               body: "redirecting"
             )
 
           {request, response}
 
         ^updated_value ->
-          refute request.headers["authorization"]
+          assert [] = Req.Request.get_header(request, "authorization")
 
           response =
             Req.Response.new(
