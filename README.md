@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/wojtekmach/req/actions/workflows/ci.yml/badge.svg)](https://github.com/wojtekmach/req/actions/workflows/ci.yml)
 
-[Docs](https://hexdocs.pm/req)
+[Docs](https://hexdocs.pm/req), [Screencast](https://www.youtube.com/watch?v=NxWgvHRN6mI "Req: A batteries included HTTP client for Elixir")
 
 Req is a batteries-included HTTP client for Elixir.
 
