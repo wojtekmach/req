@@ -141,6 +141,32 @@ defmodule Req.Response do
       when is_binary(key) and is_binary(value) do
     %{response | headers: List.keystore(response.headers, key, 0, {key, value})}
   end
+  
+  @doc """
+  Deletes the header given by `key`
+
+  All occurences of the header are deleted, in case the header is repeated multiple times.
+
+  ## Examples
+
+      iex> Req.Response.get_header(resp, "cache-control")
+      ["max-age=600", "no-transform"]
+      iex> resp = Req.Response.delete_header(resp, "cache-control")
+      iex> Req.Response.get_header(resp, "cache-control")
+      []
+
+  """
+  def delete_header(%Req.Response{} = response, key) when is_binary(key) do
+    %Req.Response{
+      response
+      | headers:
+          for(
+            {name, value} <- response.headers,
+            String.downcase(name) != String.downcase(key),
+            do: {name, value}
+          )
+    }
+  end
 
   @doc """
   Returns the `retry-after` header delay value or nil if not found.
@@ -193,7 +219,7 @@ defmodule Req.Response do
         valid_datetime
 
       {:error, reason} ->
-        raise "could not parse \"Retry-After\" header #{datetime} - #{reason}"
+        raise "cannot parse \"retry-after\" header value #{inspect(datetime)} as datetime, reason: #{reason}"
     end
   end
 end
