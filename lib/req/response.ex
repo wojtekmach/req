@@ -141,7 +141,7 @@ defmodule Req.Response do
   def put_header(%Req.Response{} = response, name, value)
       when is_binary(name) and is_binary(value) do
     name = Req.__ensure_header_downcase__(name)
-    %{response | headers: List.keystore(response.headers, name, 0, {name, value})}
+    update_in(response.headers, &List.keystore(&1, name, 0, {name, value}))
   end
 
   @doc """

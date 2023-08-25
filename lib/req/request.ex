@@ -145,11 +145,11 @@ defmodule Req.Request do
   Examples:
 
       def decode({request, response}) do
-        case List.keyfind(response.headers, "content-type", 0) do
-          {_, "application/json" <> _} ->
+        case Req.Response.get_header(response, "content-type") do
+          ["application/json" <> _] ->
             {request, update_in(response.body, &Jason.decode!/1)}
 
-          _ ->
+          [] ->
             {request, response}
         end
       end
@@ -678,7 +678,7 @@ defmodule Req.Request do
   def put_header(%Req.Request{} = request, name, value)
       when is_binary(name) and is_binary(value) do
     name = Req.__ensure_header_downcase__(name)
-    %{request | headers: List.keystore(request.headers, name, 0, {name, value})}
+    update_in(request.headers, &List.keystore(&1, name, 0, {name, value}))
   end
 
   @doc """
