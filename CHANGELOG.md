@@ -2,6 +2,44 @@
 
 ## HEAD
 
+  * Change `request.headers` and `response.headers` to be maps.
+
+    Previously headers were lists of name/value tuples, e.g.:
+
+        [{"content-type", "text/html"}]
+
+    Now they are maps of string names and lists of values, e.g.:
+
+        %{"content-type" => ["text/html"]}
+
+    This is a major breaking change. If you cannot easily update your app
+    or your dependencies, do:
+
+        # config/config.exs
+        config :req, legacy_headers_as_lists: true
+
+    This legacy fallback will be removed on Req 1.0.
+
+  * Make `request.registered_options` internal representation private.
+
+  * Make `request.options` internal representation private.
+
+    Currently `request.options` field is a map but it may change in the future.
+    One possible future change is using keywords lists internally which would
+    allow, for example, `Req.new(params: [a: 1]) |> Req.update(params: [b: 2])`
+    to keep duplicate `:params` in `request.options` which would then allow to
+    decide the duplicate key semantics on a per-step basis. And so, for example,
+    [`put_params`] would _merge_ params but most steps would simply use the
+    first value.
+
+    To have some room for manoeuvre in the future we should stop pattern
+    matching on `request.options`. Calling `request.options[key]`,
+    `put_in(request.options[key], value)`, and
+    `update_in(request.options[key], fun)` _is_ allowed.
+    New functions [`Req.Request.get_option/3`],
+    [`Req.Request.fetch_option!/2`], and [`Req.Request.delete_option/1`] have been
+    added for additional ways to manipulate the internal representation.
+
   * Fix typespecs for some functions
 
   * [`decompress_body`]: Remove support for `deflate` compression
@@ -32,26 +70,6 @@
   * [`Req.update/2`]: Merge `:params`
 
   * [`Req.Request`]: Fix displaying redacted basic authentication
-
-  * Make `request.registered_options` internal representation private.
-
-  * Make `request.options` internal representation private.
-
-    Currently `request.options` field is a map but it may change in the future.
-    One possible future change is using keywords lists internally which would
-    allow, for example, `Req.new(params: [a: 1]) |> Req.update(params: [b: 2])`
-    to keep duplicate `:params` in `request.options` which would then allow to
-    decide the duplicate key semantics on a per-step basis. And so, for example,
-    [`put_params`] would _merge_ params but most steps would simply use the
-    first value.
-
-    To have some room for manoeuvre in the future we should stop pattern
-    matching on `request.options`. Calling `request.options[key]`,
-    `put_in(request.options[key], value)`, and
-    `update_in(request.options[key], fun)` _is_ allowed.
-    New functions [`Req.Request.get_option/3`],
-    [`Req.Request.fetch_option!/2`], and [`Req.Request.delete_option/1`] have been
-    added for additional ways to manipulate the internal representation.
 
 ## v0.3.11 (2023-07-24)
 

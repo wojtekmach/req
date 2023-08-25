@@ -1,6 +1,6 @@
 defmodule Req.RequestTest do
   use ExUnit.Case, async: true
-  doctest Req.Request
+  doctest Req.Request, except: [delete_header: 2]
 
   setup do
     bypass = Bypass.open()
@@ -242,11 +242,19 @@ defmodule Req.RequestTest do
 
     authorization = "Basic " <> Base.encode64("foo:bar")
 
-    assert [
-             {"user-agent", "req/" <> _},
-             {"accept-encoding", "zstd, br, gzip"},
-             {"authorization", ^authorization}
-           ] = request.headers
+    if Req.MixProject.legacy_headers_as_lists?() do
+      assert [
+               {"user-agent", "req/0.3.11"},
+               {"accept-encoding", "zstd, br, gzip"},
+               {"authorization", ^authorization}
+             ] = request.headers
+    else
+      assert %{
+               "user-agent" => ["req/" <> _],
+               "accept-encoding" => ["zstd, br, gzip"],
+               "authorization" => [^authorization]
+             } = request.headers
+    end
   end
 
   ## Helpers

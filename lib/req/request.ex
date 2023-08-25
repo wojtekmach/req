@@ -145,11 +145,11 @@ defmodule Req.Request do
   Examples:
 
       def decode({request, response}) do
-        case List.keyfind(response.headers, "content-type", 0) do
-          {_, "application/json" <> _} ->
+        case Req.Response.get_header(response, "content-type") do
+          ["application/json" <> _] ->
             {request, update_in(response.body, &Jason.decode!/1)}
 
-          _ ->
+          [] ->
             {request, response}
         end
       end
@@ -320,7 +320,7 @@ defmodule Req.Request do
   @type t() :: %Req.Request{
           method: atom(),
           url: URI.t(),
-          headers: [{binary(), binary()}],
+          headers: %{binary() => [binary()]},
           body: iodata() | {:stream, Enumerable.t()} | nil,
           options: options(),
           halted: boolean(),
@@ -338,7 +338,7 @@ defmodule Req.Request do
 
   defstruct method: :get,
             url: URI.parse(""),
-            headers: [],
+            headers: if(Req.MixProject.legacy_headers_as_lists?(), do: [], else: %{}),
             body: nil,
             options: %{},
             halted: false,
@@ -368,20 +368,37 @@ defmodule Req.Request do
   ## Examples
 
       iex> req = Req.Request.new(url: "https://api.github.com/repos/wojtekmach/req")
-      iex> {request, response} = Req.Request.run_request(req)
-      iex> request.url.host
+      iex> {req, resp} = Req.Request.run_request(req)
+      iex> req.url.host
       "api.github.com"
-      iex> response.status
+      iex> resp.status
       200
   """
-  def new(options) do
-    options =
-      options
-      |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
-      |> Keyword.update(:url, URI.new!(""), &URI.new!/1)
-      |> Keyword.update(:options, %{}, &Map.new/1)
+  if Req.MixProject.legacy_headers_as_lists?() do
+    def new(options) do
+      options =
+        options
+        |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
+        |> Keyword.update(:url, URI.new!(""), &URI.new!/1)
+        |> Keyword.update(:options, %{}, &Map.new/1)
 
-    struct!(__MODULE__, options)
+      struct!(__MODULE__, options)
+    end
+  else
+    def new(options) do
+      options =
+        options
+        |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
+        |> Keyword.update(:url, URI.new!(""), &URI.new!/1)
+        |> Keyword.update(:headers, %{}, fn headers ->
+          Map.new(headers, fn {key, value} ->
+            {key, List.wrap(value)}
+          end)
+        end)
+        |> Keyword.update(:options, %{}, &Map.new/1)
+
+      struct!(__MODULE__, options)
+    end
   end
 
   @doc """
@@ -654,31 +671,55 @@ defmodule Req.Request do
       iex> req = Req.new(headers: [{"accept", "application/json"}])
       iex> Req.Request.get_header(req, "accept")
       ["application/json"]
+      iex> Req.Request.get_header(req, "x-unknown")
+      []
 
   """
   @spec get_header(t(), binary()) :: [binary()]
-  def get_header(%Req.Request{} = request, name) when is_binary(name) do
-    name = Req.__ensure_header_downcase__(name)
-    for {^name, value} <- request.headers, do: value
+  if Req.MixProject.legacy_headers_as_lists?() do
+    def get_header(%Req.Request{} = request, name) when is_binary(name) do
+      name = Req.__ensure_header_downcase__(name)
+
+      for {^name, value} <- request.headers do
+        value
+      end
+    end
+  else
+    def get_header(%Req.Request{} = request, name) when is_binary(name) do
+      name = Req.__ensure_header_downcase__(name)
+      Map.get(request.headers, name, [])
+    end
   end
 
   @doc """
-  Adds a new request header `name` if not present, otherwise replaces the
-  previous value of that header with `value`.
+  Sets the header `key` to `value`.
+
+  The value can be a binary or a list of binaries,
+
+  If the header was previously set, its value is overwritten.
 
   ## Examples
 
       iex> req = Req.new()
+      iex> Req.Request.get_header(req, "accept")
+      []
       iex> req = Req.Request.put_header(req, "accept", "application/json")
-      iex> req.headers
-      [{"accept", "application/json"}]
+      iex> Req.Request.get_header(req, "accept")
+      ["application/json"]
 
   """
   @spec put_header(t(), binary(), binary()) :: t()
-  def put_header(%Req.Request{} = request, name, value)
-      when is_binary(name) and is_binary(value) do
-    name = Req.__ensure_header_downcase__(name)
-    %{request | headers: List.keystore(request.headers, name, 0, {name, value})}
+  if Req.MixProject.legacy_headers_as_lists?() do
+    def put_header(%Req.Request{} = request, name, value)
+        when is_binary(name) and is_binary(value) do
+      %{request | headers: List.keystore(request.headers, name, 0, {name, value})}
+    end
+  else
+    def put_header(%Req.Request{} = request, name, value)
+        when is_binary(name) and (is_binary(value) or is_list(value)) do
+      name = Req.__ensure_header_downcase__(name)
+      put_in(request.headers[name], List.wrap(value))
+    end
   end
 
   @doc """
@@ -690,8 +731,10 @@ defmodule Req.Request do
 
       iex> req = Req.new()
       iex> req = Req.Request.put_headers(req, [{"accept", "text/html"}, {"accept-encoding", "gzip"}])
-      iex> req.headers
-      [{"accept", "text/html"}, {"accept-encoding", "gzip"}]
+      iex> Req.Request.get_header(req, "accept")
+      ["text/html"]
+      iex> Req.Request.get_header(req, "accept-encoding")
+      ["gzip"]
   """
   @spec put_headers(t(), [{binary(), binary()}]) :: t()
   def put_headers(%Req.Request{} = request, headers) do
@@ -711,18 +754,51 @@ defmodule Req.Request do
       ...>   Req.new()
       ...>   |> Req.Request.put_new_header("accept", "application/json")
       ...>   |> Req.Request.put_new_header("accept", "application/html")
-      iex> req.headers
-      [{"accept", "application/json"}]
+      iex> Req.Request.get_header(req, "accept")
+      ["application/json"]
   """
   @spec put_new_header(t(), binary(), binary()) :: t()
-  def put_new_header(%Req.Request{} = request, name, value)
-      when is_binary(name) and is_binary(value) do
-    case get_header(request, name) do
-      [] ->
-        put_header(request, name, value)
+  if Req.MixProject.legacy_headers_as_lists?() do
+    def put_new_header(%Req.Request{} = request, name, value) do
+      case get_header(request, name) do
+        [] ->
+          put_header(request, name, value)
 
-      _ ->
-        request
+        _ ->
+          request
+      end
+    end
+  else
+    def put_new_header(%Req.Request{} = request, name, value)
+        when is_binary(name) and (is_binary(value) or is_list(value)) do
+      name = Req.__ensure_header_downcase__(name)
+      update_in(request.headers, &Map.put_new(&1, name, List.wrap(value)))
+    end
+  end
+
+  @doc """
+  Deletes the header given by `name`.
+
+  All occurences of the header are deleted, in case the header is repeated multiple times.
+
+  ## Examples
+
+      iex> Req.Request.get_header(req, "cache-control")
+      ["max-age=600", "no-transform"]
+      iex> req = Req.Request.delete_header(req, "cache-control")
+      iex> Req.Request.get_header(req, "cache-control")
+      []
+
+  """
+  if Req.MixProject.legacy_headers_as_lists?() do
+    def delete_header(%Req.Request{} = request, name) when is_binary(name) do
+      name = Req.__ensure_header_downcase__(name)
+      %{request | headers: List.keydelete(request.headers, name, 0)}
+    end
+  else
+    def delete_header(%Req.Request{} = request, name) when is_binary(name) do
+      name = Req.__ensure_header_downcase__(name)
+      update_in(request.headers, &Map.delete(&1, name))
     end
   end
 
@@ -905,11 +981,22 @@ defmodule Req.Request do
       {headers, options} =
         if Req.Request.get_option(request, :redact_auth, true) do
           headers =
-            for {name, value} <- request.headers do
-              if name in ["authorization", "Authorization"] do
-                {name, "[redacted]"}
-              else
-                {name, value}
+            if Req.MixProject.legacy_headers_as_lists?() do
+              for {name, value} <- request.headers do
+                if Req.__ensure_header_downcase__(name) == "authorization" do
+                  {name, "[redacted]"}
+                else
+                  {name, value}
+                end
+              end
+            else
+              for {name, values} <- request.headers, into: %{} do
+                if Req.__ensure_header_downcase__(name) == "authorization" do
+                  [_] = values
+                  {name, ["[redacted]"]}
+                else
+                  {name, values}
+                end
               end
             end
 

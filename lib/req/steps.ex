@@ -648,8 +648,18 @@ defmodule Req.Steps do
   def run_finch(request) do
     finch_name = finch_name(request)
 
+    request_headers =
+      if unquote(Req.MixProject.legacy_headers_as_lists?()) do
+        request.headers
+      else
+        for {name, values} <- request.headers,
+            value <- values do
+          {name, value}
+        end
+      end
+
     finch_request =
-      Finch.build(request.method, request.url, request.headers, request.body)
+      Finch.build(request.method, request.url, request_headers, request.body)
       |> Map.replace!(:unix_socket, request.options[:unix_socket])
 
     finch_options =
@@ -809,7 +819,7 @@ defmodule Req.Steps do
   end
 
   defp run_plug(request) do
-    body =
+    req_body =
       case request.body do
         nil ->
           ""
@@ -821,16 +831,27 @@ defmodule Req.Steps do
           IO.iodata_to_binary(iodata)
       end
 
+    req_headers =
+      if unquote(Req.MixProject.legacy_headers_as_lists?()) do
+        request.headers
+      else
+        for {name, values} <- request.headers,
+            value <- values do
+          {name, value}
+        end
+      end
+
     conn =
-      Plug.Test.conn(request.method, request.url, body)
-      |> Map.replace!(:req_headers, request.headers)
+      Plug.Test.conn(request.method, request.url, req_body)
+      |> Map.replace!(:req_headers, req_headers)
       |> call_plug(request.options[:plug])
 
-    response = %Req.Response{
-      status: conn.status,
-      headers: conn.resp_headers,
-      body: conn.resp_body
-    }
+    response =
+      Req.Response.new(
+        status: conn.status,
+        headers: conn.resp_headers,
+        body: conn.resp_body
+      )
 
     {request, response}
   end
@@ -906,7 +927,7 @@ defmodule Req.Steps do
     if request.options[:raw] do
       {request, response}
     else
-      codecs = get_content_encoding_header(response.headers)
+      codecs = compression_algorithms(Req.Response.get_header(response, "content-encoding"))
       {decompressed_body, unknown_codecs} = decompress_body(codecs, response.body, [])
       decompressed_content_length = decompressed_body |> byte_size() |> to_string()
 
@@ -959,6 +980,17 @@ defmodule Req.Steps do
 
   defp decompress_body([], body, acc) do
     {body, acc}
+  end
+
+  defp compression_algorithms(values) do
+    values
+    |> Enum.flat_map(fn value ->
+      value
+      |> String.downcase()
+      |> String.split(",", trim: true)
+      |> Enum.map(&String.trim/1)
+    end)
+    |> Enum.reverse()
   end
 
   defmacrop nimble_csv_loaded? do
@@ -1120,14 +1152,18 @@ defmodule Req.Steps do
   end
 
   defp format(request, response) do
-    with {_, content_type} <- List.keyfind(response.headers, "content-type", 0) do
-      # remove ` || ` when we require Elixir v1.13
-      path = request.url.path || ""
+    case Req.Response.get_header(response, "content-type") do
+      [content_type] ->
+        # TODO: remove ` || ` when we require Elixir v1.13
+        path = request.url.path || ""
 
-      case extensions(content_type, path) do
-        [ext | _] -> ext
-        [] -> nil
-      end
+        case extensions(content_type, path) do
+          [ext | _] -> ext
+          [] -> nil
+        end
+
+      [] ->
+        []
     end
   end
 
@@ -1234,7 +1270,7 @@ defmodule Req.Steps do
   end
 
   defp build_redirect_request(request, response) do
-    {_, location} = List.keyfind(response.headers, "location", 0)
+    [location] = Req.Response.get_header(response, "location")
 
     log_level = Req.Request.get_option(request, :redirect_log_level, :debug)
     log_redirect(log_level, location)
@@ -1275,14 +1311,10 @@ defmodule Req.Steps do
          {request.url.host, request.url.scheme, request.url.port} do
       request
     else
-      remove_credentials(request)
+      request
+      |> Req.Request.delete_header("authorization")
+      |> Req.Request.delete_option(:auth)
     end
-  end
-
-  defp remove_credentials(request) do
-    headers = List.keydelete(request.headers, "authorization", 0)
-    request = Req.Request.delete_option(request, :auth)
-    %{request | headers: headers}
   end
 
   @doc """
@@ -1549,21 +1581,6 @@ defmodule Req.Steps do
   end
 
   ## Utilities
-
-  defp get_content_encoding_header(headers) do
-    headers
-    |> Enum.flat_map(fn {name, value} ->
-      if String.downcase(name) == "content-encoding" do
-        value
-        |> String.downcase()
-        |> String.split(",", trim: true)
-        |> Stream.map(&String.trim/1)
-      else
-        []
-      end
-    end)
-    |> Enum.reverse()
-  end
 
   defp cache_path(cache_dir, request) do
     cache_key =

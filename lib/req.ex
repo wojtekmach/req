@@ -335,14 +335,14 @@ defmodule Req do
       iex> req = Req.new(headers: [point_x: 1])
       iex> req = Req.update(req, headers: [point_y: 2])
       iex> req.headers
-      [{"point-x", "1"}, {"point-y", "2"}]
+      %{"point-x" => ["1"], "point-y" => ["2"]}
 
   The same header names are overwritten however:
 
       iex> req = Req.new(headers: [authorization: "bearer foo"])
       iex> req = Req.update(req, headers: [authorization: "bearer bar"])
       iex> req.headers
-      [{"authorization", "bearer bar"}]
+      %{"authorization" => ["bearer bar"]}
 
   Similarly to headers, `:params` are merged too:
 
@@ -372,9 +372,13 @@ defmodule Req do
 
         {:headers, new_headers}, acc ->
           update_in(acc.headers, fn old_headers ->
-            new_headers = encode_headers(new_headers)
-            new_header_names = Enum.map(new_headers, &elem(&1, 0))
-            Enum.reject(old_headers, &(elem(&1, 0) in new_header_names)) ++ new_headers
+            if unquote(Req.MixProject.legacy_headers_as_lists?()) do
+              new_headers = encode_headers(new_headers)
+              new_header_names = Enum.map(new_headers, &elem(&1, 0))
+              Enum.reject(old_headers, &(elem(&1, 0) in new_header_names)) ++ new_headers
+            else
+              Map.merge(old_headers, encode_headers(new_headers))
+            end
           end)
 
         {name, value}, acc ->
@@ -942,32 +946,52 @@ defmodule Req do
     Application.put_env(:req, :default_options, options)
   end
 
-  defp encode_headers(headers) do
-    for {name, value} <- headers do
-      name =
-        case name do
-          atom when is_atom(atom) ->
-            atom |> Atom.to_string() |> String.replace("_", "-") |> String.downcase(:ascii)
-
-          binary when is_binary(binary) ->
-            String.downcase(binary, :ascii)
-        end
-
-      value =
-        case value do
-          %DateTime{} = datetime ->
-            datetime |> DateTime.shift_zone!("Etc/UTC") |> Req.Steps.format_http_datetime()
-
-          %NaiveDateTime{} = datetime ->
-            IO.warn("setting header to %NaiveDateTime{} is deprecated, use %DateTime{} instead")
-            Req.Steps.format_http_datetime(datetime)
-
-          _ ->
-            String.Chars.to_string(value)
-        end
-
-      {name, value}
+  if Req.MixProject.legacy_headers_as_lists?() do
+    defp encode_headers(headers) do
+      for {name, value} <- headers do
+        {encode_header_name(name), encode_header_value(value)}
+      end
     end
+  else
+    defp encode_headers(headers) do
+      Enum.reduce(headers, %{}, fn {name, value}, acc ->
+        Map.update(
+          acc,
+          encode_header_name(name),
+          encode_header_values(List.wrap(value)),
+          &(&1 ++ encode_header_values(List.wrap(value)))
+        )
+      end)
+    end
+
+    defp encode_header_values([value | rest]) do
+      [encode_header_value(value) | encode_header_values(rest)]
+    end
+
+    defp encode_header_values([]) do
+      []
+    end
+  end
+
+  defp encode_header_name(name) when is_atom(name) do
+    name |> Atom.to_string() |> String.replace("_", "-") |> __ensure_header_downcase__()
+  end
+
+  defp encode_header_name(name) when is_binary(name) do
+    __ensure_header_downcase__(name)
+  end
+
+  defp encode_header_value(%DateTime{} = datetime) do
+    datetime |> DateTime.shift_zone!("Etc/UTC") |> Req.Steps.format_http_datetime()
+  end
+
+  defp encode_header_value(%NaiveDateTime{} = datetime) do
+    IO.warn("setting header to %NaiveDateTime{} is deprecated, use %DateTime{} instead")
+    Req.Steps.format_http_datetime(datetime)
+  end
+
+  defp encode_header_value(value) do
+    String.Chars.to_string(value)
   end
 
   # Plugins support is experimental, undocumented, and likely won't make the new release.
