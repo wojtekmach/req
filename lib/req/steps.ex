@@ -906,50 +906,59 @@ defmodule Req.Steps do
     if request.options[:raw] do
       {request, response}
     else
-      compression_algorithms = get_content_encoding_header(response.headers)
-      decompressed_body = decompress_body(response.body, compression_algorithms)
+      codecs = get_content_encoding_header(response.headers)
+      {decompressed_body, unknown_codecs} = decompress_body(codecs, response.body, [])
       decompressed_content_length = decompressed_body |> byte_size() |> to_string()
 
       response =
         %Req.Response{response | body: decompressed_body}
         |> Req.Response.put_header("content-length", decompressed_content_length)
-        |> Req.Response.delete_header("content-encoding")
+
+      response =
+        if unknown_codecs == [] do
+          Req.Response.delete_header(response, "content-encoding")
+        else
+          Req.Response.put_header(response, "content-encoding", Enum.join(unknown_codecs, ", "))
+        end
 
       {request, response}
     end
   end
 
-  defp decompress_body(body, algorithms) do
-    Enum.reduce(algorithms, body, &decompress_with_algorithm(&1, &2))
+  defp decompress_body([gzip | rest], body, acc) when gzip in ["gzip", "x-gzip"] do
+    decompress_body(rest, :zlib.gunzip(body), acc)
   end
 
-  defp decompress_with_algorithm(gzip, body) when gzip in ["gzip", "x-gzip"] do
-    :zlib.gunzip(body)
-  end
-
-  defp decompress_with_algorithm("br", body) do
+  defp decompress_body(["br" | rest], body, acc) do
     if brotli_loaded?() do
       {:ok, decompressed} = :brotli.decode(body)
-      decompressed
+      decompress_body(rest, decompressed, acc)
     else
-      raise("`:brotli` decompression library not loaded")
+      Logger.debug("decompress_body: :brotli library not loaded, skipping brotli decompression")
+      decompress_body(rest, body, ["br" | acc])
     end
   end
 
-  defp decompress_with_algorithm("zstd", body) do
+  defp decompress_body(["zstd" | rest], body, acc) do
     if ezstd_loaded?() do
-      :ezstd.decompress(body)
+      decompress_body(rest, :ezstd.decompress(body), acc)
     else
-      raise("`:ezstd` decompression library not loaded")
+      Logger.debug("decompress_body: :ezstd library not loaded, skipping zstd decompression")
+      decompress_body(rest, body, ["zstd" | acc])
     end
   end
 
-  defp decompress_with_algorithm("identity", body) do
-    body
+  defp decompress_body(["identity" | rest], body, acc) do
+    decompress_body(rest, body, acc)
   end
 
-  defp decompress_with_algorithm(_algorithm, body) do
-    body
+  defp decompress_body([codec | rest], body, acc) do
+    Logger.debug("decompress_body: algorithm #{inspect(codec)} is not supported")
+    decompress_body(rest, body, [codec | acc])
+  end
+
+  defp decompress_body([], body, acc) do
+    {body, acc}
   end
 
   defmacrop nimble_csv_loaded? do

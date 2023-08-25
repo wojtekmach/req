@@ -149,14 +149,11 @@ defmodule Req.Response do
 
   ## Examples
 
-      iex> response.headers
-      [
-        {"cache-control", "max-age=600"},
-        {"content-type", "text/html"},
-        {"Cache-Control", "no-transform"}
-      ]
-      iex> Req.Response.delete_header(response, "cache-control").headers
-      [{"content-type", "text/html"}]
+      iex> Req.Response.get_header(resp, "cache-control")
+      ["max-age=600", "no-transform"]
+      iex> resp = Req.Response.delete_header(resp, "cache-control")
+      iex> Req.Response.get_header(resp, "cache-control")
+      []
 
   """
   def delete_header(%Req.Response{} = response, key) when is_binary(key) do

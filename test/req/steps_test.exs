@@ -349,15 +349,16 @@ defmodule Req.StepsTest do
       assert Req.get!(c.url).body == "foo"
     end
 
-    test "unknown codec", c do
+    @tag :capture_log
+    test "unknown codecs", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         conn
-        |> Plug.Conn.put_resp_header("content-encoding", "unknown")
+        |> Plug.Conn.put_resp_header("content-encoding", "unknown1, unknown2")
         |> Plug.Conn.send_resp(200, <<1, 2, 3>>)
       end)
 
       resp = Req.get!(c.url)
-      assert Req.Response.get_header(resp, "content-encoding") == ["unknown"]
+      assert Req.Response.get_header(resp, "content-encoding") == ["unknown1, unknown2"]
       assert resp.body == <<1, 2, 3>>
     end
 
