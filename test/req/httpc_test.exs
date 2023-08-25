@@ -55,58 +55,74 @@ defmodule Req.HttpcTest do
       assert resp.body == "foofoo"
     end
 
-    # test "stream callback", c do
-    #   Bypass.expect(c.bypass, "GET", "/", fn conn ->
-    #     conn = Plug.Conn.send_chunked(conn, 200)
-    #     {:ok, conn} = Plug.Conn.chunk(conn, "foo")
-    #     {:ok, conn} = Plug.Conn.chunk(conn, "bar")
-    #     conn
-    #   end)
+    test "stream callback", %{req: req, bypass: bypass} do
+      Bypass.expect(bypass, "GET", "/", fn conn ->
+        conn = Plug.Conn.send_chunked(conn, 200)
+        {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+        {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+        conn
+      end)
 
-    #   pid = self()
+      pid = self()
 
-    #   resp =
-    #     Req.get!(
-    #       adapter: :httpc,
-    #       url: "http://localhost:#{c.bypass.port}",
-    #       stream: fn {:data, data}, acc ->
-    #         send(pid, {:data, data})
-    #         {:cont, acc}
-    #       end
-    #     )
+      resp =
+        Req.get!(
+          req,
+          stream: fn {:data, data}, acc ->
+            send(pid, {:data, data})
+            {:cont, acc}
+          end
+        )
 
-    #   assert resp.status == 200
-    #   assert_receive {:data, "foobar"}
-    #   refute_receive _
-    # end
+      assert resp.status == 200
+      assert_receive {:data, "foobar"}
 
-    # test "async request", c do
-    #   Bypass.expect(c.bypass, "GET", "/", fn conn ->
-    #     conn = Plug.Conn.send_chunked(conn, 200)
-    #     {:ok, conn} = Plug.Conn.chunk(conn, "foo")
-    #     {:ok, conn} = Plug.Conn.chunk(conn, "bar")
-    #     conn
-    #   end)
+      receive do
+        # TODO: investigate
+        {:data, ""} -> :ok
+      after
+        0 -> :ok
+      end
 
-    #   {req, resp} = Req.async_request!(adapter: :httpc, url: "http://localhost:#{c.bypass.port}")
-    #   assert resp.status == 200
-    #   assert {:ok, [data: "foobar"]} = Req.parse_message(req, assert_receive(_))
-    #   assert {:ok, [:done]} = Req.parse_message(req, assert_receive(_))
-    #   refute_receive _
-    # end
+      refute_receive _
+    end
 
-    # test "async request cancellation", c do
-    #   Bypass.expect(c.bypass, "GET", "/", fn conn ->
-    #     conn = Plug.Conn.send_chunked(conn, 200)
-    #     {:ok, conn} = Plug.Conn.chunk(conn, "foo")
-    #     {:ok, conn} = Plug.Conn.chunk(conn, "bar")
-    #     conn
-    #   end)
+    test "async request", %{req: req, bypass: bypass} do
+      Bypass.expect(bypass, "GET", "/", fn conn ->
+        conn = Plug.Conn.send_chunked(conn, 200)
+        {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+        {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+        conn
+      end)
 
-    #   {req, resp} = Req.async_request!(adapter: :httpc, url: "http://localhost:#{c.bypass.port}")
-    #   assert resp.status == 200
-    #   assert :ok = Req.cancel_async_request(req)
-    # end
+      {req, resp} = Req.async_request!(req)
+      assert resp.status == 200
+      assert {:ok, [data: "foobar"]} = Req.parse_message(req, assert_receive(_))
+
+      case Req.parse_message(req, assert_receive(_)) do
+        {:ok, [:done]} ->
+          :ok
+
+        # TODO: investigate
+        {:ok, [data: ""]} ->
+          assert {:ok, [:done]} = Req.parse_message(req, assert_receive(_))
+      end
+
+      refute_receive _
+    end
+
+    test "async request cancellation", %{req: req, bypass: bypass} do
+      Bypass.expect(bypass, "GET", "/", fn conn ->
+        conn = Plug.Conn.send_chunked(conn, 200)
+        {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+        {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+        conn
+      end)
+
+      {req, resp} = Req.async_request!(req)
+      assert resp.status == 200
+      assert :ok = Req.cancel_async_request(req)
+    end
   end
 
   def run_httpc(request) do
@@ -159,18 +175,16 @@ defmodule Req.HttpcTest do
       body_format: :binary
     ]
 
-    # case request.stream do
-    #   nil ->
-    #     httpc_request(request, httpc_req, httpc_http_options, httpc_options, nil)
-    #
-    #   :self ->
-    #     httpc_async(request, httpc_req, httpc_http_options, httpc_options, nil)
-    #
-    #   fun ->
-    #     httpc_async(request, httpc_req, httpc_http_options, httpc_options, fun)
-    # end
+    case request.stream do
+      nil ->
+        httpc_request(request, httpc_req, httpc_http_options, httpc_options)
 
-    httpc_request(request, httpc_req, httpc_http_options, httpc_options)
+      :self ->
+        httpc_async(request, httpc_req, httpc_http_options, httpc_options, nil)
+
+      fun ->
+        httpc_async(request, httpc_req, httpc_http_options, httpc_options, fun)
+    end
   end
 
   defp httpc_request(request, httpc_req, httpc_http_options, httpc_options) do
@@ -208,98 +222,98 @@ defmodule Req.HttpcTest do
     end
   end
 
-  # defp httpc_async(request, httpc_req, httpc_http_options, httpc_options, fun) do
-  #   httpc_stream =
-  #     if fun do
-  #       {:self, :once}
-  #     else
-  #       :self
-  #     end
+  defp httpc_async(request, httpc_req, httpc_http_options, httpc_options, fun) do
+    httpc_stream =
+      if fun do
+        {:self, :once}
+      else
+        :self
+      end
 
-  #   httpc_options = [sync: false, stream: httpc_stream] ++ httpc_options
-  #   {:ok, ref} = :httpc.request(request.method, httpc_req, httpc_http_options, httpc_options)
+    httpc_options = [sync: false, stream: httpc_stream] ++ httpc_options
+    {:ok, ref} = :httpc.request(request.method, httpc_req, httpc_http_options, httpc_options)
 
-  #   receive do
-  #     {:http, {^ref, :stream_start, headers}} ->
-  #       headers =
-  #         for {name, value} <- headers do
-  #           {List.to_string(name), List.to_string(value)}
-  #         end
+    receive do
+      {:http, {^ref, :stream_start, headers}} ->
+        headers =
+          for {name, value} <- headers do
+            {List.to_string(name), List.to_string(value)}
+          end
 
-  #       status =
-  #         case List.keyfind(headers, "content-range", 0) do
-  #           {_, _} -> 206
-  #           _ -> 200
-  #         end
+        status =
+          case List.keyfind(headers, "content-range", 0) do
+            {_, _} -> 206
+            _ -> 200
+          end
 
-  #       async = %Req.Async{
-  #         ref: ref,
-  #         stream_fun: &httpc_stream/2,
-  #         cancel_fun: &httpc_cancel/1
-  #       }
+        async = %Req.Async{
+          ref: ref,
+          stream_fun: &httpc_stream/2,
+          cancel_fun: &httpc_cancel/1
+        }
 
-  #       request = put_in(request.async, async)
-  #       response = Req.Response.new(status: status, headers: headers)
-  #       {request, response}
+        request = put_in(request.async, async)
+        response = Req.Response.new(status: status, headers: headers)
+        {request, response}
 
-  #     {:http, {ref, :stream_start, headers, pid}} ->
-  #       headers =
-  #         for {name, value} <- headers do
-  #           {List.to_string(name), List.to_string(value)}
-  #         end
+      {:http, {ref, :stream_start, headers, pid}} ->
+        headers =
+          for {name, value} <- headers do
+            {List.to_string(name), List.to_string(value)}
+          end
 
-  #       status =
-  #         case List.keyfind(headers, "content-range", 0) do
-  #           {_, _} -> 206
-  #           _ -> 200
-  #         end
+        status =
+          case List.keyfind(headers, "content-range", 0) do
+            {_, _} -> 206
+            _ -> 200
+          end
 
-  #       response = Req.Response.new(status: status, headers: headers)
-  #       httpc_loop(request, response, ref, pid, fun)
+        response = Req.Response.new(status: status, headers: headers)
+        httpc_loop(request, response, ref, pid, fun)
 
-  #     {:http, {^ref, {{_, status, _}, headers, body}}} ->
-  #       headers =
-  #         for {name, value} <- headers do
-  #           {List.to_string(name), List.to_string(value)}
-  #         end
+      {:http, {^ref, {{_, status, _}, headers, body}}} ->
+        headers =
+          for {name, value} <- headers do
+            {List.to_string(name), List.to_string(value)}
+          end
 
-  #       response = Req.Response.new(status: status, headers: headers, body: body)
-  #       {request, response}
-  #   end
-  # end
+        response = Req.Response.new(status: status, headers: headers, body: body)
+        {request, response}
+    end
+  end
 
-  # @doc false
-  # def httpc_stream(ref, {:http, {ref, :stream, data}}) do
-  #   {:ok, [{:data, data}]}
-  # end
+  @doc false
+  def httpc_stream(ref, {:http, {ref, :stream, data}}) do
+    {:ok, [{:data, data}]}
+  end
 
-  # # TODO: handle trailers
-  # def httpc_stream(ref, {:http, {ref, :stream_end, _headers}}) do
-  #   {:ok, [:done]}
-  # end
+  # TODO: handle trailers
+  def httpc_stream(ref, {:http, {ref, :stream_end, _headers}}) do
+    {:ok, [:done]}
+  end
 
-  # @doc false
-  # def httpc_cancel(ref) do
-  #   :httpc.cancel_request(ref)
-  # end
+  @doc false
+  def httpc_cancel(ref) do
+    :httpc.cancel_request(ref)
+  end
 
-  # defp httpc_loop(request, response, ref, pid, fun) do
-  #   :ok = :httpc.stream_next(pid)
+  defp httpc_loop(request, response, ref, pid, fun) do
+    :ok = :httpc.stream_next(pid)
 
-  #   receive do
-  #     {:http, {^ref, :stream, data}} ->
-  #       case fun.({:data, data}, {request, response}) do
-  #         {:cont, {request, response}} ->
-  #           httpc_loop(request, response, ref, pid, fun)
+    receive do
+      {:http, {^ref, :stream, data}} ->
+        case fun.({:data, data}, {request, response}) do
+          {:cont, {request, response}} ->
+            httpc_loop(request, response, ref, pid, fun)
 
-  #         {:halt, {request, response}} ->
-  #           :ok = :httpc.cancel_request(ref)
-  #           {request, response}
-  #       end
+          {:halt, {request, response}} ->
+            :ok = :httpc.cancel_request(ref)
+            {request, response}
+        end
 
-  #     # TODO: handle trailers
-  #     {:http, {^ref, :stream_end, _headers}} ->
-  #       {request, response}
-  #   end
-  # end
+      # TODO: handle trailers
+      {:http, {^ref, :stream_end, _headers}} ->
+        {request, response}
+    end
+  end
 end

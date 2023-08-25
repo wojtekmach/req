@@ -24,6 +24,8 @@ Req is a batteries-included HTTP client for Elixir.
 
   * Range requests (via [`put_range`]) step.)
 
+  * Response streaming
+
   * Follows redirects (via [`follow_redirects`] step.)
 
   * Retries on errors (via [`retry`] step.)
@@ -183,11 +185,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-[`Req.request/1`]: https://hexdocs.pm/req/Req.html#request/1
-[`Req.new/1`]:     https://hexdocs.pm/req/Req.html#new/1
-[`Req.get!/2`]:    https://hexdocs.pm/req/Req.html#get!/2
-[`Req.post!/2`]:   https://hexdocs.pm/req/Req.html#post!/2
-[`Req.Request`]:   https://hexdocs.pm/req/Req.Request.html
+[`Req.request/1`]:       https://hexdocs.pm/req/Req.html#request/1
+[`Req.new/1`]:           https://hexdocs.pm/req/Req.html#new/1
+[`Req.get!/2`]:          https://hexdocs.pm/req/Req.html#get!/2
+[`Req.post!/2`]:         https://hexdocs.pm/req/Req.html#post!/2
+[`Req.async_request/2`]: https://hexdocs.pm/req/Req.html#async_request/2
+[`Req.Request`]:         https://hexdocs.pm/req/Req.Request.html
 
 [`auth`]:               https://hexdocs.pm/req/Req.Steps.html#auth/1
 [`cache`]:              https://hexdocs.pm/req/Req.Steps.html#cache/1

@@ -348,7 +348,9 @@ defmodule Req.Request do
             error_steps: [],
             private: %{},
             registered_options: MapSet.new(),
-            current_request_steps: []
+            current_request_steps: [],
+            stream: nil,
+            async: nil
 
   @doc """
   Returns a new request struct.

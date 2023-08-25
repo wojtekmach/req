@@ -620,7 +620,7 @@ defmodule Req.Steps do
 
       iex> Req.get!(url, connect_options: [transport_opts: [cacerts: :public_key.cacerts_get()]])
 
-  Stream response body:
+  Stream response body using `Finch.stream/5`:
 
       fun = fn request, finch_request, finch_name, finch_options ->
         fun = fn
@@ -682,7 +682,56 @@ defmodule Req.Steps do
         {request, run_finch_request(deprecated_fun.(finch_request), finch_name, finch_options)}
 
       nil ->
-        {request, run_finch_request(finch_request, finch_name, finch_options)}
+        case request.stream do
+          nil ->
+            {request, run_finch_request(finch_request, finch_name, finch_options)}
+
+          fun when is_function(fun, 2) ->
+            response = Req.Response.new()
+
+            fun = fn
+              {:status, status}, {request, response} ->
+                {request, %{response | status: status}}
+
+              {:headers, headers}, {request, response} ->
+                {request, %{response | headers: headers}}
+
+              {:data, data}, acc ->
+                {:cont, result} = fun.({:data, data}, acc)
+                # TODO: handle {:halt, result}
+                result
+            end
+
+            case Finch.stream(finch_request, finch_name, {request, response}, fun, finch_options) do
+              {:ok, acc} ->
+                acc
+            end
+
+          :self ->
+            ref = Finch.async_request(finch_request, finch_name)
+
+            {:status, status} =
+              receive do
+                {^ref, message} ->
+                  message
+              end
+
+            {:headers, headers} =
+              receive do
+                {^ref, message} ->
+                  message
+              end
+
+            async = %Req.Async{
+              ref: ref,
+              stream_fun: &finch_parse_message/2,
+              cancel_fun: &finch_cancel/1
+            }
+
+            request = put_in(request.async, async)
+            response = Req.Response.new(status: status, headers: headers)
+            {request, response}
+        end
     end
   end
 
@@ -691,6 +740,23 @@ defmodule Req.Steps do
       {:ok, response} -> Req.Response.new(response)
       {:error, exception} -> exception
     end
+  end
+
+  defp finch_parse_message(ref, {ref, {:data, data}}) do
+    {:ok, [{:data, data}]}
+  end
+
+  defp finch_parse_message(ref, {ref, :done}) do
+    {:ok, [:done]}
+  end
+
+  # TODO: handle remaining possible Finch results
+  defp finch_parse_message(_ref, _other) do
+    :unknown
+  end
+
+  defp finch_cancel(ref) do
+    Finch.cancel_async_request(ref)
   end
 
   defp finch_name(request) do

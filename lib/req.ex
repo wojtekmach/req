@@ -1,5 +1,5 @@
 defmodule Req do
-  @moduledoc """
+  @moduledoc ~S"""
   The high-level API.
 
   Req is composed of three main pieces:
@@ -35,7 +35,37 @@ defmodule Req do
       iex> stream = Stream.duplicate("foo", 3)
       iex> Req.post!("https://httpbin.org/post", body: {:stream, stream}).body["data"]
       "foofoofoo"
+
+  Response streaming using callback:
+
+      iex> resp =
+      ...>   Req.get!("http://httpbin.org/stream/2", stream: fn {:data, data}, acc ->
+      ...>     IO.puts("got chunk with #{byte_size(data)} bytes")
+      ...>     {:cont, acc}
+      ...>   end)
+      # Outputs: got chunk with 249 bytes
+      # Outputs: got chunk with 249 bytes
+      iex> resp.status
+      200
+      iex> resp.body
+      ""
   """
+
+  # TODO: Add when new version of Finch is out.
+  # Response streaming to caller:
+  #
+  #     iex> {req, resp} = Req.async_request!("http://httpbin.org/stream/2")
+  #     iex> resp.status
+  #     200
+  #     iex> resp.body
+  #     ""
+  #     iex> Req.parse_message(req, receive do message -> message end)
+  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
+  #     iex> Req.parse_message(req, receive do message -> message end)
+  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
+  #     iex> Req.parse_message(req, receive do message -> message end)
+  #     [:done]
+  #     ""
 
   @type url() :: URI.t() | String.t()
 
@@ -71,9 +101,9 @@ defmodule Req do
 
       Can be one of:
 
-        * `iodata`
+        * `iodata` - send request body eagerly
 
-        * `{:stream, enumerable}`
+        * `{:stream, enumerable}` - stream `enumerable` as request body
 
   Additional URL options:
 
@@ -146,9 +176,20 @@ defmodule Req do
 
     * `:max_redirects` - the maximum number of redirects, defaults to `10`.
 
+  Response streaming:
+
+    * `:stream` - a 2-arity function used to stream response. The first argument is a "Stream Command" tuple
+      described below. The second argument is a `{request, response}` tuple.
+
+      The "Stream Command" is one of:
+
+        * `{:data, data}` - a chunk of the response body.
+
+      See module documentation for an example of streaming responses.
+
   Retry options ([`retry`](`Req.Steps.retry/1`) step):
 
-    * `:retry`: can be set to: `:safe` (default) to only retry GET/HEAD requests on HTTP 408/5xx
+    * `:retry` - can be set to: `:safe` (default) to only retry GET/HEAD requests on HTTP 408/5xx
       responses or exceptions, `false` to never retry, and `fun` - a 1-arity function that accepts
       either a `Req.Response` or an exception struct and returns boolean whether to retry
 
@@ -212,13 +253,13 @@ defmodule Req do
       iex> URI.to_string(req.url)
       "https://elixir-lang.org"
 
-  With mock adapter:
+  Fake adapter:
 
-      iex> mock = fn request ->
+      iex> fake = fn request ->
       ...>   {request, Req.Response.new(status: 200, body: "it works!")}
       ...> end
       iex>
-      iex> req = Req.new(adapter: mock)
+      iex> req = Req.new(adapter: fake)
       iex> Req.get!(req).body
       "it works!"
 
@@ -353,7 +394,7 @@ defmodule Req do
   """
   @spec update(Req.Request.t(), options :: keyword()) :: Req.Request.t()
   def update(%Req.Request{} = request, options) when is_list(options) do
-    request_option_names = [:method, :url, :headers, :body, :adapter]
+    request_option_names = [:method, :url, :headers, :body, :adapter, :stream]
 
     {request_options, options} = Keyword.split(options, request_option_names)
 
@@ -915,6 +956,48 @@ defmodule Req do
     case request(request, options) do
       {:ok, response} -> response
       {:error, exception} -> raise exception
+    end
+  end
+
+  # TODO
+  @doc false
+  def async_request(request, options \\ []) do
+    Req.Request.run_request(%{new(request, options) | stream: :self})
+  end
+
+  # TODO
+  @doc false
+  def async_request!(request, options \\ []) do
+    case async_request(request, options) do
+      {request, %Req.Response{} = response} ->
+        {request, response}
+
+      {_request, exception} ->
+        raise exception
+    end
+  end
+
+  def parse_message(%Req.Request{} = request, message) do
+    request.async.stream_fun.(request.async.ref, message)
+  end
+
+  def cancel_async_request(%Req.Request{} = request) do
+    request.async.cancel_fun.(request.async.ref)
+  end
+
+  def run_request(request, options \\ []) do
+    request
+    |> Req.update(options)
+    |> Req.Request.run_request()
+  end
+
+  def run_request!(request, options \\ []) do
+    case run_request(request, options) do
+      {request, %Req.Response{} = response} ->
+        {request, response}
+
+      {_request, exception} ->
+        raise exception
     end
   end
 
