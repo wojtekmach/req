@@ -947,10 +947,10 @@ defmodule Req do
       name =
         case name do
           atom when is_atom(atom) ->
-            atom |> Atom.to_string() |> String.replace("_", "-") |> String.downcase(:ascii)
+            atom |> Atom.to_string() |> String.replace("_", "-") |> __ensure_header_downcase__()
 
           binary when is_binary(binary) ->
-            String.downcase(binary, :ascii)
+            __ensure_header_downcase__(binary)
         end
 
       value =
