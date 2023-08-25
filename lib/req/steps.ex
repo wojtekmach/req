@@ -906,7 +906,7 @@ defmodule Req.Steps do
     if request.options[:raw] do
       {request, response}
     else
-      codecs = get_content_encoding_header(response.headers)
+      codecs = compression_algorithms(Req.Response.get_header(response, "content-encoding"))
       {decompressed_body, unknown_codecs} = decompress_body(codecs, response.body, [])
       decompressed_content_length = decompressed_body |> byte_size() |> to_string()
 
@@ -959,6 +959,17 @@ defmodule Req.Steps do
 
   defp decompress_body([], body, acc) do
     {body, acc}
+  end
+
+  defp compression_algorithms(values) do
+    values
+    |> Enum.flat_map(fn value ->
+      value
+      |> String.downcase()
+      |> String.split(",", trim: true)
+      |> Enum.map(&String.trim/1)
+    end)
+    |> Enum.reverse()
   end
 
   defmacrop nimble_csv_loaded? do
@@ -1549,21 +1560,6 @@ defmodule Req.Steps do
   end
 
   ## Utilities
-
-  defp get_content_encoding_header(headers) do
-    headers
-    |> Enum.flat_map(fn {name, value} ->
-      if String.downcase(name) == "content-encoding" do
-        value
-        |> String.downcase()
-        |> String.split(",", trim: true)
-        |> Stream.map(&String.trim/1)
-      else
-        []
-      end
-    end)
-    |> Enum.reverse()
-  end
 
   defp cache_path(cache_dir, request) do
     cache_key =
