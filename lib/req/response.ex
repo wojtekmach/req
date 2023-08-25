@@ -145,7 +145,7 @@ defmodule Req.Response do
   end
 
   @doc """
-  Deletes the header given by `key`
+  Deletes the header given by `name`.
 
   All occurences of the header are deleted, in case the header is repeated multiple times.
 

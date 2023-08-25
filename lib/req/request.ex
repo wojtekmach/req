@@ -727,6 +727,34 @@ defmodule Req.Request do
   end
 
   @doc """
+  Deletes the header given by `name`.
+
+  All occurences of the header are deleted, in case the header is repeated multiple times.
+
+  ## Examples
+
+      iex> Req.Request.get_header(req, "cache-control")
+      ["max-age=600", "no-transform"]
+      iex> req = Req.Request.delete_header(req, "cache-control")
+      iex> Req.Request.get_header(req, "cache-control")
+      []
+
+  """
+  def delete_header(%Req.Request{} = request, name) when is_binary(name) do
+    name_to_delete = Req.__ensure_header_downcase__(name)
+
+    %Req.Request{
+      request
+      | headers:
+          for(
+            {name, value} <- request.headers,
+            name != name_to_delete,
+            do: {name, value}
+          )
+    }
+  end
+
+  @doc """
   Registers options to be used by a custom steps.
 
   Req ensures that all used options were previously registered which helps

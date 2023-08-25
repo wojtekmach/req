@@ -1286,14 +1286,10 @@ defmodule Req.Steps do
          {request.url.host, request.url.scheme, request.url.port} do
       request
     else
-      remove_credentials(request)
+      request
+      |> Req.Request.delete_header("authorization")
+      |> Req.Request.delete_option(:auth)
     end
-  end
-
-  defp remove_credentials(request) do
-    headers = List.keydelete(request.headers, "authorization", 0)
-    request = Req.Request.delete_option(request, :auth)
-    %{request | headers: headers}
   end
 
   @doc """
