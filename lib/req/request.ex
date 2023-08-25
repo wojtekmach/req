@@ -56,13 +56,13 @@ defmodule Req.Request do
 
   Public fields are:
 
-    * `:method` - the HTTP request method
+    * `:method` - the HTTP request method.
 
-    * `:url` - the HTTP request URL
+    * `:url` - the HTTP request URL.
 
-    * `:headers` - the HTTP request headers
+    * `:headers` - the HTTP request headers. The header names must be downcased.
 
-    * `:body` - the HTTP request body
+    * `:body` - the HTTP request body.
 
       Can be one of:
 
@@ -304,7 +304,7 @@ defmodule Req.Request do
                [:with_body]
              ) do
           {:ok, status, headers, body} ->
-            headers = for {name, value} <- headers, do: {String.downcase(name), value}
+            headers = for {name, value} <- headers, do: {String.downcase(name, :ascii), value}
             response = %Req.Response{status: status, headers: headers, body: body}
             {request, response}
 
@@ -647,7 +647,7 @@ defmodule Req.Request do
   end
 
   @doc """
-  Returns the values of the header specified by `key`.
+  Returns the values of the header specified by `name`.
 
   ## Examples
 
@@ -657,20 +657,14 @@ defmodule Req.Request do
 
   """
   @spec get_header(t(), binary()) :: [binary()]
-  def get_header(%Req.Request{} = request, key) when is_binary(key) do
-    for {^key, value} <- request.headers, do: value
+  def get_header(%Req.Request{} = request, name) when is_binary(name) do
+    name = Req.__ensure_header_downcase__(name)
+    for {^name, value} <- request.headers, do: value
   end
 
   @doc """
-  Adds a new request header (`key`) if not present, otherwise replaces the
+  Adds a new request header `name` if not present, otherwise replaces the
   previous value of that header with `value`.
-
-  Because header keys are case-insensitive in both HTTP/1.1 and HTTP/2,
-  it is recommended for header keys to be in lowercase, to avoid sending
-  duplicate keys in a request.
-
-  Additionally, requests with mixed-case headers served over HTTP/2 are not
-  considered valid by common clients, resulting in dropped requests.
 
   ## Examples
 
@@ -681,9 +675,10 @@ defmodule Req.Request do
 
   """
   @spec put_header(t(), binary(), binary()) :: t()
-  def put_header(%Req.Request{} = request, key, value)
-      when is_binary(key) and is_binary(value) do
-    %{request | headers: List.keystore(request.headers, key, 0, {key, value})}
+  def put_header(%Req.Request{} = request, name, value)
+      when is_binary(name) and is_binary(value) do
+    name = Req.__ensure_header_downcase__(name)
+    %{request | headers: List.keystore(request.headers, name, 0, {name, value})}
   end
 
   @doc """
@@ -700,13 +695,13 @@ defmodule Req.Request do
   """
   @spec put_headers(t(), [{binary(), binary()}]) :: t()
   def put_headers(%Req.Request{} = request, headers) do
-    for {key, value} <- headers, reduce: request do
-      acc -> put_header(acc, key, value)
+    for {name, value} <- headers, reduce: request do
+      acc -> put_header(acc, name, value)
     end
   end
 
   @doc """
-  Adds a request header (`key`) unless already present.
+  Adds a request header `name` unless already present.
 
   See `put_header/3` for more information.
 
@@ -720,11 +715,11 @@ defmodule Req.Request do
       [{"accept", "application/json"}]
   """
   @spec put_new_header(t(), binary(), binary()) :: t()
-  def put_new_header(%Req.Request{} = request, key, value)
-      when is_binary(key) and is_binary(value) do
-    case get_header(request, key) do
+  def put_new_header(%Req.Request{} = request, name, value)
+      when is_binary(name) and is_binary(value) do
+    case get_header(request, name) do
       [] ->
-        put_header(request, key, value)
+        put_header(request, name, value)
 
       _ ->
         request

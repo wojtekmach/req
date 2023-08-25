@@ -59,12 +59,11 @@ defmodule Req do
         * atom header names are turned into strings, replacing `_` with `-`. For example,
           `:user_agent` becomes `"user-agent"`.
 
-        * string header names are left as is. Because header keys are case-insensitive
-          in both HTTP/1.1 and HTTP/2, it is recommended for header keys to be in
-          lowercase, to avoid sending duplicate keys in a request.
+        * string header names are downcased.
 
-        * `DateTime` header values are encoded as "HTTP date". Otherwise,
-          the header value is encoded with `String.Chars.to_string/1`.
+        * `%DateTime{}` header values are encoded as "HTTP date".
+
+        * other header values are encoded with `String.Chars.to_string/1`.
 
       If you set `:headers` options both in `Req.new/1` and `request/2`, the header lists are merged.
 
@@ -948,10 +947,10 @@ defmodule Req do
       name =
         case name do
           atom when is_atom(atom) ->
-            atom |> Atom.to_string() |> String.replace("_", "-")
+            atom |> Atom.to_string() |> String.replace("_", "-") |> String.downcase(:ascii)
 
           binary when is_binary(binary) ->
-            binary
+            String.downcase(binary, :ascii)
         end
 
       value =
@@ -997,5 +996,15 @@ defmodule Req do
       headers: Keyword.get(options, :headers, []),
       body: Keyword.get(options, :body, "")
     }
+  end
+
+  def __ensure_header_downcase__(name) do
+    downcased = String.downcase(name, :ascii)
+
+    if name != downcased do
+      IO.warn("header names should be downcased, got: #{name}")
+    end
+
+    downcased
   end
 end
