@@ -141,7 +141,6 @@ defmodule Req.Response do
       when is_binary(key) and is_binary(value) do
     %{response | headers: List.keystore(response.headers, key, 0, {key, value})}
   end
-  
   @doc """
   Deletes the header given by `key`
 
