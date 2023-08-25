@@ -4,11 +4,11 @@ defmodule Req.Response do
 
   Fields:
 
-    * `:status` - the HTTP status code
+    * `:status` - the HTTP status code.
 
-    * `:headers` - the HTTP response headers
+    * `:headers` - the HTTP response headers. The header names must be downcased.
 
-    * `:body` - the HTTP response body
+    * `:body` - the HTTP response body.
 
     * `:private` - a map reserved for libraries and frameworks to use.
       Prefix the keys with the name of your project to avoid any future
@@ -114,7 +114,7 @@ defmodule Req.Response do
   end
 
   @doc """
-  Returns the values of the header specified by `key`.
+  Returns the values of the header specified by `name`.
 
   ## Examples
 
@@ -122,24 +122,26 @@ defmodule Req.Response do
       ["application/json"]
   """
   @spec get_header(t(), binary()) :: [binary()]
-  def get_header(%Req.Response{} = response, key) when is_binary(key) do
-    for {^key, value} <- response.headers, do: value
+  def get_header(%Req.Response{} = response, name) when is_binary(name) do
+    name = Req.__ensure_header_downcase__(name)
+    for {^name, value} <- response.headers, do: value
   end
 
   @doc """
-  Adds a new response header (`key`) if not present, otherwise replaces the
+  Adds a new response header `name` if not present, otherwise replaces the
   previous value of that header with `value`.
 
   ## Examples
 
-      iex> Req.Response.put_header(response, "content-type", "application/json").headers
+      iex> resp = Req.Response.put_header(resp, "content-type", "application/json")
+      iex> resp.headers
       [{"content-type", "application/json"}]
-
   """
   @spec put_header(t(), binary(), binary()) :: t()
-  def put_header(%Req.Response{} = response, key, value)
-      when is_binary(key) and is_binary(value) do
-    %{response | headers: List.keystore(response.headers, key, 0, {key, value})}
+  def put_header(%Req.Response{} = response, name, value)
+      when is_binary(name) and is_binary(value) do
+    name = Req.__ensure_header_downcase__(name)
+    %{response | headers: List.keystore(response.headers, name, 0, {name, value})}
   end
 
   @doc """
@@ -156,13 +158,15 @@ defmodule Req.Response do
       []
 
   """
-  def delete_header(%Req.Response{} = response, key) when is_binary(key) do
+  def delete_header(%Req.Response{} = response, name) when is_binary(name) do
+    name_to_delete = Req.__ensure_header_downcase__(name)
+
     %Req.Response{
       response
       | headers:
           for(
             {name, value} <- response.headers,
-            String.downcase(name) != String.downcase(key),
+            name != name_to_delete,
             do: {name, value}
           )
     }
