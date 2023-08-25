@@ -390,17 +390,16 @@ defmodule Req.StepsTest do
       assert String.to_integer(content_length) == byte_size(body)
     end
 
-# raises
-#    test "delete content-encoding header", c do
-#      Bypass.expect(c.bypass, "GET", "/", fn conn ->
-#        conn
-#        |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
-#        |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
-#      end)
-#
-#      resp = Req.get!(c.url)
-#      assert [] = Req.Response.get_header(resp, "content-encoding")
-#    end
+    test "delete content-encoding header", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
+        |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
+      end)
+
+      resp = Req.get!(c.url)
+      assert [] = Req.Response.get_header(resp, "content-encoding")
+    end
   end
 
   describe "output" do
