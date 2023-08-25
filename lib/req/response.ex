@@ -141,4 +141,59 @@ defmodule Req.Response do
       when is_binary(key) and is_binary(value) do
     %{response | headers: List.keystore(response.headers, key, 0, {key, value})}
   end
+
+  @doc """
+  Returns the `retry-after` header delay value or nil if not found.
+  """
+  @spec get_retry_after(t()) :: integer() | nil
+  def get_retry_after(response) do
+    case get_header(response, "retry-after") do
+      [delay] ->
+        retry_delay_in_ms(delay)
+
+      [] ->
+        nil
+    end
+  end
+
+  defp retry_delay_in_ms(delay_value) do
+    case Integer.parse(delay_value) do
+      {seconds, ""} ->
+        :timer.seconds(seconds)
+
+      :error ->
+        delay_value
+        |> parse_http_datetime()
+        |> DateTime.diff(DateTime.utc_now(), :millisecond)
+        |> max(0)
+    end
+  end
+
+  @month_numbers %{
+    "Jan" => "01",
+    "Feb" => "02",
+    "Mar" => "03",
+    "Apr" => "04",
+    "May" => "05",
+    "Jun" => "06",
+    "Jul" => "07",
+    "Aug" => "08",
+    "Sep" => "09",
+    "Oct" => "10",
+    "Nov" => "11",
+    "Dec" => "12"
+  }
+
+  defp parse_http_datetime(datetime) do
+    [_day_of_week, day, month, year, time, "GMT"] = String.split(datetime, " ")
+    date = year <> "-" <> @month_numbers[month] <> "-" <> day
+
+    case DateTime.from_iso8601(date <> " " <> time <> "Z") do
+      {:ok, valid_datetime, 0} ->
+        valid_datetime
+
+      {:error, reason} ->
+        raise "could not parse \"Retry-After\" header #{datetime} - #{reason}"
+    end
+  end
 end

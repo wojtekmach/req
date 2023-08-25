@@ -1329,8 +1329,14 @@ defmodule Req.Steps do
 
         * `:transient` - same as `:safe_transient` except retries all HTTP methods (POST, DELETE, etc.)
 
-        * `fun` - a 1-arity function that accepts either a `Req.Response` or an exception struct
-          and returns boolean whether to retry.
+        * `fun` - a 2-arity function that accepts a `Req.Request` and either a `Req.Response` or an exception struct
+          and returns one of the following:
+
+            * `true` if to retry according to the `:retry_delay` option logic (see below)
+
+            * `{:delay, milliseconds}` to retry after the delay in milliseconds
+
+            * `false` or `nil` if not to retry
 
         * `false` - never retry.
 
@@ -1340,6 +1346,9 @@ defmodule Req.Steps do
 
       If the response is HTTP 429 and contains the `retry-after` header, the value of the header is used to
       determine the next retry delay.
+
+      This option must not be provided if a `:retry` function returning `{:delay, milliseconds}` is, or an
+      exception will be raised otherwise.
 
     * `:retry_log_level` - the log level to emit retry logs at. Can also be set to `false` to disable
       logging these messsages. Defaults to `:error`.
@@ -1369,7 +1378,7 @@ defmodule Req.Steps do
   def retry(request_response_or_error)
 
   def retry({request, response_or_exception}) do
-    retry? =
+    retry =
       case Map.get(request.options, :retry, :safe_transient) do
         :safe_transient ->
           safe_transient?(request, response_or_exception)
@@ -1381,7 +1390,7 @@ defmodule Req.Steps do
           false
 
         fun when is_function(fun) ->
-          fun.(response_or_exception)
+          apply_retry(fun, request, response_or_exception)
 
         :safe ->
           IO.warn("setting `retry: :safe` is deprecated in favour of `retry: :safe_transient`")
@@ -1393,14 +1402,35 @@ defmodule Req.Steps do
 
         other ->
           raise ArgumentError,
-                "expected :retry to be :safe_transient, :transient, false, or a 1-arity function, " <>
+                "expected :retry to be :safe_transient, :transient, false, or a 2-arity function, " <>
                   "got: #{inspect(other)}"
       end
 
-    if retry? do
-      retry(request, response_or_exception)
-    else
-      {request, response_or_exception}
+    case retry do
+      {:delay, delay} ->
+        unless Req.Request.get_option(request, :retry_delay) do
+          retry(request, response_or_exception, delay)
+        else
+          raise ArgumentError,
+                "expected :retry_delay not to be set when the :retry function is returning `{:delay, milliseconds}`"
+        end
+
+      true ->
+        retry(request, response_or_exception)
+
+      retry when retry in [false, nil] ->
+        {request, response_or_exception}
+    end
+  end
+
+  defp apply_retry(fun, request, response_or_exception) do
+    case Function.info(fun, :arity) do
+      {:arity, 1} ->
+        IO.warn("`retry: fun/1` has been deprecated in favor of `retry: fun/2`")
+        fun.(response_or_exception)
+
+      _ ->
+        fun.(request, response_or_exception)
     end
   end
 
@@ -1425,9 +1455,19 @@ defmodule Req.Steps do
     false
   end
 
-  defp retry(request, response_or_exception) do
+  defp retry(request, response_or_exception, delay_or_nil \\ nil)
+
+  defp retry(request, response_or_exception, nil) do
+    do_retry(request, response_or_exception, &get_retry_delay/3)
+  end
+
+  defp retry(request, response_or_exception, delay) when is_integer(delay) do
+    do_retry(request, response_or_exception, fn request, _, _ -> {request, delay} end)
+  end
+
+  defp do_retry(request, response_or_exception, delay_getter) do
     retry_count = Req.Request.get_private(request, :req_retry_count, 0)
-    {request, delay} = get_retry_delay(request, response_or_exception, retry_count)
+    {request, delay} = delay_getter.(request, response_or_exception, retry_count)
     max_retries = Req.Request.get_option(request, :max_retries, 3)
     log_level = Req.Request.get_option(request, :retry_log_level, :error)
 
@@ -1443,12 +1483,10 @@ defmodule Req.Steps do
   end
 
   defp get_retry_delay(request, %Req.Response{status: 429} = response, retry_count) do
-    case Req.Response.get_header(response, "retry-after") do
-      [delay] ->
-        {request, retry_delay_in_ms(delay)}
-
-      [] ->
-        calculate_retry_delay(request, retry_count)
+    if delay = Req.Response.get_retry_after(response) do
+      {request, delay}
+    else
+      calculate_retry_delay(request, retry_count)
     end
   end
 
@@ -1468,19 +1506,6 @@ defmodule Req.Steps do
 
   defp exp_backoff(n) do
     Integer.pow(2, n) * 1000
-  end
-
-  defp retry_delay_in_ms(delay_value) do
-    case Integer.parse(delay_value) do
-      {seconds, ""} ->
-        :timer.seconds(seconds)
-
-      :error ->
-        delay_value
-        |> parse_http_datetime()
-        |> DateTime.diff(DateTime.utc_now(), :millisecond)
-        |> max(0)
-    end
   end
 
   defp log_retry(_, _, _, _, false), do: :ok
@@ -1555,32 +1580,5 @@ defmodule Req.Steps do
   @doc false
   def format_http_datetime(datetime) do
     Calendar.strftime(datetime, "%a, %d %b %Y %H:%M:%S GMT")
-  end
-
-  @month_numbers %{
-    "Jan" => "01",
-    "Feb" => "02",
-    "Mar" => "03",
-    "Apr" => "04",
-    "May" => "05",
-    "Jun" => "06",
-    "Jul" => "07",
-    "Aug" => "08",
-    "Sep" => "09",
-    "Oct" => "10",
-    "Nov" => "11",
-    "Dec" => "12"
-  }
-  defp parse_http_datetime(datetime) do
-    [_day_of_week, day, month, year, time, "GMT"] = String.split(datetime, " ")
-    date = year <> "-" <> @month_numbers[month] <> "-" <> day
-
-    case DateTime.from_iso8601(date <> " " <> time <> "Z") do
-      {:ok, valid_datetime, 0} ->
-        valid_datetime
-
-      {:error, reason} ->
-        raise "could not parse \"Retry-After\" header #{datetime} - #{reason}"
-    end
   end
 end
