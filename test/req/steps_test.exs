@@ -624,7 +624,7 @@ defmodule Req.StepsTest do
            }
   end
 
-  describe "follow_redirects" do
+  describe "redirect" do
     test "absolute", c do
       Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
         redirect(conn, 302, c.url <> "/ok")
@@ -636,7 +636,7 @@ defmodule Req.StepsTest do
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(c.url <> "/redirect").status == 200
-             end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
+             end) =~ "[debug] redirecting to #{c.url}/ok"
     end
 
     test "relative", c do
@@ -658,13 +658,13 @@ defmodule Req.StepsTest do
                response = Req.get!(c.url <> "/redirect")
                assert response.status == 200
                assert response.body == ""
-             end) =~ "[debug] follow_redirects: redirecting to /ok"
+             end) =~ "[debug] redirecting to /ok"
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                response = Req.get!(c.url <> "/redirect?a=1")
                assert response.status == 200
                assert response.body == "a=1"
-             end) =~ "[debug] follow_redirects: redirecting to /ok?a=1"
+             end) =~ "[debug] redirecting to /ok?a=1"
     end
 
     test "301..303", c do
@@ -678,7 +678,7 @@ defmodule Req.StepsTest do
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.post!(c.url <> "/redirect", body: "body").status == 200
-             end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
+             end) =~ "[debug] redirecting to #{c.url}/ok"
     end
 
     test "307..308", c do
@@ -692,7 +692,7 @@ defmodule Req.StepsTest do
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.post!(c.url <> "/redirect", body: "body").status == 200
-             end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
+             end) =~ "[debug] redirecting to #{c.url}/ok"
     end
 
     test "auth same host", c do
@@ -710,7 +710,7 @@ defmodule Req.StepsTest do
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(c.url <> "/redirect", auth: {"foo", "bar"}).status == 200
-             end) =~ "[debug] follow_redirects: redirecting to #{c.url}/auth"
+             end) =~ "[debug] redirecting to #{c.url}/auth"
     end
 
     test "auth location trusted" do
@@ -745,9 +745,9 @@ defmodule Req.StepsTest do
                assert Req.get!("http://original",
                         adapter: adapter,
                         auth: {"authorization", "credentials"},
-                        location_trusted: true
+                        redirect_trusted: true
                       ).status == 200
-             end) =~ "[debug] follow_redirects: redirecting to http://untrusted"
+             end) =~ "[debug] redirecting to http://untrusted"
     end
 
     test "auth different host" do
@@ -758,7 +758,7 @@ defmodule Req.StepsTest do
                         adapter: adapter,
                         auth: {"authorization", "credentials"}
                       ).status == 200
-             end) =~ "[debug] follow_redirects: redirecting to http://untrusted"
+             end) =~ "[debug] redirecting to http://untrusted"
     end
 
     test "auth different port" do
@@ -769,7 +769,7 @@ defmodule Req.StepsTest do
                         adapter: adapter,
                         auth: {"authorization", "credentials"}
                       ).status == 200
-             end) =~ "[debug] follow_redirects: redirecting to http://trusted:23456"
+             end) =~ "[debug] redirecting to http://trusted:23456"
     end
 
     test "auth different scheme" do
@@ -780,7 +780,7 @@ defmodule Req.StepsTest do
                         adapter: adapter,
                         auth: {"authorization", "credentials"}
                       ).status == 200
-             end) =~ "[debug] follow_redirects: redirecting to https://trusted"
+             end) =~ "[debug] redirecting to https://trusted"
     end
 
     test "skip params", c do
@@ -795,7 +795,7 @@ defmodule Req.StepsTest do
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(c.url <> "/redirect", params: [a: 1]).status == 200
-             end) =~ "[debug] follow_redirects: redirecting to #{c.url}/ok"
+             end) =~ "[debug] redirecting to #{c.url}/ok"
     end
 
     test "max redirects", c do
@@ -819,7 +819,7 @@ defmodule Req.StepsTest do
       assert_receive :ping
       refute_receive _
 
-      assert captured_log =~ "follow_redirects: redirecting to " <> c.url
+      assert captured_log =~ "redirecting to " <> c.url
     end
 
     test "redirect_log_level, default to :debug", c do
@@ -835,7 +835,7 @@ defmodule Req.StepsTest do
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(c.url <> "/redirect").status == 200
-             end) =~ "[debug] follow_redirects: redirecting to #{no_scheme}/ok"
+             end) =~ "[debug] redirecting to #{no_scheme}/ok"
     end
 
     test "redirect_log_level, set to :error", c do
@@ -851,7 +851,7 @@ defmodule Req.StepsTest do
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(c.url <> "/redirect", redirect_log_level: :error).status == 200
-             end) =~ "[error] follow_redirects: redirecting to #{no_scheme}/ok"
+             end) =~ "[error] redirecting to #{no_scheme}/ok"
     end
 
     test "redirect_log_level, disabled", c do
@@ -883,7 +883,7 @@ defmodule Req.StepsTest do
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(c.url <> "/redirect").status == 200
-             end) =~ "[debug] follow_redirects: redirecting to #{no_scheme}/ok"
+             end) =~ "[debug] redirecting to #{no_scheme}/ok"
     end
   end
 

@@ -424,6 +424,24 @@ defmodule Req.Request do
   end
 
   @doc """
+  Fetches the value for the option `key`.
+
+  See also `get_option/3`.
+
+  ## Examples
+
+      iex> req = Req.Request.new(options: [a: 1])
+      iex> Req.Request.fetch_option(req, :a)
+      {:ok, 1}
+      iex> Req.Request.fetch_option(req, :b)
+      :error
+  """
+  @spec fetch_option(t(), atom()) :: {:ok, term()} | :error
+  def fetch_option(request, key) when is_atom(key) do
+    Map.fetch(request.options, key)
+  end
+
+  @doc """
   Fetches the value for the option `key` or raises if it's not set.
 
   See also `get_option/3`.
