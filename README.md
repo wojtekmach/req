@@ -2,9 +2,25 @@
 
 [![CI](https://github.com/wojtekmach/req/actions/workflows/ci.yml/badge.svg)](https://github.com/wojtekmach/req/actions/workflows/ci.yml)
 
-[Docs](https://hexdocs.pm/req), [Screencast](https://www.youtube.com/watch?v=NxWgvHRN6mI "Req: A batteries included HTTP client for Elixir")
+[Docs](https://hexdocs.pm/req)
 
 Req is a batteries-included HTTP client for Elixir.
+
+With just a couple lines of code:
+
+```elixir
+Mix.install([
+  {:req, "~> 0.4.0"}
+])
+
+Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
+#=> "Req is a batteries-included HTTP client for Elixir."
+```
+
+we get automatic response body decompression & decoding, following redirects, retrying on errors,
+and much more. Virtually all of the features are broken down into individual functions called
+_steps_. You can easily re-use and re-arrange built-in steps (see [`Req.Steps`] module) and
+write new ones.
 
 ## Features
 
@@ -48,7 +64,7 @@ The easiest way to use Req is with [`Mix.install/2`] (requires Elixir v1.12+):
 
 ```elixir
 Mix.install([
-  {:req, "~> 0.3.0"}
+  {:req, "~> 0.4.0"}
 ])
 
 Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
@@ -62,6 +78,14 @@ Here's an example POST request (which sends data as `application/x-www-form-urle
 ```elixir
 iex> Req.post!("https://httpbin.org/post", form: [comments: "hello!"]).body["form"]
 %{"comments" => "hello!"}
+```
+
+You can stream request body too:
+
+```elixir
+iex> stream = Stream.duplicate("foo", 3)
+iex> Req.post!("https://httpbin.org/post", body: {:stream, stream}).body["data"]
+"foofoofoo"
 ```
 
 If you are planning to make several similar requests, you can build up a request struct with
@@ -167,6 +191,10 @@ Req.get!(req, url: "https://api.github.com/user").body["login"]
 
 See [`Req.Request`] module documentation for more information on low-level API, request struct, and developing plugins.
 
+## Presentations
+
+* [Req: A batteries included HTTP client for Elixir - Elixir Kenya, 2022-08-26](https://www.youtube.com/watch?v=NxWgvHRN6mI "Req: A batteries included HTTP client for Elixir")
+
 ## Acknowledgments
 
 Req is built on top of [Finch] and is inspired by [cURL], [Requests], [Tesla], and many other HTTP clients - thank you!
@@ -191,6 +219,7 @@ limitations under the License.
 [`Req.post!/2`]:         https://hexdocs.pm/req/Req.html#post!/2
 [`Req.async_request/2`]: https://hexdocs.pm/req/Req.html#async_request/2
 [`Req.Request`]:         https://hexdocs.pm/req/Req.Request.html
+[`Req.Steps`]:           https://hexdocs.pm/req/Req.Steps.html
 
 [`auth`]:               https://hexdocs.pm/req/Req.Steps.html#auth/1
 [`cache`]:              https://hexdocs.pm/req/Req.Steps.html#cache/1

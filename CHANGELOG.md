@@ -1,24 +1,114 @@
 # CHANGELOG
 
-## HEAD
+## v0.4.0-dev
+
+Req v0.4.0 changes headers to be maps, adds request & response streaming, and improves steps.
+
+### Change Headers to be Maps
+
+Previously headers were lists of name/value tuples, e.g.:
+
+```elixir
+[{"content-type", "text/html"}]
+```
+
+This is a standard across the ecosystem (with minor difference that some Erlang libraries use
+charlists instead of binaries.)
+
+There are some problems with this particular choice though:
+
+  * We cannot use `headers[name]`
+  * We cannot use pattern matching
+
+In short, this representation isn't very ergonomic to use.
+
+Now headers are maps of string names and lists of values, e.g.:
+
+```elixir
+%{"content-type" => ["text/html"]}
+```
+
+This allows `headers[name]` usage:
+
+```elixir
+response.headers["content-type"]
+#=> ["text/html"]
+```
+
+and pattern matching:
+
+```elixir
+case Req.request!(req) do
+  %{headers: %{"content-type" => ["application/json" <> _]}} ->
+    # handle JSON response
+end
+```
+
+This is a major breaking change. If you cannot easily update your app
+or your dependencies, do:
+
+```elixir
+# config/config.exs
+config :req, legacy_headers_as_lists: true
+```
+
+This legacy fallback will be removed on Req 1.0.
+
+### Add Request Streaming
+
+Req v0.4 adds official support for request streaming by setting the request
+body to a `{:stream, enumerable}` tuple. Here's an example:
+
+```elixir
+iex> stream = Stream.duplicate("foo", 3)
+iex> Req.post!("https://httpbin.org/post", body: {:stream, stream}).body["data"]
+"foofoofoo"
+```
+
+The enumerable is passed through request steps and they may change it. For example,
+the [`compress_body`] step compressed the body on the fly.
+
+### Add Response Streaming
+
+```elixir
+resp =
+  Req.get!(
+    url: "https://github.com/elixir-lang/elixir/releases/download/v1.15.4/elixir-otp-26.zip",
+    range: 0..100_000,
+    stream: fn {:data, data}, acc ->
+      IO.inspect(byte_size(data), label: :chunk)
+      {:cont, acc}
+    end
+  )
+
+# outputs:
+# 17:07:38.131 [debug] redirecting to https://objects.githubusercontent.com/github-production-release-asset-2e6(...)
+# chunk: 16384
+# chunk: 3617
+
+resp.status
+#=> 206
+
+resp.headers["content-range"]
+#=> ["bytes 0-20000/6801977"]
+
+resp.body
+#=> ""
+```
+
+### Full CHANGELOG
 
   * Change `request.headers` and `response.headers` to be maps.
 
-    Previously headers were lists of name/value tuples, e.g.:
+  * Ensure `request.headers` and `response.headers` are downcased.
 
-        [{"content-type", "text/html"}]
+    Per [RFC 9110: HTTP Semantics](https://www.rfc-editor.org/rfc/rfc9110.html),
+    HTTP headers should be case-insensitive. However, per
+    [RFC 9113: HTTP/2](https://datatracker.ietf.org/doc/html/rfc9113) headers
+    must be sent downcased.
 
-    Now they are maps of string names and lists of values, e.g.:
-
-        %{"content-type" => ["text/html"]}
-
-    This is a major breaking change. If you cannot easily update your app
-    or your dependencies, do:
-
-        # config/config.exs
-        config :req, legacy_headers_as_lists: true
-
-    This legacy fallback will be removed on Req 1.0.
+    Req headers are now stored internally downcased and all accessor functions
+    like [`Req.Response.get_header/2`] are downcasing the given header name.
 
   * Make `request.registered_options` internal representation private.
 
@@ -37,9 +127,6 @@
     `put_in(request.options[key], value)`, and
     `update_in(request.options[key], fun)` _is_ allowed.
 
-  * Add [`Req.Request.get_option/3`], [`Req.Request.fetch_option/2`],
-    [`Req.Request.fetch_option!/2`], and [`Req.Request.delete_option/2`].
-
   * Fix typespecs for some functions
 
   * Rename `follow_redirects` step to [`redirect`]
@@ -54,6 +141,10 @@
 
   * [`decompress_body`]: Fix handling HEAD requests
 
+  * [`decompress_body`]: Re-calculate `content-length` header after decompresion
+
+  * [`decompress_body`]: Remove `content-encoding` header after decompression
+
   * [`run_finch`]: Add `:inet6` option
 
   * [`retry`]: Support `retry: :safe_transient` which retries HTTP 408/429/500/502/503/504
@@ -64,6 +155,9 @@
 
   * [`retry`]: Support `retry: :transient` which is the same as `:safe_transient` except
     it retries on all HTTP methods
+
+  * [`retry`]: Use `retry-after` header value on HTTP 503 Service Unavailable. Previously
+    only HTTP 429 Too Many Requests was using this header value.
 
   * [`retry`]: Deprecate `retry: :safe` in favour of `retry: :safe_transient`
 
@@ -76,6 +170,9 @@
   * [`Req.update/2`]: Merge `:params`
 
   * [`Req.Request`]: Fix displaying redacted basic authentication
+
+  * Add [`Req.Request.get_option/3`], [`Req.Request.fetch_option/2`],
+    [`Req.Request.fetch_option!/2`], and [`Req.Request.delete_option/2`].
 
 ## v0.3.11 (2023-07-24)
 
@@ -551,6 +648,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`compressed`]:                https://hexdocs.pm/req/Req.Steps.html#compressed/1
 [`decode_body`]:               https://hexdocs.pm/req/Req.Steps.html#decode_body/1
 [`decompress_body`]:           https://hexdocs.pm/req/Req.Steps.html#decompress_body/1
+[`compress_body`]:             https://hexdocs.pm/req/Req.Steps.html#compress_body/1
 [`encode_body`]:               https://hexdocs.pm/req/Req.Steps.html#encode_body/1
 [`redirect`]:                  https://hexdocs.pm/req/Req.Steps.html#redirect/1
 [`handle_http_errors`]:        https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
@@ -571,3 +669,5 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Request.fetch_option/2`]:  https://hexdocs.pm/req/Req.Request.html#fetch_option/2
 [`Req.Request.fetch_option!/2`]: https://hexdocs.pm/req/Req.Request.html#fetch_option!/2
 [`Req.Request.delete_option/2`]: https://hexdocs.pm/req/Req.Request.html#delete_option/2
+[`Req.Response.get_header/2`]:   https://hexdocs.pm/req/Req.Response.html#get_response/2
+[`Req.Steps`]:                   https://hexdocs.pm/req/Req.Steps.html
