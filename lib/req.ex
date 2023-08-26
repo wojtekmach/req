@@ -33,7 +33,7 @@ defmodule Req do
   Stream request body:
 
       iex> stream = Stream.duplicate("foo", 3)
-      iex> Req.post!("https://httpbin.org/post", body: {:stream, stream}).body["data"]
+      iex> Req.post!("https://httpbin.org/post", body: stream).body["data"]
       "foofoofoo"
 
   Response streaming using callback:
@@ -113,7 +113,7 @@ defmodule Req do
 
         * `iodata` - send request body eagerly
 
-        * `{:stream, enumerable}` - stream `enumerable` as request body
+        * `enumerable` - stream `enumerable` as request body
 
   Additional URL options:
 

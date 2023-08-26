@@ -166,7 +166,7 @@ defmodule Req.StepsTest do
   end
 
   describe "encode_body" do
-    # neither `body: data` nor `body: {:stream, data}` is used by the step but testing these
+    # neither `body: data` nor `body: stream` is used by the step but testing these
     # here for locality
     test "body", c do
       Bypass.expect(c.bypass, "POST", "/", fn conn ->
@@ -192,11 +192,10 @@ defmodule Req.StepsTest do
       req =
         Req.new(
           url: c.url,
-          # TODO: use Stream.duplicate("foo", 3) when we require Elixir 1.14
-          body: {:stream, ["foo"] |> Stream.cycle() |> Stream.take(3)}
+          body: Stream.take(~w[foo foo foo], 2)
         )
 
-      assert Req.post!(req).body == "foofoofoo"
+      assert Req.post!(req).body == "foofoo"
     end
 
     test "json", c do
@@ -265,7 +264,7 @@ defmodule Req.StepsTest do
         Req.new(
           url: c.url,
           method: :post,
-          body: {:stream, Stream.take(~w[foo foo foo], 2)},
+          body: Stream.take(~w[foo foo foo], 2),
           compress_body: true
         )
 
@@ -1380,7 +1379,7 @@ defmodule Req.StepsTest do
             {:ok, body, conn} = Plug.Conn.read_body(conn)
             Plug.Conn.send_resp(conn, 200, body)
           end,
-          body: {:stream, Stream.take(~w[foo foo foo], 2)}
+          body: Stream.take(~w[foo foo foo], 2)
         )
 
       assert Req.request!(req).body == "foofoo"

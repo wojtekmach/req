@@ -68,7 +68,7 @@ defmodule Req.Request do
 
         * `iodata`
 
-        * `{:stream, enumerable}`
+        * `enumerable`
 
     * `:options` - the options to be used by steps. The exact representation of options is private.
       Calling `request.options[key]`, `put_in(request.options[key], value)`, and
@@ -321,7 +321,7 @@ defmodule Req.Request do
           method: atom(),
           url: URI.t(),
           headers: %{binary() => [binary()]},
-          body: iodata() | {:stream, Enumerable.t()} | nil,
+          body: iodata() | Enumerable.t() | nil,
           options: options(),
           halted: boolean(),
           adapter: request_step(),

@@ -528,11 +528,11 @@ defmodule Req.Steps do
     if request.options[:compress_body] do
       body =
         case request.body do
-          {:stream, enumerable} ->
-            {:stream, gzip_stream(enumerable)}
-
-          iodata ->
+          iodata when is_binary(iodata) or is_list(iodata) ->
             :zlib.gzip(iodata)
+
+          enumerable ->
+            gzip_stream(enumerable)
         end
 
       request
@@ -683,8 +683,20 @@ defmodule Req.Steps do
         end
       end
 
+    body =
+      case request.body do
+        iodata when is_binary(iodata) or is_list(iodata) ->
+          iodata
+
+        nil ->
+          nil
+
+        enumerable ->
+          {:stream, enumerable}
+      end
+
     finch_request =
-      Finch.build(request.method, request.url, request_headers, request.body)
+      Finch.build(request.method, request.url, request_headers, body)
       |> Map.replace!(:unix_socket, request.options[:unix_socket])
 
     finch_options =
@@ -958,14 +970,14 @@ defmodule Req.Steps do
   defp run_plug(request) do
     req_body =
       case request.body do
+        iodata when is_binary(iodata) or is_list(iodata) ->
+          IO.iodata_to_binary(iodata)
+
         nil ->
           ""
 
-        {:stream, enumerable} ->
+        enumerable ->
           enumerable |> Enum.to_list() |> IO.iodata_to_binary()
-
-        iodata ->
-          IO.iodata_to_binary(iodata)
       end
 
     req_headers =
