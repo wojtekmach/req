@@ -1273,45 +1273,55 @@ defmodule Req.Steps do
 
   ## Request Options
 
-    * `:follow_redirects` - if set to `false`, disables automatic response redirects.
+    * `:redirect` - if set to `false`, disables automatic response redirects.
       Defaults to `true`.
 
-    * `:location_trusted` - by default, authorization credentials are only sent
-      on redirects with the same host, scheme and port. If `:location_trusted` is set
+    * `:redirect_trusted` - by default, authorization credentials are only sent
+      on redirects with the same host, scheme and port. If `:redirect_trusted` is set
       to `true`, credentials will be sent to any host.
-
-    * `:max_redirects` - the maximum number of redirects, defaults to `10`.
-      If the limit is reached, an error is raised.
 
     * `:redirect_log_level` - the log level to emit redirect logs at. Can also be set
       to `false` to disable logging these messsages. Defaults to `:debug`.
 
+    * `:max_redirects` - the maximum number of redirects, defaults to `10`.
+      If the limit is reached, an error is raised.
+
   ## Examples
 
       iex> Req.get!("http://api.github.com").status
-      # 23:24:11.670 [debug]  follow_redirects: redirecting to https://api.github.com/
+      # 23:24:11.670 [debug] redirecting to https://api.github.com/
       200
 
       iex> Req.get!("https://httpbin.org/redirect/4", max_redirects: 3)
-      # 23:07:59.570 [debug] follow_redirects: redirecting to /relative-redirect/3
-      # 23:08:00.068 [debug] follow_redirects: redirecting to /relative-redirect/2
-      # 23:08:00.206 [debug] follow_redirects: redirecting to /relative-redirect/1
+      # 23:07:59.570 [debug] redirecting to /relative-redirect/3
+      # 23:08:00.068 [debug] redirecting to /relative-redirect/2
+      # 23:08:00.206 [debug] redirecting to /relative-redirect/1
       ** (RuntimeError) too many redirects (3)
 
       iex> Req.get!("http://api.github.com", redirect_log_level: false)
       200
 
       iex> Req.get!("http://api.github.com", redirect_log_level: :error)
-      # 23:24:11.670 [error]  follow_redirects: redirecting to https://api.github.com/
+      # 23:24:11.670 [error]  redirecting to https://api.github.com/
       200
 
   """
   @doc step: :response
-  def follow_redirects(request_response)
+  def redirect(request_response)
 
-  def follow_redirects({request, response}) do
+  def redirect({request, response}) do
+    redirect? =
+      case Req.Request.fetch_option(request, :follow_redirects) do
+        {:ok, redirect?} ->
+          IO.warn(":follow_redirects option has been renamed to :redirect")
+          redirect?
+
+        :error ->
+          Req.Request.get_option(request, :redirect, true)
+      end
+
     cond do
-      !Req.Request.get_option(request, :follow_redirects, true) ->
+      !redirect? ->
         {request, response}
 
       response.status in [301, 302, 303, 307, 308] ->
@@ -1341,14 +1351,22 @@ defmodule Req.Steps do
     log_level = Req.Request.get_option(request, :redirect_log_level, :debug)
     log_redirect(log_level, location)
 
-    location_trusted = request.options[:location_trusted]
+    redirect_trusted =
+      case Req.Request.fetch_option(request, :location_trusted) do
+        {:ok, trusted} ->
+          IO.warn(":location_trusted option has been renamed to :redirect_trusted")
+          trusted
+
+        :error ->
+          request.options[:redirect_trusted]
+      end
 
     location_url = URI.merge(request.url, URI.parse(location))
 
     request
     # assume put_params step already run so remove :params option so it's not applied again
     |> Req.Request.delete_option(:params)
-    |> remove_credentials_if_untrusted(location_trusted, location_url)
+    |> remove_credentials_if_untrusted(redirect_trusted, location_url)
     |> put_redirect_request_method(response.status)
     |> put_redirect_location(location_url)
   end
@@ -1356,10 +1374,7 @@ defmodule Req.Steps do
   defp log_redirect(false, _location), do: :ok
 
   defp log_redirect(level, location) do
-    Logger.log(level, [
-      "follow_redirects: redirecting to ",
-      location
-    ])
+    Logger.log(level, ["redirecting to ", location])
   end
 
   defp put_redirect_location(request, location_url) do
@@ -1381,6 +1396,11 @@ defmodule Req.Steps do
       |> Req.Request.delete_header("authorization")
       |> Req.Request.delete_option(:auth)
     end
+  end
+
+  @deprecated "Use Req.Steps.redirect/1 instead"
+  def follow_redirects(request_response) do
+    follow_redirects(request_response)
   end
 
   @doc """

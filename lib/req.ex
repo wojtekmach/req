@@ -288,9 +288,9 @@ defmodule Req do
           :decode_body,
           :decode_json,
           :output,
-          :follow_redirects,
+          :redirect,
+          :redirect_trusted,
           :redirect_log_level,
-          :location_trusted,
           :max_redirects,
           :retry,
           :retry_delay,
@@ -305,7 +305,11 @@ defmodule Req do
           :inet6,
           :receive_timeout,
           :pool_timeout,
-          :unix_socket
+          :unix_socket,
+
+          # TODO: Remove on Req 1.0
+          :follow_redirects,
+          :location_trusted
         ])
     }
     |> update(options)
@@ -324,7 +328,7 @@ defmodule Req do
     )
     |> Req.Request.prepend_response_steps(
       retry: &Req.Steps.retry/1,
-      follow_redirects: &Req.Steps.follow_redirects/1,
+      redirect: &Req.Steps.redirect/1,
       decompress_body: &Req.Steps.decompress_body/1,
       decode_body: &Req.Steps.decode_body/1,
       handle_http_errors: &Req.Steps.handle_http_errors/1,
