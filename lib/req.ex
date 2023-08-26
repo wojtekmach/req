@@ -39,16 +39,26 @@ defmodule Req do
   Response streaming using callback:
 
       iex> resp =
-      ...>   Req.get!("http://httpbin.org/stream/2", stream: fn {:data, data}, acc ->
-      ...>     IO.puts("got chunk with #{byte_size(data)} bytes")
-      ...>     {:cont, acc}
+      ...>   Req.get!("http://httpbin.org/stream/2", into: fn {:data, data}, {req, resp} ->
+      ...>     IO.puts(data)
+      ...>     {:cont, {req, resp}}
       ...>   end)
-      # Outputs: got chunk with 249 bytes
-      # Outputs: got chunk with 249 bytes
+      # Outputs: {"url": "http://httpbin.org/stream/2", ...}
+      # Outputs: {"url": "http://httpbin.org/stream/2", ...}
       iex> resp.status
       200
       iex> resp.body
       ""
+
+  Response streaming into a collectable:
+
+      iex> resp = Req.get!("http://httpbin.org/stream/2", into: IO.stream())
+      # Outputs: {"url": "http://httpbin.org/stream/2", ...}
+      # Outputs: {"url": "http://httpbin.org/stream/2", ...}
+      iex> resp.status
+      200
+      iex> resp.body
+      %IO.Stream{}
   """
 
   # TODO: Add when new version of Finch is out.
@@ -166,6 +176,17 @@ defmodule Req do
       Setting `:output` also sets the `decode_body: false` option to prevent decoding the
       response before writing it to the file.
 
+    * `:into` - where to send the response body. It can be one of:
+
+        * `nil` - (default) read the whole response body and store it in the `response.body`
+          field.
+
+        * `fun` - stream response body using a function. The first argument is a `{:data, data}`
+          tuple containing the chunk of the response body. The second argument is a
+          `{request, response}` tuple.
+
+       * `collectable` - stream response body into a `t:Collectable.t/0`.
+
   Response redirect options ([`redirect`](`Req.Steps.redirect/1`) step):
 
     * `:redirect` - if set to `false`, disables automatic response redirects. Defaults to `true`.
@@ -175,17 +196,6 @@ defmodule Req do
       will be sent to any host.
 
     * `:max_redirects` - the maximum number of redirects, defaults to `10`.
-
-  Response streaming:
-
-    * `:stream` - a 2-arity function used to stream response. The first argument is a "Stream Command" tuple
-      described below. The second argument is a `{request, response}` tuple.
-
-      The "Stream Command" is one of:
-
-        * `{:data, data}` - a chunk of the response body.
-
-      See module documentation for an example of streaming responses.
 
   Retry options ([`retry`](`Req.Steps.retry/1`) step):
 
@@ -398,7 +408,7 @@ defmodule Req do
   """
   @spec update(Req.Request.t(), options :: keyword()) :: Req.Request.t()
   def update(%Req.Request{} = request, options) when is_list(options) do
-    request_option_names = [:method, :url, :headers, :body, :adapter, :stream]
+    request_option_names = [:method, :url, :headers, :body, :adapter, :into]
 
     {request_options, options} = Keyword.split(options, request_option_names)
 
@@ -966,7 +976,7 @@ defmodule Req do
   # TODO
   @doc false
   def async_request(request, options \\ []) do
-    Req.Request.run_request(%{new(request, options) | stream: :self})
+    Req.Request.run_request(%{new(request, options) | into: :self})
   end
 
   # TODO

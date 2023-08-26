@@ -68,7 +68,7 @@ defmodule Req.HttpcTest do
       resp =
         Req.get!(
           req,
-          stream: fn {:data, data}, acc ->
+          into: fn {:data, data}, acc ->
             send(pid, {:data, data})
             {:cont, acc}
           end
@@ -176,7 +176,7 @@ defmodule Req.HttpcTest do
       body_format: :binary
     ]
 
-    case request.stream do
+    case request.into do
       nil ->
         httpc_request(request, httpc_req, httpc_http_options, httpc_options)
 

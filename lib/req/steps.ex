@@ -1,3 +1,28 @@
+defmodule CollectWith do
+  defstruct [:collectable, :fun]
+
+  def new(collectable, fun) when is_function(fun, 1) do
+    %__MODULE__{collectable: collectable, fun: fun}
+  end
+
+  defimpl Collectable do
+    def into(struct) do
+      {acc, collector} = Collectable.into(struct.collectable)
+      fun = struct.fun
+
+      new_collector = fn
+        acc, {:cont, term} ->
+          collector.(acc, {:cont, fun.(term)})
+
+        acc, command ->
+          collector.(acc, command)
+      end
+
+      {acc, new_collector}
+    end
+  end
+end
+
 defmodule Req.Steps do
   @moduledoc """
   The collection of built-in steps.
@@ -682,35 +707,9 @@ defmodule Req.Steps do
         {request, run_finch_request(deprecated_fun.(finch_request), finch_name, finch_options)}
 
       nil ->
-        case request.stream do
+        case request.into do
           nil ->
             {request, run_finch_request(finch_request, finch_name, finch_options)}
-
-          fun when is_function(fun, 2) ->
-            response = Req.Response.new()
-
-            fun = fn
-              {:status, status}, {request, response} ->
-                {request, %{response | status: status}}
-
-              {:headers, headers}, {request, response} ->
-                headers =
-                  Enum.reduce(headers, %{}, fn {name, value}, acc ->
-                    Map.update(acc, name, [value], &(&1 ++ [value]))
-                  end)
-
-                {request, %{response | headers: headers}}
-
-              {:data, data}, acc ->
-                {:cont, result} = fun.({:data, data}, acc)
-                # TODO: handle {:halt, result}
-                result
-            end
-
-            case Finch.stream(finch_request, finch_name, {request, response}, fun, finch_options) do
-              {:ok, acc} ->
-                acc
-            end
 
           :self ->
             ref = Finch.async_request(finch_request, finch_name)
@@ -740,6 +739,69 @@ defmodule Req.Steps do
             request = put_in(request.async, async)
             response = Req.Response.new(status: status, headers: headers)
             {request, response}
+
+          fun when is_function(fun, 2) ->
+            response = Req.Response.new()
+
+            fun = fn
+              {:status, status}, {request, response} ->
+                {request, %{response | status: status}}
+
+              {:headers, headers}, {request, response} ->
+                headers =
+                  Enum.reduce(headers, %{}, fn {name, value}, acc ->
+                    Map.update(acc, name, [value], &(&1 ++ [value]))
+                  end)
+
+                {request, %{response | headers: headers}}
+
+              {:data, data}, acc ->
+                {:cont, result} = fun.({:data, data}, acc)
+                # TODO: handle {:halt, result}
+                result
+            end
+
+            case Finch.stream(finch_request, finch_name, {request, response}, fun, finch_options) do
+              {:ok, acc} ->
+                acc
+
+                # TODO: handle errors
+            end
+
+          collectable ->
+            {acc, collector} = Collectable.into(collectable)
+            response = Req.Response.new()
+
+            fun = fn
+              {:status, status}, {acc, request, response} ->
+                {acc, request, %{response | status: status}}
+
+              {:headers, headers}, {acc, request, response} ->
+                headers =
+                  Enum.reduce(headers, %{}, fn {name, value}, acc ->
+                    Map.update(acc, name, [value], &(&1 ++ [value]))
+                  end)
+
+                {acc, request, %{response | headers: headers}}
+
+              {:data, data}, {acc, request, response} ->
+                acc = collector.(acc, {:cont, data})
+                {acc, request, response}
+            end
+
+            case Finch.stream(
+                   finch_request,
+                   finch_name,
+                   {acc, request, response},
+                   fun,
+                   finch_options
+                 ) do
+              {:ok, {acc, request, response}} ->
+                acc = collector.(acc, :done)
+                {request, %{response | body: acc}}
+
+                # TODO: handle errors
+            end
         end
     end
   end

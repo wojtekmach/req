@@ -1554,7 +1554,7 @@ defmodule Req.StepsTest do
       end
     end
 
-    test "stream callback", c do
+    test "into: fun", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         conn = Plug.Conn.send_chunked(conn, 200)
         {:ok, conn} = Plug.Conn.chunk(conn, "foo")
@@ -1567,7 +1567,7 @@ defmodule Req.StepsTest do
       resp =
         Req.get!(
           url: "http://localhost:#{c.bypass.port}",
-          stream: fn {:data, data}, acc ->
+          into: fn {:data, data}, acc ->
             send(pid, {:data, data})
             {:cont, acc}
           end
@@ -1578,6 +1578,25 @@ defmodule Req.StepsTest do
       assert_receive {:data, "foo"}
       assert_receive {:data, "bar"}
       refute_receive _
+    end
+
+    test "into: collectable", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn = Plug.Conn.send_chunked(conn, 200)
+        {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+        {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+        conn
+      end)
+
+      resp =
+        Req.get!(
+          url: "http://localhost:#{c.bypass.port}",
+          into: []
+        )
+
+      assert resp.status == 200
+      assert resp.headers["transfer-encoding"] == ["chunked"]
+      assert resp.body == ["foo", "bar"]
     end
 
     async_finch? = Code.ensure_loaded?(Finch) and function_exported?(Finch, :async_request, 2)

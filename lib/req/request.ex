@@ -349,7 +349,7 @@ defmodule Req.Request do
             private: %{},
             registered_options: MapSet.new(),
             current_request_steps: [],
-            stream: nil,
+            into: nil,
             async: nil
 
   @doc """
