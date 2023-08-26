@@ -1592,7 +1592,8 @@ defmodule Req.Steps do
     end
   end
 
-  defp get_retry_delay(request, %Req.Response{status: 429} = response, retry_count) do
+  defp get_retry_delay(request, %Req.Response{status: status} = response, retry_count)
+       when status in [429, 503] do
     if delay = Req.Response.get_retry_after(response) do
       {request, delay}
     else

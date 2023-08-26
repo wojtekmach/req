@@ -1100,7 +1100,7 @@ defmodule Req.StepsTest do
         response =
           case attempt do
             0 -> Req.Response.new(status: 429) |> retry_after(0)
-            1 -> Req.Response.new(status: 429) |> retry_after(DateTime.utc_now())
+            1 -> Req.Response.new(status: 503) |> retry_after(DateTime.utc_now())
             2 -> Req.Response.new(status: 200, body: "ok")
           end
 
