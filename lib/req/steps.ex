@@ -694,6 +694,11 @@ defmodule Req.Steps do
                 {request, %{response | status: status}}
 
               {:headers, headers}, {request, response} ->
+                headers =
+                  Enum.reduce(headers, %{}, fn {name, value}, acc ->
+                    Map.update(acc, name, [value], &(&1 ++ [value]))
+                  end)
+
                 {request, %{response | headers: headers}}
 
               {:data, data}, acc ->
@@ -716,10 +721,14 @@ defmodule Req.Steps do
                   message
               end
 
-            {:headers, headers} =
+            headers =
               receive do
                 {^ref, message} ->
-                  message
+                  {:headers, headers} = message
+
+                  Enum.reduce(headers, %{}, fn {name, value}, acc ->
+                    Map.update(acc, name, [value], &(&1 ++ [value]))
+                  end)
               end
 
             async = %Req.Async{

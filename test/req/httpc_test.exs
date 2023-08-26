@@ -75,6 +75,7 @@ defmodule Req.HttpcTest do
         )
 
       assert resp.status == 200
+      assert resp.headers["transfer-encoding"] == ["chunked"]
       assert_receive {:data, "foobar"}
 
       receive do

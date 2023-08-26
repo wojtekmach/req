@@ -1574,6 +1574,7 @@ defmodule Req.StepsTest do
         )
 
       assert resp.status == 200
+      assert resp.headers["transfer-encoding"] == ["chunked"]
       assert_receive {:data, "foo"}
       assert_receive {:data, "bar"}
       refute_receive _
