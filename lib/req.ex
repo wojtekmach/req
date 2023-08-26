@@ -166,12 +166,12 @@ defmodule Req do
       Setting `:output` also sets the `decode_body: false` option to prevent decoding the
       response before writing it to the file.
 
-  Response redirect options ([`follow_redirects`](`Req.Steps.follow_redirects/1`) step):
+  Response redirect options ([`redirect`](`Req.Steps.redirect/1`) step):
 
-    * `:follow_redirects` - if set to `false`, disables automatic response redirects. Defaults to `true`.
+    * `:redirect` - if set to `false`, disables automatic response redirects. Defaults to `true`.
 
-    * `:location_trusted` - by default, authorization credentials are only sent
-      on redirects with the same host, scheme and port. If `:location_trusted` is set to `true`, credentials
+    * `:redirect_trusted` - by default, authorization credentials are only sent on redirects
+      with the same host, scheme and port. If `:redirect_trusted` is set to `true`, credentials
       will be sent to any host.
 
     * `:max_redirects` - the maximum number of redirects, defaults to `10`.
