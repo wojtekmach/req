@@ -1,7 +1,7 @@
 defmodule Req.MixProject do
   use Mix.Project
 
-  @version "0.3.11"
+  @version "0.4.0-dev"
   @source_url "https://github.com/wojtekmach/req"
 
   def project do
@@ -37,7 +37,7 @@ defmodule Req.MixProject do
   def application do
     [
       mod: {Req.Application, []},
-      extra_applications: [:logger, :inets]
+      extra_applications: [:logger]
     ]
   end
 
