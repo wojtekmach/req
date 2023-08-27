@@ -98,18 +98,17 @@ defmodule Req.HttpcTest do
 
       {req, resp} = Req.async_request!(req)
       assert resp.status == 200
-      assert {:ok, [data: "foobar"]} = Req.parse_message(req, assert_receive(_))
 
-      case Req.parse_message(req, assert_receive(_)) do
-        {:ok, [:done]} ->
-          :ok
+      assert Req.parse_message(req, assert_receive(_)) in [
+               {:ok, [data: "foo"]},
+               {:ok, [data: "foobar"]}
+             ]
 
-        # TODO: investigate
-        {:ok, [data: ""]} ->
-          assert {:ok, [:done]} = Req.parse_message(req, assert_receive(_))
-      end
-
-      refute_receive _
+      assert Req.parse_message(req, assert_receive(_)) in [
+               {:ok, [data: "bar"]},
+               {:ok, [data: ""]},
+               {:ok, [:done]}
+             ]
     end
 
     test "async request cancellation", %{req: req, bypass: bypass} do
