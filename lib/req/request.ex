@@ -66,9 +66,25 @@ defmodule Req.Request do
 
       Can be one of:
 
-        * `iodata`
+        * `iodata` - eagerly send request body
 
-        * `enumerable`
+        * `enumerable` - stream request body
+
+    * `:into` - where to send the response body. It can be one of:
+
+        * `nil` - (default) read the whole response body and store it in the `response.body`
+          field.
+
+        * `fun` - stream response body using a function. The first argument is a `{:data, data}`
+          tuple containing the chunk of the response body. The second argument is a
+          `{request, response}` tuple. For example:
+
+              into: fn {:data, data}, {req, resp} ->
+                IO.puts(data)
+                {:cont, {req, resp}}
+              end
+
+        * `collectable` - stream response body into a `t:Collectable.t/0`.
 
     * `:options` - the options to be used by steps. The exact representation of options is private.
       Calling `request.options[key]`, `put_in(request.options[key], value)`, and
@@ -322,6 +338,12 @@ defmodule Req.Request do
           url: URI.t(),
           headers: %{binary() => [binary()]},
           body: iodata() | Enumerable.t() | nil,
+          into:
+            nil
+            | iodata()
+            | ({:data, binary()}, {t(), Req.Response.t()} ->
+                 {:cont | :halt, {t, Req.Response.t()}})
+            | Collectable.t(),
           options: options(),
           halted: boolean(),
           adapter: request_step(),
