@@ -113,7 +113,7 @@ Req.get!(req, url: "/repos/elixir-mint/mint").body["description"]
 #=> "Functional HTTP client for Elixir with support for HTTP/1 and HTTP/2."
 ```
 
-See [`Req.request/1`] for more information on available options.
+See [`Req.new/1`] for more information on available options.
 
 Virtually all of Req's features are broken down into individual pieces - steps. Req works by running
 the request struct through these steps. You can easily reuse or rearrange built-in steps or write new
@@ -131,7 +131,7 @@ req =
   )
 
 Req.get!(req, url: "/repos/wojtekmach/req").body["description"]
-# Outputs: "https://api.github.com/repos/wojtekmach/req"
+# output: "https://api.github.com/repos/wojtekmach/req"
 #=> "Req is a batteries-included HTTP client for Elixir."
 ```
 
@@ -181,7 +181,7 @@ Req.get!(req, url: "https://repo.hex.pm/tarballs/req-0.1.0.tar").body["metadata.
 #=> %{"GitHub" => "https://github.com/wojtekmach/req"}
 
 Req.get!(req, url: "https://api.github.com/user").body["login"]
-# Outputs:
+# output:
 # paste this user code:
 #
 #   6C44-30A8
