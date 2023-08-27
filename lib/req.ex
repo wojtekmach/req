@@ -36,25 +36,25 @@ defmodule Req do
       iex> Req.post!("https://httpbin.org/post", body: stream).body["data"]
       "foofoofoo"
 
-  Response streaming using callback:
+  Stream response body using a callback:
 
       iex> resp =
       ...>   Req.get!("http://httpbin.org/stream/2", into: fn {:data, data}, {req, resp} ->
       ...>     IO.puts(data)
       ...>     {:cont, {req, resp}}
       ...>   end)
-      # Outputs: {"url": "http://httpbin.org/stream/2", ...}
-      # Outputs: {"url": "http://httpbin.org/stream/2", ...}
+      # output: {"url": "http://httpbin.org/stream/2", ...}
+      # output: {"url": "http://httpbin.org/stream/2", ...}
       iex> resp.status
       200
       iex> resp.body
       ""
 
-  Response streaming into a collectable:
+  Stream response body into a `Collectable`:
 
       iex> resp = Req.get!("http://httpbin.org/stream/2", into: IO.stream())
-      # Outputs: {"url": "http://httpbin.org/stream/2", ...}
-      # Outputs: {"url": "http://httpbin.org/stream/2", ...}
+      # output: {"url": "http://httpbin.org/stream/2", ...}
+      # output: {"url": "http://httpbin.org/stream/2", ...}
       iex> resp.status
       200
       iex> resp.body
@@ -183,9 +183,14 @@ defmodule Req do
 
         * `fun` - stream response body using a function. The first argument is a `{:data, data}`
           tuple containing the chunk of the response body. The second argument is a
-          `{request, response}` tuple.
+          `{request, response}` tuple. For example:
 
-       * `collectable` - stream response body into a `t:Collectable.t/0`.
+              into: fn {:data, data}, {req, resp} ->
+                IO.puts(data)
+                {:cont, {req, resp}}
+              end
+
+        * `collectable` - stream response body into a `t:Collectable.t/0`.
 
   Response redirect options ([`redirect`](`Req.Steps.redirect/1`) step):
 
@@ -991,10 +996,14 @@ defmodule Req do
     end
   end
 
+  # TODO
+  @doc false
   def parse_message(%Req.Request{} = request, message) do
     request.async.stream_fun.(request.async.ref, message)
   end
 
+  # TODO
+  @doc false
   def cancel_async_request(%Req.Request{} = request) do
     request.async.cancel_fun.(request.async.ref)
   end

@@ -32,15 +32,15 @@ write new ones.
 
   * Request body encoding and automatic response body decoding (via [`encode_body`] and [`decode_body`] steps.)
 
-  * Request body streaming
-
   * Encode params as query string (via [`put_params`] step.)
 
   * Basic, bearer, and `.netrc` authentication (via [`auth`] step.)
 
   * Range requests (via [`put_range`]) step.)
 
-  * Response streaming
+  * Request body streaming (by setting `body: enumerable`.)
+
+  * Response body streaming (by setting `into: fun | collectable`.)
 
   * Follows redirects (via [`follow_redirects`] step.)
 
@@ -84,8 +84,20 @@ You can stream request body too:
 
 ```elixir
 iex> stream = Stream.duplicate("foo", 3)
-iex> Req.post!("https://httpbin.org/post", body: {:stream, stream}).body["data"]
+iex> Req.post!("https://httpbin.org/post", body: stream).body["data"]
 "foofoofoo"
+```
+
+and stream the response body:
+
+```elixir
+iex> resp = Req.get!("http://httpbin.org/stream/2", into: IO.stream())
+# output: {"url": "http://httpbin.org/stream/2", ...}
+# output: {"url": "http://httpbin.org/stream/2", ...}
+iex> resp.status
+200
+iex> resp.body
+%IO.Stream{}
 ```
 
 If you are planning to make several similar requests, you can build up a request struct with
@@ -101,8 +113,7 @@ Req.get!(req, url: "/repos/elixir-mint/mint").body["description"]
 #=> "Functional HTTP client for Elixir with support for HTTP/1 and HTTP/2."
 ```
 
-See [`Req.request/1`] for more information on available
-options.
+See [`Req.request/1`] for more information on available options.
 
 Virtually all of Req's features are broken down into individual pieces - steps. Req works by running
 the request struct through these steps. You can easily reuse or rearrange built-in steps or write new

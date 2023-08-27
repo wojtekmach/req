@@ -54,46 +54,70 @@ config :req, legacy_headers_as_lists: true
 
 This legacy fallback will be removed on Req 1.0.
 
-### Add Request Streaming
+### Add Request Body Streaming
 
-Req v0.4 adds official support for request streaming by setting the request
-body to a `{:stream, enumerable}` tuple. Here's an example:
+Req v0.4 adds official support for request body streaming by setting the request body to an
+`enumerable`. Here's an example:
 
 ```elixir
 iex> stream = Stream.duplicate("foo", 3)
-iex> Req.post!("https://httpbin.org/post", body: {:stream, stream}).body["data"]
+iex> Req.post!("https://httpbin.org/post", body: stream).body["data"]
 "foofoofoo"
 ```
 
 The enumerable is passed through request steps and they may change it. For example,
-the [`compress_body`] step compressed the body on the fly.
+the [`compress_body`] step gzips the request body on the fly.
 
-### Add Response Streaming
+### Add Response Body Streaming
+
+Req v0.4 also adds response body streaming, via the `:into` option.
+
+Here's an example where we download the first 20kb (by making a _range_ request, via the
+[`put_range`] step) of Elixir release zip. We stream the response body into a function
+and can handle each body chunk. The function receives a `{:data, data}, {req, resp}` and returns
+a `{:cont | :halt, {req, resp}}` tuple.
 
 ```elixir
 resp =
   Req.get!(
     url: "https://github.com/elixir-lang/elixir/releases/download/v1.15.4/elixir-otp-26.zip",
-    range: 0..100_000,
-    stream: fn {:data, data}, acc ->
+    range: 0..20_000,
+    into: fn {:data, data}, {req, resp} ->
       IO.inspect(byte_size(data), label: :chunk)
-      {:cont, acc}
+      {:cont, {req, resp}}
     end
   )
 
-# outputs:
-# 17:07:38.131 [debug] redirecting to https://objects.githubusercontent.com/github-production-release-asset-2e6(...)
-# chunk: 16384
-# chunk: 3617
+# output: 17:07:38.131 [debug] redirecting to https://objects.githubusercontent.com/github-production-release-asset-2e6(...)
+# output: chunk: 16384
+# output: chunk: 3617
 
-resp.status
-#=> 206
+resp.status #=> 206
+resp.headers["content-range"] #=> ["bytes 0-20000/6801977"]
+resp.body #=> ""
+```
 
-resp.headers["content-range"]
-#=> ["bytes 0-20000/6801977"]
+Notice we only stream response _body_, that is, Req automatically handles HTTP response status and
+headers. Once the stream is done, Req passes the response through response steps which allows
+following redirects, retrying on errors, etc. Response `body` is set to empty string `""`
+which is then ignored by [`decompress_body`], [`decode_body`], and similar steps. If you need
+to decompress or decode incoming chunks, you need to do that in your custom `into: fun` function.
 
-resp.body
-#=> ""
+As the name `:into` implies, we can also stream response body into any [`Collectable`].
+Here's a similar snippet to above where we stream to a file:
+
+```elixir
+resp =
+  Req.get!(
+    url: "https://github.com/elixir-lang/elixir/releases/download/v1.15.4/elixir-otp-26.zip",
+    range: 0..20_000,
+    into: File.stream!("elixit-otp-26.zip.1")
+  )
+
+# output: 17:07:38.131 [debug] redirecting to (...)
+resp.status #=> 206
+resp.headers["content-range"] #=> ["bytes 0-20000/6801977"]
+resp.body #=> %File.Stream{}
 ```
 
 ### Full CHANGELOG
@@ -660,6 +684,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`put_path_params`]:           https://hexdocs.pm/req/Req.Steps.html#put_path_params/1
 [`put_plug`]:                  https://hexdocs.pm/req/Req.Steps.html#put_plug/1
 [`put_user_agent`]:            https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
+[`put_range`]:                 https://hexdocs.pm/req/Req.Steps.html#put_range/1
 [`retry`]:                     https://hexdocs.pm/req/Req.Steps.html#retry/1
 [`run_finch`]:                 https://hexdocs.pm/req/Req.Steps.html#run_finch/1
 [`Req.request/2`]:             https://hexdocs.pm/req/Req.html#request/2
@@ -673,3 +698,4 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Request.delete_option/2`]: https://hexdocs.pm/req/Req.Request.html#delete_option/2
 [`Req.Response.get_header/2`]:   https://hexdocs.pm/req/Req.Response.html#get_response/2
 [`Req.Steps`]:                   https://hexdocs.pm/req/Req.Steps.html
+[`Collectable`]:                 https://hexdocs.pm/elixir/Collectable.html

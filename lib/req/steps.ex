@@ -1,28 +1,3 @@
-defmodule CollectWith do
-  defstruct [:collectable, :fun]
-
-  def new(collectable, fun) when is_function(fun, 1) do
-    %__MODULE__{collectable: collectable, fun: fun}
-  end
-
-  defimpl Collectable do
-    def into(struct) do
-      {acc, collector} = Collectable.into(struct.collectable)
-      fun = struct.fun
-
-      new_collector = fn
-        acc, {:cont, term} ->
-          collector.(acc, {:cont, fun.(term)})
-
-        acc, command ->
-          collector.(acc, command)
-      end
-
-      {acc, new_collector}
-    end
-  end
-end
-
 defmodule Req.Steps do
   @moduledoc """
   The collection of built-in steps.
