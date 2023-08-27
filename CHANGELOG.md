@@ -145,6 +145,8 @@ resp.body
 
   * [`decompress_body`]: Remove `content-encoding` header after decompression
 
+  * [`decode_body`]: Do not decode resposne with `content-encoding` header
+
   * [`run_finch`]: Add `:inet6` option
 
   * [`retry`]: Support `retry: :safe_transient` which retries HTTP 408/429/500/502/503/504

@@ -282,7 +282,45 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
       end)
 
-      assert Req.get!(c.url).body == "foo"
+      resp = Req.get!(c.url)
+      assert Req.Response.get_header(resp, "content-encoding") == []
+      assert resp.body == "foo"
+    end
+
+    test "identity", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "identity")
+        |> Plug.Conn.send_resp(200, "foo")
+      end)
+
+      resp = Req.get!(c.url)
+      assert Req.Response.get_header(resp, "content-encoding") == []
+      assert resp.body == "foo"
+    end
+
+    test "brotli", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        {:ok, body} = :brotli.encode("foo")
+
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "br")
+        |> Plug.Conn.send_resp(200, body)
+      end)
+
+      resp = Req.get!(c.url)
+      assert resp.body == "foo"
+    end
+
+    test "zstd", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "zstd")
+        |> Plug.Conn.send_resp(200, :ezstd.compress("foo"))
+      end)
+
+      resp = Req.get!(c.url)
+      assert resp.body == "foo"
     end
 
     test "multiple codecs", c do
@@ -292,7 +330,9 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, "foo" |> :zlib.gzip() |> :ezstd.compress())
       end)
 
-      assert Req.get!(c.url).body == "foo"
+      resp = Req.get!(c.url)
+      assert Req.Response.get_header(resp, "content-encoding") == []
+      assert resp.body == "foo"
     end
 
     test "multiple codecs with multiple headers" do
@@ -317,29 +357,9 @@ defmodule Req.StepsTest do
         :ok = :gen_tcp.send(socket, data)
       end)
 
-      assert Req.get!("http://localhost:#{port}").body == "foo"
-    end
-
-    test "brotli", c do
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
-        {:ok, body} = :brotli.encode("foo")
-
-        conn
-        |> Plug.Conn.put_resp_header("content-encoding", "br")
-        |> Plug.Conn.send_resp(200, body)
-      end)
-
-      assert Req.get!(c.url).body == "foo"
-    end
-
-    test "zstd", c do
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
-        conn
-        |> Plug.Conn.put_resp_header("content-encoding", "zstd")
-        |> Plug.Conn.send_resp(200, :ezstd.compress("foo"))
-      end)
-
-      assert Req.get!(c.url).body == "foo"
+      resp = Req.get!("http://localhost:#{port}")
+      assert Req.Response.get_header(resp, "content-encoding") == []
+      assert resp.body == "foo"
     end
 
     @tag :capture_log
@@ -381,17 +401,6 @@ defmodule Req.StepsTest do
       resp = Req.get!(c.url)
       [content_length] = Req.Response.get_header(resp, "content-length")
       assert String.to_integer(content_length) == byte_size(body)
-    end
-
-    test "delete content-encoding header", c do
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
-        conn
-        |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
-        |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
-      end)
-
-      resp = Req.get!(c.url)
-      assert [] = Req.Response.get_header(resp, "content-encoding")
     end
   end
 
@@ -619,6 +628,24 @@ defmodule Req.StepsTest do
     end
 
     assert Req.get!("", plug: plug, raw: true).body |> :zlib.gunzip() |> Jason.decode!() == %{
+             "a" => 1
+           }
+  end
+
+  test "decode with unknown compression codec" do
+    plug = fn conn ->
+      body =
+        %{a: 1}
+        |> Jason.encode_to_iodata!()
+        |> :zlib.compress()
+
+      conn
+      |> Plug.Conn.put_resp_header("content-encoding", "deflate")
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.send_resp(200, body)
+    end
+
+    assert Req.get!("", plug: plug).body |> :zlib.uncompress() |> Jason.decode!() == %{
              "a" => 1
            }
   end
