@@ -185,6 +185,15 @@ resp.body #=> %File.Stream{}
   * [`retry`]: Use `retry-after` header value on HTTP 503 Service Unavailable. Previously
     only HTTP 429 Too Many Requests was using this header value.
 
+  * [`retry`]: Support `retry: &fun/2`. The function receives `request, response_or_exception`
+    and returns either:
+
+        * `true` - retry with the default delay
+
+        * `{:delay, milliseconds}` - retry with the given delay
+
+        * `false/nil` - don't retry
+
   * [`retry`]: Deprecate `retry: :safe` in favour of `retry: :safe_transient`
 
   * [`retry`]: Deprecate `retry: :never` in favour of `retry: false`

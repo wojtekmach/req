@@ -1521,23 +1521,20 @@ defmodule Req.Steps do
         * `fun` - a 2-arity function that accepts a `Req.Request` and either a `Req.Response` or an exception struct
           and returns one of the following:
 
-            * `true` if to retry according to the `:retry_delay` option logic (see below)
+            * `true` - retry with the default delay controller by default delay option described below.
 
-            * `{:delay, milliseconds}` to retry after the delay in milliseconds
+            * `{:delay, milliseconds}` - retry with the given delay.
 
-            * `false` or `nil` if not to retry
+            * `false/nil` - don't retry.
 
-        * `false` - never retry.
+        * `false` - don't retry.
 
-    * `:retry_delay` - a function that receives the retry count (starting at 0) and returns the delay, the
-      number of milliseconds to sleep before making another attempt.
-      Defaults to a simple exponential backoff: 1s, 2s, 4s, 8s, ...
+    * `:retry_delay` - if not set, which is the default, the retry delay is determined by
+      the value of `retry-delay` header on HTTP 429/503 responses. If the header is not set,
+      the default delay follows a simple exponential backoff: 1s, 2s, 4s, 8s, ...
 
-      If the response is HTTP 429 and contains the `retry-after` header, the value of the header is used to
-      determine the next retry delay.
-
-      This option must not be provided if a `:retry` function returning `{:delay, milliseconds}` is, or an
-      exception will be raised otherwise.
+      `:retry_delay` can be set to a function that receives the retry count (starting at 0)
+      and returns the delay, the number of milliseconds to sleep before making another attempt.
 
     * `:retry_log_level` - the log level to emit retry logs at. Can also be set to `false` to disable
       logging these messsages. Defaults to `:error`.
