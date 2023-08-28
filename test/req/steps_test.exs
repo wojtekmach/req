@@ -336,28 +336,25 @@ defmodule Req.StepsTest do
     end
 
     test "multiple codecs with multiple headers" do
-      {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, active: false)
-      {:ok, port} = :inet.port(listen_socket)
+      %{url: url} =
+        TestServer.serve(fn socket ->
+          assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
 
-      Task.start_link(fn ->
-        {:ok, socket} = :gen_tcp.accept(listen_socket)
-        assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
+          body = "foo" |> :zlib.gzip() |> :ezstd.compress()
 
-        body = "foo" |> :zlib.gzip() |> :ezstd.compress()
+          data = """
+          HTTP/1.1 200 OK
+          content-encoding: gzip
+          content-encoding: zstd
+          content-length: #{byte_size(body)}
 
-        data = """
-        HTTP/1.1 200 OK
-        content-encoding: gzip
-        content-encoding: zstd
-        content-length: #{byte_size(body)}
+          #{body}
+          """
 
-        #{body}
-        """
+          :ok = :gen_tcp.send(socket, data)
+        end)
 
-        :ok = :gen_tcp.send(socket, data)
-      end)
-
-      resp = Req.get!("http://localhost:#{port}")
+      resp = Req.get!(url)
       assert Req.Response.get_header(resp, "content-encoding") == []
       assert resp.body == "foo"
     end
@@ -1580,19 +1577,34 @@ defmodule Req.StepsTest do
       end
     end
 
-    test "into: fun", c do
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
-        conn = Plug.Conn.send_chunked(conn, 200)
-        {:ok, conn} = Plug.Conn.chunk(conn, "foo")
-        {:ok, conn} = Plug.Conn.chunk(conn, "bar")
-        conn
-      end)
+    test "into: fun" do
+      %{url: url} =
+        TestServer.serve(fn socket ->
+          {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
+
+          data = """
+          HTTP/1.1 200 OK
+          transfer-encoding: chunked
+          trailer: x-foo, x-bar
+
+          6\r
+          chunk1\r
+          6\r
+          chunk2\r
+          0\r
+          x-foo: foo\r
+          x-bar: bar\r
+          \r
+          """
+
+          :ok = :gen_tcp.send(socket, data)
+        end)
 
       pid = self()
 
       resp =
         Req.get!(
-          url: "http://localhost:#{c.bypass.port}",
+          url: url,
           into: fn {:data, data}, acc ->
             send(pid, {:data, data})
             {:cont, acc}
@@ -1601,28 +1613,49 @@ defmodule Req.StepsTest do
 
       assert resp.status == 200
       assert resp.headers["transfer-encoding"] == ["chunked"]
-      assert_receive {:data, "foo"}
-      assert_receive {:data, "bar"}
+      assert resp.headers["trailer"] == ["x-foo, x-bar"]
+      assert resp.headers["x-foo"] == ["foo"]
+      assert resp.headers["x-bar"] == ["bar"]
+      assert_receive {:data, "chunk1"}
+      assert_receive {:data, "chunk2"}
       refute_receive _
     end
 
-    test "into: collectable", c do
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
-        conn = Plug.Conn.send_chunked(conn, 200)
-        {:ok, conn} = Plug.Conn.chunk(conn, "foo")
-        {:ok, conn} = Plug.Conn.chunk(conn, "bar")
-        conn
-      end)
+    test "into: collectable" do
+      %{url: url} =
+        TestServer.serve(fn socket ->
+          {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
+
+          data = """
+          HTTP/1.1 200 OK
+          transfer-encoding: chunked
+          trailer: x-foo, x-bar
+
+          6\r
+          chunk1\r
+          6\r
+          chunk2\r
+          0\r
+          x-foo: foo\r
+          x-bar: bar\r
+          \r
+          """
+
+          :ok = :gen_tcp.send(socket, data)
+        end)
 
       resp =
         Req.get!(
-          url: "http://localhost:#{c.bypass.port}",
+          url: url,
           into: []
         )
 
       assert resp.status == 200
       assert resp.headers["transfer-encoding"] == ["chunked"]
-      assert resp.body == ["foo", "bar"]
+      assert resp.headers["trailer"] == ["x-foo, x-bar"]
+      assert resp.headers["x-foo"] == ["foo"]
+      assert resp.headers["x-bar"] == ["bar"]
+      assert resp.body == ["chunk1", "chunk2"]
     end
 
     async_finch? = Code.ensure_loaded?(Finch) and function_exported?(Finch, :async_request, 2)

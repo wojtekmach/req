@@ -734,13 +734,14 @@ defmodule Req.Steps do
               {:status, status}, {request, response} ->
                 {request, %{response | status: status}}
 
-              {:headers, headers}, {request, response} ->
-                headers =
-                  Enum.reduce(headers, %{}, fn {name, value}, acc ->
+              {:headers, fields}, {request, response} ->
+                fields =
+                  Enum.reduce(fields, %{}, fn {name, value}, acc ->
                     Map.update(acc, name, [value], &(&1 ++ [value]))
                   end)
 
-                {request, %{response | headers: headers}}
+                response = update_in(response.headers, &Map.merge(&1, fields))
+                {request, response}
 
               {:data, data}, acc ->
                 {:cont, result} = fun.({:data, data}, acc)
@@ -763,13 +764,14 @@ defmodule Req.Steps do
               {:status, status}, {acc, request, response} ->
                 {acc, request, %{response | status: status}}
 
-              {:headers, headers}, {acc, request, response} ->
-                headers =
-                  Enum.reduce(headers, %{}, fn {name, value}, acc ->
+              {:headers, fields}, {acc, request, response} ->
+                fields =
+                  Enum.reduce(fields, %{}, fn {name, value}, acc ->
                     Map.update(acc, name, [value], &(&1 ++ [value]))
                   end)
 
-                {acc, request, %{response | headers: headers}}
+                response = update_in(response.headers, &Map.merge(&1, fields))
+                {acc, request, response}
 
               {:data, data}, {acc, request, response} ->
                 acc = collector.(acc, {:cont, data})
