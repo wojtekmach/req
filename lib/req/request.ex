@@ -529,6 +529,7 @@ defmodule Req.Request do
       iex> Req.Request.update_private(req, :b, 11, & &1 + 1).private
       %{a: 1, b: 11}
   """
+  @spec update_private(t(), key :: atom(), default :: term(), (atom() -> term())) :: t()
   def update_private(request, key, default, fun) when is_atom(key) and is_function(fun, 1) do
     update_in(request.private, &Map.update(&1, key, default, fun))
   end

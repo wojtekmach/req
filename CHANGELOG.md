@@ -206,10 +206,19 @@ resp.body #=> %File.Stream{}
 
   * [`Req.Request`]: Fix displaying redacted basic authentication
 
-  * Add [`Req.Request.get_option/3`], [`Req.Request.fetch_option/2`],
-    [`Req.Request.fetch_option!/2`], and [`Req.Request.delete_option/2`].
+  * [`Req.Request`]: Add [`Req.Request.get_option/3`]
 
-  * Add [`Req.Response.delete_header/2`]
+  * [`Req.Request`]: Add [`Req.Request.fetch_option/2`]
+
+  * [`Req.Request`]: Add [`Req.Request.fetch_option!/2`]
+
+  * [`Req.Request`]: Add [`Req.Request.update_option/4`]
+
+  * [`Req.Request`]: Add [`Req.Request.delete_option/2`]
+
+  * [`Req.Response`]: Add [`Req.Response.delete_header/2`]
+
+  * [`Req.Response`]: Add [`Req.Response.update_private/2`]
 
 ## v0.3.11 (2023-07-24)
 
@@ -702,16 +711,17 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.request/2`]: https://hexdocs.pm/req/Req.html#request/2
 [`Req.update/2`]:  https://hexdocs.pm/req/Req.html#update/2
 
-[`Req.Request`]:                 https://hexdocs.pm/req/Req.Request.html
-[`Req.Request.new/1`]:           https://hexdocs.pm/req/Req.Request.html#new/1
-[`Req.Request.run_request/1`]:   https://hexdocs.pm/req/Req.Request.html#run_request/1
-[`Req.Request.get_option/3`]:    https://hexdocs.pm/req/Req.Request.html#get_option/3
-[`Req.Request.fetch_option/2`]:  https://hexdocs.pm/req/Req.Request.html#fetch_option/2
-[`Req.Request.fetch_option!/2`]: https://hexdocs.pm/req/Req.Request.html#fetch_option!/2
-[`Req.Request.delete_option/2`]: https://hexdocs.pm/req/Req.Request.html#delete_option/2
+[`Req.Request`]:                  https://hexdocs.pm/req/Req.Request.html
+[`Req.Request.new/1`]:            https://hexdocs.pm/req/Req.Request.html#new/1
+[`Req.Request.run_request/1`]:    https://hexdocs.pm/req/Req.Request.html#run_request/1
+[`Req.Request.get_option/3`]:     https://hexdocs.pm/req/Req.Request.html#get_option/3
+[`Req.Request.fetch_option/2`]:   https://hexdocs.pm/req/Req.Request.html#fetch_option/2
+[`Req.Request.fetch_option!/2`]:  https://hexdocs.pm/req/Req.Request.html#fetch_option!/2
+[`Req.Request.delete_option/2`]:  https://hexdocs.pm/req/Req.Request.html#update_private/4
 
-[`Req.Response.get_header/2`]:    https://hexdocs.pm/req/Req.Response.html#get_response/2
-[`Req.Response.delete_header/2`]: https://hexdocs.pm/req/Req.Response.html#delete_header/2
+[`Req.Response.get_header/2`]:     https://hexdocs.pm/req/Req.Response.html#get_response/2
+[`Req.Response.delete_header/2`]:  https://hexdocs.pm/req/Req.Response.html#delete_header/2
+[`Req.Response.update_private/4`]: https://hexdocs.pm/req/Req.Response.html#update_private/4
 
 [`Req.Steps`]:   https://hexdocs.pm/req/Req.Steps.html
 [`Collectable`]: https://hexdocs.pm/elixir/Collectable.html

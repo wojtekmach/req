@@ -119,7 +119,7 @@ defmodule Req.Response do
   Gets the value for a specific private `key`.
   """
   @spec get_private(t(), key :: atom(), default :: term()) :: term()
-  def get_private(response, key, default \\ nil) when is_atom(key) do
+  def get_private(%Req.Response{} = response, key, default \\ nil) when is_atom(key) do
     Map.get(response.private, key, default)
   end
 
@@ -127,8 +127,29 @@ defmodule Req.Response do
   Assigns a private `key` to `value`.
   """
   @spec put_private(t(), key :: atom(), value :: term()) :: t()
-  def put_private(response, key, value) when is_atom(key) do
+  def put_private(%Req.Response{} = response, key, value) when is_atom(key) do
     put_in(response.private[key], value)
+  end
+
+  @doc """
+  Updates private `key` with the given function.
+
+  If `key` is present in request private map then the existing value is passed to `fun` and its
+  result is used as the updated value of `key`. If `key` is not present, `default` is inserted
+  as the value of `key`. The default value will not be passed through the update function.
+
+  ## Examples
+
+      iex> resp = %Req.Response{private: %{a: 1}}
+      iex> Req.Response.update_private(resp, :a, 11, & &1 + 1).private
+      %{a: 2}
+      iex> Req.Response.update_private(resp, :b, 11, & &1 + 1).private
+      %{a: 1, b: 11}
+  """
+  @spec update_private(t(), key :: atom(), default :: term(), (atom() -> term())) :: t()
+  def update_private(%Req.Response{} = response, key, initial, fun)
+      when is_atom(key) and is_function(fun, 1) do
+    update_in(response.private, &Map.update(&1, key, initial, fun))
   end
 
   @doc """
