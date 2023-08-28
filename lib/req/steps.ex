@@ -769,7 +769,8 @@ defmodule Req.Steps do
                 {:ok, acc} ->
                   acc
 
-                  # TODO: handle errors
+                {:error, exception} ->
+                  {request, exception}
               end
             catch
               {:finch_halt, acc} ->
@@ -809,7 +810,8 @@ defmodule Req.Steps do
                 acc = collector.(acc, :done)
                 {request, %{response | body: acc}}
 
-                # TODO: handle errors
+              {:error, exception} ->
+                {request, exception}
             end
         end
     end

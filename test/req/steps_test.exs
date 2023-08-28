@@ -1642,6 +1642,20 @@ defmodule Req.StepsTest do
       assert resp.body == "foo"
     end
 
+    test "into: fun handle error", %{bypass: bypass, url: url} do
+      Bypass.down(bypass)
+
+      assert {:error, %Mint.TransportError{reason: :econnrefused}} =
+               Req.get(
+                 url: url,
+                 retry: false,
+                 into: fn {:data, data}, {req, resp} ->
+                   resp = update_in(resp.body, &(&1 <> data))
+                   {:halt, {req, resp}}
+                 end
+               )
+    end
+
     test "into: collectable" do
       %{url: url} =
         TestServer.serve(fn socket ->
@@ -1677,6 +1691,17 @@ defmodule Req.StepsTest do
       assert resp.headers["x-foo"] == ["foo"]
       assert resp.headers["x-bar"] == ["bar"]
       assert resp.body == ["chunk1", "chunk2"]
+    end
+
+    test "into: collectable handle error", %{bypass: bypass, url: url} do
+      Bypass.down(bypass)
+
+      assert {:error, %Mint.TransportError{reason: :econnrefused}} =
+               Req.get(
+                 url: url,
+                 retry: false,
+                 into: IO.stream()
+               )
     end
 
     async_finch? = Code.ensure_loaded?(Finch) and function_exported?(Finch, :async_request, 2)
