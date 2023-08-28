@@ -37,9 +37,9 @@ defmodule Req.Response do
       iex> Req.Response.new(status: 200, body: "body")
       %Req.Response{status: 200, headers: %{}, body: "body"}
 
-      iex> finch_response = %Finch.Response{status: 200}
+      iex> finch_response = %Finch.Response{status: 200, headers: [{"content-type", "text/html"}]}
       iex> Req.Response.new(finch_response)
-      %Req.Response{status: 200, headers: %{}, body: ""}
+      %Req.Response{status: 200, headers: %{"content-type" => ["text/html"]}, body: ""}
 
   """
   @spec new(options :: keyword() | map() | struct()) :: t()
