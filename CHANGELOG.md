@@ -209,6 +209,8 @@ resp.body #=> %File.Stream{}
   * Add [`Req.Request.get_option/3`], [`Req.Request.fetch_option/2`],
     [`Req.Request.fetch_option!/2`], and [`Req.Request.delete_option/2`].
 
+  * Add [`Req.Response.delete_header/2`]
+
 ## v0.3.11 (2023-07-24)
 
   * Support `Req.get(options)`, `Req.post(options)`, etc
@@ -677,34 +679,39 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
   * Initial release
 
-[`auth`]:                      https://hexdocs.pm/req/Req.Steps.html#auth/1
-[`cache`]:                     https://hexdocs.pm/req/Req.Steps.html#cache/1
-[`compress_body`]:             https://hexdocs.pm/req/Req.Steps.html#compress_body/1
-[`compressed`]:                https://hexdocs.pm/req/Req.Steps.html#compressed/1
-[`decode_body`]:               https://hexdocs.pm/req/Req.Steps.html#decode_body/1
-[`decompress_body`]:           https://hexdocs.pm/req/Req.Steps.html#decompress_body/1
-[`compress_body`]:             https://hexdocs.pm/req/Req.Steps.html#compress_body/1
-[`encode_body`]:               https://hexdocs.pm/req/Req.Steps.html#encode_body/1
-[`redirect`]:                  https://hexdocs.pm/req/Req.Steps.html#redirect/1
-[`handle_http_errors`]:        https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
-[`output`]:                    https://hexdocs.pm/req/Req.Steps.html#output/1
-[`put_base_url`]:              https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
-[`put_params`]:                https://hexdocs.pm/req/Req.Steps.html#put_params/1
-[`put_path_params`]:           https://hexdocs.pm/req/Req.Steps.html#put_path_params/1
-[`put_plug`]:                  https://hexdocs.pm/req/Req.Steps.html#put_plug/1
-[`put_user_agent`]:            https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
-[`put_range`]:                 https://hexdocs.pm/req/Req.Steps.html#put_range/1
-[`retry`]:                     https://hexdocs.pm/req/Req.Steps.html#retry/1
-[`run_finch`]:                 https://hexdocs.pm/req/Req.Steps.html#run_finch/1
-[`Req.request/2`]:             https://hexdocs.pm/req/Req.html#request/2
-[`Req.update/2`]:              https://hexdocs.pm/req/Req.html#update/2
-[`Req.Request`]:               https://hexdocs.pm/req/Req.Request.html
-[`Req.Request.new/1`]:         https://hexdocs.pm/req/Req.Request.html#new/1
-[`Req.Request.run_request/1`]: https://hexdocs.pm/req/Req.Request.html#run_request/1
+[`auth`]:                https://hexdocs.pm/req/Req.Steps.html#auth/1
+[`cache`]:               https://hexdocs.pm/req/Req.Steps.html#cache/1
+[`compress_body`]:       https://hexdocs.pm/req/Req.Steps.html#compress_body/1
+[`compressed`]:          https://hexdocs.pm/req/Req.Steps.html#compressed/1
+[`decode_body`]:         https://hexdocs.pm/req/Req.Steps.html#decode_body/1
+[`decompress_body`]:     https://hexdocs.pm/req/Req.Steps.html#decompress_body/1
+[`compress_body`]:       https://hexdocs.pm/req/Req.Steps.html#compress_body/1
+[`encode_body`]:         https://hexdocs.pm/req/Req.Steps.html#encode_body/1
+[`redirect`]:            https://hexdocs.pm/req/Req.Steps.html#redirect/1
+[`handle_http_errors`]:  https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
+[`output`]:              https://hexdocs.pm/req/Req.Steps.html#output/1
+[`put_base_url`]:        https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
+[`put_params`]:          https://hexdocs.pm/req/Req.Steps.html#put_params/1
+[`put_path_params`]:     https://hexdocs.pm/req/Req.Steps.html#put_path_params/1
+[`put_plug`]:            https://hexdocs.pm/req/Req.Steps.html#put_plug/1
+[`put_user_agent`]:      https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
+[`put_range`]:           https://hexdocs.pm/req/Req.Steps.html#put_range/1
+[`retry`]:               https://hexdocs.pm/req/Req.Steps.html#retry/1
+[`run_finch`]:           https://hexdocs.pm/req/Req.Steps.html#run_finch/1
+
+[`Req.request/2`]: https://hexdocs.pm/req/Req.html#request/2
+[`Req.update/2`]:  https://hexdocs.pm/req/Req.html#update/2
+
+[`Req.Request`]:                 https://hexdocs.pm/req/Req.Request.html
+[`Req.Request.new/1`]:           https://hexdocs.pm/req/Req.Request.html#new/1
+[`Req.Request.run_request/1`]:   https://hexdocs.pm/req/Req.Request.html#run_request/1
 [`Req.Request.get_option/3`]:    https://hexdocs.pm/req/Req.Request.html#get_option/3
 [`Req.Request.fetch_option/2`]:  https://hexdocs.pm/req/Req.Request.html#fetch_option/2
 [`Req.Request.fetch_option!/2`]: https://hexdocs.pm/req/Req.Request.html#fetch_option!/2
 [`Req.Request.delete_option/2`]: https://hexdocs.pm/req/Req.Request.html#delete_option/2
-[`Req.Response.get_header/2`]:   https://hexdocs.pm/req/Req.Response.html#get_response/2
-[`Req.Steps`]:                   https://hexdocs.pm/req/Req.Steps.html
-[`Collectable`]:                 https://hexdocs.pm/elixir/Collectable.html
+
+[`Req.Response.get_header/2`]:    https://hexdocs.pm/req/Req.Response.html#get_response/2
+[`Req.Response.delete_header/2`]: https://hexdocs.pm/req/Req.Response.html#delete_header/2
+
+[`Req.Steps`]:   https://hexdocs.pm/req/Req.Steps.html
+[`Collectable`]: https://hexdocs.pm/elixir/Collectable.html

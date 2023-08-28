@@ -194,9 +194,25 @@ defmodule Req.Response do
       []
 
   """
-  def delete_header(%Req.Response{} = response, name) when is_binary(name) do
-    name = Req.__ensure_header_downcase__(name)
-    update_in(response.headers, &Map.delete(&1, name))
+  if Req.MixProject.legacy_headers_as_lists?() do
+    def delete_header(%Req.Response{} = response, name) when is_binary(name) do
+      name_to_delete = Req.__ensure_header_downcase__(name)
+
+      %Req.Response{
+        response
+        | headers:
+            for(
+              {name, value} <- response.headers,
+              name != name_to_delete,
+              do: {name, value}
+            )
+      }
+    end
+  else
+    def delete_header(%Req.Response{} = response, name) when is_binary(name) do
+      name = Req.__ensure_header_downcase__(name)
+      update_in(response.headers, &Map.delete(&1, name))
+    end
   end
 
   @doc """
