@@ -402,6 +402,20 @@ defmodule Req.StepsTest do
   end
 
   describe "output" do
+    unless System.get_env("REQ_NOWARN_OUTPUT") do
+      @describetag :skip
+    end
+
+    @tag :tmp_dir
+    test "decode_body with output", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        json(conn, 200, %{a: 1})
+      end)
+
+      assert Req.get!(c.url, output: c.tmp_dir <> "/a.json").body == ""
+      assert File.read!(c.tmp_dir <> "/a.json") == ~s|{"a":1}|
+    end
+
     @tag :tmp_dir
     test "path (compressed)", c do
       Bypass.expect_once(c.bypass, "GET", "/foo.txt", fn conn ->
@@ -475,16 +489,6 @@ defmodule Req.StepsTest do
       end)
 
       assert Req.get!(c.url, decode_json: [keys: :atoms]).body == %{a: 1}
-    end
-
-    @tag :tmp_dir
-    test "with output", c do
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
-        json(conn, 200, %{a: 1})
-      end)
-
-      assert Req.get!(c.url, output: c.tmp_dir <> "/a.json").body == ""
-      assert File.read!(c.tmp_dir <> "/a.json") == ~s|{"a":1}|
     end
 
     test "gzip", c do

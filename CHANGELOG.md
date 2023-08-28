@@ -153,6 +153,8 @@ resp.body #=> %File.Stream{}
 
   * Fix typespecs for some functions
 
+  * Deprecate [`output`] step in favour of `into: File.stream!(path)`.
+
   * Rename `follow_redirects` step to [`redirect`]
 
   * [`redirect`]: Rename `:follow_redirects` option to `:redirect`.

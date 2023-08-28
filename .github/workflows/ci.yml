@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-20.04
     env:
       MIX_ENV: test
+      # TODO: Remove on Req 1.0
+      REQ_NOWARN_OUTPUT: true
     strategy:
       fail-fast: false
       matrix:

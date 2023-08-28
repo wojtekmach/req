@@ -1151,30 +1151,7 @@ defmodule Req.Steps do
     end
   end
 
-  @doc """
-  Writes the response body to a file.
-
-  After the output file is written, the response body is set to `""`.
-
-  ## Request Options
-
-    * `:output` - if set, writes the response body to a file. Can be one of:
-
-        * `path` - writes to the given path
-
-        * `:remote_name` - uses the remote name as the filename in the current working directory
-
-  ## Examples
-
-      iex> Req.get!("https://elixir-lang.org/index.html", output: "/tmp/elixir_home.html")
-      iex> File.exists?("/tmp/elixir_home.html")
-      true
-
-      iex> Req.get!("https://elixir-lang.org/blog/index.html", output: :remote_name)
-      iex> File.exists?("index.html")
-      true
-  """
-  @doc step: :response
+  @doc false
   def output(request_response)
 
   def output({request, response}) do
@@ -1253,9 +1230,12 @@ defmodule Req.Steps do
   end
 
   def decode_body({request, response}) do
+    # TODO: remove on Req 1.0
+    output? = request.options[:output] not in [nil, false]
+
     if request.options[:raw] == true or
          request.options[:decode_body] == false or
-         request.options[:output] not in [nil, false] or
+         output? or
          Req.Response.get_header(response, "content-encoding") != [] do
       {request, response}
     else

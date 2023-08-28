@@ -168,14 +168,6 @@ defmodule Req do
 
     * `:decode_json` - options to pass to `Jason.decode!/2`, defaults to `[]`.
 
-    * `:output` - if set, writes the response body to a file (via
-      [`output`](`Req.Steps.output/1`) step). Can be set to a string path or an atom
-      `:remote_name` which would use the remote name as the filename in the current working
-      directory. Once the file is written, the response body is replaced with `""`.
-
-      Setting `:output` also sets the `decode_body: false` option to prevent decoding the
-      response before writing it to the file.
-
     * `:into` - where to send the response body. It can be one of:
 
         * `nil` - (default) read the whole response body and store it in the `response.body`
@@ -302,7 +294,6 @@ defmodule Req do
           :raw,
           :decode_body,
           :decode_json,
-          :output,
           :redirect,
           :redirect_trusted,
           :redirect_log_level,
@@ -323,6 +314,7 @@ defmodule Req do
           :unix_socket,
 
           # TODO: Remove on Req 1.0
+          :output,
           :follow_redirects,
           :location_trusted
         ])
@@ -416,6 +408,10 @@ defmodule Req do
     request_option_names = [:method, :url, :headers, :body, :adapter, :into]
 
     {request_options, options} = Keyword.split(options, request_option_names)
+
+    if options[:output] && unquote(!System.get_env("REQ_NOWARN_OUTPUT")) do
+      IO.warn("setting `output: path` is deprecated in favour of `into: File.stream!(path)`")
+    end
 
     registered =
       MapSet.union(
