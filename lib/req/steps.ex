@@ -1230,9 +1230,12 @@ defmodule Req.Steps do
   end
 
   def decode_body({request, response}) do
+    # TODO: remove on Req 1.0
+    output? = request.options[:output] not in [nil, false]
+
     if request.options[:raw] == true or
          request.options[:decode_body] == false or
-         request.options[:output] not in [nil, false] or
+         output? or
          Req.Response.get_header(response, "content-encoding") != [] do
       {request, response}
     else

@@ -402,7 +402,7 @@ defmodule Req.StepsTest do
   end
 
   describe "output" do
-    unless System.get_env("CI") do
+    unless System.get_env("REQ_NOWARN_OUTPUT") do
       @describetag :skip
     end
 
