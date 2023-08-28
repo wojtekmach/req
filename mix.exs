@@ -27,7 +27,7 @@ defmodule Req.MixProject do
           Plug.Test,
           :brotli,
           :ezstd,
-          # TODO: Remove on next Finch release
+          # TODO: Wait for async_request/3
           Finch
         ]
       ]

@@ -78,8 +78,8 @@ defmodule Req.HttpcTest do
       assert resp.headers["transfer-encoding"] == ["chunked"]
       assert_receive {:data, "foobar"}
 
+      # httpc seems to randomly chunk things
       receive do
-        # TODO: investigate
         {:data, ""} -> :ok
       after
         0 -> :ok
@@ -99,6 +99,7 @@ defmodule Req.HttpcTest do
       {req, resp} = Req.async_request!(req)
       assert resp.status == 200
 
+      # httpc seems to randomly chunk things
       assert Req.parse_message(req, assert_receive(_)) in [
                {:ok, [data: "foo"]},
                {:ok, [data: "foobar"]}
@@ -130,7 +131,7 @@ defmodule Req.HttpcTest do
 
     httpc_headers =
       for {name, values} <- request.headers,
-          # TODO: values will always be a list on Req 1.0
+          # TODO: remove List.wrap on Req 1.0
           value <- List.wrap(values) do
         {String.to_charlist(name), String.to_charlist(value)}
       end

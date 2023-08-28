@@ -61,7 +61,7 @@ defmodule Req do
       %IO.Stream{}
   """
 
-  # TODO: Add when new version of Finch is out.
+  # TODO: Wait for async_request/3
   # Response streaming to caller:
   #
   #     iex> {req, resp} = Req.async_request!("http://httpbin.org/stream/2")
@@ -978,13 +978,13 @@ defmodule Req do
     end
   end
 
-  # TODO
+  # TODO: Wait for async_request/3
   @doc false
   def async_request(request, options \\ []) do
     Req.Request.run_request(%{new(request, options) | into: :self})
   end
 
-  # TODO
+  # TODO: Wait for async_request/3
   @doc false
   def async_request!(request, options \\ []) do
     case async_request(request, options) do
@@ -996,13 +996,13 @@ defmodule Req do
     end
   end
 
-  # TODO
+  # TODO: Wait for async_request/3
   @doc false
   def parse_message(%Req.Request{} = request, message) do
     request.async.stream_fun.(request.async.ref, message)
   end
 
-  # TODO
+  # TODO: Wait for async_request/3
   @doc false
   def cancel_async_request(%Req.Request{} = request) do
     request.async.cancel_fun.(request.async.ref)
