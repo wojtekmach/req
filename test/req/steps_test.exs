@@ -1621,6 +1621,27 @@ defmodule Req.StepsTest do
       refute_receive _
     end
 
+    test "into: fun with halt", %{bypass: bypass, url: url} do
+      Bypass.expect(bypass, "GET", "/", fn conn ->
+        conn = Plug.Conn.send_chunked(conn, 200)
+        {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+        {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+        conn
+      end)
+
+      resp =
+        Req.get!(
+          url: url,
+          into: fn {:data, data}, {req, resp} ->
+            resp = update_in(resp.body, &(&1 <> data))
+            {:halt, {req, resp}}
+          end
+        )
+
+      assert resp.status == 200
+      assert resp.body == "foo"
+    end
+
     test "into: collectable" do
       %{url: url} =
         TestServer.serve(fn socket ->

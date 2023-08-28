@@ -744,16 +744,36 @@ defmodule Req.Steps do
                 {request, response}
 
               {:data, data}, acc ->
-                {:cont, result} = fun.({:data, data}, acc)
-                # TODO: handle {:halt, result}
-                result
+                case fun.({:data, data}, acc) do
+                  {:cont, acc} ->
+                    acc
+
+                  {:halt, acc} ->
+                    throw({:finch_halt, acc})
+
+                  other ->
+                    raise ArgumentError,
+                          "expected {:cont, acc} or {:halt, acc}, got: #{inspect(other)}"
+                end
             end
 
-            case Finch.stream(finch_request, finch_name, {request, response}, fun, finch_options) do
-              {:ok, acc} ->
-                acc
+            try do
+              # TODO: use Finch.stream_while on next Finch release
+              case Finch.stream(
+                     finch_request,
+                     finch_name,
+                     {request, response},
+                     fun,
+                     finch_options
+                   ) do
+                {:ok, acc} ->
+                  acc
 
-                # TODO: handle errors
+                  # TODO: handle errors
+              end
+            catch
+              {:finch_halt, acc} ->
+                acc
             end
 
           collectable ->
