@@ -698,35 +698,6 @@ defmodule Req.Steps do
           nil ->
             {request, run_finch_request(finch_request, finch_name, finch_options)}
 
-          :self ->
-            ref = Finch.async_request(finch_request, finch_name)
-
-            {:status, status} =
-              receive do
-                {^ref, message} ->
-                  message
-              end
-
-            headers =
-              receive do
-                {^ref, message} ->
-                  {:headers, headers} = message
-
-                  Enum.reduce(headers, %{}, fn {name, value}, acc ->
-                    Map.update(acc, name, [value], &(&1 ++ [value]))
-                  end)
-              end
-
-            async = %Req.Async{
-              ref: ref,
-              stream_fun: &finch_parse_message/2,
-              cancel_fun: &finch_cancel/1
-            }
-
-            request = put_in(request.async, async)
-            response = Req.Response.new(status: status, headers: headers)
-            {request, response}
-
           fun when is_function(fun, 2) ->
             response = Req.Response.new()
 
@@ -778,7 +749,7 @@ defmodule Req.Steps do
                 acc
             end
 
-          collectable ->
+          collectable when collectable != :self ->
             {acc, collector} = Collectable.into(collectable)
             response = Req.Response.new()
 
@@ -815,6 +786,37 @@ defmodule Req.Steps do
               {:error, exception} ->
                 {request, exception}
             end
+
+          # TODO: WIP
+          :self ->
+            ref = Finch.async_request(finch_request, finch_name)
+
+            {:status, status} =
+              receive do
+                {^ref, message} ->
+                  message
+              end
+
+            headers =
+              receive do
+                {^ref, message} ->
+                  # TODO: handle trailers
+                  {:headers, headers} = message
+
+                  Enum.reduce(headers, %{}, fn {name, value}, acc ->
+                    Map.update(acc, name, [value], &(&1 ++ [value]))
+                  end)
+              end
+
+            async = %Req.Async{
+              ref: ref,
+              stream_fun: &finch_parse_message/2,
+              cancel_fun: &finch_cancel/1
+            }
+
+            request = put_in(request.async, async)
+            response = Req.Response.new(status: status, headers: headers)
+            {request, response}
         end
     end
   end
