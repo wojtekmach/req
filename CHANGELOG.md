@@ -54,6 +54,14 @@ config :req, legacy_headers_as_lists: true
 
 This legacy fallback will be removed on Req 1.0.
 
+There are two other changes to headers in this release.
+
+Header names are now case-insensitive in functions like
+`Req.Response.get_header/2`.
+
+Trailer headers, or more precisely trailer fields or simply trailers, are now stored
+in a separate `trailers` field on the `%Req.Response{}` struct as long as you use Finch 0.17+.
+
 ### Add Request Body Streaming
 
 Req v0.4 adds official support for request body streaming by setting the request body to an
@@ -133,6 +141,8 @@ resp.body #=> %File.Stream{}
 
     Req headers are now stored internally downcased and all accessor functions
     like [`Req.Response.get_header/2`] are downcasing the given header name.
+
+  * Add `trailers` field to [`Req.Response`] struct. This change requires Finch 0.17.
 
   * Make `request.registered_options` internal representation private.
 
@@ -721,6 +731,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Request.fetch_option!/2`]:  https://hexdocs.pm/req/Req.Request.html#fetch_option!/2
 [`Req.Request.delete_option/2`]:  https://hexdocs.pm/req/Req.Request.html#update_private/4
 
+[`Req.Response`]:                  https://hexdocs.pm/req/Req.Response.html
 [`Req.Response.get_header/2`]:     https://hexdocs.pm/req/Req.Response.html#get_response/2
 [`Req.Response.delete_header/2`]:  https://hexdocs.pm/req/Req.Response.html#delete_header/2
 [`Req.Response.update_private/4`]: https://hexdocs.pm/req/Req.Response.html#update_private/4

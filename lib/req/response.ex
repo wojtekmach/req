@@ -10,6 +10,8 @@ defmodule Req.Response do
 
     * `:body` - the HTTP response body.
 
+    * `:trailers` - the HTTP response trailers. The trailer names must be downcased.
+
     * `:private` - a map reserved for libraries and frameworks to use.
       Prefix the keys with the name of your project to avoid any future
       conflicts. Only accepts `t:atom/0` keys.
@@ -19,12 +21,14 @@ defmodule Req.Response do
           status: non_neg_integer(),
           headers: %{binary() => [binary()]},
           body: binary() | term(),
+          trailers: %{binary() => [binary()]},
           private: map()
         }
 
   defstruct status: 200,
             headers: if(Req.MixProject.legacy_headers_as_lists?(), do: [], else: %{}),
             body: "",
+            trailers: %{},
             private: %{}
 
   @doc """
@@ -55,15 +59,16 @@ defmodule Req.Response do
   else
     def new(options) do
       options =
-        Map.take(options, [:status, :headers, :body])
-        |> Map.update(:headers, %{}, fn
-          map when is_map(map) ->
-            map
-
-          list when is_list(list) ->
-            Enum.reduce(list, %{}, fn {name, value}, acc ->
-              Map.update(acc, name, [value], &(&1 ++ [value]))
-            end)
+        Map.take(options, [:status, :headers, :body, :trailers])
+        |> Map.update(:headers, %{}, fn headers ->
+          Enum.reduce(headers, %{}, fn {name, value}, acc ->
+            Map.update(acc, name, List.wrap(value), &(&1 ++ List.wrap(value)))
+          end)
+        end)
+        |> Map.update(:trailers, %{}, fn trailers ->
+          Enum.reduce(trailers, %{}, fn {name, value}, acc ->
+            Map.update(acc, name, List.wrap(value), &(&1 ++ List.wrap(value)))
+          end)
         end)
 
       struct!(__MODULE__, options)

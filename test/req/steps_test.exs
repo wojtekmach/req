@@ -1618,8 +1618,16 @@ defmodule Req.StepsTest do
       assert resp.status == 200
       assert resp.headers["transfer-encoding"] == ["chunked"]
       assert resp.headers["trailer"] == ["x-foo, x-bar"]
-      assert resp.headers["x-foo"] == ["foo"]
-      assert resp.headers["x-bar"] == ["bar"]
+
+      # TODO: Remove check on new Finch release
+      if Map.has_key?(%Finch.Response{}, :trailers) do
+        assert resp.trailers["x-foo"] == ["foo"]
+        assert resp.trailers["x-bar"] == ["bar"]
+      else
+        assert resp.headers["x-foo"] == ["foo"]
+        assert resp.headers["x-bar"] == ["bar"]
+      end
+
       assert_receive {:data, "chunk1"}
       assert_receive {:data, "chunk2"}
       refute_receive _
@@ -1692,8 +1700,16 @@ defmodule Req.StepsTest do
       assert resp.status == 200
       assert resp.headers["transfer-encoding"] == ["chunked"]
       assert resp.headers["trailer"] == ["x-foo, x-bar"]
-      assert resp.headers["x-foo"] == ["foo"]
-      assert resp.headers["x-bar"] == ["bar"]
+
+      # TODO: Remove check on new Finch release
+      if Map.has_key?(%Finch.Response{}, :trailers) do
+        assert resp.trailers["x-foo"] == ["foo"]
+        assert resp.trailers["x-bar"] == ["bar"]
+      else
+        assert resp.headers["x-foo"] == ["foo"]
+        assert resp.headers["x-bar"] == ["bar"]
+      end
+
       assert resp.body == ["chunk1", "chunk2"]
     end
 
