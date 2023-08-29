@@ -67,10 +67,15 @@ defmodule Req.MixProject do
   end
 
   defp finch_opts do
-    if path = System.get_env("FINCH_PATH") do
-      [path: path]
-    else
-      []
+    cond do
+      path = System.get_env("FINCH_PATH") ->
+        [path: path]
+
+      ref = System.get_env("FINCH_REF") ->
+        [github: "sneako/finch", ref: ref]
+
+      true ->
+        []
     end
   end
 
