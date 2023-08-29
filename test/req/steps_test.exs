@@ -1633,7 +1633,7 @@ defmodule Req.StepsTest do
       refute_receive _
     end
 
-    test "into: fun with halt", %{bypass: bypass, url: url, test: test} do
+    test "into: fun with halt", %{bypass: bypass, url: url} do
       Bypass.expect(bypass, "GET", "/", fn conn ->
         conn = Plug.Conn.send_chunked(conn, 200)
         {:ok, conn} = Plug.Conn.chunk(conn, "foo")
@@ -1641,12 +1641,8 @@ defmodule Req.StepsTest do
         conn
       end)
 
-      # TODO: remove when we use Finch.stream_while
-      start_supervised!({Finch, name: test})
-
       resp =
         Req.get!(
-          finch: test,
           url: url,
           into: fn {:data, data}, {req, resp} ->
             resp = update_in(resp.body, &(&1 <> data))
