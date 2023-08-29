@@ -735,11 +735,7 @@ defmodule Req.Steps do
                 {request, %{response | status: status}}
 
               {:headers, fields}, {request, response} ->
-                fields =
-                  Enum.reduce(fields, %{}, fn {name, value}, acc ->
-                    Map.update(acc, name, [value], &(&1 ++ [value]))
-                  end)
-
+                fields = finch_fields_to_map(fields)
                 response = update_in(response.headers, &Map.merge(&1, fields))
                 {request, response}
 
@@ -755,6 +751,11 @@ defmodule Req.Steps do
                     raise ArgumentError,
                           "expected {:cont, acc} or {:halt, acc}, got: #{inspect(other)}"
                 end
+
+              {:trailers, fields}, {request, response} ->
+                fields = finch_fields_to_map(fields)
+                response = update_in(response.trailers, &Map.merge(&1, fields))
+                {request, response}
             end
 
             try do
@@ -786,16 +787,17 @@ defmodule Req.Steps do
                 {acc, request, %{response | status: status}}
 
               {:headers, fields}, {acc, request, response} ->
-                fields =
-                  Enum.reduce(fields, %{}, fn {name, value}, acc ->
-                    Map.update(acc, name, [value], &(&1 ++ [value]))
-                  end)
-
+                fields = finch_fields_to_map(fields)
                 response = update_in(response.headers, &Map.merge(&1, fields))
                 {acc, request, response}
 
               {:data, data}, {acc, request, response} ->
                 acc = collector.(acc, {:cont, data})
+                {acc, request, response}
+
+              {:trailers, fields}, {acc, request, response} ->
+                fields = finch_fields_to_map(fields)
+                response = update_in(response.trailers, &Map.merge(&1, fields))
                 {acc, request, response}
             end
 
@@ -822,6 +824,12 @@ defmodule Req.Steps do
       {:ok, response} -> Req.Response.new(response)
       {:error, exception} -> exception
     end
+  end
+
+  defp finch_fields_to_map(fields) do
+    Enum.reduce(fields, %{}, fn {name, value}, acc ->
+      Map.update(acc, name, [value], &(&1 ++ [value]))
+    end)
   end
 
   defp finch_parse_message(ref, {ref, {:data, data}}) do
