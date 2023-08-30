@@ -646,9 +646,13 @@ defmodule Req.StepsTest do
       |> Plug.Conn.send_resp(200, body)
     end
 
-    assert Req.get!("", plug: plug).body |> :zlib.uncompress() |> Jason.decode!() == %{
-             "a" => 1
-           }
+    {resp, log} =
+      ExUnit.CaptureLog.with_log(fn ->
+        Req.get!("", plug: plug)
+      end)
+
+    assert resp.body |> :zlib.uncompress() |> Jason.decode!() == %{"a" => 1}
+    assert log =~ ~s|algorithm \"deflate\" is not supported|
   end
 
   describe "redirect" do

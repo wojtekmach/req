@@ -1113,7 +1113,7 @@ defmodule Req.Steps do
       {:ok, decompressed} = :brotli.decode(body)
       decompress_body(rest, decompressed, acc)
     else
-      Logger.debug("decompress_body: :brotli library not loaded, skipping brotli decompression")
+      Logger.debug(":brotli library not loaded, skipping brotli decompression")
       decompress_body(rest, body, ["br" | acc])
     end
   end
@@ -1122,7 +1122,7 @@ defmodule Req.Steps do
     if ezstd_loaded?() do
       decompress_body(rest, :ezstd.decompress(body), acc)
     else
-      Logger.debug("decompress_body: :ezstd library not loaded, skipping zstd decompression")
+      Logger.debug(":ezstd library not loaded, skipping zstd decompression")
       decompress_body(rest, body, ["zstd" | acc])
     end
   end
@@ -1132,7 +1132,7 @@ defmodule Req.Steps do
   end
 
   defp decompress_body([codec | rest], body, acc) do
-    Logger.debug("decompress_body: algorithm #{inspect(codec)} is not supported")
+    Logger.debug("algorithm #{inspect(codec)} is not supported")
     decompress_body(rest, body, [codec | acc])
   end
 

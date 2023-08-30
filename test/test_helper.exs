@@ -7,9 +7,15 @@ defmodule TestServer do
   end
 
   defp accept(listen_socket, fun) do
-    {:ok, socket} = :gen_tcp.accept(listen_socket)
-    fun.(socket)
-    :ok = :gen_tcp.close(socket)
+    case :gen_tcp.accept(listen_socket) do
+      {:ok, socket} ->
+        fun.(socket)
+        :ok = :gen_tcp.close(socket)
+
+      {:error, :closed} ->
+        :ok
+    end
+
     accept(listen_socket, fun)
   end
 end
