@@ -1,4 +1,4 @@
-defmodule TestServer do
+defmodule TestSocket do
   def serve(fun) do
     {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, active: false)
     {:ok, port} = :inet.port(listen_socket)

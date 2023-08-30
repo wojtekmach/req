@@ -337,7 +337,7 @@ defmodule Req.StepsTest do
 
     test "multiple codecs with multiple headers" do
       %{url: url} =
-        TestServer.serve(fn socket ->
+        TestSocket.serve(fn socket ->
           assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
 
           body = "foo" |> :zlib.gzip() |> :ezstd.compress()
@@ -1587,7 +1587,7 @@ defmodule Req.StepsTest do
 
     test "into: fun" do
       %{url: url} =
-        TestServer.serve(fn socket ->
+        TestSocket.serve(fn socket ->
           {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
 
           data = """
@@ -1687,7 +1687,7 @@ defmodule Req.StepsTest do
 
     test "into: collectable" do
       %{url: url} =
-        TestServer.serve(fn socket ->
+        TestSocket.serve(fn socket ->
           {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
 
           data = """
