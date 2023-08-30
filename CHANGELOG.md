@@ -210,6 +210,12 @@ resp.body #=> %File.Stream{}
 
   * [`retry`]: Deprecate `retry: :never` in favour of `retry: false`
 
+  * [`cache`]: Support `cache: :offline`
+
+    It immediately restores the cached response or fails if it's not available.
+    This option should only be used if a response was previously cached by setting
+    `cache: true`.
+
   * [`Req.request/2`]: Improve error message on invalid arguments
 
   * [`Req.update/2`]: Do not duplicate headers
