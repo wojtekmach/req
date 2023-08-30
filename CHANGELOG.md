@@ -142,7 +142,7 @@ resp.body #=> %File.Stream{}
     Req headers are now stored internally downcased and all accessor functions
     like [`Req.Response.get_header/2`] are downcasing the given header name.
 
-  * Add `trailers` field to [`Req.Response`] struct. This change requires Finch 0.17.
+  * Add `trailers` field to [`Req.Response`] struct. Trailer field is only filled in on Finch 0.17+.
 
   * Make `request.registered_options` internal representation private.
 
@@ -181,7 +181,7 @@ resp.body #=> %File.Stream{}
 
   * [`decompress_body`]: Remove `content-encoding` header after decompression
 
-  * [`decode_body`]: Do not decode resposne with `content-encoding` header
+  * [`decode_body`]: Do not decode response with `content-encoding` header
 
   * [`run_finch`]: Add `:inet6` option
 
@@ -200,11 +200,11 @@ resp.body #=> %File.Stream{}
   * [`retry`]: Support `retry: &fun/2`. The function receives `request, response_or_exception`
     and returns either:
 
-        * `true` - retry with the default delay
+      * `true` - retry with the default delay
 
-        * `{:delay, milliseconds}` - retry with the given delay
+      * `{:delay, milliseconds}` - retry with the given delay
 
-        * `false/nil` - don't retry
+      * `false/nil` - don't retry
 
   * [`retry`]: Deprecate `retry: :safe` in favour of `retry: :safe_transient`
 
