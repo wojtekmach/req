@@ -1642,13 +1642,21 @@ defmodule Req.StepsTest do
       Code.ensure_loaded?(Finch) and function_exported?(Finch, :stream_while, 5)
 
     @tag skip: not finch_stream_while?
-    test "into: fun with halt", %{bypass: bypass, url: url} do
-      Bypass.expect(bypass, "GET", "/", fn conn ->
-        conn = Plug.Conn.send_chunked(conn, 200)
-        {:ok, conn} = Plug.Conn.chunk(conn, "foo")
-        {:ok, conn} = Plug.Conn.chunk(conn, "bar")
-        conn
-      end)
+    test "into: fun with halt" do
+      # try fixing `** (exit) shutdown` on CI by starting custom server
+      defmodule StreamPlug do
+        def init(options), do: options
+
+        def call(conn, []) do
+          conn = Plug.Conn.send_chunked(conn, 200)
+          {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+          {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+          conn
+        end
+      end
+
+      start_supervised!({Plug.Cowboy, plug: StreamPlug, scheme: :http, port: 0})
+      url = "http://localhost:#{:ranch.get_port(StreamPlug.HTTP)}"
 
       resp =
         Req.get!(
