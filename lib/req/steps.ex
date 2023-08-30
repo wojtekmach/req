@@ -473,8 +473,7 @@ defmodule Req.Steps do
             {request, response}
 
           {:error, :enoent} ->
-            exception = RuntimeError.exception("cached response not found in offline mode")
-            {request, exception}
+            raise RuntimeError, "cached response not found in offline mode"
         end
 
       other when other in [false, nil] ->
