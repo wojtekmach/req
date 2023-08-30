@@ -1039,6 +1039,9 @@ defmodule Req.Steps do
   @doc """
   Decompresses the response body based on the `content-encoding` header.
 
+  This step is disabled on response body streaming. If response body is not a binary, in other
+  words it has been transformed by another step, it is left as is.
+
   Supported formats:
 
   | Format        | Decoder                                         |
@@ -1084,8 +1087,10 @@ defmodule Req.Steps do
   @doc step: :response
   def decompress_body(request_response)
 
-  def decompress_body({request, response})
-      when response.body == "" or not is_binary(response.body) do
+  def decompress_body({request, %{body: body} = response})
+      when request.into != nil or
+             body == "" or
+             not is_binary(body) do
     {request, response}
   end
 
@@ -1208,8 +1213,8 @@ defmodule Req.Steps do
   | zip      | `:zip.unzip/2`                                                    |
   | csv      | `NimbleCSV.RFC4180.parse_string/2` (if [nimble_csv] is installed) |
 
-  If response body is not a binary, in other words it has been transformed by
-  another step, it is left as is.
+  This step is disabled on response body streaming. If response body is not a binary, in other
+  words it has been transformed by another step, it is left as is.
 
   ## Request Options
 
@@ -1239,11 +1244,10 @@ defmodule Req.Steps do
   @doc step: :response
   def decode_body(request_response)
 
-  def decode_body({request, %{body: ""} = response}) do
-    {request, response}
-  end
-
-  def decode_body({request, response}) when not is_binary(response.body) do
+  def decode_body({request, %{body: body} = response})
+      when request.async != nil or
+             body == "" or
+             not is_binary(body) do
     {request, response}
   end
 
