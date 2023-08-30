@@ -1637,6 +1637,11 @@ defmodule Req.StepsTest do
       refute_receive _
     end
 
+    # TODO: Remove on Finch 0.17
+    finch_stream_while? =
+      Code.ensure_loaded?(Finch) and function_exported?(Finch, :stream_while, 5)
+
+    @tag skip: not finch_stream_while?
     test "into: fun with halt", %{bypass: bypass, url: url} do
       Bypass.expect(bypass, "GET", "/", fn conn ->
         conn = Plug.Conn.send_chunked(conn, 200)
@@ -1728,6 +1733,7 @@ defmodule Req.StepsTest do
                )
     end
 
+    # TODO: Remove on Finch 0.17
     async_finch? = Code.ensure_loaded?(Finch) and function_exported?(Finch, :async_request, 2)
 
     @tag skip: not async_finch?

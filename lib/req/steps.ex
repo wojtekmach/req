@@ -680,10 +680,10 @@ defmodule Req.Steps do
     run_finch(request, finch_request, finch_name, finch_options)
   end
 
-  defp run_finch(request, finch_request, finch_name, finch_options) do
-    case request.options[:finch_request] do
+  defp run_finch(req, finch_req, finch_name, finch_options) do
+    case req.options[:finch_request] do
       fun when is_function(fun, 4) ->
-        fun.(request, finch_request, finch_name, finch_options)
+        fun.(req, finch_req, finch_name, finch_options)
 
       deprecated_fun when is_function(deprecated_fun, 1) ->
         IO.warn(
@@ -691,133 +691,141 @@ defmodule Req.Steps do
             "See Req.Steps.run_finch/1 for more information."
         )
 
-        {request, run_finch_request(deprecated_fun.(finch_request), finch_name, finch_options)}
+        {req, run_finch_request(deprecated_fun.(finch_req), finch_name, finch_options)}
 
       nil ->
-        case request.into do
+        case req.into do
           nil ->
-            {request, run_finch_request(finch_request, finch_name, finch_options)}
+            {req, run_finch_request(finch_req, finch_name, finch_options)}
 
           fun when is_function(fun, 2) ->
-            response = Req.Response.new()
+            finch_stream_into_fun(req, finch_req, finch_name, finch_options, fun)
 
-            fun = fn
-              {:status, status}, {request, response} ->
-                {request, %{response | status: status}}
-
-              {:headers, fields}, {request, response} ->
-                fields = finch_fields_to_map(fields)
-                response = update_in(response.headers, &Map.merge(&1, fields))
-                {request, response}
-
-              {:data, data}, acc ->
-                case fun.({:data, data}, acc) do
-                  {:cont, acc} ->
-                    acc
-
-                  {:halt, acc} ->
-                    throw({:finch_halt, acc})
-
-                  other ->
-                    raise ArgumentError,
-                          "expected {:cont, acc} or {:halt, acc}, got: #{inspect(other)}"
-                end
-
-              {:trailers, fields}, {request, response} ->
-                fields = finch_fields_to_map(fields)
-                response = update_in(response.trailers, &Map.merge(&1, fields))
-                {request, response}
-            end
-
-            try do
-              # TODO: use Finch.stream_while on next Finch release
-              case Finch.stream(
-                     finch_request,
-                     finch_name,
-                     {request, response},
-                     fun,
-                     finch_options
-                   ) do
-                {:ok, acc} ->
-                  acc
-
-                {:error, exception} ->
-                  {request, exception}
-              end
-            catch
-              {:finch_halt, acc} ->
-                acc
-            end
+          :self ->
+            finch_stream_into_self(req, finch_req, finch_name, finch_options)
 
           collectable when collectable != :self ->
-            {acc, collector} = Collectable.into(collectable)
-            response = Req.Response.new()
-
-            fun = fn
-              {:status, status}, {acc, request, response} ->
-                {acc, request, %{response | status: status}}
-
-              {:headers, fields}, {acc, request, response} ->
-                fields = finch_fields_to_map(fields)
-                response = update_in(response.headers, &Map.merge(&1, fields))
-                {acc, request, response}
-
-              {:data, data}, {acc, request, response} ->
-                acc = collector.(acc, {:cont, data})
-                {acc, request, response}
-
-              {:trailers, fields}, {acc, request, response} ->
-                fields = finch_fields_to_map(fields)
-                response = update_in(response.trailers, &Map.merge(&1, fields))
-                {acc, request, response}
-            end
-
-            case Finch.stream(
-                   finch_request,
-                   finch_name,
-                   {acc, request, response},
-                   fun,
-                   finch_options
-                 ) do
-              {:ok, {acc, request, response}} ->
-                acc = collector.(acc, :done)
-                {request, %{response | body: acc}}
-
-              {:error, exception} ->
-                {request, exception}
-            end
-
-          # TODO: WIP
-          :self ->
-            ref = Finch.async_request(finch_request, finch_name)
-
-            {:status, status} =
-              receive do
-                {^ref, message} ->
-                  message
-              end
-
-            headers =
-              receive do
-                {^ref, message} ->
-                  # TODO: handle trailers
-                  {:headers, headers} = message
-
-                  Enum.reduce(headers, %{}, fn {name, value}, acc ->
-                    Map.update(acc, name, [value], &(&1 ++ [value]))
-                  end)
-              end
-
-            async = %Req.Async{
-              ref: ref,
-              stream_fun: &finch_parse_message/2,
-              cancel_fun: &finch_cancel/1
-            }
-
-            request = put_in(request.async, async)
-            response = Req.Response.new(status: status, headers: headers)
-            {request, response}
+            finch_stream_into_collectable(req, finch_req, finch_name, finch_options, collectable)
         end
+    end
+  end
+
+  defp finch_stream_into_fun(req, finch_req, finch_name, finch_options, fun) do
+    resp = Req.Response.new()
+
+    fun = fn
+      {:status, status}, {req, resp} ->
+        {:cont, {req, %{resp | status: status}}}
+
+      {:headers, fields}, {req, resp} ->
+        fields = finch_fields_to_map(fields)
+        resp = update_in(resp.headers, &Map.merge(&1, fields))
+        {:cont, {req, resp}}
+
+      {:data, data}, acc ->
+        fun.({:data, data}, acc)
+
+      {:trailers, fields}, {req, resp} ->
+        fields = finch_fields_to_map(fields)
+        resp = update_in(resp.trailers, &Map.merge(&1, fields))
+        {:cont, {req, resp}}
+    end
+
+    case finch_stream_while(finch_req, finch_name, {req, resp}, fun, finch_options) do
+      {:ok, acc} ->
+        acc
+
+      {:error, exception} ->
+        {req, exception}
+    end
+  end
+
+  defp finch_stream_into_collectable(req, finch_req, finch_name, finch_options, collectable) do
+    {acc, collector} = Collectable.into(collectable)
+    resp = Req.Response.new()
+
+    fun = fn
+      {:status, status}, {acc, req, resp} ->
+        {acc, req, %{resp | status: status}}
+
+      {:headers, fields}, {acc, req, resp} ->
+        fields = finch_fields_to_map(fields)
+        resp = update_in(resp.headers, &Map.merge(&1, fields))
+        {acc, req, resp}
+
+      {:data, data}, {acc, req, resp} ->
+        acc = collector.(acc, {:cont, data})
+        {acc, req, resp}
+
+      {:trailers, fields}, {acc, req, resp} ->
+        fields = finch_fields_to_map(fields)
+        resp = update_in(resp.trailers, &Map.merge(&1, fields))
+        {acc, req, resp}
+    end
+
+    case Finch.stream(finch_req, finch_name, {acc, req, resp}, fun, finch_options) do
+      {:ok, {acc, req, resp}} ->
+        acc = collector.(acc, :done)
+        {req, %{resp | body: acc}}
+
+      {:error, exception} ->
+        {req, exception}
+    end
+  end
+
+  # TODO: WIP
+  defp finch_stream_into_self(req, finch_req, finch_name, finch_options) do
+    ref = Finch.async_request(finch_req, finch_name, finch_options)
+
+    {:status, status} =
+      receive do
+        {^ref, message} ->
+          message
+      end
+
+    headers =
+      receive do
+        {^ref, message} ->
+          # TODO: handle trailers
+          {:headers, headers} = message
+
+          Enum.reduce(headers, %{}, fn {name, value}, acc ->
+            Map.update(acc, name, [value], &(&1 ++ [value]))
+          end)
+      end
+
+    async = %Req.Async{
+      ref: ref,
+      stream_fun: &finch_parse_message/2,
+      cancel_fun: &finch_cancel/1
+    }
+
+    req = put_in(req.async, async)
+    resp = Req.Response.new(status: status, headers: headers)
+    {req, resp}
+  end
+
+  # TODO: Remove on Finch 0.17
+  if Code.ensure_loaded?(Finch) and function_exported?(Finch, :stream_while, 5) do
+    defp finch_stream_while(finch_req, finch_name, acc, fun, finch_options) do
+      Finch.stream_while(finch_req, finch_name, acc, fun, finch_options)
+    end
+  else
+    defp finch_stream_while(finch_req, finch_name, acc, fun, finch_options) do
+      fun = fn item, acc ->
+        case fun.(item, acc) do
+          {:cont, acc} ->
+            acc
+
+          {:halt, _acc} ->
+            raise ArgumentError, "returning {:halt, _acc} requires Finch 0.17+"
+
+          other ->
+            raise ArgumentError, "expected {:cont, _acc}, got: #{inspect(other)}"
+        end
+      end
+
+      Finch.stream(finch_req, finch_name, acc, fun, finch_options)
     end
   end
 

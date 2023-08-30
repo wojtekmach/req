@@ -11,6 +11,8 @@ jobs:
       MIX_ENV: test
       # TODO: Remove on Req 1.0
       REQ_NOWARN_OUTPUT: true
+      # TODO: Remove on Finch 0.17
+      FINCH_REF: b08b594
     strategy:
       fail-fast: false
       matrix:
