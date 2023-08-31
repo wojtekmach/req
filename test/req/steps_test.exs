@@ -698,32 +698,52 @@ defmodule Req.StepsTest do
              end) =~ "[debug] redirecting to /ok?a=1"
     end
 
-    test "301..303", c do
-      Bypass.expect(c.bypass, "POST", "/redirect", fn conn ->
-        redirect(conn, 301, c.url <> "/ok")
-      end)
+    test "change POST to GET to get on 301..303", c do
+      for status <- 301..303 do
+        Bypass.expect(c.bypass, "POST", "/redirect", fn conn ->
+          redirect(conn, status, c.url <> "/ok")
+        end)
 
-      Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-        Plug.Conn.send_resp(conn, 200, "ok")
-      end)
+        Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
 
-      assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.post!(c.url <> "/redirect", body: "body").status == 200
-             end) =~ "[debug] redirecting to #{c.url}/ok"
+        assert ExUnit.CaptureLog.capture_log(fn ->
+                 assert Req.post!(c.url <> "/redirect", body: "body").status == 200
+               end) =~ "[debug] redirecting to #{c.url}/ok"
+      end
     end
 
-    test "307..308", c do
-      Bypass.expect(c.bypass, "POST", "/redirect", fn conn ->
-        redirect(conn, 307, c.url <> "/ok")
-      end)
+    test "do not change method on 307 and 308", c do
+      for status <- [307, 308] do
+        Bypass.expect(c.bypass, "POST", "/redirect", fn conn ->
+          redirect(conn, status, c.url <> "/ok")
+        end)
 
-      Bypass.expect(c.bypass, "POST", "/ok", fn conn ->
-        Plug.Conn.send_resp(conn, 200, "ok")
-      end)
+        Bypass.expect(c.bypass, "POST", "/ok", fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
 
-      assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.post!(c.url <> "/redirect", body: "body").status == 200
-             end) =~ "[debug] redirecting to #{c.url}/ok"
+        assert ExUnit.CaptureLog.capture_log(fn ->
+                 assert Req.post!(c.url <> "/redirect", body: "body").status == 200
+               end) =~ "[debug] redirecting to #{c.url}/ok"
+      end
+    end
+
+    test "never change HEAD requests", c do
+      for status <- [301, 302, 303, 307, 307] do
+        Bypass.expect(c.bypass, "HEAD", "/redirect", fn conn ->
+          redirect(conn, status, c.url <> "/ok")
+        end)
+
+        Bypass.expect(c.bypass, "HEAD", "/ok", fn conn ->
+          Plug.Conn.send_resp(conn, 200, "")
+        end)
+
+        assert ExUnit.CaptureLog.capture_log(fn ->
+                 assert Req.head!(c.url <> "/redirect").status == 200
+               end) =~ "[debug] redirecting to #{c.url}/ok"
+      end
     end
 
     test "auth same host", c do

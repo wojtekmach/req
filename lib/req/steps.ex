@@ -1454,8 +1454,8 @@ defmodule Req.Steps do
     # assume put_params step already run so remove :params option so it's not applied again
     |> Req.Request.delete_option(:params)
     |> remove_credentials_if_untrusted(redirect_trusted, location_url)
-    |> put_redirect_request_method(response.status)
-    |> put_redirect_location(location_url)
+    |> put_redirect_method(response.status)
+    |> Map.replace!(:url, location_url)
   end
 
   defp log_redirect(false, _location), do: :ok
@@ -1464,13 +1464,20 @@ defmodule Req.Steps do
     Logger.log(level, ["redirecting to ", location])
   end
 
-  defp put_redirect_location(request, location_url) do
-    put_in(request.url, location_url)
+  # https://www.rfc-editor.org/rfc/rfc9110#name-301-moved-permanently and 302:
+  #
+  # > Note: For historical reasons, a user agent MAY change the request method from
+  # > POST to GET for the subsequent request.
+  #
+  # And my understanding is essentially same applies for 303.
+  # Also see https://everything.curl.dev/http/redirects
+  defp put_redirect_method(%{method: :post} = request, status) when status in 301..303 do
+    %{request | method: :get}
   end
 
-  defp put_redirect_request_method(request, status) when status in 307..308, do: request
-
-  defp put_redirect_request_method(request, _), do: %{request | method: :get}
+  defp put_redirect_method(request, _status) do
+    request
+  end
 
   defp remove_credentials_if_untrusted(request, true, _), do: request
 
