@@ -171,6 +171,10 @@ resp.body #=> %File.Stream{}
 
   * [`redirect`]: Rename `:location_trusted` option to `:redirect_trusted`.
 
+  * [`redirect`]: Change HTTP request method to GET only on POST requests that result in 301..303.
+
+    Previously we were changing the method to GET for all 3xx except 307 and 308.
+
   * [`decompress_body`]: Remove support for `deflate` compression
 
   * [`decompress_body`]: Don't crash on unknown codec
