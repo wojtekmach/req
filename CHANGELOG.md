@@ -190,7 +190,7 @@ resp.body #=> %File.Stream{}
   * [`run_finch`]: Add `:inet6` option
 
   * [`retry`]: Support `retry: :safe_transient` which retries HTTP 408/429/500/502/503/504
-    or exceptions with :reason set to :timeout/:econnrefused.
+    or exceptions with `reason` field set to `:timeout`/`:econnrefused`.
 
     `:safe_transient` is the new default retry mode. (Previously we retried on 408/429/5xx and
     _any_ exception.)
@@ -234,7 +234,7 @@ resp.body #=> %File.Stream{}
 
   * [`Req.Response`]: Add [`Req.Response.delete_header/2`]
 
-  * [`Req.Response`]: Add [`Req.Response.update_private/2`]
+  * [`Req.Response`]: Add [`Req.Response.update_private/4`]
 
 ## v0.3.11 (2023-07-24)
 
@@ -733,7 +733,9 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Request.get_option/3`]:     https://hexdocs.pm/req/Req.Request.html#get_option/3
 [`Req.Request.fetch_option/2`]:   https://hexdocs.pm/req/Req.Request.html#fetch_option/2
 [`Req.Request.fetch_option!/2`]:  https://hexdocs.pm/req/Req.Request.html#fetch_option!/2
-[`Req.Request.delete_option/2`]:  https://hexdocs.pm/req/Req.Request.html#update_private/4
+[`Req.Request.update_option/4`]:   https://hexdocs.pm/req/Req.Request.html#update_option/4
+[`Req.Request.delete_option/2`]:  https://hexdocs.pm/req/Req.Request.html#delete_option/2
+[`Req.Request.update_private/4`]:  https://hexdocs.pm/req/Req.Request.html#update_private/4
 
 [`Req.Response`]:                  https://hexdocs.pm/req/Req.Response.html
 [`Req.Response.get_header/2`]:     https://hexdocs.pm/req/Req.Response.html#get_response/2
