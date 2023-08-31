@@ -209,15 +209,7 @@ defmodule Req do
 
   Caching options ([`cache`](`Req.Steps.cache/1`) step):
 
-    * `:cache` - can be one of:
-
-        * `true` - performs simple HTTP caching using `if-modified-since` header.
-
-        * `false` - (default) no caching.
-
-        * `:offline` - immediately restores the cached response or fails if it's not available.
-          This option should only be used if a response was previously cached by setting
-          `cache: true`.
+    * `:cache` - if `true`, performs HTTP caching. Defaults to `false`.
 
     * `:cache_dir` - the directory to store the cache, defaults to `<user_cache_dir>/req`
       (see: `:filename.basedir/3`)

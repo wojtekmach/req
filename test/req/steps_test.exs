@@ -1307,139 +1307,90 @@ defmodule Req.StepsTest do
     end
   end
 
-  describe "cache" do
-    @describetag :tmp_dir
+  @tag :tmp_dir
+  test "cache", c do
+    pid = self()
 
-    test "simple", c do
-      pid = self()
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      case Plug.Conn.get_req_header(conn, "if-modified-since") do
+        [] ->
+          send(pid, :cache_miss)
 
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
-        case Plug.Conn.get_req_header(conn, "if-modified-since") do
-          [] ->
-            send(pid, :cache_miss)
+          conn
+          |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
+          |> Plug.Conn.send_resp(200, "ok")
 
-            conn
-            |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
-            |> Plug.Conn.send_resp(200, "ok")
+        _ ->
+          send(pid, :cache_hit)
 
-          _ ->
-            send(pid, :cache_hit)
-
-            conn
-            |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
-            |> Plug.Conn.send_resp(304, "")
-        end
-      end)
-
-      request =
-        Req.new(
-          url: c.url,
-          cache: true,
-          cache_dir: c.tmp_dir
-        )
-
-      response = Req.get!(request)
-      assert response.status == 200
-      assert response.body == "ok"
-      assert_received :cache_miss
-
-      response = Req.get!(request)
-      assert response.status == 200
-      assert response.body == "ok"
-      assert_received :cache_hit
-    end
-
-    test "cache: offline", c do
-      pid = self()
-
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
-        case Plug.Conn.get_req_header(conn, "if-modified-since") do
-          [] ->
-            send(pid, :cache_miss)
-
-            conn
-            |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
-            |> Plug.Conn.send_resp(200, "ok")
-
-          _ ->
-            send(pid, :cache_hit)
-
-            conn
-            |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
-            |> Plug.Conn.send_resp(304, "")
-        end
-      end)
-
-      request =
-        Req.new(
-          url: c.url,
-          cache_dir: c.tmp_dir
-        )
-
-      assert_raise RuntimeError, "cached response not found in offline mode", fn ->
-        Req.get!(request, cache: :offline)
+          conn
+          |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
+          |> Plug.Conn.send_resp(304, "")
       end
+    end)
 
-      response = Req.get!(request, cache: true)
-      assert response.status == 200
-      assert response.body == "ok"
-      assert_received :cache_miss
+    request = Req.new(url: c.url, cache: true, cache_dir: c.tmp_dir)
 
-      response = Req.get!(request, cache: :offline)
-      assert response.status == 200
-      assert response.body == "ok"
-      refute_receive _
-    end
+    response = Req.get!(request)
+    assert response.status == 200
+    assert response.body == "ok"
+    assert_received :cache_miss
 
-    @tag :capture_log
-    test "cache + retry", c do
-      pid = self()
-      {:ok, _} = Agent.start_link(fn -> 0 end, name: :counter)
+    response = Req.Request.run!(request)
+    assert response.status == 200
+    assert response.body == "ok"
+    assert_received :cache_hit
+  end
 
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
-        case Plug.Conn.get_req_header(conn, "if-modified-since") do
-          [] ->
-            send(pid, :cache_miss)
+  @tag :tmp_dir
+  @tag :capture_log
+  test "cache + retry", c do
+    pid = self()
+    {:ok, _} = Agent.start_link(fn -> 0 end, name: :counter)
 
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      case Plug.Conn.get_req_header(conn, "if-modified-since") do
+        [] ->
+          send(pid, :cache_miss)
+
+          conn
+          |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
+          |> json(200, %{a: 1})
+
+        _ ->
+          send(pid, :cache_hit)
+          count = Agent.get_and_update(:counter, &{&1, &1 + 1})
+
+          if count < 2 do
+            Plug.Conn.send_resp(conn, 500, "")
+          else
             conn
             |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
-            |> json(200, %{a: 1})
+            |> Plug.Conn.send_resp(304, "")
+          end
+      end
+    end)
 
-          _ ->
-            send(pid, :cache_hit)
-            count = Agent.get_and_update(:counter, &{&1, &1 + 1})
+    request =
+      Req.new(
+        url: c.url,
+        retry_delay: 10,
+        cache: true,
+        cache_dir: c.tmp_dir
+      )
 
-            if count < 2 do
-              Plug.Conn.send_resp(conn, 500, "")
-            else
-              conn
-              |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
-              |> Plug.Conn.send_resp(304, "")
-            end
-        end
-      end)
+    response = Req.get!(request)
+    assert response.status == 200
+    assert response.body == %{"a" => 1}
+    assert_received :cache_miss
 
-      request =
-        Req.new(
-          url: c.url,
-          retry_delay: 10,
-          cache: true,
-          cache_dir: c.tmp_dir
-        )
-
-      response = Req.get!(request)
-      assert response.status == 200
-      assert response.body == %{"a" => 1}
-      assert_received :cache_miss
-
-      response = Req.get!(request)
-      assert response.status == 200
-      assert response.body == %{"a" => 1}
-      assert_received :cache_hit
-      assert_received :cache_hit
-      assert_received :cache_hit
-      refute_received _
-    end
+    response = Req.Request.run!(request)
+    assert response.status == 200
+    assert response.body == %{"a" => 1}
+    assert_received :cache_hit
+    assert_received :cache_hit
+    assert_received :cache_hit
+    refute_received _
   end
 
   describe "put_plug" do

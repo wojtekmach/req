@@ -430,15 +430,7 @@ defmodule Req.Steps do
 
   ## Options
 
-    * `:cache` - can be one of:
-
-        * `true` - performs simple HTTP caching using `if-modified-since` header.
-
-        * `false` - (default) no caching.
-
-        * `:offline` - immediately restores the cached response or fails if it's not available.
-          This option should only be used if a response was previously cached by setting
-          `cache: true`.
+    * `:cache` - if `true`, performs simple caching using `if-modified-since` header. Defaults to `false`.
 
     * `:cache_dir` - the directory to store the cache, defaults to `<user_cache_dir>/req`
       (see: `:filename.basedir/3`)
@@ -462,19 +454,6 @@ defmodule Req.Steps do
         request
         |> put_if_modified_since(cache_path)
         |> Req.Request.prepend_response_steps(handle_cache: &handle_cache(&1, cache_path))
-
-      :offline ->
-        dir = request.options[:cache_dir] || :filename.basedir(:user_cache, ~c"req")
-        cache_path = cache_path(dir, request)
-
-        case File.read(cache_path) do
-          {:ok, contents} ->
-            response = :erlang.binary_to_term(contents)
-            {request, response}
-
-          {:error, :enoent} ->
-            raise RuntimeError, "cached response not found in offline mode"
-        end
 
       other when other in [false, nil] ->
         request
