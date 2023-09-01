@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.4.1 (2023-09-01)
+
+  * Fix Req.Request Inspect regression
+
 ## v0.4.0 (2023-09-01)
 
 Req v0.4.0 changes headers to be maps, adds request & response streaming, and improves steps.
