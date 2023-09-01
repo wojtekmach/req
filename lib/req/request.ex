@@ -1024,7 +1024,7 @@ defmodule Req.Request do
       {headers, options} =
         if Req.Request.get_option(request, :redact_auth, true) do
           headers =
-            if Req.MixProject.legacy_headers_as_lists?() do
+            if unquote(Req.MixProject.legacy_headers_as_lists?()) do
               for {name, value} <- request.headers do
                 if Req.__ensure_header_downcase__(name) == "authorization" do
                   {name, "[redacted]"}
