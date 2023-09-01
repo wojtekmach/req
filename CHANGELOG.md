@@ -228,8 +228,6 @@ resp.body #=> %File.Stream{}
 
   * [`Req.Request`]: Add [`Req.Request.fetch_option!/2`]
 
-  * [`Req.Request`]: Add [`Req.Request.update_option/4`]
-
   * [`Req.Request`]: Add [`Req.Request.delete_option/2`]
 
   * [`Req.Response`]: Add [`Req.Response.delete_header/2`]
@@ -732,7 +730,6 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Request.get_option/3`]:     https://hexdocs.pm/req/Req.Request.html#get_option/3
 [`Req.Request.fetch_option/2`]:   https://hexdocs.pm/req/Req.Request.html#fetch_option/2
 [`Req.Request.fetch_option!/2`]:  https://hexdocs.pm/req/Req.Request.html#fetch_option!/2
-[`Req.Request.update_option/4`]:   https://hexdocs.pm/req/Req.Request.html#update_option/4
 [`Req.Request.delete_option/2`]:  https://hexdocs.pm/req/Req.Request.html#delete_option/2
 [`Req.Request.update_private/4`]:  https://hexdocs.pm/req/Req.Request.html#update_private/4
 
