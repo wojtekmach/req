@@ -73,14 +73,14 @@ Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
 
 If you want to use Req in a Mix project, you can add the above dependency to your `mix.exs`.
 
-Here's an example POST request (which sends data as `application/x-www-form-urlencoded`):
+Here's an example POST with JSON data:
 
 ```elixir
-iex> Req.post!("https://httpbin.org/post", form: [comments: "hello!"]).body["form"]
-%{"comments" => "hello!"}
+iex> Req.post!("https://httpbin.org/post", json: %{x: 1, y: 2}).body["json"]
+%{"x" => 1, "y" => 2}
 ```
 
-You can stream request body too:
+You can stream request body:
 
 ```elixir
 iex> stream = Stream.duplicate("foo", 3)
@@ -147,7 +147,7 @@ And here is how they can be used:
 
 ```elixir
 Mix.install([
-  {:req, "~> 0.3.0"},
+  {:req, "~> 0.4.0"},
   {:req_easyhtml, "~> 0.1.0"},
   {:req_s3, "~> 0.1.0"},
   {:req_hex, "~> 0.1.0"},
