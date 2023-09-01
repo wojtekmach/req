@@ -163,7 +163,7 @@ resp.body #=> %File.Stream{}
 
   * Fix typespecs for some functions
 
-  * Deprecate [`output`] step in favour of `into: File.stream!(path)`.
+  * Deprecate `output` step in favour of `into: File.stream!(path)`.
 
   * Rename `follow_redirects` step to [`redirect`]
 
@@ -714,7 +714,6 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`encode_body`]:         https://hexdocs.pm/req/Req.Steps.html#encode_body/1
 [`redirect`]:            https://hexdocs.pm/req/Req.Steps.html#redirect/1
 [`handle_http_errors`]:  https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
-[`output`]:              https://hexdocs.pm/req/Req.Steps.html#output/1
 [`put_base_url`]:        https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
 [`put_params`]:          https://hexdocs.pm/req/Req.Steps.html#put_params/1
 [`put_path_params`]:     https://hexdocs.pm/req/Req.Steps.html#put_path_params/1
