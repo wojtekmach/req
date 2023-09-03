@@ -84,10 +84,10 @@ defmodule Req.MixProject do
   defp plug_opts do
     cond do
       path = System.get_env("PLUG_PATH") ->
-        [path: path]
+        [path: path, override: true]
 
       ref = System.get_env("PLUG_REF") ->
-        [github: "elixir-plug/plug", ref: ref]
+        [github: "elixir-plug/plug", ref: ref, override: true]
 
       true ->
         []
