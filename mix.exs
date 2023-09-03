@@ -28,7 +28,9 @@ defmodule Req.MixProject do
           :brotli,
           :ezstd,
           # TODO: Wait for async_request/3
-          Finch
+          Finch,
+          # TODO: Wait for Plug 1.15
+          Plug.Conn
         ]
       ]
     ]
@@ -58,7 +60,7 @@ defmodule Req.MixProject do
       {:mime, "~> 1.6 or ~> 2.0"},
       {:jason, "~> 1.0"},
       {:nimble_csv, "~> 1.0", optional: true},
-      {:plug, "~> 1.0", optional: true},
+      {:plug, "~> 1.0", [optional: true] ++ plug_opts()},
       {:brotli, "~> 0.3.1", optional: true},
       {:ezstd, "~> 1.0", optional: true},
       {:bypass, "~> 2.1", only: :test},
@@ -73,6 +75,19 @@ defmodule Req.MixProject do
 
       ref = System.get_env("FINCH_REF") ->
         [github: "sneako/finch", ref: ref]
+
+      true ->
+        []
+    end
+  end
+
+  defp plug_opts do
+    cond do
+      path = System.get_env("PLUG_PATH") ->
+        [path: path]
+
+      ref = System.get_env("PLUG_REF") ->
+        [github: "elixir-plug/plug", ref: ref]
 
       true ->
         []

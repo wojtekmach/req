@@ -987,6 +987,8 @@ defmodule Req.Steps do
   end
 
   defp run_plug(request) do
+    plug = request.options[:plug]
+
     req_body =
       case request.body do
         iodata when is_binary(iodata) or is_list(iodata) ->
@@ -1009,19 +1011,76 @@ defmodule Req.Steps do
         end
       end
 
+    conn = Plug.Test.conn(request.method, request.url, req_body)
+
     conn =
-      Plug.Test.conn(request.method, request.url, req_body)
+      if request.into do
+        register_before_chunk(conn, fn conn, chunk ->
+          update_in(conn.private[:req_plug_chunks], fn chunks ->
+            (chunks || []) ++ [chunk]
+          end)
+        end)
+      else
+        conn
+      end
+
+    conn =
+      conn
       |> Map.replace!(:req_headers, req_headers)
-      |> call_plug(request.options[:plug])
+      |> call_plug(plug)
 
     response =
       Req.Response.new(
         status: conn.status,
-        headers: conn.resp_headers,
-        body: conn.resp_body
+        headers: conn.resp_headers
       )
 
-    {request, response}
+    case request.into do
+      nil ->
+        response = put_in(response.body, conn.resp_body)
+        {request, response}
+
+      fun when is_function(fun, 2) ->
+        chunks =
+          conn.private[:req_plug_chunks] ||
+            raise "plug #{inspect(plug)} does not send chunked response"
+
+        Enum.reduce_while(
+          chunks,
+          {request, response},
+          fn chunk, acc ->
+            fun.({:data, chunk}, acc)
+          end
+        )
+
+      collectable ->
+        chunks =
+          conn.private[:req_plug_chunks] ||
+            raise "plug #{inspect(plug)} does not send chunked response"
+
+        {acc, collector} = Collectable.into(collectable)
+
+        {acc, {request, response}} =
+          Enum.reduce(
+            chunks,
+            {acc, {request, response}},
+            fn chunk, {acc1, acc2} ->
+              {collector.(acc1, {:cont, chunk}), acc2}
+            end
+          )
+
+        acc = collector.(acc, :done)
+        {request, %{response | body: acc}}
+    end
+  end
+
+  # TODO: remove when we depend on Plug 1.15
+  defp register_before_chunk(conn, callback) do
+    if Code.ensure_loaded?(Plug.Conn) and function_exported?(Plug.Conn, :register_before_chunk, 2) do
+      Plug.Conn.register_before_chunk(conn, callback)
+    else
+      raise "using :into and :plug requires Plug 1.15"
+    end
   end
 
   defp call_plug(conn, plug) when is_atom(plug) do

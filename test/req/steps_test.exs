@@ -1436,6 +1436,27 @@ defmodule Req.StepsTest do
 
       assert Req.request!(req).body == "foofoo"
     end
+
+    # TODO: Remove on Plug 1.15
+    plug_register_before_chunk? =
+      Code.ensure_loaded?(Plug.Conn) and function_exported?(Plug.Conn, :register_before_chunk, 2)
+
+    @tag skip: not plug_register_before_chunk?
+    test "response stream" do
+      req =
+        Req.new(
+          plug: fn conn ->
+            conn = Plug.Conn.send_chunked(conn, 200)
+            {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+            {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+            conn
+          end,
+          into: []
+        )
+
+      resp = Req.request!(req)
+      assert resp.body == ["foo", "bar"]
+    end
   end
 
   describe "run_finch" do

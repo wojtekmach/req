@@ -13,6 +13,8 @@ jobs:
       REQ_NOWARN_OUTPUT: true
       # TODO: Remove on Finch 0.17
       FINCH_REF: b08b594
+      # TODO: Remove on Plug 1.15
+      PLUG_REF: 7b859ef
     strategy:
       fail-fast: false
       matrix:
