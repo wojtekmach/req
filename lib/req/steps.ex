@@ -1013,64 +1013,52 @@ defmodule Req.Steps do
 
     conn = Plug.Test.conn(request.method, request.url, req_body)
 
-    conn =
-      if request.into do
-        register_before_chunk(conn, fn conn, chunk ->
-          update_in(conn.private[:req_plug_chunks], fn chunks ->
-            (chunks || []) ++ [IO.iodata_to_binary(chunk)]
-          end)
-        end)
-      else
-        conn
-      end
-
-    conn =
-      conn
-      |> Map.replace!(:req_headers, req_headers)
-      |> call_plug(plug)
-
-    response =
-      Req.Response.new(
-        status: conn.status,
-        headers: conn.resp_headers
-      )
+    conn = put_in(conn.req_headers, req_headers)
 
     case request.into do
       nil ->
-        response = put_in(response.body, conn.resp_body)
+        conn = call_plug(conn, plug)
+
+        response =
+          Req.Response.new(
+            status: conn.status,
+            headers: conn.resp_headers,
+            body: conn.resp_body
+          )
+
         {request, response}
 
       fun when is_function(fun, 2) ->
-        chunks =
-          conn.private[:req_plug_chunks] ||
-            raise "plug #{inspect(plug)} does not send chunked response"
+        conn = put_in(conn.private[:req_acc], {request, Req.Response.new()})
 
-        Enum.reduce_while(
-          chunks,
-          {request, response},
-          fn chunk, acc ->
-            fun.({:data, chunk}, acc)
-          end
-        )
+        conn =
+          conn
+          |> register_before_chunk(fn conn, chunk ->
+            chunk = IO.iodata_to_binary(chunk)
+            {:cont, acc} = fun.({:data, chunk}, conn.private[:req_acc])
+            put_in(conn.private[:req_acc], acc)
+          end)
+          |> call_plug(plug)
+
+        conn.private[:req_acc]
 
       collectable ->
-        chunks =
-          conn.private[:req_plug_chunks] ||
-            raise "plug #{inspect(plug)} does not send chunked response"
-
         {acc, collector} = Collectable.into(collectable)
+        conn = put_in(conn.private[:req_acc], {acc, request, Req.Response.new()})
 
-        {acc, {request, response}} =
-          Enum.reduce(
-            chunks,
-            {acc, {request, response}},
-            fn chunk, {acc1, acc2} ->
-              {collector.(acc1, {:cont, chunk}), acc2}
-            end
-          )
+        conn =
+          conn
+          |> register_before_chunk(fn conn, chunk ->
+            chunk = IO.iodata_to_binary(chunk)
+            {acc, req, resp} = conn.private[:req_acc]
+            acc = collector.(acc, {:cont, chunk})
+            put_in(conn.private[:req_acc], {acc, req, resp})
+          end)
+          |> call_plug(plug)
 
+        {acc, req, resp} = conn.private[:req_acc]
         acc = collector.(acc, :done)
-        {request, %{response | body: acc}}
+        {req, %{resp | body: acc}}
     end
   end
 

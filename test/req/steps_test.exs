@@ -1442,7 +1442,28 @@ defmodule Req.StepsTest do
       Code.ensure_loaded?(Plug.Conn) and function_exported?(Plug.Conn, :register_before_chunk, 2)
 
     @tag skip: not plug_register_before_chunk?
-    test "response stream" do
+    test "into: fun" do
+      req =
+        Req.new(
+          plug: fn conn ->
+            conn = Plug.Conn.send_chunked(conn, 200)
+            {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+            {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+            conn
+          end,
+          into: fn {:data, data}, {req, resp} ->
+            resp = update_in(resp.body, &(&1 <> data))
+            {:cont, {req, resp}}
+          end
+        )
+
+      resp = Req.request!(req)
+      assert resp.status == 200
+      assert resp.body == "foobar"
+    end
+
+    @tag skip: not plug_register_before_chunk?
+    test "into: collectable" do
       req =
         Req.new(
           plug: fn conn ->
@@ -1455,6 +1476,7 @@ defmodule Req.StepsTest do
         )
 
       resp = Req.request!(req)
+      assert resp.status == 200
       assert resp.body == ["foo", "bar"]
     end
   end
