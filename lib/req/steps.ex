@@ -1017,7 +1017,7 @@ defmodule Req.Steps do
       if request.into do
         register_before_chunk(conn, fn conn, chunk ->
           update_in(conn.private[:req_plug_chunks], fn chunks ->
-            (chunks || []) ++ [chunk]
+            (chunks || []) ++ [IO.iodata_to_binary(chunk)]
           end)
         end)
       else
