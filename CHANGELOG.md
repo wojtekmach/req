@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.4.2 (2023-09-04)
+
+  * [`put_plug`]: Handle response streaming on Plug 1.15+.
+
+  * Don't warn on mixed-case header names
+
 ## v0.4.1 (2023-09-01)
 
   * Fix Req.Request Inspect regression
