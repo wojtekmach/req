@@ -60,7 +60,8 @@ defmodule Req.Request do
 
     * `:url` - the HTTP request URL.
 
-    * `:headers` - the HTTP request headers. The header names must be downcased.
+    * `:headers` - the HTTP request headers. The header names should be downcased.
+      See also "Header Names" section in `Req` module documentation.
 
     * `:body` - the HTTP request body.
 
@@ -709,6 +710,8 @@ defmodule Req.Request do
   @doc """
   Returns the values of the header specified by `name`.
 
+  See also "Header Names" section in `Req` module documentation.
+
   ## Examples
 
       iex> req = Req.new(headers: [{"accept", "application/json"}])
@@ -735,11 +738,13 @@ defmodule Req.Request do
   end
 
   @doc """
-  Sets the header `key` to `value`.
+  Sets the header `name` to `value`.
 
   The value can be a binary or a list of binaries,
 
   If the header was previously set, its value is overwritten.
+
+  See also "Header Names" section in `Req` module documentation.
 
   ## Examples
 
@@ -755,6 +760,7 @@ defmodule Req.Request do
   if Req.MixProject.legacy_headers_as_lists?() do
     def put_header(%Req.Request{} = request, name, value)
         when is_binary(name) and is_binary(value) do
+      name = Req.__ensure_header_downcase__(name)
       %{request | headers: List.keystore(request.headers, name, 0, {name, value})}
     end
   else
@@ -823,6 +829,8 @@ defmodule Req.Request do
   Deletes the header given by `name`.
 
   All occurences of the header are deleted, in case the header is repeated multiple times.
+
+  See also "Header Names" section in `Req` module documentation.
 
   ## Examples
 

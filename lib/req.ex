@@ -59,6 +59,27 @@ defmodule Req do
       200
       iex> resp.body
       %IO.Stream{}
+
+  ## Header Names
+
+  The HTTP specification requires that header names should be case-insensitive.
+  Req allows two ways to access the headers; using functions and by accessing
+  the data directly:
+
+      iex> Req.Response.get_header(response, "content-type")
+      ["text/html"]
+
+      iex> response.headers["content-type"]
+      ["text/html"]
+
+  While we can ensure case-insensitive handling in the former case, we can't
+  in the latter. For this reason, Req made the following design choices:
+
+    * header names are stored as downcased
+
+    * functions like `Req.Request.get_header/2`, `Req.Request.put_header/3`,
+      `Req.Response.get_header/2`, `Req.Response.put_header/3`, etc
+      automatically downcase the given header name.
   """
 
   # TODO: Wait for Finch 0.17
@@ -92,7 +113,7 @@ defmodule Req do
 
     * `:url` - the request URL.
 
-    * `:headers` - the request headers.
+    * `:headers` - the request headers. The header names should be downcased.
 
       The headers are automatically encoded using these rules:
 
@@ -106,6 +127,8 @@ defmodule Req do
         * other header values are encoded with `String.Chars.to_string/1`.
 
       If you set `:headers` options both in `Req.new/1` and `request/2`, the header lists are merged.
+
+      See also "Header Names" section in the module documentation.
 
     * `:body` - the request body.
 
@@ -1125,12 +1148,6 @@ defmodule Req do
   end
 
   def __ensure_header_downcase__(name) do
-    downcased = String.downcase(name, :ascii)
-
-    if name != downcased do
-      IO.warn("header names should be downcased, got: #{name}")
-    end
-
-    downcased
+    String.downcase(name, :ascii)
   end
 end
