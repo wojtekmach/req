@@ -335,6 +335,7 @@ defmodule Req do
           :receive_timeout,
           :pool_timeout,
           :unix_socket,
+          :redact_auth,
 
           # TODO: Remove on Req 1.0
           :output,

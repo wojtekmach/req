@@ -406,6 +406,11 @@ defmodule Req.Request do
         |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
         |> Keyword.update(:url, URI.new!(""), &URI.new!/1)
         |> Keyword.update(:options, %{}, &Map.new/1)
+        |> Keyword.update(
+          :registered_options,
+          MapSet.new([:redact_auth]),
+          &MapSet.put(&1, :redact_auth)
+        )
 
       struct!(__MODULE__, options)
     end
@@ -421,6 +426,11 @@ defmodule Req.Request do
           end)
         end)
         |> Keyword.update(:options, %{}, &Map.new/1)
+        |> Keyword.update(
+          :registered_options,
+          MapSet.new([:redact_auth]),
+          &MapSet.put(&1, :redact_auth)
+        )
 
       struct!(__MODULE__, options)
     end
