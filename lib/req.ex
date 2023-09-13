@@ -219,13 +219,33 @@ defmodule Req do
 
   Retry options ([`retry`](`Req.Steps.retry/1`) step):
 
-    * `:retry` - can be set to: `:safe` (default) to only retry GET/HEAD requests on HTTP 408/5xx
-      responses or exceptions, `false` to never retry, and `fun` - a 1-arity function that accepts
-      either a `Req.Response` or an exception struct and returns boolean whether to retry
+    * `:retry` - can be one of the following:
 
-    * `:retry_delay` - a function that receives the retry count (starting at 0) and returns the delay, the
-      number of milliseconds to sleep before making another attempt.
-      Defaults to a simple exponential backoff: 1s, 2s, 4s, 8s, ...
+        * `:safe_transient` (default) - retry safe (GET/HEAD) requests on HTTP 408/429/500/502/503/504 responses
+          or exceptions with `reason` field set to `:timeout`/`:econnrefused`.
+
+        * `:transient` - same as `:safe_transient` except retries all HTTP methods (POST, DELETE, etc.)
+
+        * `fun` - a 2-arity function that accepts a `Req.Request` and either a `Req.Response` or an exception struct
+          and returns one of the following:
+
+            * `true` - retry with the default delay controller by default delay option described below.
+
+            * `{:delay, milliseconds}` - retry with the given delay.
+
+            * `false/nil` - don't retry.
+
+        * `false` - don't retry.
+
+    * `:retry_delay` - if not set, which is the default, the retry delay is determined by
+      the value of `retry-delay` header on HTTP 429/503 responses. If the header is not set,
+      the default delay follows a simple exponential backoff: 1s, 2s, 4s, 8s, ...
+
+      `:retry_delay` can be set to a function that receives the retry count (starting at 0)
+      and returns the delay, the number of milliseconds to sleep before making another attempt.
+
+    * `:retry_log_level` - the log level to emit retry logs at. Can also be set to `false` to disable
+      logging these messsages. Defaults to `:error`.
 
     * `:max_retries` - maximum number of retry attempts, defaults to `3` (for a total of `4`
       requests to the server, including the initial one.)
