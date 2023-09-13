@@ -544,6 +544,23 @@ defmodule Req.Request do
   end
 
   @doc """
+  Drops the given `keys` from options.
+
+  ## Examples
+
+      iex> req = Req.Request.new(options: [a: 1, b: 2, c: 3])
+      iex> req = Req.Request.drop_options(req, [:a, :b])
+      iex> Req.Request.get_option(req, :a)
+      nil
+      iex> Req.Request.get_option(req, :c)
+      3
+  """
+  @spec drop_options(t(), [atom()]) :: t()
+  def drop_options(request, keys) when is_list(keys) do
+    update_in(request.options, &Map.drop(&1, keys))
+  end
+
+  @doc """
   Gets the value for a specific private `key`.
   """
   def get_private(request, key, default \\ nil) when is_atom(key) do
