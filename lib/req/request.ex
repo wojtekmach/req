@@ -447,6 +447,31 @@ defmodule Req.Request do
   end
 
   @doc """
+  Gets the value for the option `key`.
+
+  This is useful if the default value is very expensive to calculate or generally
+  difficult to setup and teardown again.
+
+  See also `get_option/3`.
+
+  ## Examples
+
+      iex> req = Req.Request.new(options: [a: 1])
+      iex> fun = fn ->
+      ...>   # some expensive operation here
+      ...>   42
+      ...> end
+      iex> Req.Request.get_option_lazy(req, :a, fun)
+      1
+      iex> Req.Request.get_option_lazy(req, :b, fun)
+      42
+  """
+  @spec get_option_lazy(t(), atom(), (-> term())) :: term()
+  def get_option_lazy(request, key, fun) when is_function(fun, 0) do
+    Map.get_lazy(request.options, key, fun)
+  end
+
+  @doc """
   Fetches the value for the option `key`.
 
   See also `get_option/3`.
