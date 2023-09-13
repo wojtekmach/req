@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## v0.4.3 (2023-09-13)
+
+  * [`Req.new/1`]: Fix setting `:redact_auth`
+
+  * [`Req.Request`]: Add `Req.Request.get_option_lazy/3`
+
+  * [`Req.Request`]: Add `Req.Request.drop_options/2`
+
 ## v0.4.2 (2023-09-04)
 
   * [`put_plug`]: Handle response streaming on Plug 1.15+.
@@ -731,16 +739,19 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`retry`]:               https://hexdocs.pm/req/Req.Steps.html#retry/1
 [`run_finch`]:           https://hexdocs.pm/req/Req.Steps.html#run_finch/1
 
+[`Req.new/1`]:     https://hexdocs.pm/req/Req.html#new/1
 [`Req.request/2`]: https://hexdocs.pm/req/Req.html#request/2
 [`Req.update/2`]:  https://hexdocs.pm/req/Req.html#update/2
 
-[`Req.Request`]:                  https://hexdocs.pm/req/Req.Request.html
-[`Req.Request.new/1`]:            https://hexdocs.pm/req/Req.Request.html#new/1
-[`Req.Request.run_request/1`]:    https://hexdocs.pm/req/Req.Request.html#run_request/1
-[`Req.Request.get_option/3`]:     https://hexdocs.pm/req/Req.Request.html#get_option/3
-[`Req.Request.fetch_option/2`]:   https://hexdocs.pm/req/Req.Request.html#fetch_option/2
-[`Req.Request.fetch_option!/2`]:  https://hexdocs.pm/req/Req.Request.html#fetch_option!/2
-[`Req.Request.delete_option/2`]:  https://hexdocs.pm/req/Req.Request.html#delete_option/2
+[`Req.Request`]:                   https://hexdocs.pm/req/Req.Request.html
+[`Req.Request.new/1`]:             https://hexdocs.pm/req/Req.Request.html#new/1
+[`Req.Request.run_request/1`]:     https://hexdocs.pm/req/Req.Request.html#run_request/1
+[`Req.Request.get_option/3`]:      https://hexdocs.pm/req/Req.Request.html#get_option/3
+[`Req.Request.get_option_lazy/2`]: https://hexdocs.pm/req/Req.Request.html#get_option_lazy/2
+[`Req.Request.fetch_option/2`]:    https://hexdocs.pm/req/Req.Request.html#fetch_option/2
+[`Req.Request.fetch_option!/2`]:   https://hexdocs.pm/req/Req.Request.html#fetch_option!/2
+[`Req.Request.delete_option/2`]:   https://hexdocs.pm/req/Req.Request.html#delete_option/2
+[`Req.Request.drop_options/2`]:    https://hexdocs.pm/req/Req.Request.html#drop_options/2
 [`Req.Request.update_private/4`]:  https://hexdocs.pm/req/Req.Request.html#update_private/4
 
 [`Req.Response`]:                  https://hexdocs.pm/req/Req.Response.html
