@@ -293,6 +293,9 @@ defmodule Req do
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket.
 
+    * `:finch_private` - a map or keyword list of private metadata to add to the Finch request. May be useful
+      for adding custom data when handling telemetry with `Finch.Telemetry`.
+
     * `:finch_request` - a function that executes the Finch request, defaults to using `Finch.request/3`.
 
   ## Examples
@@ -350,6 +353,7 @@ defmodule Req do
           :plug,
           :finch,
           :finch_request,
+          :finch_private,
           :connect_options,
           :inet6,
           :receive_timeout,
