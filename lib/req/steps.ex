@@ -248,23 +248,11 @@ defmodule Req.Steps do
   end
 
   defmacrop brotli_loaded? do
-    if Code.ensure_loaded?(:brotli) do
-      true
-    else
-      quote do
-        Code.ensure_loaded?(:brotli)
-      end
-    end
+    Code.ensure_loaded?(:brotli)
   end
 
   defmacrop ezstd_loaded? do
-    if Code.ensure_loaded?(:ezstd) do
-      true
-    else
-      quote do
-        Code.ensure_loaded?(:ezstd)
-      end
-    end
+    Code.ensure_loaded?(:ezstd)
   end
 
   defp supported_accept_encoding do
@@ -1226,13 +1214,7 @@ defmodule Req.Steps do
   end
 
   defmacrop nimble_csv_loaded? do
-    if Code.ensure_loaded?(NimbleCSV) do
-      true
-    else
-      quote do
-        Code.ensure_loaded?(NimbleCSV)
-      end
-    end
+    Code.ensure_loaded?(NimbleCSV)
   end
 
   @doc false
