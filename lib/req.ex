@@ -113,7 +113,7 @@ defmodule Req do
 
     * `:url` - the request URL.
 
-    * `:headers` - the request headers as a key-value map or key-value tuple list. 
+    * `:headers` - the request headers as a `{key, value}` enumerable (e.g. map, keyword list). 
 
       The header names should be downcased.
 
