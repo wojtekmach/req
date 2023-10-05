@@ -1648,6 +1648,30 @@ defmodule Req.StepsTest do
       end
     end
 
+    def send_telemetry_metadata_pid(_name, _measurements, metadata, _) do
+      send(metadata.request.private.pid, :telemetry_private)
+      :ok
+    end
+
+    test ":finch_private", c do
+      on_exit(fn -> :telemetry.detach("#{c.test}") end)
+
+      :ok =
+        :telemetry.attach(
+          "#{c.test}",
+          [:finch, :request, :stop],
+          &__MODULE__.send_telemetry_metadata_pid/4,
+          nil
+        )
+
+      Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "finch_private")
+      end)
+
+      assert Req.get!(c.url <> "/ok", finch_private: %{pid: self()}).body == "finch_private"
+      assert_received :telemetry_private
+    end
+
     test "into: fun" do
       %{url: url} =
         TestSocket.serve(fn socket ->

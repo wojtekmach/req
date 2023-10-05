@@ -587,6 +587,9 @@ defmodule Req.Steps do
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket.
 
+    * `:finch_private` - a map or keyword list of private metadata to add to the Finch request. May be useful
+      for adding custom data when handling telemetry with `Finch.Telemetry`.
+
     * `:finch_request` - a function that executes the Finch request, defaults to using `Finch.request/3`.
 
       The function should accept 4 arguments:
@@ -675,6 +678,7 @@ defmodule Req.Steps do
     finch_request =
       Finch.build(request.method, request.url, request_headers, body)
       |> Map.replace!(:unix_socket, request.options[:unix_socket])
+      |> add_private_options(request.options[:finch_private])
 
     finch_options =
       request.options |> Map.take([:receive_timeout, :pool_timeout]) |> Enum.to_list()
@@ -836,6 +840,15 @@ defmodule Req.Steps do
       {:ok, response} -> Req.Response.new(response)
       {:error, exception} -> exception
     end
+  end
+
+  defp add_private_options(finch_request, nil), do: finch_request
+
+  defp add_private_options(finch_request, private_options)
+       when is_list(private_options) or is_map(private_options) do
+    Enum.reduce(private_options, finch_request, fn {k, v}, acc_finch_req ->
+      Finch.Request.put_private(acc_finch_req, k, v)
+    end)
   end
 
   defp finch_fields_to_map(fields) do
