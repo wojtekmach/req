@@ -113,7 +113,9 @@ defmodule Req do
 
     * `:url` - the request URL.
 
-    * `:headers` - the request headers. The header names should be downcased.
+    * `:headers` - the request headers as a `{key, value}` enumerable (e.g. map, keyword list). 
+
+      The header names should be downcased.
 
       The headers are automatically encoded using these rules:
 
@@ -432,15 +434,15 @@ defmodule Req do
 
   Passing `:headers` will automatically encode and merge them:
 
-      iex> req = Req.new(headers: [point_x: 1])
-      iex> req = Req.update(req, headers: [point_y: 2])
+      iex> req = Req.new(headers: %{point_x: 1})
+      iex> req = Req.update(req, headers: %{point_y: 2})
       iex> req.headers
       %{"point-x" => ["1"], "point-y" => ["2"]}
 
   The same header names are overwritten however:
 
-      iex> req = Req.new(headers: [authorization: "bearer foo"])
-      iex> req = Req.update(req, headers: [authorization: "bearer bar"])
+      iex> req = Req.new(headers: %{authorization: "bearer foo"})
+      iex> req = Req.update(req, headers: %{authorization: "bearer bar"})
       iex> req.headers
       %{"authorization" => ["bearer bar"]}
 
