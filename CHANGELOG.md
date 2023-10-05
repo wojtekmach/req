@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## HEAD
+## v0.4.4 (2023-10-05)
 
   * `compressed`: Check for optional depenedencies brotli and ezstd only at compile-time.
     (backported from v0.3.12.)
