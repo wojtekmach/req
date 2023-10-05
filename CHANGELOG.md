@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v0.3.12 (2023-08-05)
+
+  * `compressed`: Check for optional depenedencies brotli and ezstd only at compile-time.
+  * `decode_body`: Check for optional depenedency nimble_csv at compile-time.
+
 ## v0.3.11 (2023-07-24)
 
   * Support `Req.get(options)`, `Req.post(options)`, etc
