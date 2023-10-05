@@ -8,6 +8,8 @@
   * `decode_body`: Check for optional depenedency nimble_csv at compile-time.
     (backported from v0.3.12.)
 
+  * `run_finch`: Add `:finch_private` option
+
 ## v0.4.3 (2023-09-13)
 
   * [`Req.new/1`]: Fix setting `:redact_auth`
