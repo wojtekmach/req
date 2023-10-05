@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## HEAD
+
+  * `compressed`: Check for optional depenedencies brotli and ezstd only at compile-time.
+    (backported from v0.3.12.)
+
+  * `decode_body`: Check for optional depenedency nimble_csv at compile-time.
+    (backported from v0.3.12.)
+
 ## v0.4.3 (2023-09-13)
 
   * [`Req.new/1`]: Fix setting `:redact_auth`
