@@ -1042,45 +1042,44 @@ defmodule Req.Steps do
         {request, response}
 
       fun when is_function(fun, 2) ->
-        conn = put_in(conn.private[:req_acc], {request, Req.Response.new()})
+        conn = call_plug(conn, plug)
 
-        conn =
-          conn
-          |> register_before_chunk(fn conn, chunk ->
-            chunk = IO.iodata_to_binary(chunk)
-            {:cont, acc} = fun.({:data, chunk}, conn.private[:req_acc])
-            put_in(conn.private[:req_acc], acc)
-          end)
-          |> call_plug(plug)
+        response =
+          Req.Response.new(
+            status: conn.status,
+            headers: conn.resp_headers
+          )
 
-        conn.private[:req_acc]
+        Enum.reduce_while(plug_sent_chunks(conn), {request, response}, fn chunk, acc ->
+          fun.({:data, chunk}, acc)
+        end)
 
       collectable ->
         {acc, collector} = Collectable.into(collectable)
-        conn = put_in(conn.private[:req_acc], {acc, request, Req.Response.new()})
+        conn = call_plug(conn, plug)
 
-        conn =
-          conn
-          |> register_before_chunk(fn conn, chunk ->
-            chunk = IO.iodata_to_binary(chunk)
-            {acc, req, resp} = conn.private[:req_acc]
-            acc = collector.(acc, {:cont, chunk})
-            put_in(conn.private[:req_acc], {acc, req, resp})
+        response =
+          Req.Response.new(
+            status: conn.status,
+            headers: conn.resp_headers
+          )
+
+        acc =
+          Enum.reduce(plug_sent_chunks(conn), acc, fn chunk, acc ->
+            collector.(acc, {:cont, chunk})
           end)
-          |> call_plug(plug)
 
-        {acc, req, resp} = conn.private[:req_acc]
         acc = collector.(acc, :done)
-        {req, %{resp | body: acc}}
+        {request, %{response | body: acc}}
     end
   end
 
-  # TODO: remove when we depend on Plug 1.15
-  defp register_before_chunk(conn, callback) do
-    if Code.ensure_loaded?(Plug.Conn) and function_exported?(Plug.Conn, :register_before_chunk, 2) do
-      Plug.Conn.register_before_chunk(conn, callback)
+  # TODO: remove when we depend on Plug 1.16
+  defp plug_sent_chunks(conn) do
+    if Code.ensure_loaded?(Plug.Test) and function_exported?(Plug.Test, :sent_chunks, 1) do
+      Plug.Test.sent_chunks(conn)
     else
-      raise "using :into and :plug requires Plug 1.15"
+      raise "using :into and :plug requires Plug 1.16"
     end
   end
 

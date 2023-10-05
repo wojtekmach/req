@@ -1437,11 +1437,11 @@ defmodule Req.StepsTest do
       assert Req.request!(req).body == "foofoo"
     end
 
-    # TODO: Remove on Plug 1.15
-    plug_register_before_chunk? =
-      Code.ensure_loaded?(Plug.Conn) and function_exported?(Plug.Conn, :register_before_chunk, 2)
+    # TODO: Remove on Plug 1.16
+    plug_sent_chunks? =
+      Code.ensure_loaded?(Plug.Test) and function_exported?(Plug.Test, :sent_chunks, 1)
 
-    @tag skip: not plug_register_before_chunk?
+    @tag skip: not plug_sent_chunks?
     test "into: fun" do
       req =
         Req.new(
@@ -1462,7 +1462,28 @@ defmodule Req.StepsTest do
       assert resp.body == "foobar"
     end
 
-    @tag skip: not plug_register_before_chunk?
+    @tag skip: not plug_sent_chunks?
+    test "into: fun with halt" do
+      req =
+        Req.new(
+          plug: fn conn ->
+            conn = Plug.Conn.send_chunked(conn, 200)
+            {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+            {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+            conn
+          end,
+          into: fn {:data, data}, {req, resp} ->
+            resp = update_in(resp.body, &(&1 <> data))
+            {:halt, {req, resp}}
+          end
+        )
+
+      resp = Req.request!(req)
+      assert resp.status == 200
+      assert resp.body == "foo"
+    end
+
+    @tag skip: not plug_sent_chunks?
     test "into: collectable" do
       req =
         Req.new(
