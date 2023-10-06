@@ -58,7 +58,43 @@ defmodule Req.RequestTest do
     assert {:ok, %{status: 200, body: "from cache - updated"}} = Req.Request.run(request)
   end
 
+  test "steps emit telemtry events", c do
+    ref =
+      :telemetry_test.attach_event_handlers(self(), [
+        [:req, :step, :start],
+        [:req, :step, :stop]
+      ])
+
+    request =
+      new(url: c.url <> "/ok")
+      |> Req.Request.prepend_request_steps(
+        foo: fn request ->
+          {request, %Req.Response{status: 200, body: "from cache"}}
+        end
+      )
+      |> Req.Request.prepend_response_steps(
+        bar: fn {request, response} ->
+          {request, update_in(response.body, &(&1 <> " - updated"))}
+        end
+      )
+
+    Req.Request.run(request)
+
+    assert_received {[:req, :step, :start], ^ref, _timestamps,
+                     %{step_name: :foo, step_phase: :request}}
+
+    assert_received {[:req, :step, :start], ^ref, _timestamps,
+                     %{step_name: :bar, step_phase: :response}}
+
+    assert_received {[:req, :step, :stop], ^ref, %{duration: duration}, meta}
+
+    assert %{step_name: :foo, step_phase: :request, telemetry_span_context: _} = meta
+    assert duration > 0
+  end
+
   test "request step returns exception", c do
+    ref = :telemetry_test.attach_event_handlers(self(), [[:req, :step, :stop]])
+
     request =
       new(url: c.url <> "/ok")
       |> Req.Request.prepend_request_steps(
@@ -73,6 +109,9 @@ defmodule Req.RequestTest do
       )
 
     assert {:error, %RuntimeError{message: "oops - updated"}} = Req.Request.run(request)
+
+    assert_received {[:req, :step, :stop], ^ref, _timestamps,
+                     %{step_name: :foo, step_phase: :error}}
   end
 
   test "request step halts with response", c do

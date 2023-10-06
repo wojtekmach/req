@@ -64,7 +64,8 @@ defmodule Req.MixProject do
       {:brotli, "~> 0.3.1", optional: true},
       {:ezstd, "~> 1.0", optional: true},
       {:bypass, "~> 2.1", only: :test},
-      {:ex_doc, ">= 0.0.0", only: :docs}
+      {:ex_doc, ">= 0.0.0", only: :docs},
+      {:telemetry, "~> 0.4 or ~> 1.0"}
     ]
   end
 

@@ -476,7 +476,7 @@ defmodule Req.Request do
       iex> Req.Request.get_option_lazy(req, :b, fun)
       42
   """
-  @spec get_option_lazy(t(), atom(), (-> term())) :: term()
+  @spec get_option_lazy(t(), atom(), (() -> term())) :: term()
   def get_option_lazy(request, key, fun) when is_function(fun, 0) do
     Map.get_lazy(request.options, key, fun)
   end
@@ -707,7 +707,7 @@ defmodule Req.Request do
 
   @doc false
   def prepare(%{request_steps: [step | steps]} = request) do
-    case run_step(step, request) do
+    case run_step(step, request, :request) do
       %Req.Request{} = request ->
         request = %{request | request_steps: steps}
         prepare(request)
@@ -969,10 +969,10 @@ defmodule Req.Request do
   """
   def run_request(request)
 
-  def run_request(%{current_request_steps: [step | rest]} = request) do
-    step = Keyword.fetch!(request.request_steps, step)
+  def run_request(%{current_request_steps: [step_name | rest]} = request) do
+    step_fn = Keyword.fetch!(request.request_steps, step_name)
 
-    case step.(request) do
+    case run_step({step_name, step_fn}, request, :request) do
       %Req.Request{} = request ->
         run_request(%{request | current_request_steps: rest})
 
@@ -1005,7 +1005,7 @@ defmodule Req.Request do
     steps = request.response_steps
 
     Enum.reduce_while(steps, {request, response}, fn step, {request, response} ->
-      case run_step(step, {request, response}) do
+      case run_step(step, {request, response}, :response) do
         {%Req.Request{halted: true} = request, response_or_exception} ->
           {:halt, {request, response_or_exception}}
 
@@ -1022,7 +1022,7 @@ defmodule Req.Request do
     steps = request.error_steps
 
     Enum.reduce_while(steps, {request, exception}, fn step, {request, exception} ->
-      case run_step(step, {request, exception}) do
+      case run_step(step, {request, exception}, :error) do
         {%Req.Request{halted: true} = request, response_or_exception} ->
           {:halt, {request, response_or_exception}}
 
@@ -1035,8 +1035,10 @@ defmodule Req.Request do
     end)
   end
 
-  defp run_step({name, step}, state) when is_atom(name) and is_function(step, 1) do
-    step.(state)
+  defp run_step({name, step}, state, step_phase) when is_atom(name) and is_function(step, 1) do
+    :telemetry.span([:req, :step], %{step_name: name, step_phase: step_phase}, fn ->
+      {step.(state), %{step_name: name, step_phase: step_phase}}
+    end)
   end
 
   @doc false
