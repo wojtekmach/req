@@ -113,7 +113,7 @@ defmodule Req do
 
     * `:url` - the request URL.
 
-    * `:headers` - the request headers as a `{key, value}` enumerable (e.g. map, keyword list). 
+    * `:headers` - the request headers as a `{key, value}` enumerable (e.g. map, keyword list).
 
       The header names should be downcased.
 
@@ -218,6 +218,8 @@ defmodule Req do
       will be sent to any host.
 
     * `:max_redirects` - the maximum number of redirects, defaults to `10`.
+
+    * `:keep_cookie` - if set to `true`, transmits server cookies on redirected requests. Defaults to `false`.
 
   Retry options ([`retry`](`Req.Steps.retry/1`) step):
 
@@ -345,6 +347,7 @@ defmodule Req do
           :redirect,
           :redirect_trusted,
           :redirect_log_level,
+          :keep_cookie,
           :max_redirects,
           :retry,
           :retry_delay,

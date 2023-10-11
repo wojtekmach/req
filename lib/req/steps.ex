@@ -1491,12 +1491,29 @@ defmodule Req.Steps do
 
     location_url = URI.merge(request.url, URI.parse(location))
 
+    keep_cookie = Req.Request.get_option(request, :keep_cookie, false)
+
     request
     # assume put_params step already run so remove :params option so it's not applied again
     |> Req.Request.delete_option(:params)
+    |> maybe_set_cookie(response, keep_cookie)
     |> remove_credentials_if_untrusted(redirect_trusted, location_url)
     |> put_redirect_method(response.status)
     |> Map.replace!(:url, location_url)
+  end
+
+  defp maybe_set_cookie(request, _response, false) do
+    request
+  end
+
+  defp maybe_set_cookie(request, response, _) do
+    case Req.Response.get_header(response, "set-cookie") do
+      [] ->
+        request
+
+      cookie ->
+        Req.Request.put_header(request, "cookie", cookie)
+    end
   end
 
   defp log_redirect(false, _location), do: :ok

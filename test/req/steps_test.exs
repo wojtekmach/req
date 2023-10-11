@@ -849,6 +849,37 @@ defmodule Req.StepsTest do
              end) =~ "[debug] redirecting to #{c.url}/ok"
     end
 
+    test "keep cookie", c do
+      auth_header = {"authorization", "Basic " <> Base.encode64("foo:bar")}
+
+      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+        redirect(conn, 307, c.url <> "/auth")
+      end)
+
+      Bypass.expect(c.bypass, "GET", "/auth", fn conn ->
+        assert auth_header in conn.req_headers
+
+        conn
+        |> Plug.Conn.put_resp_cookie("SessionId", "some-session-id")
+        |> redirect(302, c.url <> "/authenticated")
+      end)
+
+      Bypass.expect(c.bypass, "GET", "/authenticated", fn conn ->
+        conn = Plug.Conn.fetch_cookies(conn)
+        assert conn.req_cookies["SessionId"] == "some-session-id"
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+      output =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert Req.get!(c.url <> "/redirect", auth: {"foo", "bar"}, keep_cookie: true).status ==
+                   200
+        end)
+
+      assert output =~ "[debug] redirecting to #{c.url}/auth"
+      assert output =~ "[debug] redirecting to #{c.url}/authenticated"
+    end
+
     test "max redirects", c do
       pid = self()
 
