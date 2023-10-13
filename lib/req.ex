@@ -409,7 +409,7 @@ defmodule Req do
 
   defp new(request, options) when is_list(options) do
     raise ArgumentError,
-          "expected 1nd argument to be a request, got: #{inspect(request)}"
+          "expected 1st argument to be a request, got: #{inspect(request)}"
   end
 
   defp new(_request, options) do
