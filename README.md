@@ -1,9 +1,7 @@
 # Req
 
 [![License](https://img.shields.io/hexpm/l/req.svg)](https://github.com/wojtekmach/req/blob/master/LICENSE.md)
-[![Module Version](https://img.shields.io/hexpm/v/req.svg)](https://hex.pm/packages/req)
-[![Total Downloads](https://img.shields.io/hexpm/dt/req.svg)](https://hex.pm/packages/req)
-[![Last Updated](https://img.shields.io/github/last-commit/wojtekmach/req.svg)](https://github.com/wojtekmach/req/commits/master)
+[![Version](https://img.shields.io/hexpm/v/req.svg)](https://hex.pm/packages/req)
 [![CI](https://github.com/wojtekmach/req/actions/workflows/ci.yml/badge.svg)](https://github.com/wojtekmach/req/actions/workflows/ci.yml)
 
 [Docs](https://hexdocs.pm/req)
