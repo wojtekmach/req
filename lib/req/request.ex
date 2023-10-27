@@ -808,14 +808,15 @@ defmodule Req.Request do
       ["application/json"]
 
   """
-  @spec put_header(t(), binary(), binary()) :: t()
   if Req.MixProject.legacy_headers_as_lists?() do
+    @spec put_header(t(), binary(), binary()) :: t()
     def put_header(%Req.Request{} = request, name, value)
         when is_binary(name) and is_binary(value) do
       name = Req.__ensure_header_downcase__(name)
       %{request | headers: List.keystore(request.headers, name, 0, {name, value})}
     end
   else
+    @spec put_header(t(), binary(), binary() | [binary()]) :: t()
     def put_header(%Req.Request{} = request, name, value)
         when is_binary(name) and (is_binary(value) or is_list(value)) do
       name = Req.__ensure_header_downcase__(name)
