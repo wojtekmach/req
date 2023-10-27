@@ -215,8 +215,6 @@ defmodule Req.Steps do
   Now, let's pass `compressed: false` and notice the raw body was not compressed:
 
       iex> response = Req.get!("https://elixir-lang.org", raw: true, compressed: false)
-      iex> Req.Response.get_header(response, "content-encoding")
-      nil
       iex> response.body |> binary_part(0, 15)
       "<!DOCTYPE html>"
 
@@ -1102,8 +1100,8 @@ defmodule Req.Steps do
 
   This step updates the following headers to reflect the changes:
 
-    * `content-length` is set to the length of the decompressed body
     * `content-encoding` is removed
+    * `content-length` is removed
 
   ## Options
 
@@ -1112,8 +1110,6 @@ defmodule Req.Steps do
   ## Examples
 
       iex> response = Req.get!("https://httpbin.org/gzip")
-      iex> Req.Response.get_header(response, "content-encoding")
-      ["gzip"]
       iex> response.body["gzipped"]
       true
 
@@ -1149,15 +1145,13 @@ defmodule Req.Steps do
     else
       codecs = compression_algorithms(Req.Response.get_header(response, "content-encoding"))
       {decompressed_body, unknown_codecs} = decompress_body(codecs, response.body, [])
-      decompressed_content_length = decompressed_body |> byte_size() |> to_string()
-
-      response =
-        %Req.Response{response | body: decompressed_body}
-        |> Req.Response.put_header("content-length", decompressed_content_length)
+      response = put_in(response.body, decompressed_body)
 
       response =
         if unknown_codecs == [] do
-          Req.Response.delete_header(response, "content-encoding")
+          response
+          |> Req.Response.delete_header("content-encoding")
+          |> Req.Response.delete_header("content-length")
         else
           Req.Response.put_header(response, "content-encoding", Enum.join(unknown_codecs, ", "))
         end
