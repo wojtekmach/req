@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## HEAD
+
+  * `decompress_body`: Remove `content-length` header
+
+  * `auth`: Deprecate `auth: {user, pass}` in favour of `auth: {:basic, "user:pass"}`
+
+  * `Req.Request`: Allow steps to be `{mod, fun, args}`
+
 ## v0.4.4 (2023-10-05)
 
   * `compressed`: Check for optional depenedencies brotli and ezstd only at compile-time.
