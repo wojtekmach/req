@@ -157,15 +157,15 @@ defmodule Req do
 
       Can be one of:
 
-        * `string` - sets to this value.
-
-        * `{username, password}` - uses Basic HTTP authentication.
+        * `{:basic, userinfo}` - uses Basic HTTP authentication.
 
         * `{:bearer, token}` - uses Bearer HTTP authentication.
 
         * `:netrc` - load credentials from the default .netrc file.
 
         * `{:netrc, path}` - load credentials from `path`.
+
+        * `string` - sets to this value.
 
     * `:redact_auth` - if set to `true`, when `Req.Request` struct is inspected, authentication credentials
       are redacted. Defaults to `true`.
@@ -426,11 +426,11 @@ defmodule Req do
   ## Examples
 
       iex> req = Req.new(base_url: "https://httpbin.org")
-      iex> req = Req.update(req, auth: {"alice", "secret"})
+      iex> req = Req.update(req, auth: {:basic, "alice:secret"})
       iex> req.options[:base_url]
       "https://httpbin.org"
       iex> req.options[:auth]
-      {"alice", "secret"}
+      {:basic, "alice:secret"}
 
   Passing `:headers` will automatically encode and merge them:
 

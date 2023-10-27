@@ -65,7 +65,7 @@ defmodule Req.Steps do
 
         * `string` - sets to this value;
 
-        * `{username, password}` - uses Basic HTTP authentication;
+        * `{:basic, userinfo}` - uses Basic HTTP authentication;
 
         * `{:bearer, token}` - uses Bearer HTTP authentication;
 
@@ -76,9 +76,9 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {"bad", "bad"}).status
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:basic, "foo:foo"}).status
       401
-      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {"foo", "bar"}).status
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:basic, "foo:bar"}).status
       200
 
       iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, ""}).status
@@ -106,13 +106,12 @@ defmodule Req.Steps do
     Req.Request.put_new_header(request, "authorization", authorization)
   end
 
-  defp auth(request, {:bearer, token}) when is_binary(token) do
-    Req.Request.put_new_header(request, "authorization", "Bearer #{token}")
+  defp auth(request, {:basic, userinfo}) when is_binary(userinfo) do
+    Req.Request.put_new_header(request, "authorization", "Basic " <> Base.encode64(userinfo))
   end
 
-  defp auth(request, {username, password}) when is_binary(username) and is_binary(password) do
-    value = Base.encode64("#{username}:#{password}")
-    Req.Request.put_new_header(request, "authorization", "Basic #{value}")
+  defp auth(request, {:bearer, token}) when is_binary(token) do
+    Req.Request.put_new_header(request, "authorization", "Bearer " <> token)
   end
 
   defp auth(request, :netrc) do
@@ -124,10 +123,22 @@ defmodule Req.Steps do
     authenticate_with_netrc(request, path)
   end
 
+  defp auth(request, {username, password}) when is_binary(username) and is_binary(password) do
+    IO.warn(
+      "setting `auth: {username, password}` is deprecated in favour of `auth: {:basic, userinfo}`"
+    )
+
+    Req.Request.put_new_header(
+      request,
+      "authorization",
+      "Basic " <> Base.encode64("#{username}:#{password}")
+    )
+  end
+
   defp authenticate_with_netrc(request, path) when is_binary(path) do
     case Map.fetch(load_netrc(path), request.url.host) do
       {:ok, {username, password}} ->
-        auth(request, {username, password})
+        auth(request, {:basic, "#{username}:#{password}"})
 
       :error ->
         request

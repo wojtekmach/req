@@ -235,7 +235,7 @@ defmodule Req.RequestTest do
 
   test "prepare/1" do
     request =
-      Req.new(method: :get, base_url: "http://foo", url: "/bar", auth: {"foo", "bar"})
+      Req.new(method: :get, base_url: "http://foo", url: "/bar", auth: {:basic, "foo:bar"})
       |> Req.Request.prepare()
 
     assert request.url == URI.parse("http://foo/bar")

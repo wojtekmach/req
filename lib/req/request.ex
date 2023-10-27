@@ -726,7 +726,7 @@ defmodule Req.Request do
 
   ## Examples
 
-      iex> req = Req.new(auth: {"alice", "secret"}, http_errors: :raise)
+      iex> req = Req.new(auth: {:basic, "alice:secret"}, http_errors: :raise)
       iex> req = Req.Request.merge_options(req, auth: {:bearer, "abcd"}, base_url: "https://example.com")
       iex> req.options[:auth]
       {:bearer, "abcd"}
@@ -1109,7 +1109,11 @@ defmodule Req.Request do
               %{auth: {:bearer, _bearer}} ->
                 %{request.options | auth: {:bearer, "[redacted]"}}
 
-              %{auth: {_username, _password}} ->
+              %{auth: {:basic, _userinfo}} ->
+                %{request.options | auth: {:basic, "[redacted]"}}
+
+              # TODO: remove on 1.0/1.1?
+              %{auth: {username, password}} when is_binary(username) and is_binary(password) ->
                 %{request.options | auth: {"[redacted]", "[redacted]"}}
 
               _ ->

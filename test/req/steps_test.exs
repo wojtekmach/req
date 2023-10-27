@@ -54,7 +54,7 @@ defmodule Req.StepsTest do
     end
 
     test "basic" do
-      req = Req.new(auth: {"foo", "bar"}) |> Req.Request.prepare()
+      req = Req.new(auth: {:basic, "foo:bar"}) |> Req.Request.prepare()
 
       assert Req.Request.get_header(req, "authorization") == ["Basic #{Base.encode64("foo:bar")}"]
     end
@@ -743,7 +743,7 @@ defmodule Req.StepsTest do
       end)
 
       assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.get!(c.url <> "/redirect", auth: {"foo", "bar"}).status == 200
+               assert Req.get!(c.url <> "/redirect", auth: {:basic, "foo:bar"}).status == 200
              end) =~ "[debug] redirecting to #{c.url}/auth"
     end
 
@@ -778,7 +778,7 @@ defmodule Req.StepsTest do
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!("http://original",
                         adapter: adapter,
-                        auth: {"authorization", "credentials"},
+                        auth: {:basic, "authorization:credentials"},
                         redirect_trusted: true
                       ).status == 200
              end) =~ "[debug] redirecting to http://untrusted"
@@ -790,7 +790,7 @@ defmodule Req.StepsTest do
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!("http://trusted",
                         adapter: adapter,
-                        auth: {"authorization", "credentials"}
+                        auth: {:basic, "authorization:credentials"}
                       ).status == 200
              end) =~ "[debug] redirecting to http://untrusted"
     end
@@ -801,7 +801,7 @@ defmodule Req.StepsTest do
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!("http://trusted:12345",
                         adapter: adapter,
-                        auth: {"authorization", "credentials"}
+                        auth: {:basic, "authorization:credentials"}
                       ).status == 200
              end) =~ "[debug] redirecting to http://trusted:23456"
     end
@@ -812,7 +812,7 @@ defmodule Req.StepsTest do
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!("http://trusted",
                         adapter: adapter,
-                        auth: {"authorization", "credentials"}
+                        auth: {:basic, "authorization:credentials"}
                       ).status == 200
              end) =~ "[debug] redirecting to https://trusted"
     end
