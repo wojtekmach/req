@@ -41,6 +41,24 @@ defmodule Req.RequestTest do
     assert {:ok, %{status: 200, body: "ok"}} = Req.Request.run(request)
   end
 
+  test "step as MFArgs", c do
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    request =
+      new(url: c.url)
+      |> Req.Request.prepend_request_steps(foo: {__MODULE__, :simple_step, [:hi]})
+
+    assert {:ok, %{status: 200, body: "ok"}} = Req.Request.run(request)
+    assert_received :hi
+  end
+
+  def simple_step(request, what) do
+    send(self(), what)
+    request
+  end
+
   test "request step returns response", c do
     request =
       new(url: c.url <> "/ok")

@@ -354,9 +354,9 @@ defmodule Req.Request do
           private: map()
         }
 
-  @typep request_step() :: fun()
-  @typep response_step() :: fun()
-  @typep error_step() :: fun()
+  @typep request_step() :: fun() | {module(), atom(), [term()]}
+  @typep response_step() :: fun() | {module(), atom(), [term()]}
+  @typep error_step() :: fun() | {module(), atom(), [term()]}
   @typep options() :: term()
 
   defstruct method: :get,
@@ -706,7 +706,7 @@ defmodule Req.Request do
   end
 
   @doc false
-  def prepare(%{request_steps: [step | steps]} = request) do
+  def prepare(%{request_steps: [{_name, step} | steps]} = request) do
     case run_step(step, request) do
       %Req.Request{} = request ->
         request = %{request | request_steps: steps}
@@ -973,7 +973,7 @@ defmodule Req.Request do
   def run_request(%{current_request_steps: [step | rest]} = request) do
     step = Keyword.fetch!(request.request_steps, step)
 
-    case step.(request) do
+    case run_step(step, request) do
       %Req.Request{} = request ->
         run_request(%{request | current_request_steps: rest})
 
@@ -989,7 +989,7 @@ defmodule Req.Request do
   end
 
   def run_request(%{current_request_steps: []} = request) do
-    case request.adapter.(request) do
+    case run_step(request.adapter, request) do
       {request, %Req.Response{} = response} ->
         run_response(request, response)
 
@@ -1005,7 +1005,7 @@ defmodule Req.Request do
   defp run_response(request, response) do
     steps = request.response_steps
 
-    Enum.reduce_while(steps, {request, response}, fn step, {request, response} ->
+    Enum.reduce_while(steps, {request, response}, fn {_name, step}, {request, response} ->
       case run_step(step, {request, response}) do
         {%Req.Request{halted: true} = request, response_or_exception} ->
           {:halt, {request, response_or_exception}}
@@ -1022,7 +1022,7 @@ defmodule Req.Request do
   defp run_error(request, exception) do
     steps = request.error_steps
 
-    Enum.reduce_while(steps, {request, exception}, fn step, {request, exception} ->
+    Enum.reduce_while(steps, {request, exception}, fn {_name, step}, {request, exception} ->
       case run_step(step, {request, exception}) do
         {%Req.Request{halted: true} = request, response_or_exception} ->
           {:halt, {request, response_or_exception}}
@@ -1036,8 +1036,12 @@ defmodule Req.Request do
     end)
   end
 
-  defp run_step({name, step}, state) when is_atom(name) and is_function(step, 1) do
+  defp run_step(step, state) when is_function(step, 1) do
     step.(state)
+  end
+
+  defp run_step({mod, fun, args}, state) when is_atom(mod) and is_atom(fun) and is_list(args) do
+    apply(mod, fun, [state | args])
   end
 
   @doc false
