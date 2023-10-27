@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## HEAD
+## v0.4.5 (2023-10-27)
 
   * `decompress_body`: Remove `content-length` header
 

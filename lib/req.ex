@@ -1054,21 +1054,22 @@ defmodule Req do
     request.async.cancel_fun.(request.async.ref)
   end
 
-  def run_request(request, options \\ []) do
-    request
-    |> Req.update(options)
-    |> Req.Request.run_request()
-  end
+  # TODO: Req.run/2?
+  # defp run_request(request, options \\ []) do
+  #   request
+  #   |> Req.update(options)
+  #   |> Req.Request.run_request()
+  # end
 
-  def run_request!(request, options \\ []) do
-    case run_request(request, options) do
-      {request, %Req.Response{} = response} ->
-        {request, response}
+  # defp run_request!(request, options \\ []) do
+  #   case run_request(request, options) do
+  #     {request, %Req.Response{} = response} ->
+  #       {request, response}
 
-      {_request, exception} ->
-        raise exception
-    end
-  end
+  #     {_request, exception} ->
+  #       raise exception
+  #   end
+  # end
 
   @doc """
   Returns default options.
