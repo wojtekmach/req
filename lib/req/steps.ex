@@ -1139,9 +1139,9 @@ defmodule Req.Steps do
       iex> resp.status
       200
 
-      iex> Req.get!("https://httpbin.org/json", checksum: "sha1:ffffffffffffffffffff50f44540c4c5d4c8227c")
+      iex> Req.get!("https://httpbin.org/json", checksum: "sha1:bad")
       ** (RuntimeError) checksum mismatch
-      expected: sha1:ffffffffffffffffffff50f44540c4c5d4c8227c
+      expected: sha1:bad
       actual:   sha1:9274ffd9cf273d4a008750f44540c4c5d4c8227c
   """
   @doc step: :request
@@ -1151,12 +1151,11 @@ defmodule Req.Steps do
         request
 
       checksum when is_binary(checksum) ->
-        {label, type, base16} = extract_checksum(checksum)
-        expected = Base.decode16!(base16, case: :lower)
+        type = checksum_type(checksum)
 
         case request.into do
           nil ->
-            hash = :crypto.hash_init(type)
+            hash = hash_init(type)
 
             into =
               fn {:data, chunk}, {req, resp} ->
@@ -1166,13 +1165,13 @@ defmodule Req.Steps do
               end
 
             request
-            |> Req.Request.put_private(:req_checksum_label, label)
-            |> Req.Request.put_private(:req_checksum_expected, expected)
+            |> Req.Request.put_private(:req_checksum_type, type)
+            |> Req.Request.put_private(:req_checksum_expected, checksum)
             |> Req.Request.put_private(:req_checksum_hash, hash)
             |> Map.replace!(:into, into)
 
           fun when is_function(fun, 2) ->
-            hash = :crypto.hash_init(type)
+            hash = hash_init(type)
 
             into =
               fn {:data, chunk}, {req, resp} ->
@@ -1181,13 +1180,13 @@ defmodule Req.Steps do
               end
 
             request
-            |> Req.Request.put_private(:req_checksum_label, label)
-            |> Req.Request.put_private(:req_checksum_expected, expected)
+            |> Req.Request.put_private(:req_checksum_type, type)
+            |> Req.Request.put_private(:req_checksum_expected, checksum)
             |> Req.Request.put_private(:req_checksum_hash, hash)
             |> Map.replace!(:into, into)
 
           collectable ->
-            hash = :crypto.hash_init(type)
+            hash = hash_init(type)
 
             into =
               %CollectableWithChecksum{
@@ -1196,21 +1195,19 @@ defmodule Req.Steps do
               }
 
             request
-            |> Req.Request.put_private(:req_checksum_label, label)
-            |> Req.Request.put_private(:req_checksum_expected, expected)
+            |> Req.Request.put_private(:req_checksum_type, type)
+            |> Req.Request.put_private(:req_checksum_expected, checksum)
             |> Req.Request.put_private(:req_checksum_hash, :pdict)
             |> Map.replace!(:into, into)
         end
     end
   end
 
-  defp extract_checksum("sha1:" <> <<base16::binary-size(40)>>) do
-    {:sha1, :sha, base16}
-  end
+  defp checksum_type("sha1:" <> _), do: :sha1
+  defp checksum_type("sha256:" <> _), do: :sha256
 
-  defp extract_checksum("sha256:" <> <<base16::binary-size(64)>>) do
-    {:sha256, :sha256, base16}
-  end
+  defp hash_init(:sha1), do: hash_init(:sha)
+  defp hash_init(type), do: :crypto.hash_init(type)
 
   ## Response steps
 
@@ -1229,22 +1226,27 @@ defmodule Req.Steps do
           hash
         end
 
-      label = request.private.req_checksum_label
+      type = request.private.req_checksum_type
       expected = request.private.req_checksum_expected
-      actual = :crypto.hash_final(hash)
+
+      actual =
+        "#{type}:" <>
+          (hash
+           |> :crypto.hash_final()
+           |> Base.encode16(case: :lower, padding: false))
 
       if expected != actual do
         raise """
         checksum mismatch
-        expected: #{label}:#{Base.encode16(expected, case: :lower, padding: false)}
-        actual:   #{label}:#{Base.encode16(actual, case: :lower, padding: false)}\
+        expected: #{expected}
+        actual:   #{actual}\
         """
       end
 
       request =
         update_in(
           request.private,
-          &Map.drop(&1, [:req_checksum_hash, :req_checksum_expected, :req_checksum_label])
+          &Map.drop(&1, [:req_checksum_hash, :req_checksum_expected, :req_checksum_type])
         )
 
       {request, response}

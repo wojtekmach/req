@@ -292,16 +292,12 @@ defmodule Req.StepsTest do
       assert_raise RuntimeError,
                    """
                    checksum mismatch
-                   expected: sha1:0000000000000000000000000000000000000000
+                   expected: sha1:bad
                    actual:   #{@foo_sha1}\
                    """,
                    fn ->
-                     Req.get!(req, checksum: "sha1:0000000000000000000000000000000000000000")
+                     Req.get!(req, checksum: "sha1:bad")
                    end
-
-      assert_raise FunctionClauseError, fn ->
-        Req.get!(req, checksum: "sha1:bad")
-      end
     end
 
     test "into: fun", c do
@@ -326,16 +322,12 @@ defmodule Req.StepsTest do
       assert_raise RuntimeError,
                    """
                    checksum mismatch
-                   expected: sha1:0000000000000000000000000000000000000000
+                   expected: sha1:bad
                    actual:   #{@foo_sha1}\
                    """,
                    fn ->
-                     Req.get!(req, checksum: "sha1:0000000000000000000000000000000000000000")
+                     Req.get!(req, checksum: "sha1:bad")
                    end
-
-      assert_raise FunctionClauseError, fn ->
-        Req.get!(req, checksum: "sha1:bad")
-      end
     end
 
     test "into: collectable", c do
@@ -358,16 +350,12 @@ defmodule Req.StepsTest do
       assert_raise RuntimeError,
                    """
                    checksum mismatch
-                   expected: sha1:0000000000000000000000000000000000000000
+                   expected: sha1:bad
                    actual:   #{@foo_sha1}\
                    """,
                    fn ->
-                     Req.get!(req, checksum: "sha1:0000000000000000000000000000000000000000")
+                     Req.get!(req, checksum: "sha1:bad")
                    end
-
-      assert_raise FunctionClauseError, fn ->
-        Req.get!(req, checksum: "sha1:bad")
-      end
     end
   end
 
