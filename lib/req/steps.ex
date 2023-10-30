@@ -1092,7 +1092,166 @@ defmodule Req.Steps do
     plug.(conn)
   end
 
+  defmodule CollectableWithChecksum do
+    @moduledoc false
+
+    defstruct [:collectable, :hash]
+
+    defimpl Collectable do
+      def into(%{collectable: collectable, hash: hash}) do
+        {acc, collector} = Collectable.into(collectable)
+
+        new_collector = fn
+          {acc, hash}, {:cont, element} ->
+            hash = :crypto.hash_update(hash, element)
+            {collector.(acc, {:cont, element}), hash}
+
+          {acc, hash}, :done ->
+            # verification happens in verify_checksum step (so it happens after retries,
+            # redirects, etc) and there's no other way to put the data there.
+            Process.put(:req_checksum_hash, hash)
+            collector.(acc, :done)
+
+          {acc, _hash}, :halt ->
+            collector.(acc, :halt)
+        end
+
+        {{acc, hash}, new_collector}
+      end
+    end
+  end
+
+  @doc """
+  Sets expected response body checksum.
+
+  ## Request Options
+
+    * `:checksum` - if set, this is the expected response body checksum.
+
+      Can be one of:
+
+        * `"sha1:(...)"`
+        * `"sha256:(...)"`
+
+  ## Examples
+
+      iex> resp = Req.get!("https://httpbin.org/json", checksum: "sha1:9274ffd9cf273d4a008750f44540c4c5d4c8227c")
+      iex> resp.status
+      200
+
+      iex> Req.get!("https://httpbin.org/json", checksum: "sha1:ffffffffffffffffffff50f44540c4c5d4c8227c")
+      ** (RuntimeError) checksum mismatch
+      expected: sha1:ffffffffffffffffffff50f44540c4c5d4c8227c
+      actual:   sha1:9274ffd9cf273d4a008750f44540c4c5d4c8227c
+  """
+  @doc step: :request
+  def checksum(request) do
+    case Req.Request.get_option(request, :checksum) do
+      nil ->
+        request
+
+      checksum when is_binary(checksum) ->
+        {label, type, base16} = extract_checksum(checksum)
+        expected = Base.decode16!(base16, case: :lower)
+
+        case request.into do
+          nil ->
+            hash = :crypto.hash_init(type)
+
+            into =
+              fn {:data, chunk}, {req, resp} ->
+                req = update_in(req.private.req_checksum_hash, &:crypto.hash_update(&1, chunk))
+                resp = update_in(resp.body, &(&1 <> chunk))
+                {:cont, {req, resp}}
+              end
+
+            request
+            |> Req.Request.put_private(:req_checksum_label, label)
+            |> Req.Request.put_private(:req_checksum_expected, expected)
+            |> Req.Request.put_private(:req_checksum_hash, hash)
+            |> Map.replace!(:into, into)
+
+          fun when is_function(fun, 2) ->
+            hash = :crypto.hash_init(type)
+
+            into =
+              fn {:data, chunk}, {req, resp} ->
+                req = update_in(req.private.req_checksum_hash, &:crypto.hash_update(&1, chunk))
+                fun.({:data, chunk}, {req, resp})
+              end
+
+            request
+            |> Req.Request.put_private(:req_checksum_label, label)
+            |> Req.Request.put_private(:req_checksum_expected, expected)
+            |> Req.Request.put_private(:req_checksum_hash, hash)
+            |> Map.replace!(:into, into)
+
+          collectable ->
+            hash = :crypto.hash_init(type)
+
+            into =
+              %CollectableWithChecksum{
+                collectable: collectable,
+                hash: hash
+              }
+
+            request
+            |> Req.Request.put_private(:req_checksum_label, label)
+            |> Req.Request.put_private(:req_checksum_expected, expected)
+            |> Req.Request.put_private(:req_checksum_hash, :pdict)
+            |> Map.replace!(:into, into)
+        end
+    end
+  end
+
+  defp extract_checksum("sha1:" <> <<base16::binary-size(40)>>) do
+    {:sha1, :sha, base16}
+  end
+
+  defp extract_checksum("sha256:" <> <<base16::binary-size(64)>>) do
+    {:sha256, :sha256, base16}
+  end
+
   ## Response steps
+
+  @doc """
+  Verifies the response body checksum.
+
+  See `checksum/1` for more information.
+  """
+  @doc step: :response
+  def verify_checksum({request, response}) do
+    if hash = request.private[:req_checksum_hash] do
+      hash =
+        if hash == :pdict do
+          Process.delete(:req_checksum_hash)
+        else
+          hash
+        end
+
+      label = request.private.req_checksum_label
+      expected = request.private.req_checksum_expected
+      actual = :crypto.hash_final(hash)
+
+      if expected != actual do
+        raise """
+        checksum mismatch
+        expected: #{label}:#{Base.encode16(expected, case: :lower, padding: false)}
+        actual:   #{label}:#{Base.encode16(actual, case: :lower, padding: false)}\
+        """
+      end
+
+      request =
+        update_in(
+          request.private,
+          &Map.drop(&1, [:req_checksum_hash, :req_checksum_expected, :req_checksum_label])
+        )
+
+      {request, response}
+    else
+      {request, response}
+    end
+  end
 
   @doc """
   Decompresses the response body based on the `content-encoding` header.
