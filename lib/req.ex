@@ -327,10 +327,10 @@ defmodule Req do
     %Req.Request{
       registered_options:
         MapSet.new([
+          # request steps
           :user_agent,
           :compressed,
           :range,
-          :http_errors,
           :base_url,
           :params,
           :path_params,
@@ -338,8 +338,11 @@ defmodule Req do
           :form,
           :json,
           :compress_body,
-          :compressed,
+          :checksum,
+
+          # response steps
           :raw,
+          :http_errors,
           :decode_body,
           :decode_json,
           :redirect,
@@ -381,11 +384,13 @@ defmodule Req do
       put_range: &Req.Steps.put_range/1,
       cache: &Req.Steps.cache/1,
       put_plug: &Req.Steps.put_plug/1,
-      compress_body: &Req.Steps.compress_body/1
+      compress_body: &Req.Steps.compress_body/1,
+      checksum: &Req.Steps.checksum/1
     )
     |> Req.Request.prepend_response_steps(
       retry: &Req.Steps.retry/1,
       redirect: &Req.Steps.redirect/1,
+      verify_checksum: &Req.Steps.verify_checksum/1,
       decompress_body: &Req.Steps.decompress_body/1,
       decode_body: &Req.Steps.decode_body/1,
       handle_http_errors: &Req.Steps.handle_http_errors/1,

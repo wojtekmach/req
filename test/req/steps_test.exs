@@ -272,6 +272,93 @@ defmodule Req.StepsTest do
     end
   end
 
+  describe "checksum" do
+    @foo_sha1 "sha1:0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"
+    @foo_sha256 "sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+
+    test "into: binary", c do
+      Bypass.stub(c.bypass, "GET", "/", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "foo")
+      end)
+
+      req = Req.new(url: c.url)
+
+      resp = Req.get!(req, checksum: @foo_sha1)
+      assert resp.body == "foo"
+
+      resp = Req.get!(req, checksum: @foo_sha256)
+      assert resp.body == "foo"
+
+      assert_raise RuntimeError,
+                   """
+                   checksum mismatch
+                   expected: sha1:bad
+                   actual:   #{@foo_sha1}\
+                   """,
+                   fn ->
+                     Req.get!(req, checksum: "sha1:bad")
+                   end
+    end
+
+    test "into: fun", c do
+      Bypass.stub(c.bypass, "GET", "/", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "foo")
+      end)
+
+      req =
+        Req.new(
+          url: c.url,
+          into: fn {:data, chunk}, {req, resp} ->
+            {:cont, {req, update_in(resp.body, &(&1 <> chunk))}}
+          end
+        )
+
+      resp = Req.get!(req, checksum: @foo_sha1)
+      assert resp.body == "foo"
+
+      resp = Req.get!(req, checksum: @foo_sha256)
+      assert resp.body == "foo"
+
+      assert_raise RuntimeError,
+                   """
+                   checksum mismatch
+                   expected: sha1:bad
+                   actual:   #{@foo_sha1}\
+                   """,
+                   fn ->
+                     Req.get!(req, checksum: "sha1:bad")
+                   end
+    end
+
+    test "into: collectable", c do
+      Bypass.stub(c.bypass, "GET", "/", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "foo")
+      end)
+
+      req =
+        Req.new(
+          url: c.url,
+          into: []
+        )
+
+      resp = Req.get!(req, checksum: @foo_sha1)
+      assert resp.body == ["foo"]
+
+      resp = Req.get!(req, checksum: @foo_sha256)
+      assert resp.body == ["foo"]
+
+      assert_raise RuntimeError,
+                   """
+                   checksum mismatch
+                   expected: sha1:bad
+                   actual:   #{@foo_sha1}\
+                   """,
+                   fn ->
+                     Req.get!(req, checksum: "sha1:bad")
+                   end
+    end
+  end
+
   ## Response steps
 
   describe "decompress_body" do
