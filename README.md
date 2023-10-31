@@ -1,6 +1,6 @@
 # Req
 
-[![License](https://img.shields.io/hexpm/l/req.svg)](https://github.com/wojtekmach/req/blob/master/LICENSE.md)
+[![License](https://img.shields.io/hexpm/l/req.svg)](https://github.com/wojtekmach/req/blob/main/LICENSE.md)
 [![Version](https://img.shields.io/hexpm/v/req.svg)](https://hex.pm/packages/req)
 [![CI](https://github.com/wojtekmach/req/actions/workflows/ci.yml/badge.svg)](https://github.com/wojtekmach/req/actions/workflows/ci.yml)
 
