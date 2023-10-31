@@ -206,7 +206,8 @@ See [`Req.Request`] module documentation for more information on low-level API, 
 
 ## Presentations
 
-* [Req: A batteries included HTTP client for Elixir - Elixir Kenya, 2022-08-26](https://www.youtube.com/watch?v=NxWgvHRN6mI "Req: A batteries included HTTP client for Elixir")
+  * [Req: A batteries-included HTTP client for Elixir - ElixirConf 2023, 2023-09-08](https://www.youtube.com/watch?v=owz2QacFuoQ "ElixirConf 2023 - Wojtek Mach - Req - a batteries-included HTTP client for Elixir")
+  * [Req: A batteries included HTTP client for Elixir - Elixir Kenya, 2022-08-26](https://www.youtube.com/watch?v=NxWgvHRN6mI "Req: A batteries included HTTP client for Elixir")
 
 ## Acknowledgments
 
