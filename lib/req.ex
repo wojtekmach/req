@@ -113,7 +113,7 @@ defmodule Req do
 
     * `:url` - the request URL.
 
-    * `:headers` - the request headers as a `{key, value}` enumerable (e.g. map, keyword list). 
+    * `:headers` - the request headers as a `{key, value}` enumerable (e.g. map, keyword list).
 
       The header names should be downcased.
 
@@ -529,7 +529,7 @@ defmodule Req do
 
   With options:
 
-      iex> {:ok, resp} = Req.get!(url: "https://api.github.com/repos/wojtekmach/req")
+      iex> {:ok, resp} = Req.get(url: "https://api.github.com/repos/wojtekmach/req")
       iex> resp.status
       200
 
@@ -618,7 +618,8 @@ defmodule Req do
 
   """
   @doc type: :request
-  @spec head(url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  @spec head(url() | keyword() | Req.Request.t(), options :: keyword()) ::
+          {:ok, Req.Response.t()} | {:error, Exception.t()}
   def head(request, options \\ []) do
     request(%{new(request, options) | method: :head})
   end
