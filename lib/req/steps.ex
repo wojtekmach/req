@@ -409,7 +409,7 @@ defmodule Req.Steps do
     Req.Request.put_header(request, "range", range)
   end
 
-  def put_range(%{options: %{range: first..last}} = request) do
+  def put_range(%{options: %{range: first..last//1}} = request) do
     Req.Request.put_header(request, "range", "bytes=#{first}-#{last}")
   end
 
