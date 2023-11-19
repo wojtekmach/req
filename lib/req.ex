@@ -247,7 +247,7 @@ defmodule Req do
       and returns the delay, the number of milliseconds to sleep before making another attempt.
 
     * `:retry_log_level` - the log level to emit retry logs at. Can also be set to `false` to disable
-      logging these messsages. Defaults to `:error`.
+      logging these messages. Defaults to `:error`.
 
     * `:max_retries` - maximum number of retry attempts, defaults to `3` (for a total of `4`
       requests to the server, including the initial one.)
