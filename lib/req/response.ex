@@ -214,7 +214,7 @@ defmodule Req.Response do
   @doc """
   Deletes the header given by `name`.
 
-  All occurences of the header are deleted, in case the header is repeated multiple times.
+  All occurrences of the header are deleted, in case the header is repeated multiple times.
 
   See also "Header Names" section in `Req` module documentation.
 

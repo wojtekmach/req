@@ -1575,7 +1575,7 @@ defmodule Req.Steps do
       to `true`, credentials will be sent to any host.
 
     * `:redirect_log_level` - the log level to emit redirect logs at. Can also be set
-      to `false` to disable logging these messsages. Defaults to `:debug`.
+      to `false` to disable logging these messages. Defaults to `:debug`.
 
     * `:max_redirects` - the maximum number of redirects, defaults to `10`.
       If the limit is reached, an error is raised.
@@ -1780,7 +1780,7 @@ defmodule Req.Steps do
       and returns the delay, the number of milliseconds to sleep before making another attempt.
 
     * `:retry_log_level` - the log level to emit retry logs at. Can also be set to `false` to disable
-      logging these messsages. Defaults to `:error`.
+      logging these messages. Defaults to `:error`.
 
     * `:max_retries` - maximum number of retry attempts, defaults to `3` (for a total of `4`
       requests to the server, including the initial one.)
