@@ -194,7 +194,7 @@ defmodule Req.Response do
 
       iex> resp = Req.Response.put_header(%Req.Response{}, "content-type", "application/json")
       iex> resp.headers
-      [{"content-type", "application/json"}]
+      %{"content-type" => ["application/json"]}
   """
   @spec put_header(t(), binary(), binary()) :: t()
   if Req.MixProject.legacy_headers_as_lists?() do
