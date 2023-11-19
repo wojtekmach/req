@@ -192,7 +192,7 @@ defmodule Req.Response do
 
   ## Examples
 
-      iex> resp = Req.Response.put_header(resp, "content-type", "application/json")
+      iex> resp = Req.Response.put_header(%Req.Response{}, "content-type", "application/json")
       iex> resp.headers
       [{"content-type", "application/json"}]
   """
