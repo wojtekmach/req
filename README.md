@@ -36,6 +36,10 @@ write new ones.
 
   * Encode params as query string (via [`put_params`] step.)
 
+  * Setting base URL (via [`put_base_url`] step.)
+
+  * Templated request paths (via [`put_path_params`] step.)
+
   * Basic, bearer, and `.netrc` authentication (via [`auth`] step.)
 
   * Range requests (via [`put_range`]) step.)
@@ -50,11 +54,9 @@ write new ones.
 
   * Raise on 4xx/5xx errors (via [`handle_http_errors`] step.)
 
+  * Verify response body against a checksum (via [`checksum`] step.)
+
   * Basic HTTP caching (via [`cache`] step.)
-
-  * Setting base URL (via [`put_base_url`] step.)
-
-  * Templated request paths (via [`put_path_params`] step.)
 
   * Running against a plug (via [`put_plug`] step.)
 
@@ -253,6 +255,7 @@ limitations under the License.
 [`put_user_agent`]:     https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
 [`retry`]:              https://hexdocs.pm/req/Req.Steps.html#retry/1
 [`run_finch`]:          https://hexdocs.pm/req/Req.Steps.html#run_finch/1
+[`checksum`]:           https://hexdocs.pm/req/Req.Steps.html#checksum/1
 
 [Finch]: https://github.com/sneako/finch
 [cURL]: https://curl.se
