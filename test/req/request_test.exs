@@ -269,7 +269,7 @@ defmodule Req.RequestTest do
     else
       assert %{
                "user-agent" => ["req/" <> _],
-               "accept-encoding" => ["zstd, br, gzip"],
+               "accept-encoding" => ["zstd, br, gzip, deflate"],
                "authorization" => [^authorization]
              } = request.headers
     end

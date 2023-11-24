@@ -201,6 +201,7 @@ defmodule Req.Steps do
   Supported formats:
 
     * `gzip`
+    * `deflate`
     * `br` (if [brotli] is installed)
     * `zstd` (if [ezstd] is installed)
 
@@ -265,7 +266,7 @@ defmodule Req.Steps do
   end
 
   defp supported_accept_encoding do
-    value = "gzip"
+    value = "gzip, deflate"
     value = if brotli_loaded?(), do: "br, " <> value, else: value
     if ezstd_loaded?(), do: "zstd, " <> value, else: value
   end
@@ -1266,6 +1267,7 @@ defmodule Req.Steps do
   | Format        | Decoder                                         |
   | ------------- | ----------------------------------------------- |
   | gzip, x-gzip  | `:zlib.gunzip/1`                                |
+  | deflate       | `:zlib.uncompress/1` or `:zlib.unzip/1          |
   | br            | `:brotli.decode/1` (if [brotli] is installed)   |
   | zstd          | `:ezstd.decompress/1` (if [ezstd] is installed) |
   | _other_       | Returns data as is                              |
@@ -1283,6 +1285,10 @@ defmodule Req.Steps do
 
       iex> response = Req.get!("https://httpbin.org/gzip")
       iex> response.body["gzipped"]
+      true
+
+      iex> response = Req.get!("https://httpbin.org/deflate")
+      iex> response.body["deflated"]
       true
 
   If the [brotli] package is installed, Brotli is also supported:
@@ -1334,6 +1340,19 @@ defmodule Req.Steps do
 
   defp decompress_body([gzip | rest], body, acc) when gzip in ["gzip", "x-gzip"] do
     decompress_body(rest, :zlib.gunzip(body), acc)
+  end
+
+  defp decompress_body(["deflate" | rest], body, acc) do
+    # uncompress/1 is used when the body *has* zlib headers and checksum
+    # unzip/1 works when the body has no headers or checksum.
+    unzipped =
+      try do
+        :zlib.uncompress(body)
+      rescue
+        ErlangError -> :zlib.unzip(body)
+      end
+
+    decompress_body(rest, unzipped, acc)
   end
 
   defp decompress_body(["br" | rest], body, acc) do

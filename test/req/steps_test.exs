@@ -410,6 +410,31 @@ defmodule Req.StepsTest do
       assert resp.body == "foo"
     end
 
+    test "deflate", c do
+      # Retrieved from https://httpbin.org/deflate
+      httpbin_deflate_response =
+        <<120, 156, 61, 142, 63, 15, 130, 48, 16, 197, 119, 62, 5, 233, 108, 43, 109, 105, 181,
+          38, 14, 12, 70, 93, 13, 38, 174, 64, 143, 63, 137, 180, 90, 234, 34, 225, 187, 91, 32,
+          113, 184, 225, 253, 222, 187, 119, 55, 70, 113, 140, 52, 212, 207, 194, 131, 70, 135,
+          216, 187, 15, 108, 226, 25, 182, 80, 104, 112, 67, 96, 99, 144, 1, 92, 236, 224, 131,
+          66, 173, 247, 175, 178, 51, 196, 186, 6, 45, 209, 224, 221, 7, 112, 56, 107, 192, 44, 9,
+          7, 239, 109, 66, 82, 34, 254, 254, 3, 103, 253, 215, 224, 220, 21, 21, 224, 235, 124, 8,
+          221, 172, 245, 71, 138, 165, 144, 73, 205, 5, 197, 2, 168, 40, 211, 164, 228, 66, 210,
+          82, 239, 82, 94, 237, 37, 147, 74, 160, 208, 48, 173, 47, 245, 224, 91, 187, 44, 159,
+          79, 249, 218, 141, 172, 235, 154, 206, 204, 76, 41, 66, 217, 142, 48, 174, 194, 48, 20,
+          77, 209, 15, 160, 201, 56, 67>>
+
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "deflate")
+        |> Plug.Conn.send_resp(200, httpbin_deflate_response)
+      end)
+
+      resp = Req.get!(c.url)
+      {:ok, json} = Jason.decode(resp.body)
+      assert %{"deflated" => true} = json
+    end
+
     test "multiple codecs", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         conn
@@ -704,6 +729,8 @@ defmodule Req.StepsTest do
   end
 
   test "decode with unknown compression codec" do
+    non_existent_codec = "deflate_but_with_the_wrong_content-encoding"
+
     plug = fn conn ->
       body =
         %{a: 1}
@@ -711,7 +738,7 @@ defmodule Req.StepsTest do
         |> :zlib.compress()
 
       conn
-      |> Plug.Conn.put_resp_header("content-encoding", "deflate")
+      |> Plug.Conn.put_resp_header("content-encoding", non_existent_codec)
       |> Plug.Conn.put_resp_content_type("application/json")
       |> Plug.Conn.send_resp(200, body)
     end
@@ -722,7 +749,7 @@ defmodule Req.StepsTest do
       end)
 
     assert resp.body |> :zlib.uncompress() |> Jason.decode!() == %{"a" => 1}
-    assert log =~ ~s|algorithm \"deflate\" is not supported|
+    assert log =~ ~s|algorithm \"#{non_existent_codec}\" is not supported|
   end
 
   describe "redirect" do
