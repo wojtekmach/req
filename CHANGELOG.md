@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## HEAD
+
+  * New step: [`checksum`]
+  * [`put_plug`]: Fix response streaming when plug uses `send_resp` or `send_file`
+
 ## v0.4.5 (2023-10-27)
 
   * `decompress_body`: Remove `content-length` header
@@ -761,6 +766,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`put_range`]:           https://hexdocs.pm/req/Req.Steps.html#put_range/1
 [`retry`]:               https://hexdocs.pm/req/Req.Steps.html#retry/1
 [`run_finch`]:           https://hexdocs.pm/req/Req.Steps.html#run_finch/1
+[`checksum`]:            https://hexdocs.pm/req/Req.Steps.html#checksum/1
 
 [`Req.new/1`]:     https://hexdocs.pm/req/Req.html#new/1
 [`Req.request/2`]: https://hexdocs.pm/req/Req.html#request/2
