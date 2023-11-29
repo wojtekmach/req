@@ -1119,6 +1119,9 @@ defmodule Req.Steps do
           {acc, hash}, :done ->
             # verification happens in verify_checksum step (so it happens after retries,
             # redirects, etc) and there's no other way to put the data there.
+            #
+            # TODO: maybe collectables return a map with :body and arbitrary keys,
+            # and we'd store checksum in such key instead?
             Process.put(:req_checksum_hash, hash)
             collector.(acc, :done)
 
@@ -1140,6 +1143,7 @@ defmodule Req.Steps do
 
       Can be one of:
 
+        * `"md5:(...)"`
         * `"sha1:(...)"`
         * `"sha256:(...)"`
 
@@ -1213,6 +1217,7 @@ defmodule Req.Steps do
     end
   end
 
+  defp checksum_type("md5:" <> _), do: :md5
   defp checksum_type("sha1:" <> _), do: :sha1
   defp checksum_type("sha256:" <> _), do: :sha256
 
