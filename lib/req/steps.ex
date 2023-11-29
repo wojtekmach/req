@@ -1047,7 +1047,7 @@ defmodule Req.Steps do
             headers: conn.resp_headers
           )
 
-        Enum.reduce_while(plug_sent_chunks(conn), {request, response}, fn chunk, acc ->
+        Enum.reduce_while(plug_body_chunks(conn), {request, response}, fn chunk, acc ->
           fun.({:data, chunk}, acc)
         end)
 
@@ -1062,7 +1062,7 @@ defmodule Req.Steps do
           )
 
         acc =
-          Enum.reduce(plug_sent_chunks(conn), acc, fn chunk, acc ->
+          Enum.reduce(plug_body_chunks(conn), acc, fn chunk, acc ->
             collector.(acc, {:cont, chunk})
           end)
 
@@ -1071,22 +1071,26 @@ defmodule Req.Steps do
     end
   end
 
+  defp plug_body_chunks(conn) do
+    %Plug.Conn{adapter: {Plug.Adapters.Test.Conn, %{ref: ref}}} = conn
+
+    # If plug sent response (send_resp/send_file), use that, otherwise get sent chunks.
+    receive do
+      {^ref, response} ->
+        {_status, _headers, body} = response
+        [body]
+    after
+      0 ->
+        plug_sent_chunks(conn)
+    end
+  end
+
   defp plug_sent_chunks(conn) do
     # TODO: remove when we depend on Plug 1.16
     if Code.ensure_loaded?(Plug.Test) and function_exported?(Plug.Test, :sent_chunks, 1) do
-      %Plug.Conn{adapter: {Plug.Adapters.Test.Conn, %{ref: ref}}} = conn
-
-      # Check if function sent response: send_resp/send_file/etc. If so, use that as chunks.
-      receive do
-        {^ref, response} ->
-          {_status, _headers, body} = response
-          [body]
-      after
-        0 ->
-          Plug.Test.sent_chunks(conn)
-      end
+      Plug.Test.sent_chunks(conn)
     else
-      raise "using :into and :plug requires Plug 1.16"
+      raise "using :plug and :into with chunked response requires Plug 1.16"
     end
   end
 
