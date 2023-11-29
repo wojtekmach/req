@@ -1570,6 +1570,36 @@ defmodule Req.StepsTest do
       assert resp.status == 200
       assert resp.body == ["foo", "bar"]
     end
+
+    @tag skip: not plug_sent_chunks?
+    test "into: collectable with send_resp" do
+      req =
+        Req.new(
+          plug: fn conn ->
+            Plug.Conn.send_resp(conn, 200, "foo")
+          end,
+          into: []
+        )
+
+      resp = Req.request!(req)
+      assert resp.status == 200
+      assert resp.body == ["foo"]
+    end
+
+    @tag skip: not plug_sent_chunks?
+    test "into: collectable with send_file" do
+      req =
+        Req.new(
+          plug: fn conn ->
+            Plug.Conn.send_file(conn, 200, "mix.exs")
+          end,
+          into: []
+        )
+
+      resp = Req.request!(req)
+      assert resp.status == 200
+      assert ["defmodule Req.MixProject do" <> _] = resp.body
+    end
   end
 
   describe "run_finch" do

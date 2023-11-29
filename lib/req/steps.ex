@@ -1071,10 +1071,20 @@ defmodule Req.Steps do
     end
   end
 
-  # TODO: remove when we depend on Plug 1.16
   defp plug_sent_chunks(conn) do
+    # TODO: remove when we depend on Plug 1.16
     if Code.ensure_loaded?(Plug.Test) and function_exported?(Plug.Test, :sent_chunks, 1) do
-      Plug.Test.sent_chunks(conn)
+      %Plug.Conn{adapter: {Plug.Adapters.Test.Conn, %{ref: ref}}} = conn
+
+      # Check if function sent response: send_resp/send_file/etc. If so, use that as chunks.
+      receive do
+        {^ref, response} ->
+          {_status, _headers, body} = response
+          [body]
+      after
+        0 ->
+          Plug.Test.sent_chunks(conn)
+      end
     else
       raise "using :into and :plug requires Plug 1.16"
     end
