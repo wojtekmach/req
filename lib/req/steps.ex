@@ -1250,21 +1250,18 @@ defmodule Req.Steps do
            |> :crypto.hash_final()
            |> Base.encode16(case: :lower, padding: false))
 
-      if expected != actual do
-        raise """
-        checksum mismatch
-        expected: #{expected}
-        actual:   #{actual}\
-        """
+      if expected == actual do
+        request =
+          update_in(
+            request.private,
+            &Map.drop(&1, [:req_checksum_hash, :req_checksum_expected, :req_checksum_type])
+          )
+
+        {request, response}
+      else
+        exception = Req.ChecksumMismatchError.exception(expected: expected, actual: actual)
+        {request, exception}
       end
-
-      request =
-        update_in(
-          request.private,
-          &Map.drop(&1, [:req_checksum_hash, :req_checksum_expected, :req_checksum_type])
-        )
-
-      {request, response}
     else
       {request, response}
     end

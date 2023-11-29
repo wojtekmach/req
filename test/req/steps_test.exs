@@ -293,7 +293,7 @@ defmodule Req.StepsTest do
       resp = Req.get!(req, checksum: @foo_sha256)
       assert resp.body == "foo"
 
-      assert_raise RuntimeError,
+      assert_raise Req.ChecksumMismatchError,
                    """
                    checksum mismatch
                    expected: sha1:bad
@@ -323,7 +323,7 @@ defmodule Req.StepsTest do
       resp = Req.get!(req, checksum: @foo_sha256)
       assert resp.body == "foo"
 
-      assert_raise RuntimeError,
+      assert_raise Req.ChecksumMismatchError,
                    """
                    checksum mismatch
                    expected: sha1:bad
@@ -351,7 +351,7 @@ defmodule Req.StepsTest do
       resp = Req.get!(req, checksum: @foo_sha256)
       assert resp.body == ["foo"]
 
-      assert_raise RuntimeError,
+      assert_raise Req.ChecksumMismatchError,
                    """
                    checksum mismatch
                    expected: sha1:bad
