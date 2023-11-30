@@ -20,9 +20,9 @@ defmodule Req.Response do
 
   @type t() :: %__MODULE__{
           status: non_neg_integer(),
-          headers: %{binary() => [binary()]},
+          headers: %{optional(binary()) => [binary()]},
           body: binary() | term(),
-          trailers: %{binary() => [binary()]},
+          trailers: %{optional(binary()) => [binary()]},
           private: map()
         }
 

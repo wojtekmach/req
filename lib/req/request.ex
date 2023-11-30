@@ -337,7 +337,7 @@ defmodule Req.Request do
   @type t() :: %Req.Request{
           method: atom(),
           url: URI.t(),
-          headers: %{binary() => [binary()]},
+          headers: %{optional(binary()) => [binary()]},
           body: iodata() | Enumerable.t() | nil,
           into:
             nil
