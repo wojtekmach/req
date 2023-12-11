@@ -1654,34 +1654,30 @@ defmodule Req.StepsTest do
       end
     end
 
-    test ":receive_timeout", c do
+    test ":receive_timeout" do
       pid = self()
 
-      Bypass.stub(c.bypass, "GET", "/", fn conn ->
-        send(pid, :ping)
-        Process.sleep(10)
-        Plug.Conn.send_resp(conn, 200, "ok")
-      end)
+      %{url: url} =
+        TestSocket.serve(fn socket ->
+          assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
+          send(pid, :ping)
+          body = "ok"
 
-      options = [receive_timeout: 0, retry_delay: 10]
+          Process.sleep(1000)
 
-      log =
-        ExUnit.CaptureLog.capture_log(fn ->
-          assert {:error, %Mint.TransportError{reason: :timeout}} =
-                   Req.request([method: :get, url: c.url] ++ options)
+          data = """
+          HTTP/1.1 200 OK
+          content-length: #{byte_size(body)}
 
-          assert_receive :ping
-          assert_receive :ping
-          assert_receive :ping
-          assert_receive :ping
-          refute_receive _
+          #{body}
+          """
+
+          :ok = :gen_tcp.send(socket, data)
         end)
 
-      refute log =~ "4 attempts left"
-
-      assert log =~ "3 attempts left"
-      assert log =~ "2 attempts left"
-      assert log =~ "1 attempt left"
+      req = Req.new(url: url, receive_timeout: 50, retry: false)
+      assert {:error, %Mint.TransportError{reason: :timeout}} = Req.request(req)
+      assert_received :ping
     end
 
     test ":connect_options :protocol", c do
