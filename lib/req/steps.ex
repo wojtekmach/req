@@ -996,114 +996,130 @@ defmodule Req.Steps do
     end
   end
 
-  defp run_plug(request) do
-    plug = request.options[:plug]
+  if Code.ensure_loaded?(Plug.Test) do
+    defp run_plug(request) do
+      plug = request.options[:plug]
 
-    req_body =
-      case request.body do
-        iodata when is_binary(iodata) or is_list(iodata) ->
-          IO.iodata_to_binary(iodata)
+      req_body =
+        case request.body do
+          iodata when is_binary(iodata) or is_list(iodata) ->
+            IO.iodata_to_binary(iodata)
 
-        nil ->
-          ""
+          nil ->
+            ""
 
-        enumerable ->
-          enumerable |> Enum.to_list() |> IO.iodata_to_binary()
-      end
-
-    req_headers =
-      if unquote(Req.MixProject.legacy_headers_as_lists?()) do
-        request.headers
-      else
-        for {name, values} <- request.headers,
-            value <- values do
-          {name, value}
+          enumerable ->
+            enumerable |> Enum.to_list() |> IO.iodata_to_binary()
         end
-      end
 
-    conn = Plug.Test.conn(request.method, request.url, req_body)
+      req_headers =
+        if unquote(Req.MixProject.legacy_headers_as_lists?()) do
+          request.headers
+        else
+          for {name, values} <- request.headers,
+              value <- values do
+            {name, value}
+          end
+        end
 
-    conn = put_in(conn.req_headers, req_headers)
+      conn = Plug.Test.conn(request.method, request.url, req_body)
 
-    case request.into do
-      nil ->
-        conn = call_plug(conn, plug)
+      conn = put_in(conn.req_headers, req_headers)
 
-        response =
-          Req.Response.new(
-            status: conn.status,
-            headers: conn.resp_headers,
-            body: conn.resp_body
-          )
+      case request.into do
+        nil ->
+          conn = call_plug(conn, plug)
 
-        {request, response}
+          response =
+            Req.Response.new(
+              status: conn.status,
+              headers: conn.resp_headers,
+              body: conn.resp_body
+            )
 
-      fun when is_function(fun, 2) ->
-        conn = call_plug(conn, plug)
+          {request, response}
 
-        response =
-          Req.Response.new(
-            status: conn.status,
-            headers: conn.resp_headers
-          )
+        fun when is_function(fun, 2) ->
+          conn = call_plug(conn, plug)
 
-        Enum.reduce_while(plug_body_chunks(conn), {request, response}, fn chunk, acc ->
-          fun.({:data, chunk}, acc)
-        end)
+          response =
+            Req.Response.new(
+              status: conn.status,
+              headers: conn.resp_headers
+            )
 
-      collectable ->
-        {acc, collector} = Collectable.into(collectable)
-        conn = call_plug(conn, plug)
-
-        response =
-          Req.Response.new(
-            status: conn.status,
-            headers: conn.resp_headers
-          )
-
-        acc =
-          Enum.reduce(plug_body_chunks(conn), acc, fn chunk, acc ->
-            collector.(acc, {:cont, chunk})
+          Enum.reduce_while(plug_body_chunks(conn), {request, response}, fn chunk, acc ->
+            fun.({:data, chunk}, acc)
           end)
 
-        acc = collector.(acc, :done)
-        {request, %{response | body: acc}}
+        collectable ->
+          {acc, collector} = Collectable.into(collectable)
+          conn = call_plug(conn, plug)
+
+          response =
+            Req.Response.new(
+              status: conn.status,
+              headers: conn.resp_headers
+            )
+
+          acc =
+            Enum.reduce(plug_body_chunks(conn), acc, fn chunk, acc ->
+              collector.(acc, {:cont, chunk})
+            end)
+
+          acc = collector.(acc, :done)
+          {request, %{response | body: acc}}
+      end
     end
-  end
 
-  defp plug_body_chunks(conn) do
-    %Plug.Conn{adapter: {Plug.Adapters.Test.Conn, %{ref: ref}}} = conn
+    defp plug_body_chunks(conn) do
+      %Plug.Conn{adapter: {Plug.Adapters.Test.Conn, %{ref: ref}}} = conn
 
-    # If plug sent response (send_resp/send_file), use that, otherwise get sent chunks.
-    receive do
-      {^ref, response} ->
-        {_status, _headers, body} = response
-        [body]
-    after
-      0 ->
-        plug_sent_chunks(conn)
+      # If plug sent response (send_resp/send_file) then use that, otherwise get sent chunks.
+      receive do
+        {^ref, response} ->
+          {_status, _headers, body} = response
+          [body]
+      after
+        0 ->
+          plug_sent_chunks(conn)
+      end
     end
-  end
 
-  defp plug_sent_chunks(conn) do
     # TODO: remove when we depend on Plug 1.16
-    if Code.ensure_loaded?(Plug.Test) and function_exported?(Plug.Test, :sent_chunks, 1) do
-      Plug.Test.sent_chunks(conn)
+    if function_exported?(Plug.Test, :sent_chunks, 1) do
+      defp plug_sent_chunks(conn) do
+        Plug.Test.sent_chunks(conn)
+      end
     else
-      raise "using :plug and :into with chunked response requires Plug 1.16"
+      defp plug_sent_chunks(_conn) do
+        raise "using :plug and :into with chunked response requires Plug 1.16"
+      end
     end
-  end
 
-  defp call_plug(conn, plug) when is_atom(plug) do
-    plug.call(conn, [])
-  end
+    defp call_plug(conn, plug) when is_atom(plug) do
+      plug.call(conn, [])
+    end
 
-  defp call_plug(conn, {plug, options}) when is_atom(plug) do
-    plug.call(conn, plug.init(options))
-  end
+    defp call_plug(conn, {plug, options}) when is_atom(plug) do
+      plug.call(conn, plug.init(options))
+    end
 
-  defp call_plug(conn, plug) when is_function(plug, 1) do
-    plug.(conn)
+    defp call_plug(conn, plug) when is_function(plug, 1) do
+      plug.(conn)
+    end
+  else
+    defp run_plug(_request) do
+      Logger.error("""
+      Could not find plug dependency.
+
+      Please add :plug to your dependencies:
+
+          {:plug, "~> 1.0"}
+      """)
+
+      raise "missing plug dependency"
+    end
   end
 
   defmodule CollectableWithChecksum do

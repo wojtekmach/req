@@ -28,9 +28,7 @@ defmodule Req.MixProject do
           :brotli,
           :ezstd,
           # TODO: Wait for async_request/3
-          Finch,
-          # TODO: Wait for Plug 1.15
-          Plug.Conn
+          Finch
         ]
       ]
     ]
