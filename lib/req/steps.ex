@@ -821,10 +821,10 @@ defmodule Req.Steps do
             acc
 
           {:halt, _acc} ->
-            raise ArgumentError, "returning {:halt, _acc} requires Finch 0.17+"
+            raise ArgumentError, "returning {:halt, acc} requires Finch 0.17+"
 
           other ->
-            raise ArgumentError, "expected {:cont, _acc}, got: #{inspect(other)}"
+            raise ArgumentError, "expected {:cont, acc}, got: #{inspect(other)}"
         end
       end
 
@@ -977,15 +977,22 @@ defmodule Req.Steps do
         assert Req.get!("http:///hello", plug: echo).body == "hello"
       end
 
-  which is particularly useful to create HTTP service mocks with tools like
+  which is particularly useful to create HTTP service mocks, similar to tools like
   [Bypass](https://github.com/PSPDFKit-labs/bypass).
 
-  Here is another example, let's run the request against `Plug.Static` pointed to the Req's source
-  code and fetch the README:
+  Response streaming is also supported however at the moment the entire response
+  body is emitted as one chunk:
 
-      iex> resp = Req.get!("http:///README.md", plug: {Plug.Static, at: "/", from: "."})
-      iex> resp.body =~ "Req is a batteries-included HTTP client for Elixir."
-      true
+      test "echo" do
+        plug = fn conn ->
+          conn = Plug.Conn.send_chunked(conn, 200)
+          {:ok, conn} = Plug.Conn.chunk(conn, "echo")
+          {:ok, conn} = Plug.Conn.chunk(conn, "echo")
+          conn
+        end
+
+        assert Req.get!(plug: plug, into: []).body == ["echoecho"]
+      end
   """
   @doc step: :request
   def put_plug(request) do
@@ -1048,9 +1055,20 @@ defmodule Req.Steps do
               headers: conn.resp_headers
             )
 
-          Enum.reduce_while(plug_body_chunks(conn), {request, response}, fn chunk, acc ->
-            fun.({:data, chunk}, acc)
-          end)
+          case fun.({:data, conn.resp_body}, {request, response}) do
+            {:cont, acc} ->
+              acc
+
+            {:halt, acc} ->
+              message =
+                "returning {:halt, acc} is not yet supported by Plug adapter and it behaves as {:cont, acc}"
+
+              IO.warn(message, [])
+              acc
+
+            other ->
+              raise ArgumentError, "expected {:cont, acc}, got: #{inspect(other)}"
+          end
 
         collectable ->
           {acc, collector} = Collectable.into(collectable)
@@ -1062,38 +1080,9 @@ defmodule Req.Steps do
               headers: conn.resp_headers
             )
 
-          acc =
-            Enum.reduce(plug_body_chunks(conn), acc, fn chunk, acc ->
-              collector.(acc, {:cont, chunk})
-            end)
-
+          acc = collector.(acc, {:cont, conn.resp_body})
           acc = collector.(acc, :done)
           {request, %{response | body: acc}}
-      end
-    end
-
-    defp plug_body_chunks(conn) do
-      %Plug.Conn{adapter: {Plug.Adapters.Test.Conn, %{ref: ref}}} = conn
-
-      # If plug sent response (send_resp/send_file) then use that, otherwise get sent chunks.
-      receive do
-        {^ref, response} ->
-          {_status, _headers, body} = response
-          [body]
-      after
-        0 ->
-          plug_sent_chunks(conn)
-      end
-    end
-
-    # TODO: remove when we depend on Plug 1.16
-    if function_exported?(Plug.Test, :sent_chunks, 1) do
-      defp plug_sent_chunks(conn) do
-        Plug.Test.sent_chunks(conn)
-      end
-    else
-      defp plug_sent_chunks(_conn) do
-        raise "using :plug and :into with chunked response requires Plug 1.16"
       end
     end
 

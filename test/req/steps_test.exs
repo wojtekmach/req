@@ -1511,11 +1511,6 @@ defmodule Req.StepsTest do
       assert Req.request!(req).body == "foofoo"
     end
 
-    # TODO: Remove on Plug 1.16
-    plug_sent_chunks? =
-      Code.ensure_loaded?(Plug.Test) and function_exported?(Plug.Test, :sent_chunks, 1)
-
-    @tag skip: not plug_sent_chunks?
     test "into: fun" do
       req =
         Req.new(
@@ -1536,7 +1531,6 @@ defmodule Req.StepsTest do
       assert resp.body == "foobar"
     end
 
-    @tag skip: not plug_sent_chunks?
     test "into: fun with halt" do
       req =
         Req.new(
@@ -1552,12 +1546,12 @@ defmodule Req.StepsTest do
           end
         )
 
-      resp = Req.request!(req)
+      {resp, output} = ExUnit.CaptureIO.with_io(:standard_error, fn -> Req.request!(req) end)
+      assert output =~ ~r/returning {:halt, acc} is not yet supported by Plug adapter/
       assert resp.status == 200
-      assert resp.body == "foo"
+      assert resp.body == "foobar"
     end
 
-    @tag skip: not plug_sent_chunks?
     test "into: collectable" do
       req =
         Req.new(
@@ -1572,10 +1566,9 @@ defmodule Req.StepsTest do
 
       resp = Req.request!(req)
       assert resp.status == 200
-      assert resp.body == ["foo", "bar"]
+      assert resp.body == ["foobar"]
     end
 
-    @tag skip: not plug_sent_chunks?
     test "into: collectable with send_resp" do
       req =
         Req.new(
@@ -1590,7 +1583,6 @@ defmodule Req.StepsTest do
       assert resp.body == ["foo"]
     end
 
-    @tag skip: not plug_sent_chunks?
     test "into: collectable with send_file" do
       req =
         Req.new(
