@@ -1,9 +1,10 @@
 # CHANGELOG
 
-## HEAD
+## v0.4.6 (2023-12-11)
 
   * New step: [`checksum`]
   * [`put_plug`]: Fix response streaming when plug uses `send_resp` or `send_file`
+  * [`retry`]: Retry on `:closed`
 
 ## v0.4.5 (2023-10-27)
 
