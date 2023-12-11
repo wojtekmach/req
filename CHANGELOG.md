@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.4.7 (2023-12-11)
+
+  * [`put_plug`]: Don't crash if plug is not installed and :plug is not used
+
 ## v0.4.6 (2023-12-11)
 
   * New step: [`checksum`]
