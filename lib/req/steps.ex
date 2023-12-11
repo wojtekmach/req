@@ -1158,7 +1158,7 @@ defmodule Req.Steps do
       200
 
       iex> Req.get!("https://httpbin.org/json", checksum: "sha1:bad")
-      ** (RuntimeError) checksum mismatch
+      ** (Req.ChecksumMismatchError) checksum mismatch
       expected: sha1:bad
       actual:   sha1:9274ffd9cf273d4a008750f44540c4c5d4c8227c
   """
