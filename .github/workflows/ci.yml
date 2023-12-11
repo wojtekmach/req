@@ -52,7 +52,7 @@ jobs:
 
       - run: mix deps.compile
 
-      - run: mix compile --warnings-as-errors
+      - run: mix compile --no-optional-deps --warnings-as-errors
         if: ${{ matrix.lint }}
 
       - run: mix test --slowest 5
