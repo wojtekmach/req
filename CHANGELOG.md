@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v0.4.8 (2023-12-11)
+
+  * [`put_plug`]: Fix response streaming. Previously we were relying on unreleased
+    Plug features (which may never get released). Now, Plug adapter will emit the
+    entire response body as one chunk. Thus,
+    `plug: plug, into: fn ... -> {:halt, acc} end` is not yet supported as it
+    requires Plug changes that are still being disucssed. On the flip side,
+    we should have much more stable Plug integration regardless of this small
+    limitation.
+
 ## v0.4.7 (2023-12-11)
 
   * [`put_plug`]: Don't crash if plug is not installed and :plug is not used
