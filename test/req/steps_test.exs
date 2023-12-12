@@ -1099,6 +1099,20 @@ defmodule Req.StepsTest do
       assert log =~ "will retry in 4ms, 1 attempt left"
     end
 
+    test "invalid :retry_delay" do
+      adapter = fn request ->
+        {request, Req.Response.new(status: 500)}
+      end
+
+      req = Req.new(adapter: adapter, retry_delay: fn _ -> :ok end)
+
+      assert_raise ArgumentError,
+                   "expected :retry_delay function to return non-negative integer, got: :ok",
+                   fn ->
+                     Req.request!(req)
+                   end
+    end
+
     @tag :capture_log
     test "eventually successful - integer", c do
       adapter = fn request ->
