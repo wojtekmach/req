@@ -6,7 +6,7 @@
     Plug features (which may never get released). Now, Plug adapter will emit the
     entire response body as one chunk. Thus,
     `plug: plug, into: fn ... -> {:halt, acc} end` is not yet supported as it
-    requires Plug changes that are still being disucssed. On the flip side,
+    requires Plug changes that are still being discussed. On the flip side,
     we should have much more stable Plug integration regardless of this small
     limitation.
 
