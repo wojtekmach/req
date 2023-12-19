@@ -400,7 +400,7 @@ defmodule Req.Request do
       200
   """
   if Req.MixProject.legacy_headers_as_lists?() do
-    def new(options) do
+    def new(options \\ []) do
       options =
         options
         |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
@@ -415,7 +415,7 @@ defmodule Req.Request do
       struct!(__MODULE__, options)
     end
   else
-    def new(options) do
+    def new(options \\ []) do
       options =
         options
         |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])

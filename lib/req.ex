@@ -100,6 +100,9 @@ defmodule Req do
 
   @type url() :: URI.t() | String.t()
 
+  @req Req.Request.new()
+       |> Req.Steps.attach()
+
   @doc """
   Returns a new request struct with built-in steps.
 
@@ -324,79 +327,8 @@ defmodule Req do
     options = Keyword.merge(default_options(), options)
     {plugins, options} = Keyword.pop(options, :plugins, [])
 
-    %Req.Request{
-      registered_options:
-        MapSet.new([
-          # request steps
-          :user_agent,
-          :compressed,
-          :range,
-          :base_url,
-          :params,
-          :path_params,
-          :auth,
-          :form,
-          :json,
-          :compress_body,
-          :checksum,
-
-          # response steps
-          :raw,
-          :http_errors,
-          :decode_body,
-          :decode_json,
-          :redirect,
-          :redirect_trusted,
-          :redirect_log_level,
-          :max_redirects,
-          :retry,
-          :retry_delay,
-          :retry_log_level,
-          :max_retries,
-          :cache,
-          :cache_dir,
-          :plug,
-          :finch,
-          :finch_request,
-          :finch_private,
-          :connect_options,
-          :inet6,
-          :receive_timeout,
-          :pool_timeout,
-          :unix_socket,
-          :redact_auth,
-
-          # TODO: Remove on Req 1.0
-          :output,
-          :follow_redirects,
-          :location_trusted
-        ])
-    }
+    @req
     |> update(options)
-    |> Req.Request.prepend_request_steps(
-      put_user_agent: &Req.Steps.put_user_agent/1,
-      compressed: &Req.Steps.compressed/1,
-      encode_body: &Req.Steps.encode_body/1,
-      put_base_url: &Req.Steps.put_base_url/1,
-      auth: &Req.Steps.auth/1,
-      put_params: &Req.Steps.put_params/1,
-      put_path_params: &Req.Steps.put_path_params/1,
-      put_range: &Req.Steps.put_range/1,
-      cache: &Req.Steps.cache/1,
-      put_plug: &Req.Steps.put_plug/1,
-      compress_body: &Req.Steps.compress_body/1,
-      checksum: &Req.Steps.checksum/1
-    )
-    |> Req.Request.prepend_response_steps(
-      retry: &Req.Steps.retry/1,
-      redirect: &Req.Steps.redirect/1,
-      verify_checksum: &Req.Steps.verify_checksum/1,
-      decompress_body: &Req.Steps.decompress_body/1,
-      decode_body: &Req.Steps.decode_body/1,
-      handle_http_errors: &Req.Steps.handle_http_errors/1,
-      output: &Req.Steps.output/1
-    )
-    |> Req.Request.prepend_error_steps(retry: &Req.Steps.retry/1)
     |> run_plugins(plugins)
   end
 
