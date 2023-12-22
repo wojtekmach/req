@@ -275,7 +275,7 @@ defmodule Req.Steps do
   Supported formats:
 
     * `gzip`
-    * `br` (if [brotli] is installed)
+    * `br` (if [ExBrotli] is installed)
     * `zstd` (if [ezstd] is installed)
 
   ## Request Options
@@ -308,7 +308,7 @@ defmodule Req.Steps do
 
       Mix.install([
         :req,
-        {:brotli, "~> 0.3.0"},
+        {:ex_brotli, git: "https://github.com/skygroup2/ex_brotli.git", branch: "main"},
         {:ezstd, "~> 1.0"}
       ])
 
@@ -316,7 +316,7 @@ defmodule Req.Steps do
       response.body["headers"]["Accept-Encoding"]
       #=> "zstd, br, gzip"
 
-  [brotli]: https://hex.pm/packages/brotli
+  [ExBrotli]: https://github.com/skygroup2/ex_brotli
   [ezstd]: https://hex.pm/packages/ezstd
   """
   @doc step: :request
@@ -334,13 +334,17 @@ defmodule Req.Steps do
     Code.ensure_loaded?(:brotli)
   end
 
+  defmacrop ex_brotli_loaded? do
+    Code.ensure_loaded?(ExBrotli)
+  end
+
   defmacrop ezstd_loaded? do
     Code.ensure_loaded?(:ezstd)
   end
 
   defp supported_accept_encoding do
     value = "gzip"
-    value = if brotli_loaded?(), do: "br, " <> value, else: value
+    value = if ex_brotli_loaded?() or brotli_loaded?(), do: "br, " <> value, else: value
     if ezstd_loaded?(), do: "zstd, " <> value, else: value
   end
 
@@ -1358,12 +1362,12 @@ defmodule Req.Steps do
 
   Supported formats:
 
-  | Format        | Decoder                                         |
-  | ------------- | ----------------------------------------------- |
-  | gzip, x-gzip  | `:zlib.gunzip/1`                                |
-  | br            | `:brotli.decode/1` (if [brotli] is installed)   |
-  | zstd          | `:ezstd.decompress/1` (if [ezstd] is installed) |
-  | _other_       | Returns data as is                              |
+  | Format        | Decoder                                                |
+  | ------------- | ------------------------------------------------------ |
+  | gzip, x-gzip  | `:zlib.gunzip/1`                                       |
+  | br            | `ExBrotli.decompress/1` (if [ExBrotli] is installed)   |
+  | zstd          | `:ezstd.decompress/1` (if [ezstd] is installed)        |
+  | _other_       | Returns data as is                                     |
 
   This step updates the following headers to reflect the changes:
 
@@ -1380,11 +1384,11 @@ defmodule Req.Steps do
       iex> response.body["gzipped"]
       true
 
-  If the [brotli] package is installed, Brotli is also supported:
+  If the [ExBrotli] package is installed, Brotli is also supported:
 
       Mix.install([
         :req,
-        {:brotli, "~> 0.3.0"}
+        {:ex_brotli, git: "https://github.com/skygroup2/ex_brotli.git", branch: "main"}
       ])
 
       response = Req.get!("https://httpbin.org/brotli")
@@ -1393,7 +1397,7 @@ defmodule Req.Steps do
       response.body["brotli"]
       #=> true
 
-  [brotli]: http://hex.pm/packages/brotli
+  [ExBrotli]: https://github.com/skygroup2/ex_brotli
   [ezstd]: https://hex.pm/packages/ezstd
   """
   @doc step: :response
@@ -1432,12 +1436,18 @@ defmodule Req.Steps do
   end
 
   defp decompress_body(["br" | rest], body, acc) do
-    if brotli_loaded?() do
-      {:ok, decompressed} = :brotli.decode(body)
-      decompress_body(rest, decompressed, acc)
-    else
-      Logger.debug(":brotli library not loaded, skipping brotli decompression")
-      decompress_body(rest, body, ["br" | acc])
+    cond do
+      ex_brotli_loaded?() ->
+        {:ok, decompressed} = ExBrotli.decompress(body)
+        decompress_body(rest, decompressed, acc)
+
+      brotli_loaded?() ->
+        {:ok, decompressed} = :brotli.decode(body)
+        decompress_body(rest, decompressed, acc)
+
+      true ->
+        Logger.debug("ExBrotli library not loaded, skipping brotli decompression")
+        decompress_body(rest, body, ["br" | acc])
     end
   end
 
