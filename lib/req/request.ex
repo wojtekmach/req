@@ -1013,7 +1013,7 @@ defmodule Req.Request do
 
       other ->
         raise "expected adapter to return {request, response} or {request, exception}, " <>
-                "got: #{inspect(other) }"
+                "got: #{inspect(other)}"
     end
   end
 
@@ -1101,13 +1101,11 @@ defmodule Req.Request do
       sep = color(",", :map, opts)
       close = color("}", :map, opts)
 
-      redact_options = Req.Request.get_option(request, :redact_options, [])
       redact_headers = Req.Request.get_option(request, :redact_headers, [])
 
       headers =
         if unquote(Req.MixProject.legacy_headers_as_lists?()) do
           for {name, value} <- request.headers do
-            require IEx; IEx.pry
             case Enum.member?(redact_headers, Req.__ensure_header_downcase__(name)) do
               true -> {name, "[redacted]"}
               _ -> {name, value}
