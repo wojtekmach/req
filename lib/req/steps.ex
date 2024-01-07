@@ -636,7 +636,7 @@ defmodule Req.Steps do
 
         * `:timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
 
-        * `:protocol` - the HTTP protocol to use, defaults to `:http1`.
+        * `:protocols` - the HTTP protocols to use, defaults to `[:http1]`.
 
         * `:hostname` - Mint explicit hostname, see `Mint.HTTP.connect/4` for more information.
 
@@ -690,7 +690,7 @@ defmodule Req.Steps do
 
       iex> Req.get!(url, connect_options: [timeout: 5000])
 
-      iex> Req.get!(url, connect_options: [protocol: :http2])
+      iex> Req.get!(url, connect_options: [protocols: [:http2]])
 
   Connecting with built-in CA store (requires OTP 25+):
 
@@ -937,12 +937,14 @@ defmodule Req.Steps do
           connect_options,
           MapSet.new([
             :timeout,
-            :protocol,
+            :protocols,
             :transport_opts,
             :proxy_headers,
             :proxy,
             :client_settings,
-            :hostname
+            :hostname,
+            # deprecated
+            :protocol
           ])
         )
 
@@ -960,6 +962,12 @@ defmodule Req.Steps do
         proxy_opts = Keyword.take(connect_options, [:proxy])
         client_settings_opts = Keyword.take(connect_options, [:client_settings])
 
+        if connect_options[:protocol] do
+          IO.warn(
+            "setting `connect_options: [protocol: term()]` is deprecated, use `connect_options: [protocols: [term()]]` instead"
+          )
+        end
+
         pool_opts = [
           conn_opts:
             hostname_opts ++
@@ -967,7 +975,8 @@ defmodule Req.Steps do
               proxy_headers_opts ++
               proxy_opts ++
               client_settings_opts,
-          protocol: connect_options[:protocol] || :http1
+          protocols:
+            List.wrap(connect_options[:protocols] || connect_options[:protocol] || :http1)
         ]
 
         name =
