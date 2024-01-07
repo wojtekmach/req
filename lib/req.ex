@@ -80,23 +80,22 @@ defmodule Req do
     * functions like `Req.Request.get_header/2`, `Req.Request.put_header/3`,
       `Req.Response.get_header/2`, `Req.Response.put_header/3`, etc
       automatically downcase the given header name.
-  """
 
-  # TODO: Wait for Finch 0.17
-  # Response streaming to caller:
-  #
-  #     iex> {req, resp} = Req.async_request!("http://httpbin.org/stream/2")
-  #     iex> resp.status
-  #     200
-  #     iex> resp.body
-  #     ""
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [:done]
-  #     ""
+  Response streaming to caller (available with Finch 0.17+):
+
+      iex> {req, resp} = Req.async_request!("http://httpbin.org/stream/2")
+      iex> resp.status
+      200
+      iex> resp.body
+      ""
+      iex> Req.parse_message(req, receive do message -> message end)
+      [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
+      iex> Req.parse_message(req, receive do message -> message end)
+      [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
+      iex> Req.parse_message(req, receive do message -> message end)
+      [:done]
+      ""
+  """
 
   @type url() :: URI.t() | String.t()
 
@@ -962,14 +961,10 @@ defmodule Req do
     end
   end
 
-  # TODO: Wait for Finch 0.17
-  @doc false
   def async_request(request, options \\ []) do
     Req.Request.run_request(%{new(request, options) | into: :self})
   end
 
-  # TODO: Wait for Finch 0.17
-  @doc false
   def async_request!(request, options \\ []) do
     case async_request(request, options) do
       {request, %Req.Response{} = response} ->
@@ -980,14 +975,10 @@ defmodule Req do
     end
   end
 
-  # TODO: Wait for Finch 0.17
-  @doc false
   def parse_message(%Req.Request{} = request, message) do
     request.async.stream_fun.(request.async.ref, message)
   end
 
-  # TODO: Wait for Finch 0.17
-  @doc false
   def cancel_async_request(%Req.Request{} = request) do
     request.async.cancel_fun.(request.async.ref)
   end

@@ -882,28 +882,8 @@ defmodule Req.Steps do
     {req, resp}
   end
 
-  # TODO: Remove on Finch 0.17
-  if Code.ensure_loaded?(Finch) and function_exported?(Finch, :stream_while, 5) do
-    defp finch_stream_while(finch_req, finch_name, acc, fun, finch_options) do
-      Finch.stream_while(finch_req, finch_name, acc, fun, finch_options)
-    end
-  else
-    defp finch_stream_while(finch_req, finch_name, acc, fun, finch_options) do
-      fun = fn item, acc ->
-        case fun.(item, acc) do
-          {:cont, acc} ->
-            acc
-
-          {:halt, _acc} ->
-            raise ArgumentError, "returning {:halt, acc} requires Finch 0.17+"
-
-          other ->
-            raise ArgumentError, "expected {:cont, acc}, got: #{inspect(other)}"
-        end
-      end
-
-      Finch.stream(finch_req, finch_name, acc, fun, finch_options)
-    end
+  defp finch_stream_while(finch_req, finch_name, acc, fun, finch_options) do
+    Finch.stream_while(finch_req, finch_name, acc, fun, finch_options)
   end
 
   defp run_finch_request(finch_request, finch_name, finch_options) do
