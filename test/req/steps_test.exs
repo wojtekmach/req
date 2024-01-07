@@ -1692,7 +1692,7 @@ defmodule Req.StepsTest do
         Plug.Conn.send_resp(conn, 200, "ok")
       end)
 
-      req = Req.new(url: c.url, connect_options: [protocol: :http2])
+      req = Req.new(url: c.url, connect_options: [protocols: [:http2]])
       assert Req.request!(req).body == "ok"
     end
 
