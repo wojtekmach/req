@@ -808,7 +808,7 @@ defmodule Req.Steps do
         {:cont, {req, resp}}
     end
 
-    case finch_stream_while(finch_req, finch_name, {req, resp}, fun, finch_options) do
+    case Finch.stream_while(finch_req, finch_name, {req, resp}, fun, finch_options) do
       {:ok, acc} ->
         acc
 
@@ -880,10 +880,6 @@ defmodule Req.Steps do
     req = put_in(req.async, async)
     resp = Req.Response.new(status: status, headers: headers)
     {req, resp}
-  end
-
-  defp finch_stream_while(finch_req, finch_name, acc, fun, finch_options) do
-    Finch.stream_while(finch_req, finch_name, acc, fun, finch_options)
   end
 
   defp run_finch_request(finch_request, finch_name, finch_options) do
