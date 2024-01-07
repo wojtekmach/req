@@ -976,7 +976,7 @@ defmodule Req.Steps do
               proxy_opts ++
               client_settings_opts,
           protocols:
-            List.wrap(connect_options[:protocols] || connect_options[:protocol] || :http1)
+            connect_options[:protocols] || List.wrap(connect_options[:protocol] || :http1)
         ]
 
         name =
