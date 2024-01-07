@@ -961,10 +961,12 @@ defmodule Req do
     end
   end
 
+  @doc false
   def async_request(request, options \\ []) do
     Req.Request.run_request(%{new(request, options) | into: :self})
   end
 
+  @doc false
   def async_request!(request, options \\ []) do
     case async_request(request, options) do
       {request, %Req.Response{} = response} ->
@@ -975,10 +977,12 @@ defmodule Req do
     end
   end
 
+  @doc false
   def parse_message(%Req.Request{} = request, message) do
     request.async.stream_fun.(request.async.ref, message)
   end
 
+  @doc false
   def cancel_async_request(%Req.Request{} = request) do
     request.async.cancel_fun.(request.async.ref)
   end
