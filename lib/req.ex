@@ -80,22 +80,22 @@ defmodule Req do
     * functions like `Req.Request.get_header/2`, `Req.Request.put_header/3`,
       `Req.Response.get_header/2`, `Req.Response.put_header/3`, etc
       automatically downcase the given header name.
-
-  Response streaming to caller (available with Finch 0.17+):
-
-      iex> {req, resp} = Req.async_request!("http://httpbin.org/stream/2")
-      iex> resp.status
-      200
-      iex> resp.body
-      ""
-      iex> Req.parse_message(req, receive do message -> message end)
-      [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
-      iex> Req.parse_message(req, receive do message -> message end)
-      [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
-      iex> Req.parse_message(req, receive do message -> message end)
-      [:done]
-      ""
   """
+
+  # Response streaming to caller:
+  #
+  #     iex> {req, resp} = Req.async_request!("http://httpbin.org/stream/2")
+  #     iex> resp.status
+  #     200
+  #     iex> resp.body
+  #     ""
+  #     iex> Req.parse_message(req, receive do message -> message end)
+  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
+  #     iex> Req.parse_message(req, receive do message -> message end)
+  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
+  #     iex> Req.parse_message(req, receive do message -> message end)
+  #     [:done]
+  #     ""
 
   @type url() :: URI.t() | String.t()
 
