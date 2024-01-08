@@ -202,7 +202,8 @@ defmodule Req do
 
         * `fun` - stream response body using a function. The first argument is a `{:data, data}`
           tuple containing the chunk of the response body. The second argument is a
-          `{request, response}` tuple. For example:
+          `{request, response}` tuple. To continue streaming chunks, return `{:cont, {req, resp}}`.
+          To cancel, return `{:halt, {req, resp}}`. For example:
 
               into: fn {:data, data}, {req, resp} ->
                 IO.puts(data)
