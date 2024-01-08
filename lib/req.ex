@@ -278,7 +278,8 @@ defmodule Req do
 
         * `:timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
 
-        * `:protocols` - the HTTP protocols to use, defaults to `[:http1]`.
+        * `:protocols` - the HTTP protocols to use, defaults to `[:http1, :http2]`, that is default to HTTP/1 but if negotiated, allow HTTP/2
+          over HTTP/1 connection. To force HTTP/2, set `protocols: [:http2]`.
 
         * `:hostname` - Mint explicit hostname.
 
