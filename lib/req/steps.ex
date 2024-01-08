@@ -944,7 +944,8 @@ defmodule Req.Steps do
             :proxy,
             :client_settings,
             :hostname,
-            # deprecated
+
+            # TODO: Remove on Req v1.0
             :protocol
           ])
         )
@@ -964,9 +965,10 @@ defmodule Req.Steps do
         client_settings_opts = Keyword.take(connect_options, [:client_settings])
 
         if connect_options[:protocol] do
-          IO.warn(
-            "setting `connect_options: [protocol: term()]` is deprecated, use `connect_options: [protocols: [term()]]` instead"
-          )
+          IO.warn([
+            "setting `connect_options: [protocol: protocol]` is deprecated, ",
+            "use `connect_options: [protocols: protocols]` instead"
+          ])
         end
 
         pool_opts = [
