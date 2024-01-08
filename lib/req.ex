@@ -80,23 +80,22 @@ defmodule Req do
     * functions like `Req.Request.get_header/2`, `Req.Request.put_header/3`,
       `Req.Response.get_header/2`, `Req.Response.put_header/3`, etc
       automatically downcase the given header name.
-  """
 
-  # TODO: Wait for Finch 0.17
-  # Response streaming to caller:
-  #
-  #     iex> {req, resp} = Req.async_request!("http://httpbin.org/stream/2")
-  #     iex> resp.status
-  #     200
-  #     iex> resp.body
-  #     ""
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [:done]
-  #     ""
+  Response streaming to caller (available with Finch 0.17+):
+
+      iex> {req, resp} = Req.async_request!("http://httpbin.org/stream/2")
+      iex> resp.status
+      200
+      iex> resp.body
+      ""
+      iex> Req.parse_message(req, receive do message -> message end)
+      [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
+      iex> Req.parse_message(req, receive do message -> message end)
+      [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
+      iex> Req.parse_message(req, receive do message -> message end)
+      [:done]
+      ""
+  """
 
   @type url() :: URI.t() | String.t()
 
@@ -203,7 +202,8 @@ defmodule Req do
 
         * `fun` - stream response body using a function. The first argument is a `{:data, data}`
           tuple containing the chunk of the response body. The second argument is a
-          `{request, response}` tuple. For example:
+          `{request, response}` tuple. To continue streaming chunks, return `{:cont, {req, resp}}`.
+          To cancel, return `{:halt, {req, resp}}`. For example:
 
               into: fn {:data, data}, {req, resp} ->
                 IO.puts(data)
@@ -278,7 +278,7 @@ defmodule Req do
 
         * `:timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
 
-        * `:protocol` - the HTTP protocol to use, defaults to `:http1`.
+        * `:protocols` - the HTTP protocols to use, defaults to `[:http1]`.
 
         * `:hostname` - Mint explicit hostname.
 
@@ -962,13 +962,11 @@ defmodule Req do
     end
   end
 
-  # TODO: Wait for Finch 0.17
   @doc false
   def async_request(request, options \\ []) do
     Req.Request.run_request(%{new(request, options) | into: :self})
   end
 
-  # TODO: Wait for Finch 0.17
   @doc false
   def async_request!(request, options \\ []) do
     case async_request(request, options) do
@@ -980,13 +978,11 @@ defmodule Req do
     end
   end
 
-  # TODO: Wait for Finch 0.17
   @doc false
   def parse_message(%Req.Request{} = request, message) do
     request.async.stream_fun.(request.async.ref, message)
   end
 
-  # TODO: Wait for Finch 0.17
   @doc false
   def cancel_async_request(%Req.Request{} = request) do
     request.async.cancel_fun.(request.async.ref)

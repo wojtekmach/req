@@ -1692,7 +1692,7 @@ defmodule Req.StepsTest do
         Plug.Conn.send_resp(conn, 200, "ok")
       end)
 
-      req = Req.new(url: c.url, connect_options: [protocol: :http2])
+      req = Req.new(url: c.url, connect_options: [protocols: [:http2]])
       assert Req.request!(req).body == "ok"
     end
 
@@ -1837,25 +1837,14 @@ defmodule Req.StepsTest do
       assert resp.headers["transfer-encoding"] == ["chunked"]
       assert resp.headers["trailer"] == ["x-foo, x-bar"]
 
-      # TODO: Remove check on new Finch release
-      if Map.has_key?(%Finch.Response{}, :trailers) do
-        assert resp.trailers["x-foo"] == ["foo"]
-        assert resp.trailers["x-bar"] == ["bar"]
-      else
-        assert resp.headers["x-foo"] == ["foo"]
-        assert resp.headers["x-bar"] == ["bar"]
-      end
+      assert resp.trailers["x-foo"] == ["foo"]
+      assert resp.trailers["x-bar"] == ["bar"]
 
       assert_receive {:data, "chunk1"}
       assert_receive {:data, "chunk2"}
       refute_receive _
     end
 
-    # TODO: Remove on Finch 0.17
-    finch_stream_while? =
-      Code.ensure_loaded?(Finch) and function_exported?(Finch, :stream_while, 5)
-
-    @tag skip: not finch_stream_while?
     test "into: fun with halt" do
       # try fixing `** (exit) shutdown` on CI by starting custom server
       defmodule StreamPlug do
@@ -1932,14 +1921,8 @@ defmodule Req.StepsTest do
       assert resp.headers["transfer-encoding"] == ["chunked"]
       assert resp.headers["trailer"] == ["x-foo, x-bar"]
 
-      # TODO: Remove check on new Finch release
-      if Map.has_key?(%Finch.Response{}, :trailers) do
-        assert resp.trailers["x-foo"] == ["foo"]
-        assert resp.trailers["x-bar"] == ["bar"]
-      else
-        assert resp.headers["x-foo"] == ["foo"]
-        assert resp.headers["x-bar"] == ["bar"]
-      end
+      assert resp.trailers["x-foo"] == ["foo"]
+      assert resp.trailers["x-bar"] == ["bar"]
 
       assert resp.body == ["chunk1", "chunk2"]
     end
@@ -1955,10 +1938,6 @@ defmodule Req.StepsTest do
                )
     end
 
-    # TODO: Remove on Finch 0.17
-    async_finch? = Code.ensure_loaded?(Finch) and function_exported?(Finch, :async_request, 2)
-
-    @tag skip: not async_finch?
     test "async request", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         conn = Plug.Conn.send_chunked(conn, 200)
@@ -1975,7 +1954,6 @@ defmodule Req.StepsTest do
       refute_receive _
     end
 
-    @tag skip: not async_finch?
     test "async request cancellation", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         conn = Plug.Conn.send_chunked(conn, 200)
