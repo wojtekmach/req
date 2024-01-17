@@ -204,6 +204,20 @@ Req.get!(req, url: "https://api.github.com/user").body["login"]
 #=> "wojtekmach"
 ```
 
+### Using low level Mint options with Req
+
+To pass transport options to Mint you will need to pass `connect_options` to Req when building your request.
+For example, to disable SSL Verification on requests you would do the following:
+
+```elixir
+  Req.get!("https://example.com", connect_options: [transport_opts: [verify: :verify_none]])
+
+  #=> %Req.Response{
+  #     status: 200,
+  #     ...
+  #   }
+```
+
 See [`Req.Request`] module documentation for more information on low-level API, request struct, and developing plugins.
 
 ## Presentations
