@@ -38,7 +38,7 @@ jobs:
           # so we need to cache per OTP
           key: mix-otp-${{ matrix.pair.otp }}-deps-${{ hashFiles('**/mix.lock') }}
 
-      - run: mix deps.get
+      - run: mix deps.get --check-locked
 
       - run: mix format --check-formatted
         if: ${{ matrix.lint }}
