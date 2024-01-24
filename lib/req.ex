@@ -329,8 +329,8 @@ defmodule Req do
     {plugins, options} = Keyword.pop(options, :plugins, [])
 
     @req
-    |> update(options)
     |> run_plugins(plugins)
+    |> update(options)
   end
 
   defp new(%Req.Request{} = request, options) when is_list(options) do
@@ -1082,7 +1082,7 @@ defmodule Req do
     String.Chars.to_string(value)
   end
 
-  # Plugins support is experimental, undocumented, and likely won't make the new release.
+  # Plugins support is experimental and undocumented.
   defp run_plugins(request, [plugin | rest]) when is_atom(plugin) do
     run_plugins(plugin.attach(request), rest)
   end

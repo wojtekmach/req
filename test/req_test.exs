@@ -63,4 +63,13 @@ defmodule ReqTest do
                ~s|"authorization" => ["[redacted]"]|
     end
   end
+
+  test "plugins" do
+    foo = fn req ->
+      Req.Request.register_options(req, [:foo])
+    end
+
+    req = Req.new(plugins: [foo], foo: 42)
+    assert req.options.foo == 42
+  end
 end
