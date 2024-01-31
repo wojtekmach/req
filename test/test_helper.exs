@@ -20,5 +20,5 @@ defmodule TestSocket do
   end
 end
 
-ExUnit.configure(exclude: :integration)
+ExUnit.configure(exclude: [:integration, :live])
 ExUnit.start()
