@@ -4,14 +4,14 @@ defmodule Req.Test do
   @doc """
   Returns the stub created by `stub/2`.
   """
-  def stub(name) do
-    case NimbleOwnership.fetch_owner(@ownership, callers(), name) do
+  def stub(stub_name) do
+    case NimbleOwnership.fetch_owner(@ownership, callers(), stub_name) do
       {:ok, owner} when is_pid(owner) ->
-        %{^name => value} = NimbleOwnership.get_owned(@ownership, owner)
+        %{^stub_name => value} = NimbleOwnership.get_owned(@ownership, owner)
         value
 
       :error ->
-        raise "cannot find stub #{inspect(name)} in process #{inspect(self())}"
+        raise "cannot find stub #{inspect(stub_name)} in process #{inspect(self())}"
     end
   end
 
@@ -31,11 +31,21 @@ defmodule Req.Test do
       iex> Task.async(fn -> Req.Test.stub(MyStub) end) |> Task.await()
       :foo
   """
-  def stub(name, value) do
-    NimbleOwnership.get_and_update(@ownership, self(), name, fn _ -> {:ok, value} end)
+  def stub(stub_name, value) do
+    NimbleOwnership.get_and_update(@ownership, self(), stub_name, fn _ -> {:ok, value} end)
   end
 
   defp callers do
     [self() | Process.get(:"$callers") || []]
+  end
+
+  @doc false
+  def init(stub_name) do
+    stub_name
+  end
+
+  @doc false
+  def call(conn, stub_name) do
+    stub(stub_name).(conn)
   end
 end

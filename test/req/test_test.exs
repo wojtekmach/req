@@ -20,4 +20,12 @@ defmodule Req.TestTest do
 
     assert Req.Test.stub(:foo) == 2
   end
+
+  test "plug" do
+    Req.Test.stub(:foo, fn conn ->
+      Plug.Conn.send_resp(conn, 200, "hi")
+    end)
+
+    assert Req.get!(plug: {Req.Test, :foo}).body == "hi"
+  end
 end
