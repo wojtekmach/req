@@ -14,7 +14,7 @@ defmodule Req.TestTest do
 
     Task.async(fn ->
       assert Req.Test.stub(:foo) == 2
-      # Req.Test.stub(:foo, 3)
+      Req.Test.stub(:foo, 3)
     end)
     |> Task.await()
 
