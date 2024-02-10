@@ -1360,7 +1360,7 @@ defmodule Req.Steps do
           to_string(request.method),
           to_string(request.url),
           headers,
-          request.body || ""
+          IO.iodata_to_binary(request.body || "")
         )
 
       Req.update(request, headers: headers)
