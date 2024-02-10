@@ -29,6 +29,7 @@ defmodule Req.Steps do
       :json,
       :compress_body,
       :checksum,
+      :aws_sigv4,
 
       # response steps
       :raw,
@@ -73,7 +74,8 @@ defmodule Req.Steps do
       cache: &Req.Steps.cache/1,
       put_plug: &Req.Steps.put_plug/1,
       compress_body: &Req.Steps.compress_body/1,
-      checksum: &Req.Steps.checksum/1
+      checksum: &Req.Steps.checksum/1,
+      put_aws_sigv4: &Req.Steps.put_aws_sigv4/1
     )
     |> Req.Request.prepend_response_steps(
       retry: &Req.Steps.retry/1,
@@ -1294,6 +1296,78 @@ defmodule Req.Steps do
 
   defp hash_init(:sha1), do: hash_init(:sha)
   defp hash_init(type), do: :crypto.hash_init(type)
+
+  defmacrop aws_signature_loaded? do
+    Code.ensure_loaded?(:aws_signature)
+  end
+
+  # experimental
+  @doc false
+  def put_aws_sigv4(request) do
+    if aws_options = request.options[:aws_sigv4] do
+      unless aws_signature_loaded?() do
+        Logger.error("""
+        Could not find aws_signature dependency.
+
+        Please add :aws_signature to your dependencies:
+
+            {:aws_signature, "~> 0.3.0"}
+        """)
+
+        raise "missing aws_signature dependency"
+      end
+
+      aws_options =
+        case aws_options do
+          list when is_list(list) ->
+            list
+
+          map when is_map(map) ->
+            Enum.to_list(map)
+
+          other ->
+            raise ArgumentError,
+                  ":aws_sigv4 must be a keywords list or a map, got: #{inspect(other)}"
+        end
+
+      # aws_credentials returns this key so let's ignore it
+      aws_options = Keyword.drop(aws_options, [:credential_provider])
+
+      Req.Request.validate_options(aws_options, [
+        :access_key_id,
+        :secret_access_key,
+        :service,
+        :region
+      ])
+
+      access_key_id = Keyword.fetch!(aws_options, :access_key_id)
+      secret_access_key = Keyword.fetch!(aws_options, :secret_access_key)
+      service = Keyword.fetch!(aws_options, :service)
+      region = Keyword.get(aws_options, :region, "us-east-1")
+
+      now = NaiveDateTime.utc_now() |> NaiveDateTime.to_erl()
+
+      request = Req.Request.put_new_header(request, "host", request.url.host)
+      headers = for {name, values} <- request.headers, value <- values, do: {name, value}
+
+      headers =
+        :aws_signature.sign_v4(
+          access_key_id,
+          secret_access_key,
+          region,
+          to_string(service),
+          now,
+          to_string(request.method),
+          to_string(request.url),
+          headers,
+          request.body || ""
+        )
+
+      Req.update(request, headers: headers)
+    else
+      request
+    end
+  end
 
   ## Response steps
 
