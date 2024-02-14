@@ -44,6 +44,8 @@ write new ones.
 
   * Range requests (via [`put_range`]) step.)
 
+  * Use AWS V4 Signature (via [`put_aws_sigv4`]) step.)
+
   * Request body streaming (by setting `body: enumerable`.)
 
   * Response body streaming (by setting `into: fun | collectable`.)
@@ -256,6 +258,7 @@ limitations under the License.
 [`retry`]:              https://hexdocs.pm/req/Req.Steps.html#retry/1
 [`run_finch`]:          https://hexdocs.pm/req/Req.Steps.html#run_finch/1
 [`checksum`]:           https://hexdocs.pm/req/Req.Steps.html#checksum/1
+[`put_aws_sigv4`]:       https://hexdocs.pm/req/Req.Steps.html#put_aws_sigv4/1
 
 [Finch]: https://github.com/sneako/finch
 [cURL]: https://curl.se

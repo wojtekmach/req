@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## v0.4.9 (2024-02-14)
+
+ * [`retry`]: Raise on invalid return from `:retry_delay` function
+
+ * [`run_finch`]: Update to Finch 0.17
+
+ * [`run_finch`]: Deprecate `connect_options: [protocol: ...]` in favour of
+   `connect_options: [protocols: ...]]` which defaults to `[:http1, :http2]`, that is,
+   make request using HTTP/1 but if negotiated switch to HTTP/2 over the HTTP/1 connection.
+
+ * New step: [`put_aws_sigv4`] - signs request with AWS Signature Version 4.
+
 ## v0.4.8 (2023-12-11)
 
   * [`put_plug`]: Fix response streaming. Previously we were relying on unreleased
@@ -782,6 +794,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`retry`]:               https://hexdocs.pm/req/Req.Steps.html#retry/1
 [`run_finch`]:           https://hexdocs.pm/req/Req.Steps.html#run_finch/1
 [`checksum`]:            https://hexdocs.pm/req/Req.Steps.html#checksum/1
+[`put_aws_sigv4`]:       https://hexdocs.pm/req/Req.Steps.html#put_aws_sigv4/1
 
 [`Req.new/1`]:     https://hexdocs.pm/req/Req.html#new/1
 [`Req.request/2`]: https://hexdocs.pm/req/Req.html#request/2

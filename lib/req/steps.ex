@@ -1301,8 +1301,43 @@ defmodule Req.Steps do
     Code.ensure_loaded?(:aws_signature)
   end
 
-  # experimental
-  @doc false
+  @doc """
+  Signs request with AWS Signature Version 4.
+
+  This step requires [`:aws_signature`](https://hex.pm/packages/aws_signature) dependency:
+
+      {:aws_signature, "~> 0.3.0"}
+
+  ## Request Options
+
+    * `:aws_sigv4` - if set, the AWS options to sign request:
+
+        * `:access_key_id` - the AWS access key id.
+
+        * `:secret_access_key` - the AWS secret access key.
+
+        * `:service` - the AWS service.
+
+        * `:region` - if set, AWS region. Defaults to `"us-east-1"`.
+
+  ## Examples
+
+      iex> req =
+      ...> Req.new(
+      ...>   base_url: "https://s3.amazonaws.com",
+      ...>   aws_sigv4: [
+      ...>     access_key_id: System.get_env("AWS_ACCESS_KEY_ID"),
+      ...>     secret_access_key: System.get_env("AWS_SECRET_ACCESS_KEY"),
+      ...>     service: :s3
+      ...>   ]
+      ...> )
+      iex>
+      iex> %{status: 200} = Req.put!(req, "/bucket1/key1", body: "Hello, World!")
+      iex> resp = Req.get!(req, "/bucket1/key1").body
+      "Hello, World!"
+
+  """
+  @doc step: :request
   def put_aws_sigv4(request) do
     if aws_options = request.options[:aws_sigv4] do
       unless aws_signature_loaded?() do
@@ -1346,8 +1381,13 @@ defmodule Req.Steps do
       region = Keyword.get(aws_options, :region, "us-east-1")
 
       now = NaiveDateTime.utc_now() |> NaiveDateTime.to_erl()
+      body = IO.iodata_to_binary(request.body || "")
 
-      request = Req.Request.put_new_header(request, "host", request.url.host)
+      request =
+        request
+        |> Req.Request.put_new_header("host", request.url.host)
+        |> Req.Request.put_new_header("content-length", to_string(byte_size(body)))
+
       headers = for {name, values} <- request.headers, value <- values, do: {name, value}
 
       headers =
@@ -1360,7 +1400,7 @@ defmodule Req.Steps do
           to_string(request.method),
           to_string(request.url),
           headers,
-          IO.iodata_to_binary(request.body || "")
+          body
         )
 
       Req.update(request, headers: headers)

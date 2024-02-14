@@ -181,6 +181,22 @@ defmodule Req do
     * `:compress_body` - if set to `true`, compresses the request body using gzip (via [`compress_body`](`Req.Steps.compress_body/1`) step.)
       Defaults to `false`.
 
+  AWS Signature Version 4 options ([`put_aws_sigv4`](`Req.Steps.put_aws_sigv4/1`) step):
+
+    * `:aws_sigv4` - if set, the AWS options to sign request:
+
+        * `:access_key_id` - the AWS access key id.
+
+        * `:secret_access_key` - the AWS secret access key.
+
+        * `:service` - the AWS service.
+
+        * `:region` - if set, AWS region. Defaults to `"us-east-1"`.
+
+  This functionality requires [`:aws_signature`](https://hex.pm/packages/aws_signature) dependency:
+
+      {:aws_signature, "~> 0.3.0"}
+
   Response body options:
 
     * `:compressed` - if set to `true`, asks the server to return compressed response.

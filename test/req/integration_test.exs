@@ -3,14 +3,18 @@ defmodule Req.IntegrationTest do
 
   @moduletag :integration
 
-  setup do
-    original_gl = Process.group_leader()
-    {:ok, capture_gl} = StringIO.open("")
-    Process.group_leader(self(), capture_gl)
+  setup context do
+    if context[:doctest] do
+      original_gl = Process.group_leader()
+      {:ok, capture_gl} = StringIO.open("")
+      Process.group_leader(self(), capture_gl)
 
-    on_exit(fn ->
-      Process.group_leader(self(), original_gl)
-    end)
+      on_exit(fn ->
+        Process.group_leader(self(), original_gl)
+      end)
+    else
+      :ok
+    end
   end
 
   doctest Req,
@@ -38,4 +42,25 @@ defmodule Req.IntegrationTest do
       decompress_body: 1,
       handle_http_errors: 1
     ]
+
+  @aws_access_key_id System.get_env("REQ_AWS_ACCESS_KEY_ID")
+  @aws_secret_access_key System.get_env("REQ_AWS_SECRET_ACCESS_KEY")
+  @aws_bucket System.get_env("REQ_AWS_BUCKET")
+
+  @tag :s3
+  test "s3" do
+    req =
+      Req.new(
+        base_url: "https://#{@aws_bucket}.s3.amazonaws.com",
+        aws_sigv4: [
+          access_key_id: @aws_access_key_id,
+          secret_access_key: @aws_secret_access_key,
+          service: :s3
+        ]
+      )
+
+    now = to_string(DateTime.utc_now())
+    %{status: 200} = Req.put!(req, url: "/key1", json: %{now: now})
+    assert Req.get!(req, url: "/key1").body == %{"now" => now}
+  end
 end
