@@ -1408,9 +1408,7 @@ defmodule Req.Steps do
             {"", [body_digest: "UNSIGNED-PAYLOAD"]}
         end
 
-      request =
-        request
-        |> Req.Request.put_new_header("host", request.url.host)
+      request = Req.Request.put_new_header(request, "host", request.url.host)
 
       headers = for {name, values} <- request.headers, value <- values, do: {name, value}
 
