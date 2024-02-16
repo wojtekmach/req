@@ -6,7 +6,13 @@ defmodule Req.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      {Finch, name: Req.Finch},
+      {Finch,
+       name: Req.Finch,
+       pools: %{
+         default: [
+           protocols: [:http1, :http2]
+         ]
+       }},
       {DynamicSupervisor, strategy: :one_for_one, name: Req.FinchSupervisor},
       {NimbleOwnership, name: Req.Ownership}
     ]

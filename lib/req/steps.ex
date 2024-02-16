@@ -966,12 +966,22 @@ defmodule Req.Steps do
         proxy_opts = Keyword.take(connect_options, [:proxy])
         client_settings_opts = Keyword.take(connect_options, [:client_settings])
 
-        if connect_options[:protocol] do
-          IO.warn([
-            "setting `connect_options: [protocol: protocol]` is deprecated, ",
-            "use `connect_options: [protocols: protocols]` instead"
-          ])
-        end
+        protocols =
+          cond do
+            protocols = connect_options[:protocols] ->
+              protocols
+
+            protocol = connect_options[:protocol] ->
+              IO.warn([
+                "setting `connect_options: [protocol: protocol]` is deprecated, ",
+                "use `connect_options: [protocols: protocols]` instead"
+              ])
+
+              [protocol]
+
+            true ->
+              [:http1, :http2]
+          end
 
         pool_opts = [
           conn_opts:
@@ -980,8 +990,7 @@ defmodule Req.Steps do
               proxy_headers_opts ++
               proxy_opts ++
               client_settings_opts,
-          protocols:
-            connect_options[:protocols] || List.wrap(connect_options[:protocol] || :http1)
+          protocols: protocols
         ]
 
         name =
