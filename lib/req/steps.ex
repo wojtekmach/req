@@ -1336,6 +1336,16 @@ defmodule Req.Steps do
       iex> resp = Req.get!(req, "/bucket1/key1").body
       "Hello, World!"
 
+  Request body streaming also works though `content-length` header must be explicitly set:
+
+      iex> path = "a.txt"
+      iex> File.write!(path, String.duplicate("a", 100_000))
+      iex> size = File.stat!(path).size
+      iex> chunk_size = 10 * 1024
+      iex> stream = File.stream!(path, chunk_size)
+      iex> %{status: 200} = Req.put!(req, url: "/key1", headers: [content_length: size], body: stream)
+      iex> byte_size(Req.get!(req, "/bucket1/key1").body)
+      100_000
   """
   @doc step: :request
   def put_aws_sigv4(request) do
@@ -1381,12 +1391,26 @@ defmodule Req.Steps do
       region = Keyword.get(aws_options, :region, "us-east-1")
 
       now = NaiveDateTime.utc_now() |> NaiveDateTime.to_erl()
-      body = IO.iodata_to_binary(request.body || "")
+
+      {body, options} =
+        case request.body do
+          nil ->
+            {"", []}
+
+          iodata when is_binary(iodata) or is_list(iodata) ->
+            {iodata, []}
+
+          _enumerable ->
+            if Req.Request.get_header(request, "content-length") == [] do
+              raise "content-length header must be explicitly set when streaming request body"
+            end
+
+            {"", [body_digest: "UNSIGNED-PAYLOAD"]}
+        end
 
       request =
         request
         |> Req.Request.put_new_header("host", request.url.host)
-        |> Req.Request.put_new_header("content-length", to_string(byte_size(body)))
 
       headers = for {name, values} <- request.headers, value <- values, do: {name, value}
 
@@ -1400,7 +1424,8 @@ defmodule Req.Steps do
           to_string(request.method),
           to_string(request.url),
           headers,
-          body
+          body,
+          options
         )
 
       Req.update(request, headers: headers)

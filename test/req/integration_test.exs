@@ -60,7 +60,24 @@ defmodule Req.IntegrationTest do
       )
 
     now = to_string(DateTime.utc_now())
-    %{status: 200} = Req.put!(req, url: "/key1", json: %{now: now})
-    assert Req.get!(req, url: "/key1").body == %{"now" => now}
+
+    %{status: 200} =
+      Req.put!(req,
+        url: "/key1",
+        body: now
+      )
+
+    assert Req.get!(req, url: "/key1").body == now
+
+    now = to_string(DateTime.utc_now())
+
+    %{status: 200} =
+      Req.put!(req,
+        url: "/key1",
+        headers: [content_length: byte_size(now) * 2],
+        body: Stream.duplicate(now, 2)
+      )
+
+    assert Req.get!(req, url: "/key1").body == String.duplicate(now, 2)
   end
 end
