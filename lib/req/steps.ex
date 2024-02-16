@@ -1323,14 +1323,14 @@ defmodule Req.Steps do
   ## Examples
 
       iex> req =
-      ...> Req.new(
-      ...>   base_url: "https://s3.amazonaws.com",
-      ...>   aws_sigv4: [
-      ...>     access_key_id: System.get_env("AWS_ACCESS_KEY_ID"),
-      ...>     secret_access_key: System.get_env("AWS_SECRET_ACCESS_KEY"),
-      ...>     service: :s3
-      ...>   ]
-      ...> )
+      ...>   Req.new(
+      ...>     base_url: "https://s3.amazonaws.com",
+      ...>     aws_sigv4: [
+      ...>       access_key_id: System.get_env("AWS_ACCESS_KEY_ID"),
+      ...>       secret_access_key: System.get_env("AWS_SECRET_ACCESS_KEY"),
+      ...>       service: :s3
+      ...>     ]
+      ...>   )
       iex>
       iex> %{status: 200} = Req.put!(req, "/bucket1/key1", body: "Hello, World!")
       iex> resp = Req.get!(req, "/bucket1/key1").body
