@@ -179,15 +179,15 @@ defmodule Req.Steps do
   end
 
   defp auth(request, authorization) when is_binary(authorization) do
-    Req.Request.put_new_header(request, "authorization", authorization)
+    Req.Request.put_header(request, "authorization", authorization)
   end
 
   defp auth(request, {:basic, userinfo}) when is_binary(userinfo) do
-    Req.Request.put_new_header(request, "authorization", "Basic " <> Base.encode64(userinfo))
+    Req.Request.put_header(request, "authorization", "Basic " <> Base.encode64(userinfo))
   end
 
   defp auth(request, {:bearer, token}) when is_binary(token) do
-    Req.Request.put_new_header(request, "authorization", "Bearer " <> token)
+    Req.Request.put_header(request, "authorization", "Bearer " <> token)
   end
 
   defp auth(request, :netrc) do
@@ -204,7 +204,7 @@ defmodule Req.Steps do
       "setting `auth: {username, password}` is deprecated in favour of `auth: {:basic, userinfo}`"
     )
 
-    Req.Request.put_new_header(
+    Req.Request.put_header(
       request,
       "authorization",
       "Basic " <> Base.encode64("#{username}:#{password}")
