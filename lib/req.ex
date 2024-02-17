@@ -60,6 +60,20 @@ defmodule Req do
       iex> resp.body
       %IO.Stream{}
 
+  Stream response body to caller:
+
+      iex> {req, resp} = Req.async_request!("http://httpbin.org/stream/2")
+      iex> resp.status
+      200
+      iex> resp.body
+      ""
+      iex> Req.parse_message(req, receive do message -> message end)
+      {:ok, [data: "{\"url\": \"http://httpbin.org/stream/2\"" <> ...]}
+      iex> Req.parse_message(req, receive do message -> message end)
+      {:ok, [data: "{\"url\": \"http://httpbin.org/stream/2\"" <> ...]}
+      iex> Req.parse_message(req, receive do message -> message end)
+      {:ok, [:done]}
+
   ## Header Names
 
   The HTTP specification requires that header names should be case-insensitive.
@@ -81,21 +95,6 @@ defmodule Req do
       `Req.Response.get_header/2`, `Req.Response.put_header/3`, etc
       automatically downcase the given header name.
   """
-
-  # Response streaming to caller:
-  #
-  #     iex> {req, resp} = Req.async_request!("http://httpbin.org/stream/2")
-  #     iex> resp.status
-  #     200
-  #     iex> resp.body
-  #     ""
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [:done]
-  #     ""
 
   @type url() :: URI.t() | String.t()
 
@@ -979,12 +978,78 @@ defmodule Req do
     end
   end
 
-  @doc false
+  @doc """
+  Makes an HTTP request asynchronously and returns a tuple consisting of
+  either the request and the response or the request and an exception.
+
+  `request` can be one of:
+
+    * a `String` or `URI`;
+    * a `Keyword` options;
+    * a `Req.Request` struct;
+
+  See `new/1` for a list of available options.
+
+  Each chunk of the response is streamed to the calling process as soon as it arrives.
+  It is the caller's responsibility to receive each message.
+
+  See also `parse_message/2` and `cancel_async_request/1`.
+
+  ## Examples
+
+      iex> {_req, resp} = Req.async_request(url: "https://reqbin.org/ndjson")
+      iex> resp.status
+      200
+      iex> resp.body
+      ""
+      iex> flush
+      # output: {{Finch.HTTP1.Pool, #PID<0.467.0>}, {:data, "{\"y\":1,\"x\":1}\n"}}
+      # output: {{Finch.HTTP1.Pool, #PID<0.467.0>}, {:data, "{\"y\":2,\"x\":2}\n"}}
+      # output: {{Finch.HTTP1.Pool, #PID<0.467.0>}, {:data, "{\"y\":3,\"x\":3}\n"}}
+      # output: {{Finch.HTTP1.Pool, #PID<0.467.0>}, :done}
+      :ok
+  """
+  @doc type: :request
+  @spec async_request(url() | keyword() | Req.Request.t(), options :: keyword()) ::
+          {Req.Request.t(), Req.Response.t()} | {Req.Request.t(), Exception.t()}
   def async_request(request, options \\ []) do
     Req.Request.run_request(%{new(request, options) | into: :self})
   end
 
-  @doc false
+  @doc """
+  Makes an HTTP request asynchronously and returns `{%Req.Request{}, %Req.Response{}}`
+  or raises an exception.
+
+  `request` can be one of:
+
+    * a `String` or `URI`;
+    * a `Keyword` options;
+    * a `Req.Request` struct;
+
+  See `new/1` for a list of available options.
+
+  Each chunk of the response is streamed to the calling process as soon as it arrives.
+  It is the caller's responsibility to receive each message.
+
+  See also `parse_message/2` and `cancel_async_request/1`.
+
+  ## Examples
+
+      iex> {_req, resp} = Req.async_request!(url: "https://reqbin.org/ndjson")
+      iex> resp.status
+      200
+      iex> resp.body
+      ""
+      iex> flush
+      # output: {{Finch.HTTP1.Pool, #PID<0.467.0>}, {:data, "{\"y\":1,\"x\":1}\n"}}
+      # output: {{Finch.HTTP1.Pool, #PID<0.467.0>}, {:data, "{\"y\":2,\"x\":2}\n"}}
+      # output: {{Finch.HTTP1.Pool, #PID<0.467.0>}, {:data, "{\"y\":3,\"x\":3}\n"}}
+      # output: {{Finch.HTTP1.Pool, #PID<0.467.0>}, :done}
+      :ok
+  """
+  @doc type: :request
+  @spec async_request!(url() | keyword() | Req.Request.t(), options :: keyword()) ::
+          {Req.Request.t(), Req.Response.t()}
   def async_request!(request, options \\ []) do
     case async_request(request, options) do
       {request, %Req.Response{} = response} ->
@@ -995,12 +1060,41 @@ defmodule Req do
     end
   end
 
-  @doc false
+  @doc """
+  Parses a response message from an asynchronous request and returns
+  a tuple containing the response data or `:unknown`.
+
+  ## Examples
+
+      iex> {req, _resp} = Req.async_request(url: "https://reqbin.org/ndjson")
+      iex> Req.parse_message(req, receive do message -> message end)
+      {:ok, [data: "{\"y\":1,\"x\":1}\n"]}
+      iex> Req.parse_message(req, receive do message -> message end)
+      {:ok, [data: "{\"y\":2,\"x\":2}\n"]}
+      iex> Req.parse_message(req, receive do message -> message end)
+      {:ok, [data: "{\"y\":3,\"x\":3}\n"]}
+      iex> Req.parse_message(req, receive do message -> message end)
+      {:ok, [:done]}
+  """
+  @spec parse_message(Req.Request.t(), any()) ::
+          {:ok, [{:data, binary()}]} | {:ok, [:done]} | :unknown
   def parse_message(%Req.Request{} = request, message) do
     request.async.stream_fun.(request.async.ref, message)
   end
 
-  @doc false
+  @doc """
+  Cancels an asynchronous request.
+
+    ## Examples
+
+      iex> {req, _resp} = Req.async_request!(url: "https://reqbin.org/ndjson")
+      iex> Req.cancel_async_request(req)
+      :ok
+      iex> flush
+      # output: {{Finch.HTTP1.Pool, #PID<0.467.0>}, {:data, "{\"y\":1,\"x\":1}\n"}}
+      :ok
+  """
+  @spec cancel_async_request(Req.Request.t()) :: :ok
   def cancel_async_request(%Req.Request{} = request) do
     request.async.cancel_fun.(request.async.ref)
   end
