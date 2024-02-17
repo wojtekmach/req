@@ -60,7 +60,7 @@ defmodule Req do
       iex> resp.body
       %IO.Stream{}
 
-  Stream response body to caller:
+  Stream response body to the calling process:
 
       iex> {req, resp} = Req.async_request!("http://httpbin.org/stream/2")
       iex> resp.status
