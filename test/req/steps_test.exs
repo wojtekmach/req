@@ -428,7 +428,7 @@ defmodule Req.StepsTest do
             datetime: ~U[2024-01-01 00:00:00Z]
           ],
           headers: [content_length: 5],
-          body: Stream.duplicate("hello", 1),
+          body: Stream.take(["hello"], 1),
           plug: plug
         )
 
