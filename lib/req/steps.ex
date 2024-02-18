@@ -1329,6 +1329,8 @@ defmodule Req.Steps do
 
         * `:region` - if set, AWS region. Defaults to `"us-east-1"`.
 
+        * `:datetime` - the request datetime, defaults to `DateTime.utc_now(:second)`.
+
   ## Examples
 
       iex> req =
@@ -1391,15 +1393,20 @@ defmodule Req.Steps do
         :access_key_id,
         :secret_access_key,
         :service,
-        :region
+        :region,
+        :datetime
       ])
 
       access_key_id = Keyword.fetch!(aws_options, :access_key_id)
       secret_access_key = Keyword.fetch!(aws_options, :secret_access_key)
       service = Keyword.fetch!(aws_options, :service)
       region = Keyword.get(aws_options, :region, "us-east-1")
+      datetime = Keyword.get(aws_options, :datetime)
 
-      now = NaiveDateTime.utc_now() |> NaiveDateTime.to_erl()
+      now =
+        (datetime || DateTime.utc_now(:second))
+        |> DateTime.to_naive()
+        |> NaiveDateTime.to_erl()
 
       {body, options} =
         case request.body do

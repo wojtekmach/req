@@ -363,6 +363,79 @@ defmodule Req.StepsTest do
     end
   end
 
+  describe "put_aws_sigv4" do
+    test "body: binary" do
+      plug = fn conn ->
+        assert {:ok, "hello", conn} = Plug.Conn.read_body(conn)
+
+        assert Plug.Conn.get_req_header(conn, "x-amz-content-sha256") == [
+                 "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+               ]
+
+        assert Plug.Conn.get_req_header(conn, "authorization") == [
+                 """
+                 AWS4-HMAC-SHA256 \
+                 Credential=foo/20240101/us-east-1/s3/aws4_request,\
+                 SignedHeaders=accept-encoding;host;user-agent;x-amz-content-sha256;x-amz-date,\
+                 Signature=63ed3a83e644851643fc95f7633e4f0c40fcaf4f601b5550a7a1e4baee396d4e\
+                 """
+               ]
+
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end
+
+      req =
+        Req.new(
+          url: "http://localhost",
+          aws_sigv4: [
+            access_key_id: "foo",
+            secret_access_key: "bar",
+            service: :s3,
+            datetime: ~U[2024-01-01 00:00:00Z]
+          ],
+          body: "hello",
+          plug: plug
+        )
+
+      assert Req.put!(req).body == "ok"
+    end
+
+    test "body: enumerable" do
+      plug = fn conn ->
+        assert {:ok, "hello", conn} = Plug.Conn.read_body(conn)
+
+        assert Plug.Conn.get_req_header(conn, "x-amz-content-sha256") == ["UNSIGNED-PAYLOAD"]
+
+        assert Plug.Conn.get_req_header(conn, "authorization") == [
+                 """
+                 AWS4-HMAC-SHA256 \
+                 Credential=foo/20240101/us-east-1/s3/aws4_request,\
+                 SignedHeaders=accept-encoding;content-length;host;user-agent;x-amz-content-sha256;x-amz-date,\
+                 Signature=60f249fe10f78886863fc610a0c836c749a322103a91088cca62ad418e33cbe4\
+                 """
+               ]
+
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end
+
+      req =
+        Req.new(
+          url: "http://localhost",
+          aws_sigv4: [
+            access_key_id: "foo",
+            secret_access_key: "bar",
+            service: :s3,
+            datetime: ~U[2024-01-01 00:00:00Z]
+          ],
+          headers: [content_length: 5],
+          body: Stream.duplicate("hello", 1),
+          plug: plug
+        )
+
+      assert Req.put!(req).body == "ok"
+    end
+  end
+
   ## Response steps
 
   describe "decompress_body" do
