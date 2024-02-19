@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.4.11 (2024-02-19)
+
+  * [`Req.Test.json/2`]: Don't crash compilation when Plug is not available
+
 ## v0.4.10 (2024-02-19)
 
   * [`run_finch`]: Default to `connect_options: [protocols: [:http1, :http2]]`.
@@ -829,6 +833,8 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Response.get_header/2`]:     https://hexdocs.pm/req/Req.Response.html#get_response/2
 [`Req.Response.delete_header/2`]:  https://hexdocs.pm/req/Req.Response.html#delete_header/2
 [`Req.Response.update_private/4`]: https://hexdocs.pm/req/Req.Response.html#update_private/4
+
+[`Req.Test.json/2`]: https://hexdocs.pm/req/Req.Test.html#json/2
 
 [`Req.Steps`]:   https://hexdocs.pm/req/Req.Steps.html
 [`Collectable`]: https://hexdocs.pm/elixir/Collectable.html

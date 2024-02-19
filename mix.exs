@@ -1,7 +1,7 @@
 defmodule Req.MixProject do
   use Mix.Project
 
-  @version "0.4.10"
+  @version "0.4.11"
   @source_url "https://github.com/wojtekmach/req"
 
   def project do
@@ -25,8 +25,10 @@ defmodule Req.MixProject do
         exclude: [
           NimbleCSV.RFC4180,
           Plug.Test,
+          Plug.Conn,
           :brotli,
-          :ezstd
+          :ezstd,
+          :aws_signature
         ]
       ]
     ]

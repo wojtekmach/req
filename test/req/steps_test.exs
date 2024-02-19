@@ -377,7 +377,7 @@ defmodule Req.StepsTest do
                  AWS4-HMAC-SHA256 \
                  Credential=foo/20240101/us-east-1/s3/aws4_request,\
                  SignedHeaders=accept-encoding;host;user-agent;x-amz-content-sha256;x-amz-date,\
-                 Signature=63ed3a83e644851643fc95f7633e4f0c40fcaf4f601b5550a7a1e4baee396d4e\
+                 Signature=a7a27655988cf90a6d834c6544e8a5e1ef00308a64692f0e656167165d42ec4d\
                  """
                ]
 
@@ -411,7 +411,7 @@ defmodule Req.StepsTest do
                  AWS4-HMAC-SHA256 \
                  Credential=foo/20240101/us-east-1/s3/aws4_request,\
                  SignedHeaders=accept-encoding;content-length;host;user-agent;x-amz-content-sha256;x-amz-date,\
-                 Signature=60f249fe10f78886863fc610a0c836c749a322103a91088cca62ad418e33cbe4\
+                 Signature=6d8d9e360bf82d48064ee93cc628133da813bfc9b587fe52f8792c2335b29312\
                  """
                ]
 
