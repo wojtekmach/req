@@ -405,7 +405,7 @@ defmodule Req.Request do
       options =
         options
         |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
-        |> Keyword.update(:url, URI.new!(""), &URI.new!/1)
+        |> Keyword.update(:url, URI.new!(""), &URI.parse/1)
         |> Keyword.update(:options, %{}, &Map.new/1)
         |> Keyword.update(
           :registered_options,
@@ -420,7 +420,7 @@ defmodule Req.Request do
       options =
         options
         |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
-        |> Keyword.update(:url, URI.new!(""), &URI.new!/1)
+        |> Keyword.update(:url, URI.new!(""), &URI.parse/1)
         |> Keyword.update(:headers, %{}, fn headers ->
           Map.new(headers, fn {key, value} ->
             {key, List.wrap(value)}
