@@ -25,7 +25,7 @@ defmodule Req.Test do
       defmodule MyApp.Weather do
         def get_rating(location) do
           case get_temperature(location) do
-            {:ok, %{status: 200, body: %{"celsius" => celsius"}}} ->
+            {:ok, %{status: 200, body: %{"celsius" => celsius}}} ->
               cond do
                 celsius < 18.0 -> {:ok, :too_cold}
                 celsius < 30.0 -> {:ok, :nice}
