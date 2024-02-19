@@ -55,7 +55,7 @@ defmodule Req.Test do
 
   And tests:
 
-      # config/runtime.exs
+      # config/test.exs
       config :myapp, weather_req_options: [
         plug: {Req.Test, MyApp.Weather}
       ]
