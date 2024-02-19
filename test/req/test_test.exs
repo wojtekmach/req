@@ -1,5 +1,6 @@
 defmodule Req.TestTest do
   use ExUnit.Case, async: true
+  doctest Req.Test
 
   test "stub" do
     assert_raise RuntimeError, ~r/cannot find stub/, fn ->

@@ -60,6 +60,8 @@ write new ones.
 
   * Basic HTTP caching (via [`cache`] step.)
 
+  * Easily create test stubs (see [`Req.Test`].)
+
   * Running against a plug (via [`put_plug`] step.)
 
   * Pluggable adapters. By default, Req uses [Finch] (via [`run_finch`] step.)
@@ -238,6 +240,7 @@ limitations under the License.
 [`Req.async_request/2`]: https://hexdocs.pm/req/Req.html#async_request/2
 [`Req.Request`]:         https://hexdocs.pm/req/Req.Request.html
 [`Req.Steps`]:           https://hexdocs.pm/req/Req.Steps.html
+[`Req.Test`]:            https://hexdocs.pm/req/Req.Test.html
 
 [`auth`]:               https://hexdocs.pm/req/Req.Steps.html#auth/1
 [`cache`]:              https://hexdocs.pm/req/Req.Steps.html#cache/1
