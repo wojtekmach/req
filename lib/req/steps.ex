@@ -1749,7 +1749,7 @@ defmodule Req.Steps do
 
   defp format(request, response) do
     case Req.Response.get_header(response, "content-type") do
-      [content_type] ->
+      [content_type | _] ->
         # TODO: remove ` || ` when we require Elixir v1.13
         path = request.url.path || ""
 

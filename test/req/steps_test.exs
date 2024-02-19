@@ -612,6 +612,20 @@ defmodule Req.StepsTest do
   end
 
   describe "decode_body" do
+    test "multiple types", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        headers =
+          [
+            {"content-type", "text/plain"},
+            {"content-type", "text/plain; charset=utf-8"}
+          ] ++ conn.resp_headers
+
+        Plug.Conn.send_resp(%{conn | resp_headers: headers}, 200, "ok")
+      end)
+
+      assert Req.get!(c.url).body == "ok"
+    end
+
     test "json", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         json(conn, 200, %{a: 1})
