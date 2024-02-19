@@ -73,6 +73,8 @@ defmodule Req.Test do
       end
   """
 
+  require Logger
+
   @ownership Req.Ownership
 
   @doc """
@@ -90,22 +92,38 @@ defmodule Req.Test do
       iex> resp.body
       %{"celsius" => 25.0}
   """
-  def json(%Plug.Conn{} = conn, data) do
-    send_resp(conn, conn.status || 200, "application/json", Jason.encode_to_iodata!(data))
-  end
+  def json(conn, data)
 
-  defp send_resp(conn, default_status, default_content_type, body) do
-    conn
-    |> ensure_resp_content_type(default_content_type)
-    |> Plug.Conn.send_resp(conn.status || default_status, body)
-  end
+  if Code.ensure_loaded?(Plug.Test) do
+    def json(%Plug.Conn{} = conn, data) do
+      send_resp(conn, conn.status || 200, "application/json", Jason.encode_to_iodata!(data))
+    end
 
-  defp ensure_resp_content_type(%Plug.Conn{resp_headers: resp_headers} = conn, content_type) do
-    if List.keyfind(resp_headers, "content-type", 0) do
+    defp send_resp(conn, default_status, default_content_type, body) do
       conn
-    else
-      content_type = content_type <> "; charset=utf-8"
-      %Plug.Conn{conn | resp_headers: [{"content-type", content_type} | resp_headers]}
+      |> ensure_resp_content_type(default_content_type)
+      |> Plug.Conn.send_resp(conn.status || default_status, body)
+    end
+
+    defp ensure_resp_content_type(%Plug.Conn{resp_headers: resp_headers} = conn, content_type) do
+      if List.keyfind(resp_headers, "content-type", 0) do
+        conn
+      else
+        content_type = content_type <> "; charset=utf-8"
+        %Plug.Conn{conn | resp_headers: [{"content-type", content_type} | resp_headers]}
+      end
+    end
+  else
+    def json(_conn, _data) do
+      Logger.error("""
+      Could not find plug dependency.
+
+      Please add :plug to your dependencies:
+
+          {:plug, "~> 1.0"}
+      """)
+
+      raise "missing plug dependency"
     end
   end
 
