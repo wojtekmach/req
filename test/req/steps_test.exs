@@ -2025,6 +2025,27 @@ defmodule Req.StepsTest do
                )
     end
 
+    # TODO
+    @tag :skip
+    test "into: fun with content-encoding", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "gzip")
+        |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
+      end)
+
+      pid = self()
+
+      fun = fn {:data, data}, acc ->
+        send(pid, {:data, data})
+        {:cont, acc}
+      end
+
+      assert Req.get!(c.url, into: fun).body == ""
+      assert_received {:data, "foo"}
+      refute_receive _
+    end
+
     test "async request", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         conn = Plug.Conn.send_chunked(conn, 200)
