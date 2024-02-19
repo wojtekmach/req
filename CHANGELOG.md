@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## v0.4.10 (2024-02-19)
+
+  * [`run_finch`]: Default to `connect_options: [protocols: [:http1, :http2]]`.
+
+  * [`run_finch`]: Change version requirement to `~> 0.17`, that is all versions up to `1.0`.
+
+  * [`put_aws_sigv4`]: Support streaming request body.
+
+  * [`auth`]: Always update `authorization` header.
+
+  * [`decode_body`]: Gracefully handle multiple content-type values.
+
+  * [`Req.Request.new/1`]: Use `URI.parse` for now.
+
 ## v0.4.9 (2024-02-14)
 
  * [`retry`]: Raise on invalid return from `:retry_delay` function
