@@ -53,14 +53,15 @@ defmodule Req.Test do
         auth: {:bearer, System.fetch_env!("MYAPP_WEATHER_API_KEY")}
       ]
 
-  And tests:
+  In tests, instead of hitting the network, we make the request against
+  a [plug](`Req.Steps.put_plug/1`) _stub_ named `MyApp.Weather`:
 
       # config/test.exs
       config :myapp, weather_req_options: [
         plug: {Req.Test, MyApp.Weather}
       ]
 
-  And now we can easily stub out values **in concurrent tests**:
+  Now we can control our stubs **in concurrent tests**:
 
       use ExUnit.Case, async: true
 
