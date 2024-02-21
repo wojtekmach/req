@@ -42,7 +42,7 @@ defmodule Req.Test do
             base_url: "https://weather-service"
           ]
           |> Keyword.merge(Application.get_env(:myapp, :weather_req_options, []))
-          |> Req.request(options)
+          |> Req.request()
         end
       end
 
