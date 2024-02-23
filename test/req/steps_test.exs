@@ -10,6 +10,18 @@ defmodule Req.StepsTest do
 
   ## Request steps
 
+  describe "compressed" do
+    test "sets accept-encoding" do
+      req = Req.new() |> Req.Request.prepare()
+      assert req.headers["accept-encoding"] == ["zstd, br, gzip"]
+    end
+
+    test "does not set accept-encoding when streaming response body" do
+      req = Req.new(into: []) |> Req.Request.prepare()
+      refute req.headers["accept-encoding"]
+    end
+  end
+
   describe "put_base_url" do
     test "it works", c do
       Bypass.expect(c.bypass, "GET", "", fn conn ->

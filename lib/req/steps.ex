@@ -277,13 +277,17 @@ defmodule Req.Steps do
   Supported formats:
 
     * `gzip`
+
     * `br` (if [brotli] is installed)
+
     * `zstd` (if [ezstd] is installed)
 
   ## Request Options
 
     * `:compressed` - if set to `true`, sets the `accept-encoding` header with compression
       algorithms that Req supports. Defaults to `true`.
+
+      When streaming response body (`into: fun | collectable`), `compressed` defaults to `false`.
 
   ## Examples
 
@@ -322,7 +326,7 @@ defmodule Req.Steps do
   [ezstd]: https://hex.pm/packages/ezstd
   """
   @doc step: :request
-  def compressed(request) do
+  def compressed(%Req.Request{into: nil} = request) do
     case Req.Request.get_option(request, :compressed, true) do
       true ->
         Req.Request.put_new_header(request, "accept-encoding", supported_accept_encoding())
@@ -330,6 +334,10 @@ defmodule Req.Steps do
       false ->
         request
     end
+  end
+
+  def compressed(request) do
+    request
   end
 
   defmacrop brotli_loaded? do
