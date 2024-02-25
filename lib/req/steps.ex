@@ -287,7 +287,8 @@ defmodule Req.Steps do
     * `:compressed` - if set to `true`, sets the `accept-encoding` header with compression
       algorithms that Req supports. Defaults to `true`.
 
-      When streaming response body (`into: fun | collectable`), `compressed` defaults to `false`.
+      When streaming response body (`into: fun | collectable`), `:compressed` defaults to `false`.
+      This default may change in the future.
 
   ## Examples
 
@@ -326,18 +327,14 @@ defmodule Req.Steps do
   [ezstd]: https://hex.pm/packages/ezstd
   """
   @doc step: :request
-  def compressed(%Req.Request{into: nil} = request) do
-    case Req.Request.get_option(request, :compressed, true) do
-      true ->
-        Req.Request.put_new_header(request, "accept-encoding", supported_accept_encoding())
-
-      false ->
-        request
-    end
-  end
-
   def compressed(request) do
-    request
+    default = request.into == nil
+
+    if Req.Request.get_option(request, :compressed, default) do
+      Req.Request.put_new_header(request, "accept-encoding", supported_accept_encoding())
+    else
+      request
+    end
   end
 
   defmacrop brotli_loaded? do
