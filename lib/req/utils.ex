@@ -2,93 +2,92 @@ defmodule Req.Utils do
   @moduledoc false
 
   defmodule CollectableWith do
-    defstruct [:collectable, :init, :fun]
+    defstruct [:collectable, :init_fun, :fun, :acc, :collector]
 
     defimpl Collectable do
-      def into(%{collectable: collectable, init: init, fun: fun}) do
-        {acc, collector} = Collectable.into(collectable)
-
-        new_collector = fn acc, command ->
-          fun.(acc, collector, command)
+      def into(%{acc: acc, collector: collector, init_fun: init_fun, fun: fun}) do
+        new_collector = fn {acc, state}, command ->
+          {command, state} = fun.(command, state)
+          {collector.(acc, command), state}
         end
 
-        {init.(acc), new_collector}
+        {init_fun.(acc, %{}), new_collector}
       end
     end
   end
 
-  def collectable_with(collectable, init, fun) do
-    %CollectableWith{collectable: collectable, init: init, fun: fun}
+  def collectable_with(collectable, init_fun, fun)
+
+  def collectable_with(
+        %Req.Utils.CollectableWith{init_fun: init_fun1, fun: fun1} = collectable,
+        init_fun2,
+        fun2
+      ) do
+    %{
+      collectable
+      | init_fun: fn acc, state ->
+          {acc, state} = init_fun1.(acc, state)
+          init_fun2.(acc, state)
+        end,
+        fun: fn command, state ->
+          {command, state} = fun1.(command, state)
+          fun2.(command, state)
+        end
+    }
+  end
+
+  def collectable_with(collectable, init_fun, fun) do
+    {acc, collector} = Collectable.into(collectable)
+    %Req.Utils.CollectableWith{acc: acc, collector: collector, init_fun: init_fun, fun: fun}
   end
 
   def with_hash(collectable, type) do
-    collector = fn
-      {acc, hash}, collector, {:cont, element} ->
-        hash = :crypto.hash_update(hash, element)
-        {collector.(acc, {:cont, element}), hash}
+    collectable_with(
+      collectable,
+      fn acc, state ->
+        {acc, Map.put(state, :hash, :crypto.hash_init(hash_type(type)))}
+      end,
+      fn
+        {:cont, element}, state ->
+          {{:cont, element}, update_in(state.hash, &:crypto.hash_update(&1, element))}
 
-      {acc, hash}, collector, :done ->
-        hash = :crypto.hash_final(hash)
-        {collector.(acc, :done), hash}
+        :halt, state ->
+          {:halt, state}
 
-      {acc, hash}, collector, :halt ->
-        {collector.(acc, :halt), hash}
-    end
-
-    collectable_with(collectable, fn acc -> {acc, hash_init(type)} end, collector)
+        :done, state ->
+          {:done, update_in(state.hash, &:crypto.hash_final/1)}
+      end
+    )
   end
 
-  defp hash_init(:sha1), do: hash_init(:sha)
-  defp hash_init(type), do: :crypto.hash_init(type)
-
-  def with_gzip(collectable) do
-    # https://github.com/erlang/otp/blob/OTP-26.0/erts/preloaded/src/zlib.erl#L548:L558
-    z = :zlib.open()
-    :ok = :zlib.deflateInit(z, :default, :deflated, 16 + 15, 8, :default)
-
-    collector = fn
-      acc, collector, {:cont, decompressed} ->
-        compressed = IO.iodata_to_binary(:zlib.deflate(z, decompressed))
-        collector.(acc, {:cont, compressed})
-
-      acc, collector, :done ->
-        compressed = IO.iodata_to_binary(:zlib.deflate(z, [], :finish))
-        :zlib.deflateEnd(z)
-        :zlib.close(z)
-        acc = collector.(acc, {:cont, compressed})
-        collector.(acc, :done)
-
-      acc, collector, :halt ->
-        :zlib.deflateEnd(z)
-        :zlib.close(z)
-        collector.(acc, :halt)
-    end
-
-    collectable_with(collectable, & &1, collector)
-  end
+  defp hash_type(:sha1), do: :sha
+  defp hash_type(other), do: other
 
   def with_gunzip(collectable) do
+    # https://github.com/erlang/otp/blob/OTP-26.0/erts/preloaded/src/zlib.erl#L548:L558
     z = :zlib.open()
     :ok = :zlib.inflateInit(z, 16 + 15)
 
-    collector = fn
-      acc, collector, {:cont, compressed} ->
-        decompressed = IO.iodata_to_binary(:zlib.inflate(z, compressed))
-        collector.(acc, {:cont, decompressed})
+    collectable_with(
+      collectable,
+      fn acc, state ->
+        {acc, state}
+      end,
+      fn
+        {:cont, element}, state ->
+          decompressed = IO.iodata_to_binary(:zlib.inflate(z, element))
+          {{:cont, decompressed}, state}
 
-      acc, collector, :done ->
-        :zlib.inflateEnd(z)
-        :zlib.close(z)
-        collector.(acc, :done)
+        :halt, state ->
+          :zlib.inflateEnd(z)
+          :zlib.close(z)
+          {:halt, state}
 
-      acc, collector, :halt ->
-        :zlib.inflateEnd(z)
-        :zlib.close(z)
-        collector.(acc, :halt)
-    end
-
-    z = :zlib.open()
-    :ok = :zlib.inflateInit(z, 16 + 15)
-    collectable_with(collectable, & &1, collector)
+        :done, state ->
+          :zlib.inflateEnd(z)
+          :zlib.close(z)
+          {:done, state}
+      end
+    )
   end
 end

@@ -1,44 +1,43 @@
 defmodule Req.UtilsTest do
   use ExUnit.Case, async: true
 
-  test "collectable_with" do
-    collector = fn
-      acc, collector, {:cont, element} ->
-        collector.(acc, {:cont, String.upcase(element)})
-
-      acc, collector, :done ->
-        collector.(acc, :done)
-
-      acc, collector, :halt ->
-        collector.(acc, :halt)
-    end
-
-    list_with_upcase = Req.Utils.collectable_with([], & &1, collector)
-    assert Enum.into(~w[foo bar baz], list_with_upcase) == ~w[FOO BAR BAZ]
+  test "with_hash/2" do
+    assert Enum.into(~w[foo bar baz], Req.Utils.with_hash("", :md5)) ==
+             {"foobarbaz", %{hash: :crypto.hash(:md5, "foobarbaz")}}
   end
 
   test "with_gunzip/2" do
-    assert Enum.into([:zlib.gzip("foobarbaz")], Req.Utils.with_gunzip("")) ==
-             "foobarbaz"
-  end
-
-  test "with_gzip/2" do
-    assert Enum.into(~w[foo bar baz], Req.Utils.with_gzip("")) ==
-             :zlib.gzip("foobarbaz")
-  end
-
-  test "with_hash/2" do
-    assert Enum.into(~w[foo bar baz], Req.Utils.with_hash("", :md5)) ==
-             {"foobarbaz", :crypto.hash(:md5, "foobarbaz")}
+    assert Enum.into([:zlib.gzip(~w[foo bar baz])], Req.Utils.with_gunzip("")) ==
+             {"foobarbaz", %{}}
   end
 
   test "compose" do
-    collectable =
-      ""
-      |> Req.Utils.with_hash(:md5)
-      |> Req.Utils.with_gunzip()
+    assert Enum.into(~w[foo bar baz], "" |> Req.Utils.with_hash(:md5) |> with_count()) ==
+             {"foobarbaz", %{count: 3, hash: :crypto.hash(:md5, "foobarbaz")}}
 
-    assert Enum.into([:zlib.gzip("foobarbaz")], collectable) ==
-             {"foobarbaz", :crypto.hash(:md5, "foobarbaz")}
+    assert Enum.into(
+             [:zlib.gzip("foobarbaz")],
+             "" |> Req.Utils.with_gunzip() |> Req.Utils.with_hash(:md5) |> with_count()
+           ) ==
+             {"foobarbaz", %{count: 1, hash: :crypto.hash(:md5, "foobarbaz")}}
+  end
+
+  defp with_count(collectable) do
+    Req.Utils.collectable_with(
+      collectable,
+      fn acc, state ->
+        {acc, Map.put(state, :count, 0)}
+      end,
+      fn
+        {:cont, element}, state ->
+          {{:cont, element}, update_in(state.count, &(&1 + 1))}
+
+        :halt, state ->
+          {:halt, state}
+
+        :done, state ->
+          {:done, state}
+      end
+    )
   end
 end

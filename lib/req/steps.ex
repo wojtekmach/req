@@ -850,8 +850,17 @@ defmodule Req.Steps do
 
     case Finch.stream(finch_req, finch_name, {acc, req, resp}, fun, finch_options) do
       {:ok, {acc, req, resp}} ->
-        acc = collector.(acc, :done)
-        {req, %{resp | body: acc}}
+        case collectable do
+          %Req.Utils.CollectableWith{} ->
+            {acc, state} = collector.(acc, :done)
+            req = put_in(req.private[:req_checksum_hash], state.hash)
+            resp = put_in(resp.body, acc)
+            {req, resp}
+
+          _ ->
+            acc = collector.(acc, :done)
+            {req, %{resp | body: acc}}
+        end
 
       {:error, exception} ->
         {req, exception}
@@ -1287,19 +1296,12 @@ defmodule Req.Steps do
             |> Map.replace!(:into, into)
 
           collectable ->
-            hash = hash_init(type)
-
-            into =
-              %CollectableWithChecksum{
-                collectable: collectable,
-                hash: hash
-              }
+            collectable = Req.Utils.with_hash(collectable, type)
 
             request
             |> Req.Request.put_private(:req_checksum_type, type)
             |> Req.Request.put_private(:req_checksum_expected, checksum)
-            |> Req.Request.put_private(:req_checksum_hash, :pdict)
-            |> Map.replace!(:into, into)
+            |> Map.replace!(:into, collectable)
         end
     end
   end
@@ -1463,21 +1465,10 @@ defmodule Req.Steps do
   @doc step: :response
   def verify_checksum({request, response}) do
     if hash = request.private[:req_checksum_hash] do
-      hash =
-        if hash == :pdict do
-          Process.delete(:req_checksum_hash)
-        else
-          hash
-        end
-
       type = request.private.req_checksum_type
       expected = request.private.req_checksum_expected
-
-      actual =
-        "#{type}:" <>
-          (hash
-           |> :crypto.hash_final()
-           |> Base.encode16(case: :lower, padding: false))
+      hash = hash |> :crypto.hash_final() |> Base.encode16(case: :lower, padding: false)
+      actual = "#{type}:#{hash}"
 
       if expected == actual do
         request =
