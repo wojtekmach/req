@@ -1658,13 +1658,19 @@ defmodule Req.Steps do
 
   Supported formats:
 
-  | Format   | Decoder                                                           |
-  | -------- | ----------------------------------------------------------------- |
-  | json     | `Jason.decode!/2`                                                 |
-  | gzip     | `:zlib.gunzip/1`                                                  |
-  | tar, tgz | `:erl_tar.extract/2`                                              |
-  | zip      | `:zip.unzip/2`                                                    |
-  | csv      | `NimbleCSV.RFC4180.parse_string/2` (if [nimble_csv] is installed) |
+  | Format       | Decoder                                                           |
+  | ------------ | ----------------------------------------------------------------- |
+  | `json`       | `Jason.decode!/2`                                                 |
+  | `gzip`       | `:zlib.gunzip/1`                                                  |
+  | `tar`, `tgz` | `:erl_tar.extract/2`                                              |
+  | `zip`        | `:zip.unzip/2`                                                    |
+  | `csv`        | `NimbleCSV.RFC4180.parse_string/2` (if [nimble_csv] is installed) |
+
+  The format is determined based on the `content-type` header of the response. For example,
+  if the `content-type` is `application/json`, the response body is decoded as JSON. The built-in
+  decoders also understand format extensions, such as decoding as JSON for a content-type of
+  `application/vnd.api+json`. To do this, Req falls back to `MIME.extensions/1`; check the
+  documentation for that function for more information.
 
   This step is disabled on response body streaming. If response body is not a binary, in other
   words it has been transformed by another step, it is left as is.
