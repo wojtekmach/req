@@ -29,4 +29,29 @@ defmodule Req.TestTest do
 
     assert Req.get!(plug: {Req.Test, :foo}).body == "hi"
   end
+
+  describe "allow/3" do
+    test "allows the request via an owner process" do
+      test_pid = self()
+      ref = make_ref()
+
+      Req.Test.stub(:foo, 1)
+
+      child_pid =
+        spawn(fn ->
+          # Make sure we have no $callers in the pdict.
+          Process.delete(:"$callers")
+
+          receive do
+            :go -> send(test_pid, {ref, Req.Test.stub(:foo)})
+          end
+        end)
+
+      Req.Test.stub(:foo, 1)
+      Req.Test.allow(:foo, self(), child_pid)
+
+      send(child_pid, :go)
+      assert_receive {^ref, 1}
+    end
+  end
 end
