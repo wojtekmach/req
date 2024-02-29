@@ -7,7 +7,7 @@ defmodule Req.Test do
   >
   > ["Mocks Aren't Stubs" by Martin Fowler](https://martinfowler.com/articles/mocksArentStubs.html#TheDifferenceBetweenMocksAndStubs)
 
-  Req has built-in support for stubs via `:plug`, `:adapter`, and (indirectly) `:base_url`
+  Req already has built-in support for stubs via `:plug`, `:adapter`, and (indirectly) `:base_url`
   options. This module enhances these capabilities by providing:
 
     * Stub any value with [`Req.Test.stub(name, value)`](`stub/2`) and access it with
@@ -16,6 +16,11 @@ defmodule Req.Test do
     * Access plug stubs with `plug: {Req.Test, name}`.
 
     * Easily create JSON responses for Plug stubs with [`Req.Test.json(conn, body)`](`json/2`).
+
+  This module bases stubs on the ownership model of
+  [nimble_ownership](https://hex.pm/packages/nimble_ownership), also used by
+  [Mox](https://hex.pm/packages/mox) for example. This allows `Req.Test` to be used in concurrent
+  tests.
 
   ## Example
 
@@ -72,6 +77,39 @@ defmodule Req.Test do
 
         assert MyApp.Weather.get_rating("Krakow, Poland") == {:ok, :nice}
       end
+
+  ### Concurrency and Allowances
+
+  The example above works in concurrent tests because `MyApp.Weather.get_rating/1` calls
+  directly to `Req.request/1` *in the same process*. It also works in many cases where the
+  request happens in a spawned process, such as a `Task`, `GenServer`, and more.
+
+  However, if you are encountering issues with stubs not being available in spawned processes,
+  it's likely that you'll need **explicit allowances**. For example, if
+  `MyApp.Weather.get_rating/1` was calling `Req.request/1` in a process spawned with `spawn/1`,
+  the stub would not be available in the spawned process:
+
+      # With code like this, the stub would not be available in the spawned task:
+      def get_rating_async(location) do
+        spawn(fn -> get_rating(location) end)
+      end
+
+  To make stubs defined in the test process available in other processes, you can use
+  `allow/3`. For example, imagine that the call to `MyApp.Weather.get_rating/1`
+  was happening in a spawned GenServer:
+
+      test "nice weather" do
+        {:ok, pid} = start_gen_server(...)
+
+        Req.Test.stub(MyApp.Weather, fn conn ->
+          Req.Test.json(conn, %{"celsius" => 25.0})
+        end)
+
+        Req.Test.allow(MyApp.Weather, self(), pid)
+
+        assert get_weather(pid, "Krakow, Poland") == {:ok, :nice}
+      end
+
   """
 
   require Logger
@@ -160,6 +198,13 @@ defmodule Req.Test do
   """
   def stub(stub_name, value) do
     NimbleOwnership.get_and_update(@ownership, self(), stub_name, fn _ -> {:ok, value} end)
+  end
+
+  @doc """
+  Allows `pid_to_allow` to access `stub_name` provided that `owner` is already allowed.
+  """
+  def allow(stub_name, owner, pid_to_allow) when is_pid(owner) do
+    NimbleOwnership.allow(@ownership, owner, pid_to_allow, stub_name)
   end
 
   defp callers do
