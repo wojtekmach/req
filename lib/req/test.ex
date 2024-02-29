@@ -81,9 +81,13 @@ defmodule Req.Test do
   ### Concurrency and Allowances
 
   The example above works in concurrent tests because `MyApp.Weather.get_rating/1` calls
-  directly to `Req.request/1` *in the same process*. For example, if `MyApp.Weather.get_rating/1`
-  was calling `Req.request/1` in a spawned process, the stub would not be available in the spawned
-  process:
+  directly to `Req.request/1` *in the same process*. It also works in many cases where the
+  request happens in a spawned process, such as a `Task`, `GenServer`, and more.
+
+  However, if you are encountering issues with stubs not being available in spawned processes,
+  it's likely that you'll need **explicit allowances**. For example, if
+  `MyApp.Weather.get_rating/1` was calling `Req.request/1` in a process spawned with `spawn/1`,
+  the stub would not be available in the spawned process:
 
       # With code like this, the stub would not be available in the spawned task:
       def get_rating_async(location) do
