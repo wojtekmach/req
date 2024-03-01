@@ -4,7 +4,7 @@ defmodule ReqTest do
   doctest Req,
     only: [
       new: 1,
-      update: 2
+      merge: 2
     ]
 
   setup do

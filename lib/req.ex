@@ -350,7 +350,7 @@ defmodule Req do
   end
 
   defp new(%Req.Request{} = request, options) when is_list(options) do
-    Req.update(request, options)
+    Req.merge(request, options)
   end
 
   defp new(options1, options2) when is_list(options1) and is_list(options2) do
@@ -371,6 +371,11 @@ defmodule Req do
           "expected 2nd argument to be an options keywords list, got: #{inspect(options)}"
   end
 
+  @deprecated "Use Req.merge/2 instead"
+  def update(request, options) do
+    Req.merge(request, options)
+  end
+
   @doc """
   Updates a request struct.
 
@@ -380,7 +385,7 @@ defmodule Req do
   ## Examples
 
       iex> req = Req.new(base_url: "https://httpbin.org")
-      iex> req = Req.update(req, auth: {:basic, "alice:secret"})
+      iex> req = Req.merge(req, auth: {:basic, "alice:secret"})
       iex> req.options[:base_url]
       "https://httpbin.org"
       iex> req.options[:auth]
@@ -389,26 +394,26 @@ defmodule Req do
   Passing `:headers` will automatically encode and merge them:
 
       iex> req = Req.new(headers: %{point_x: 1})
-      iex> req = Req.update(req, headers: %{point_y: 2})
+      iex> req = Req.merge(req, headers: %{point_y: 2})
       iex> req.headers
       %{"point-x" => ["1"], "point-y" => ["2"]}
 
   The same header names are overwritten however:
 
       iex> req = Req.new(headers: %{authorization: "bearer foo"})
-      iex> req = Req.update(req, headers: %{authorization: "bearer bar"})
+      iex> req = Req.merge(req, headers: %{authorization: "bearer bar"})
       iex> req.headers
       %{"authorization" => ["bearer bar"]}
 
   Similarly to headers, `:params` are merged too:
 
       req = Req.new(url: "https://httpbin.org/anything", params: [a: 1, b: 1])
-      req = Req.update(req, params: [a: 2])
+      req = Req.merge(req, params: [a: 2])
       Req.get!(req).body["args"]
       #=> %{"a" => "2", "b" => "1"}
   """
-  @spec update(Req.Request.t(), options :: keyword()) :: Req.Request.t()
-  def update(%Req.Request{} = request, options) when is_list(options) do
+  @spec merge(Req.Request.t(), options :: keyword()) :: Req.Request.t()
+  def merge(%Req.Request{} = request, options) when is_list(options) do
     request_option_names = [:method, :url, :headers, :body, :adapter, :into]
 
     {request_options, options} = Keyword.split(options, request_option_names)
@@ -1008,7 +1013,7 @@ defmodule Req do
   # TODO: Req.run/2?
   # defp run_request(request, options \\ []) do
   #   request
-  #   |> Req.update(options)
+  #   |> Req.merge(options)
   #   |> Req.Request.run_request()
   # end
 

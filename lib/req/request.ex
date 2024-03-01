@@ -750,7 +750,7 @@ defmodule Req.Request do
           IO.warn(
             "Passing " <>
               Enum.map_join(deprecated, "/", &inspect/1) <>
-              " is deprecated, use Req.update/2 instead."
+              " is deprecated, use Req.merge/2 instead."
           )
 
           Keyword.drop(options, deprecated)

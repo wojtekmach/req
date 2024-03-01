@@ -236,7 +236,7 @@ resp.body #=> %File.Stream{}
 
     Currently `request.options` field is a map but it may change in the future.
     One possible future change is using keywords lists internally which would
-    allow, for example, `Req.new(params: [a: 1]) |> Req.update(params: [b: 2])`
+    allow, for example, `Req.new(params: [a: 1]) |> Req.merge(params: [b: 2])`
     to keep duplicate `:params` in `request.options` which would then allow to
     decide the duplicate key semantics on a per-step basis. And so, for example,
     [`put_params`] would _merge_ params but most steps would simply use the
@@ -302,9 +302,9 @@ resp.body #=> %File.Stream{}
 
   * [`Req.request/2`]: Improve error message on invalid arguments
 
-  * [`Req.update/2`]: Do not duplicate headers
+  * [`Req.merge/2`]: Do not duplicate headers
 
-  * [`Req.update/2`]: Merge `:params`
+  * [`Req.merge/2`]: Merge `:params`
 
   * [`Req.Request`]: Fix displaying redacted basic authentication
 
@@ -816,7 +816,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
 [`Req.new/1`]:     https://hexdocs.pm/req/Req.html#new/1
 [`Req.request/2`]: https://hexdocs.pm/req/Req.html#request/2
-[`Req.update/2`]:  https://hexdocs.pm/req/Req.html#update/2
+[`Req.merge/2`]:  https://hexdocs.pm/req/Req.html#update/2
 
 [`Req.Request`]:                   https://hexdocs.pm/req/Req.Request.html
 [`Req.Request.new/1`]:             https://hexdocs.pm/req/Req.Request.html#new/1

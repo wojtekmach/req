@@ -1450,7 +1450,7 @@ defmodule Req.Steps do
           options
         )
 
-      Req.update(request, headers: headers)
+      Req.merge(request, headers: headers)
     else
       request
     end
