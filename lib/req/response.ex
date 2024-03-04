@@ -26,6 +26,8 @@ defmodule Req.Response do
           private: map()
         }
 
+  @derive {Inspect, except: [:async]}
+
   defstruct status: 200,
             headers: if(Req.MixProject.legacy_headers_as_lists?(), do: [], else: %{}),
             body: "",
