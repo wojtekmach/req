@@ -384,6 +384,22 @@ defmodule Req.StepsTest do
                      Req.get!(req, checksum: "sha1:bad")
                    end
     end
+
+    test "into: pid", c do
+      Bypass.stub(c.bypass, "GET", "/", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "foo")
+      end)
+
+      req =
+        Req.new(
+          url: c.url,
+          into: self()
+        )
+
+      assert_raise ArgumentError, ":checksum cannot be used with `into: pid`", fn ->
+        Req.get!(req, checksum: @foo_sha1)
+      end
+    end
   end
 
   describe "put_aws_sigv4" do

@@ -1379,6 +1379,9 @@ defmodule Req.Steps do
             |> Req.Request.put_private(:req_checksum_hash, hash)
             |> Map.replace!(:into, into)
 
+          pid when is_pid(pid) ->
+            raise ArgumentError, ":checksum cannot be used with `into: pid`"
+
           collectable ->
             hash = hash_init(type)
 
