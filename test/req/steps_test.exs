@@ -56,6 +56,17 @@ defmodule Req.StepsTest do
       assert Req.get!("foo", base_url: c.url <> "/api/v2/").body == "ok"
       assert Req.get!("", base_url: c.url <> "/api/v2/foo").body == "ok"
     end
+
+    test "function" do
+      plug = fn conn ->
+        Plug.Conn.send_resp(conn, 200, conn.request_path)
+      end
+
+      assert Req.get!(plug: plug, base_url: fn -> "/api/v1" end).body == "/api/v1"
+      assert Req.get!(plug: plug, base_url: fn -> "/api/v1" end, url: "foo").body == "/api/v1/foo"
+      assert Req.get!(plug: plug, base_url: fn -> URI.new!("/api/v1") end).body == "/api/v1"
+      assert Req.get!(plug: plug, base_url: {URI, :new!, ["/api/v1"]}).body == "/api/v1"
+    end
   end
 
   describe "auth" do

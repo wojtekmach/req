@@ -98,6 +98,9 @@ defmodule Req.Steps do
 
     * `:base_url` - if set, the request URL is merged with this base URL.
 
+      The base url can be a string, a `%URI{}` struct, a 0-arity function,
+      or a `{mod, fun, args}` tuple describing a function to call.
+
   ## Examples
 
       iex> req = Req.new(base_url: "https://httpbin.org")
@@ -114,6 +117,33 @@ defmodule Req.Steps do
     if request.url.scheme != nil do
       request
     else
+      base_url =
+        case base_url do
+          binary when is_binary(binary) ->
+            binary
+
+          %URI{} = url ->
+            URI.to_string(url)
+
+          fun when is_function(fun, 0) ->
+            case fun.() do
+              binary when is_binary(binary) ->
+                binary
+
+              %URI{} = url ->
+                URI.to_string(url)
+            end
+
+          {mod, fun, args} when is_atom(mod) and is_atom(fun) and is_list(args) ->
+            case apply(mod, fun, args) do
+              binary when is_binary(binary) ->
+                binary
+
+              %URI{} = url ->
+                URI.to_string(url)
+            end
+        end
+
       %{request | url: URI.parse(join(base_url, request.url))}
     end
   end
