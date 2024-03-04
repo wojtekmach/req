@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## HEAD
+
+  * [`compressed`]: Default `compressed: false` when streaming response body
+
+  * [`put_base_url`]: Allow `:base_url` to be a 0-arity function or MFArgs
+
+  * [`Req.Test`]: Add [`Req.Test.allow/3`]
+
+  * [`Req`]: Deprecate `Req.update/2` in favour of [`Req.merge/2`]
+
+  * [`Req`]: Add response body streaming via `into: self()`, `Req.parse_message/2`,
+    and `Req.cancel_async_response/1`.
+
 ## v0.4.11 (2024-02-19)
 
   * [`Req.Test.json/2`]: Don't crash compilation when Plug is not available
@@ -814,9 +827,12 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`checksum`]:            https://hexdocs.pm/req/Req.Steps.html#checksum/1
 [`put_aws_sigv4`]:       https://hexdocs.pm/req/Req.Steps.html#put_aws_sigv4/1
 
-[`Req.new/1`]:     https://hexdocs.pm/req/Req.html#new/1
-[`Req.request/2`]: https://hexdocs.pm/req/Req.html#request/2
-[`Req.merge/2`]:  https://hexdocs.pm/req/Req.html#update/2
+[`Req`]:                        https://hexdocs.pm/req/Req.html
+[`Req.new/1`]:                  https://hexdocs.pm/req/Req.html#new/1
+[`Req.request/2`]:              https://hexdocs.pm/req/Req.html#request/2
+[`Req.merge/2`]:                https://hexdocs.pm/req/Req.html#merge/2
+[`Req.parse_message/2`]:        https://hexdocs.pm/req/Req.html#merge/2
+[`Req.cancel_async_request/1`]: https://hexdocs.pm/req/Req.html#merge/2
 
 [`Req.Request`]:                   https://hexdocs.pm/req/Req.Request.html
 [`Req.Request.new/1`]:             https://hexdocs.pm/req/Req.Request.html#new/1
@@ -834,7 +850,9 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Response.delete_header/2`]:  https://hexdocs.pm/req/Req.Response.html#delete_header/2
 [`Req.Response.update_private/4`]: https://hexdocs.pm/req/Req.Response.html#update_private/4
 
+[`Req.Test`]: https://hexdocs.pm/req/Req.Test
 [`Req.Test.json/2`]: https://hexdocs.pm/req/Req.Test.html#json/2
+[`Req.Test.allow/3`]: https://hexdocs.pm/req/Req.Test.html#json/2
 
 [`Req.Steps`]:   https://hexdocs.pm/req/Req.Steps.html
 [`Collectable`]: https://hexdocs.pm/elixir/Collectable.html
