@@ -842,9 +842,13 @@ defmodule Req.Steps do
             finch_stream_into_fun(req, finch_req, finch_name, finch_options, fun)
 
           :self ->
+            IO.warn("setting into: :self is deprecated, set into: self() instead")
             finch_stream_into_self(req, finch_req, finch_name, finch_options)
 
-          collectable when collectable != :self ->
+          pid when is_pid(pid) ->
+            finch_stream_into_pid(req, finch_req, finch_name, finch_options, pid)
+
+          collectable ->
             finch_stream_into_collectable(req, finch_req, finch_name, finch_options, collectable)
         end
     end
@@ -913,8 +917,42 @@ defmodule Req.Steps do
     end
   end
 
-  # TODO: WIP
   defp finch_stream_into_self(req, finch_req, finch_name, finch_options) do
+    ref = Finch.async_request(finch_req, finch_name, finch_options)
+
+    {:status, status} =
+      receive do
+        {^ref, message} ->
+          message
+      end
+
+    headers =
+      receive do
+        {^ref, message} ->
+          {:headers, headers} = message
+
+          Enum.reduce(headers, %{}, fn {name, value}, acc ->
+            Map.update(acc, name, [value], &(&1 ++ [value]))
+          end)
+      end
+
+    async = %Req.Async{
+      ref: ref,
+      stream_fun: &finch_parse_message/2,
+      cancel_fun: &finch_cancel/1
+    }
+
+    req = put_in(req.async, async)
+    resp = Req.Response.new(status: status, headers: headers)
+    {req, resp}
+  end
+
+  defp finch_stream_into_pid(req, finch_req, finch_name, finch_options, pid) do
+    if pid != self() do
+      raise ArgumentError,
+            "`into: pid` only supports the calling process at the moment, i.e. `self()`"
+    end
+
     ref = Finch.async_request(finch_req, finch_name, finch_options)
 
     {:status, status} =
@@ -940,8 +978,8 @@ defmodule Req.Steps do
       cancel_fun: &finch_cancel/1
     }
 
-    req = put_in(req.async, async)
     resp = Req.Response.new(status: status, headers: headers)
+    resp = put_in(resp.async, async)
     {req, resp}
   end
 

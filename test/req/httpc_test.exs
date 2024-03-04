@@ -55,7 +55,7 @@ defmodule Req.HttpcTest do
       assert resp.body == "foofoo"
     end
 
-    test "stream callback", %{req: req, bypass: bypass} do
+    test "into: fun", %{req: req, bypass: bypass} do
       Bypass.expect(bypass, "GET", "/", fn conn ->
         conn = Plug.Conn.send_chunked(conn, 200)
         {:ok, conn} = Plug.Conn.chunk(conn, "foo")
@@ -88,7 +88,7 @@ defmodule Req.HttpcTest do
       refute_receive _
     end
 
-    test "async request", %{req: req, bypass: bypass} do
+    test "into: pid", %{req: req, bypass: bypass} do
       Bypass.expect(bypass, "GET", "/", fn conn ->
         conn = Plug.Conn.send_chunked(conn, 200)
         {:ok, conn} = Plug.Conn.chunk(conn, "foo")
@@ -96,23 +96,23 @@ defmodule Req.HttpcTest do
         conn
       end)
 
-      {req, resp} = Req.async_request!(req)
+      resp = Req.get!(req, into: self())
       assert resp.status == 200
 
       # httpc seems to randomly chunk things
-      assert Req.parse_message(req, assert_receive(_)) in [
+      assert Req.parse_message(resp, assert_receive(_)) in [
                {:ok, [data: "foo"]},
                {:ok, [data: "foobar"]}
              ]
 
-      assert Req.parse_message(req, assert_receive(_)) in [
+      assert Req.parse_message(resp, assert_receive(_)) in [
                {:ok, [data: "bar"]},
                {:ok, [data: ""]},
                {:ok, [:done]}
              ]
     end
 
-    test "async request cancellation", %{req: req, bypass: bypass} do
+    test "into: pid cancel", %{req: req, bypass: bypass} do
       Bypass.expect(bypass, "GET", "/", fn conn ->
         conn = Plug.Conn.send_chunked(conn, 200)
         {:ok, conn} = Plug.Conn.chunk(conn, "foo")
@@ -120,9 +120,9 @@ defmodule Req.HttpcTest do
         conn
       end)
 
-      {req, resp} = Req.async_request!(req)
+      resp = Req.get!(req, into: self())
       assert resp.status == 200
-      assert :ok = Req.cancel_async_request(req)
+      assert :ok = Req.cancel_async_response(resp)
     end
   end
 
@@ -180,8 +180,8 @@ defmodule Req.HttpcTest do
       nil ->
         httpc_request(request, httpc_req, httpc_http_options, httpc_options)
 
-      :self ->
-        httpc_async(request, httpc_req, httpc_http_options, httpc_options, nil)
+      pid when is_pid(pid) ->
+        httpc_async(request, httpc_req, httpc_http_options, httpc_options, pid)
 
       fun ->
         httpc_async(request, httpc_req, httpc_http_options, httpc_options, fun)
@@ -223,15 +223,17 @@ defmodule Req.HttpcTest do
     end
   end
 
-  defp httpc_async(request, httpc_req, httpc_http_options, httpc_options, fun) do
-    httpc_stream =
-      if fun do
-        {:self, :once}
-      else
-        :self
+  defp httpc_async(request, httpc_req, httpc_http_options, httpc_options, pid_or_fun) do
+    stream =
+      case pid_or_fun do
+        pid when is_pid(pid) ->
+          :self
+
+        fun when is_function(fun) ->
+          {:self, :once}
       end
 
-    httpc_options = [sync: false, stream: httpc_stream] ++ httpc_options
+    httpc_options = [sync: false, stream: stream] ++ httpc_options
     {:ok, ref} = :httpc.request(request.method, httpc_req, httpc_http_options, httpc_options)
 
     receive do
@@ -253,8 +255,8 @@ defmodule Req.HttpcTest do
           cancel_fun: &httpc_cancel/1
         }
 
-        request = put_in(request.async, async)
         response = Req.Response.new(status: status, headers: headers)
+        response = put_in(response.async, async)
         {request, response}
 
       {:http, {ref, :stream_start, headers, pid}} ->
@@ -270,7 +272,14 @@ defmodule Req.HttpcTest do
           end
 
         response = Req.Response.new(status: status, headers: headers)
-        httpc_loop(request, response, ref, pid, fun)
+
+        case pid_or_fun do
+          fun when is_function(fun) ->
+            httpc_loop(request, response, ref, pid, fun)
+
+          pid when is_pid(pid) ->
+            {request, response}
+        end
 
       {:http, {^ref, {{_, status, _}, headers, body}}} ->
         headers =

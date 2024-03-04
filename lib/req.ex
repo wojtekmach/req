@@ -60,6 +60,17 @@ defmodule Req do
       iex> resp.body
       %IO.Stream{}
 
+  Stream response body to the current process:
+
+      iex> resp = Req.get!("http://httpbin.org/stream/2", into: self())
+      iex> Req.parse_message(resp, receive do message -> message end)
+      {:ok, [data: "{\"url\": \"http://httpbin.org/stream/2\", ..., \"id\": 0}\n"]}
+      iex> Req.parse_message(resp, receive do message -> message end)
+      {:ok, [data: "{\"url\": \"http://httpbin.org/stream/2\", ..., \"id\": 1}\n"]}
+      iex> Req.parse_message(resp, receive do message -> message end)
+      {:ok, [:done]}
+      ""
+
   ## Header Names
 
   The HTTP specification requires that header names should be case-insensitive.
@@ -227,6 +238,9 @@ defmodule Req do
               end
 
         * `collectable` - stream response body into a `t:Collectable.t/0`.
+
+        * `pid` - stream response body into a process mailbox. The messages should be parsed using
+          `Req.parse_message/2`.
 
   Response redirect options ([`redirect`](`Req.Steps.redirect/1`) step):
 
@@ -985,10 +999,12 @@ defmodule Req do
   end
 
   @doc false
+  @deprecated "use Req.request(into: self()) instead"
   def async_request(request, options \\ []) do
     Req.Request.run_request(%{new(request, options) | into: :self})
   end
 
+  @deprecated "use Req.request!(into: self()) instead"
   @doc false
   def async_request!(request, options \\ []) do
     case async_request(request, options) do
@@ -1000,32 +1016,50 @@ defmodule Req do
     end
   end
 
+  @doc """
+  Parses asynchronous response body message.
+
+  ## Examples
+
+      iex> resp = Req.get!("http://httpbin.org/stream/2", into: self())
+      iex> Req.parse_message(resp, receive do message -> message end)
+      {:ok, [data: "{\"url\": \"http://httpbin.org/stream/2\", ..., \"id\": 0}\n"]}
+      iex> Req.parse_message(resp, receive do message -> message end)
+      {:ok, [data: "{\"url\": \"http://httpbin.org/stream/2\", ..., \"id\": 1}\n"]}
+      iex> Req.parse_message(resp, receive do message -> message end)
+      {:ok, [:done]}
+  """
+  def parse_message(%Req.Response{} = resp, message) do
+    resp.async.stream_fun.(resp.async.ref, message)
+  end
+
   @doc false
   def parse_message(%Req.Request{} = request, message) do
+    IO.warn(
+      "passing %Req.Request{} to parse_message/2 is deprecated. Pass %Req.Response{} instead"
+    )
+
     request.async.stream_fun.(request.async.ref, message)
   end
 
+  @doc """
+  Cancels an asynchronous response.
+
+  ## Examples
+
+      iex> resp = Req.get!("http://httpbin.org/stream/2", into: self())
+      iex> Req.cancel_async_response(resp)
+      :ok
+  """
+  def cancel_async_response(%Req.Response{} = response) do
+    response.async.cancel_fun.(response.async.ref)
+  end
+
+  @deprecated "use Req.cancel_async_response(resp)) instead"
   @doc false
   def cancel_async_request(%Req.Request{} = request) do
     request.async.cancel_fun.(request.async.ref)
   end
-
-  # TODO: Req.run/2?
-  # defp run_request(request, options \\ []) do
-  #   request
-  #   |> Req.merge(options)
-  #   |> Req.Request.run_request()
-  # end
-
-  # defp run_request!(request, options \\ []) do
-  #   case run_request(request, options) do
-  #     {request, %Req.Response{} = response} ->
-  #       {request, response}
-
-  #     {_request, exception} ->
-  #       raise exception
-  #   end
-  # end
 
   @doc """
   Returns default options.

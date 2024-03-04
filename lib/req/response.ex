@@ -30,7 +30,8 @@ defmodule Req.Response do
             headers: if(Req.MixProject.legacy_headers_as_lists?(), do: [], else: %{}),
             body: "",
             trailers: %{},
-            private: %{}
+            private: %{},
+            async: nil
 
   @doc """
   Returns a new response.

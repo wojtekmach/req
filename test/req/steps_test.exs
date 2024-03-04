@@ -2069,7 +2069,7 @@ defmodule Req.StepsTest do
       refute_receive _
     end
 
-    test "async request", c do
+    test "into: pid", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         conn = Plug.Conn.send_chunked(conn, 200)
         {:ok, conn} = Plug.Conn.chunk(conn, "foo")
@@ -2077,15 +2077,15 @@ defmodule Req.StepsTest do
         conn
       end)
 
-      {req, resp} = Req.async_request!(url: "http://localhost:#{c.bypass.port}")
+      resp = Req.get!(url: "http://localhost:#{c.bypass.port}", into: self())
       assert resp.status == 200
-      assert {:ok, [data: "foo"]} = Req.parse_message(req, assert_receive(_))
-      assert {:ok, [data: "bar"]} = Req.parse_message(req, assert_receive(_))
-      assert {:ok, [:done]} = Req.parse_message(req, assert_receive(_))
+      assert {:ok, [data: "foo"]} = Req.parse_message(resp, assert_receive(_))
+      assert {:ok, [data: "bar"]} = Req.parse_message(resp, assert_receive(_))
+      assert {:ok, [:done]} = Req.parse_message(resp, assert_receive(_))
       refute_receive _
     end
 
-    test "async request cancellation", c do
+    test "into: pid cancel", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         conn = Plug.Conn.send_chunked(conn, 200)
         {:ok, conn} = Plug.Conn.chunk(conn, "foo")
@@ -2093,9 +2093,9 @@ defmodule Req.StepsTest do
         conn
       end)
 
-      {req, resp} = Req.async_request!(url: "http://localhost:#{c.bypass.port}")
+      resp = Req.get!(url: "http://localhost:#{c.bypass.port}", into: self())
       assert resp.status == 200
-      assert :ok = Req.cancel_async_request(req)
+      assert :ok = Req.cancel_async_response(resp)
     end
   end
 

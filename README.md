@@ -48,7 +48,7 @@ write new ones.
 
   * Request body streaming (by setting `body: enumerable`.)
 
-  * Response body streaming (by setting `into: fun | collectable`.)
+  * Response body streaming (by setting `into: fun | collectable | pid`.)
 
   * Follows redirects (via [`redirect`] step.)
 
@@ -107,6 +107,8 @@ iex> resp.status
 iex> resp.body
 %IO.Stream{}
 ```
+
+(See [`Req`] module documentation for more examples of response body streaming.)
 
 If you are planning to make several similar requests, you can build up a request struct with
 desired common options and re-use it:
@@ -237,7 +239,7 @@ limitations under the License.
 [`Req.new/1`]:           https://hexdocs.pm/req/Req.html#new/1
 [`Req.get!/2`]:          https://hexdocs.pm/req/Req.html#get!/2
 [`Req.post!/2`]:         https://hexdocs.pm/req/Req.html#post!/2
-[`Req.async_request/2`]: https://hexdocs.pm/req/Req.html#async_request/2
+[`Req`]:                 https://hexdocs.pm/req
 [`Req.Request`]:         https://hexdocs.pm/req/Req.Request.html
 [`Req.Steps`]:           https://hexdocs.pm/req/Req.Steps.html
 [`Req.Test`]:            https://hexdocs.pm/req/Req.Test.html
