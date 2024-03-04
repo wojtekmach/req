@@ -633,32 +633,53 @@ defmodule Req.Steps do
   Runs the request using `Finch`.
 
   This is the default Req _adapter_. See
-  ["Adapter" section in the `Req.Request`](Req.Request.html#module-adapter) module
-  documentation for more information on adapters.
+  ["Adapter" section in the `Req.Request`](Req.Request.html#module-adapter) module documentation
+  for more information on adapters.
+
+  ## HTTP/1 Pools
+
+  On HTTP/1 connections, Finch creates a pool per `{scheme, host, port}` tuple. These pools
+  are kept around to re-use connections as much as possible, however they are **not automatically
+  terminated**. To do so, you can configure custom Finch pool:
+
+      {:ok, _} =
+        Finch.start_link(
+          name: MyFinch,
+          pools: %{
+            default: [
+              # terminate idle {scheme, host, port} pool after 60s
+              pool_max_idle_time: 60_000
+            ]
+          }
+        )
+
+      Req.get!("https://httpbin.org/json", finch: MyFinch)
 
   ## Request Options
 
-    * `:finch` - the name of the Finch pool. Defaults to a pool automatically started by
-      Req. The default pool uses HTTP/1 although that may change in the future.
+    * `:finch` - the name of the Finch pool. Defaults to a pool automatically started by Req.
 
     * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
       the given connection options:
 
         * `:timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
 
-        * `:protocols` - the HTTP protocols to use, defaults to `[:http1, :http2]`, that is default to HTTP/1 but if negotiated, allow HTTP/2
-          over HTTP/1 connection. To force HTTP/2, set `protocols: [:http2]`.
+        * `:protocols` - the HTTP protocols to use, defaults to `[:http1, :http2]`, that is
+        default to HTTP/1 but if negotiated, allow HTTP/2 over HTTP/1 connection. To force HTTP/1,
+        set to `[:http1]` and force HTTP/2, set to `[:http2]`.
 
         * `:hostname` - Mint explicit hostname, see `Mint.HTTP.connect/4` for more information.
 
-        * `:transport_opts` - Mint transport options, see `Mint.HTTP.connect/4` for more information.
+        * `:transport_opts` - Mint transport options, see `Mint.HTTP.connect/4` for more
+        information.
 
         * `:proxy_headers` - Mint proxy headers, see `Mint.HTTP.connect/4` for more information.
 
         * `:proxy` - Mint HTTP/1 proxy settings, a `{schema, address, port, options}` tuple.
           See `Mint.HTTP.connect/4` for more information.
 
-        * `:client_settings` - Mint HTTP/2 client settings, see `Mint.HTTP.connect/4` for more information.
+        * `:client_settings` - Mint HTTP/2 client settings, see `Mint.HTTP.connect/4` for more
+        information.
 
     * `:inet6` - if set to true, uses IPv6. Defaults to `false`. This is a shortcut for
       setting `connect_options: [transport_opts: [inet6: true]]`.
@@ -669,10 +690,11 @@ defmodule Req.Steps do
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket.
 
-    * `:finch_private` - a map or keyword list of private metadata to add to the Finch request. May be useful
-      for adding custom data when handling telemetry with `Finch.Telemetry`.
+    * `:finch_private` - a map or keyword list of private metadata to add to the Finch request.
+      May be useful for adding custom data when handling telemetry with `Finch.Telemetry`.
 
-    * `:finch_request` - a function that executes the Finch request, defaults to using `Finch.request/3`.
+    * `:finch_request` - a function that executes the Finch request, defaults to using
+      `Finch.request/3`.
 
       The function should accept 4 arguments:
 
