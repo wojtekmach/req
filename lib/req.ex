@@ -1033,7 +1033,6 @@ defmodule Req do
     resp.async.stream_fun.(resp.async.ref, message)
   end
 
-  @doc false
   def parse_message(%Req.Request{} = request, message) do
     IO.warn(
       "passing %Req.Request{} to parse_message/2 is deprecated. Pass %Req.Response{} instead"
