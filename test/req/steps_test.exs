@@ -1636,6 +1636,7 @@ defmodule Req.StepsTest do
       end
 
       assert Req.request!(plug: plug, json: %{a: 1}).body == "ok"
+      refute_receive _
     end
 
     test "request stream" do
@@ -1649,6 +1650,7 @@ defmodule Req.StepsTest do
         )
 
       assert Req.request!(req).body == "foofoo"
+      refute_receive _
     end
 
     test "into: fun" do
@@ -1669,6 +1671,7 @@ defmodule Req.StepsTest do
       resp = Req.request!(req)
       assert resp.status == 200
       assert resp.body == "foobar"
+      refute_receive _
     end
 
     test "into: fun with halt" do
@@ -1690,6 +1693,7 @@ defmodule Req.StepsTest do
       assert output =~ ~r/returning {:halt, acc} is not yet supported by Plug adapter/
       assert resp.status == 200
       assert resp.body == "foobar"
+      refute_receive _
     end
 
     test "into: collectable" do
@@ -1707,6 +1711,7 @@ defmodule Req.StepsTest do
       resp = Req.request!(req)
       assert resp.status == 200
       assert resp.body == ["foobar"]
+      refute_receive _
     end
 
     test "into: collectable with send_resp" do
@@ -1721,6 +1726,7 @@ defmodule Req.StepsTest do
       resp = Req.request!(req)
       assert resp.status == 200
       assert resp.body == ["foo"]
+      refute_receive _
     end
 
     test "into: collectable with send_file" do
@@ -1735,6 +1741,20 @@ defmodule Req.StepsTest do
       resp = Req.request!(req)
       assert resp.status == 200
       assert ["defmodule Req.MixProject do" <> _] = resp.body
+      refute_receive _
+    end
+
+    # TODO
+    @tag :skip
+    test "inform", c do
+      Bypass.expect(c.bypass, fn conn ->
+        conn
+        |> Plug.Conn.inform(100)
+        |> Plug.Conn.send_resp(200, "ok")
+      end)
+
+      assert Req.put!(c.url, body: "foo", headers: [expect: "100-continue"]).status == 200
+      refute_receive _
     end
   end
 

@@ -1203,11 +1203,25 @@ defmodule Req.Steps do
       conn = Plug.Test.conn(request.method, request.url, req_body)
 
       conn = put_in(conn.req_headers, req_headers)
+      conn = call_plug(conn, plug)
+
+      # consume messages sent by Plug.Test adapter
+      {_, %{ref: ref}} = conn.adapter
+
+      receive do
+        {^ref, {_status, _headers, _body}} -> :ok
+      after
+        0 -> :ok
+      end
+
+      receive do
+        {:plug_conn, :sent} -> :ok
+      after
+        0 -> :ok
+      end
 
       case request.into do
         nil ->
-          conn = call_plug(conn, plug)
-
           response =
             Req.Response.new(
               status: conn.status,
@@ -1218,8 +1232,6 @@ defmodule Req.Steps do
           {request, response}
 
         fun when is_function(fun, 2) ->
-          conn = call_plug(conn, plug)
-
           response =
             Req.Response.new(
               status: conn.status,
@@ -1243,7 +1255,6 @@ defmodule Req.Steps do
 
         collectable ->
           {acc, collector} = Collectable.into(collectable)
-          conn = call_plug(conn, plug)
 
           response =
             Req.Response.new(
