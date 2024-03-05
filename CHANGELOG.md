@@ -2,16 +2,18 @@
 
 ## HEAD
 
+  * [`Req`]: Add response body streaming via `into: :self`, `Req.parse_message/2`,
+    and `Req.cancel_async_response/1`.
+
+  * [`Req`]: Deprecate `Req.update/2` in favour of [`Req.merge/2`]
+
+  * [`Req.Test`]: Add [`Req.Test.allow/3`]
+
   * [`compressed`]: Default `compressed: false` when streaming response body
 
   * [`put_base_url`]: Allow `:base_url` to be a 0-arity function or MFArgs
 
-  * [`Req.Test`]: Add [`Req.Test.allow/3`]
-
-  * [`Req`]: Deprecate `Req.update/2` in favour of [`Req.merge/2`]
-
-  * [`Req`]: Add response body streaming via `into: :self`, `Req.parse_message/2`,
-    and `Req.cancel_async_response/1`.
+  * [`put_plug`]: Do not leak `Plug.Test` messages
 
 ## v0.4.11 (2024-02-19)
 
