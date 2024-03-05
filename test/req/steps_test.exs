@@ -385,7 +385,7 @@ defmodule Req.StepsTest do
                    end
     end
 
-    test "into: pid", c do
+    test "into: :self", c do
       Bypass.stub(c.bypass, "GET", "/", fn conn ->
         Plug.Conn.send_resp(conn, 200, "foo")
       end)
@@ -393,10 +393,10 @@ defmodule Req.StepsTest do
       req =
         Req.new(
           url: c.url,
-          into: self()
+          into: :self
         )
 
-      assert_raise ArgumentError, ":checksum cannot be used with `into: pid`", fn ->
+      assert_raise ArgumentError, ":checksum cannot be used with `into: :self`", fn ->
         Req.get!(req, checksum: @foo_sha1)
       end
     end
@@ -1628,6 +1628,30 @@ defmodule Req.StepsTest do
   end
 
   describe "put_plug" do
+    test "foo" do
+      defmodule Foo do
+        use GenServer
+
+        def start_link(arg) do
+          GenServer.start_link(__MODULE__, arg)
+        end
+
+        @impl true
+        def init(_) do
+          Req.get!(
+            plug: fn conn ->
+              Plug.Conn.send_resp(conn, 200, "ok")
+            end
+          )
+
+          {:ok, %{}}
+        end
+      end
+
+      start_supervised!(Foo)
+      Process.sleep(100)
+    end
+
     test "request" do
       plug = fn conn ->
         {:ok, body, conn} = Plug.Conn.read_body(conn)
@@ -1741,19 +1765,6 @@ defmodule Req.StepsTest do
       resp = Req.request!(req)
       assert resp.status == 200
       assert ["defmodule Req.MixProject do" <> _] = resp.body
-      refute_receive _
-    end
-
-    # TODO
-    @tag :skip
-    test "inform", c do
-      Bypass.expect(c.bypass, fn conn ->
-        conn
-        |> Plug.Conn.inform(100)
-        |> Plug.Conn.send_resp(200, "ok")
-      end)
-
-      assert Req.put!(c.url, body: "foo", headers: [expect: "100-continue"]).status == 200
       refute_receive _
     end
   end
@@ -2105,7 +2116,7 @@ defmodule Req.StepsTest do
       refute_receive _
     end
 
-    test "into: pid", c do
+    test "into: :self", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         conn = Plug.Conn.send_chunked(conn, 200)
         {:ok, conn} = Plug.Conn.chunk(conn, "foo")
@@ -2113,7 +2124,7 @@ defmodule Req.StepsTest do
         conn
       end)
 
-      resp = Req.get!(url: "http://localhost:#{c.bypass.port}", into: self())
+      resp = Req.get!(url: "http://localhost:#{c.bypass.port}", into: :self)
       assert resp.status == 200
       assert {:ok, [data: "foo"]} = Req.parse_message(resp, assert_receive(_))
       assert {:ok, [data: "bar"]} = Req.parse_message(resp, assert_receive(_))
@@ -2121,7 +2132,7 @@ defmodule Req.StepsTest do
       refute_receive _
     end
 
-    test "into: pid cancel", c do
+    test "into: :self cancel", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         conn = Plug.Conn.send_chunked(conn, 200)
         {:ok, conn} = Plug.Conn.chunk(conn, "foo")
@@ -2129,7 +2140,7 @@ defmodule Req.StepsTest do
         conn
       end)
 
-      resp = Req.get!(url: "http://localhost:#{c.bypass.port}", into: self())
+      resp = Req.get!(url: "http://localhost:#{c.bypass.port}", into: :self)
       assert resp.status == 200
       assert :ok = Req.cancel_async_response(resp)
     end

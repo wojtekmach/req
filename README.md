@@ -48,7 +48,7 @@ write new ones.
 
   * Request body streaming (by setting `body: enumerable`.)
 
-  * Response body streaming (by setting `into: fun | collectable | pid`.)
+  * Response body streaming (by setting `into: fun | collectable | :self`.)
 
   * Follows redirects (via [`redirect`] step.)
 

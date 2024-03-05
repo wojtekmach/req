@@ -841,12 +841,11 @@ defmodule Req.Steps do
           fun when is_function(fun, 2) ->
             finch_stream_into_fun(req, finch_req, finch_name, finch_options, fun)
 
-          :self ->
-            IO.warn("setting into: :self is deprecated, set into: self() instead")
-            finch_stream_into_self(req, finch_req, finch_name, finch_options)
+          :legacy_self ->
+            finch_stream_into_legacy_self(req, finch_req, finch_name, finch_options)
 
-          pid when is_pid(pid) ->
-            finch_stream_into_pid(req, finch_req, finch_name, finch_options, pid)
+          :self ->
+            finch_stream_into_self(req, finch_req, finch_name, finch_options)
 
           collectable ->
             finch_stream_into_collectable(req, finch_req, finch_name, finch_options, collectable)
@@ -917,7 +916,7 @@ defmodule Req.Steps do
     end
   end
 
-  defp finch_stream_into_self(req, finch_req, finch_name, finch_options) do
+  defp finch_stream_into_legacy_self(req, finch_req, finch_name, finch_options) do
     ref = Finch.async_request(finch_req, finch_name, finch_options)
 
     {:status, status} =
@@ -947,12 +946,7 @@ defmodule Req.Steps do
     {req, resp}
   end
 
-  defp finch_stream_into_pid(req, finch_req, finch_name, finch_options, pid) do
-    if pid != self() do
-      raise ArgumentError,
-            "`into: pid` only supports the calling process at the moment, i.e. `self()`"
-    end
-
+  defp finch_stream_into_self(req, finch_req, finch_name, finch_options) do
     ref = Finch.async_request(finch_req, finch_name, finch_options)
 
     {:status, status} =
@@ -1390,8 +1384,8 @@ defmodule Req.Steps do
             |> Req.Request.put_private(:req_checksum_hash, hash)
             |> Map.replace!(:into, into)
 
-          pid when is_pid(pid) ->
-            raise ArgumentError, ":checksum cannot be used with `into: pid`"
+          :self ->
+            raise ArgumentError, ":checksum cannot be used with `into: :self`"
 
           collectable ->
             hash = hash_init(type)

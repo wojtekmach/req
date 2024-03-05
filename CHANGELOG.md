@@ -10,7 +10,7 @@
 
   * [`Req`]: Deprecate `Req.update/2` in favour of [`Req.merge/2`]
 
-  * [`Req`]: Add response body streaming via `into: self()`, `Req.parse_message/2`,
+  * [`Req`]: Add response body streaming via `into: :self`, `Req.parse_message/2`,
     and `Req.cancel_async_response/1`.
 
 ## v0.4.11 (2024-02-19)

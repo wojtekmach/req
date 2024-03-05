@@ -88,7 +88,7 @@ defmodule Req.HttpcTest do
       refute_receive _
     end
 
-    test "into: pid", %{req: req, bypass: bypass} do
+    test "into: :self", %{req: req, bypass: bypass} do
       Bypass.expect(bypass, "GET", "/", fn conn ->
         conn = Plug.Conn.send_chunked(conn, 200)
         {:ok, conn} = Plug.Conn.chunk(conn, "foo")
@@ -96,7 +96,7 @@ defmodule Req.HttpcTest do
         conn
       end)
 
-      resp = Req.get!(req, into: self())
+      resp = Req.get!(req, into: :self)
       assert resp.status == 200
 
       # httpc seems to randomly chunk things
@@ -120,7 +120,7 @@ defmodule Req.HttpcTest do
         conn
       end)
 
-      resp = Req.get!(req, into: self())
+      resp = Req.get!(req, into: :self)
       assert resp.status == 200
       assert :ok = Req.cancel_async_response(resp)
     end
@@ -180,8 +180,8 @@ defmodule Req.HttpcTest do
       nil ->
         httpc_request(request, httpc_req, httpc_http_options, httpc_options)
 
-      pid when is_pid(pid) ->
-        httpc_async(request, httpc_req, httpc_http_options, httpc_options, pid)
+      :self ->
+        httpc_async(request, httpc_req, httpc_http_options, httpc_options, :self)
 
       fun ->
         httpc_async(request, httpc_req, httpc_http_options, httpc_options, fun)
@@ -223,10 +223,10 @@ defmodule Req.HttpcTest do
     end
   end
 
-  defp httpc_async(request, httpc_req, httpc_http_options, httpc_options, pid_or_fun) do
+  defp httpc_async(request, httpc_req, httpc_http_options, httpc_options, self_or_fun) do
     stream =
-      case pid_or_fun do
-        pid when is_pid(pid) ->
+      case self_or_fun do
+        :self ->
           :self
 
         fun when is_function(fun) ->
@@ -273,12 +273,12 @@ defmodule Req.HttpcTest do
 
         response = Req.Response.new(status: status, headers: headers)
 
-        case pid_or_fun do
+        case self_or_fun do
+          :self ->
+            {request, response}
+
           fun when is_function(fun) ->
             httpc_loop(request, response, ref, pid, fun)
-
-          pid when is_pid(pid) ->
-            {request, response}
         end
 
       {:http, {^ref, {{_, status, _}, headers, body}}} ->

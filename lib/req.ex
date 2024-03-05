@@ -62,7 +62,7 @@ defmodule Req do
 
   Stream response body to the current process:
 
-      iex> resp = Req.get!("http://httpbin.org/stream/2", into: self())
+      iex> resp = Req.get!("http://httpbin.org/stream/2", into: :self)
       iex> Req.parse_message(resp, receive do message -> message end)
       {:ok, [data: "{\"url\": \"http://httpbin.org/stream/2\", ..., \"id\": 0}\n"]}
       iex> Req.parse_message(resp, receive do message -> message end)
@@ -239,7 +239,7 @@ defmodule Req do
 
         * `collectable` - stream response body into a `t:Collectable.t/0`.
 
-        * `pid` - stream response body into a process mailbox. The messages should be parsed using
+        * `:self` - stream response body into the process mailbox. The messages should be parsed using
           `Req.parse_message/2`.
 
   Response redirect options ([`redirect`](`Req.Steps.redirect/1`) step):
@@ -1001,7 +1001,7 @@ defmodule Req do
   @doc false
   @deprecated "use Req.request(into: self()) instead"
   def async_request(request, options \\ []) do
-    Req.Request.run_request(%{new(request, options) | into: :self})
+    Req.Request.run_request(%{new(request, options) | into: :legacy_self})
   end
 
   @deprecated "use Req.request!(into: self()) instead"
