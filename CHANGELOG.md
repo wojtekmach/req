@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## HEAD
+## v0.4.12 (2024-03-06)
 
   * [`Req`]: Add response body streaming via `into: :self`, `Req.parse_message/2`,
     and `Req.cancel_async_response/1`.
