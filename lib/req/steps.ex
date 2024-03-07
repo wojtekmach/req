@@ -694,9 +694,7 @@ defmodule Req.Steps do
 
         * `:timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
 
-        * `:protocols` - the HTTP protocols to use, defaults to `[:http1, :http2]`, that is
-        default to HTTP/1 but if negotiated, allow HTTP/2 over HTTP/1 connection. To force HTTP/1,
-        set to `[:http1]` and force HTTP/2, set to `[:http2]`.
+        * `:protocols` - the HTTP protocols to use, defaults to `[:http1]`.
 
         * `:hostname` - Mint explicit hostname, see `Mint.HTTP.connect/4` for more information.
 

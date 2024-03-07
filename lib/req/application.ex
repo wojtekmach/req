@@ -10,7 +10,7 @@ defmodule Req.Application do
        name: Req.Finch,
        pools: %{
          default: [
-           protocols: [:http1, :http2]
+           protocols: [:http1]
          ]
        }},
       {DynamicSupervisor, strategy: :one_for_one, name: Req.FinchSupervisor},
