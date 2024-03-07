@@ -23,38 +23,41 @@ defmodule Req.StepsTest do
   end
 
   describe "put_base_url" do
-    test "it works", c do
-      Bypass.expect(c.bypass, "GET", "", fn conn ->
-        Plug.Conn.send_resp(conn, 200, "ok")
-      end)
+    test "it works" do
+      %{url: url} =
+        start_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
 
-      assert Req.get!("/", base_url: c.url).body == "ok"
-      assert Req.get!("", base_url: c.url).body == "ok"
+      assert Req.get!("/", base_url: url).body == "ok"
+      assert Req.get!("", base_url: url).body == "ok"
 
-      req = Req.new(base_url: c.url)
+      req = Req.new(base_url: url)
       assert Req.get!(req, url: "/").body == "ok"
       assert Req.get!(req, url: "").body == "ok"
     end
 
-    test "with absolute url", c do
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
-        Plug.Conn.send_resp(conn, 200, "ok")
-      end)
+    test "with absolute url" do
+      %{url: url} =
+        start_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
 
-      assert Req.get!(c.url, base_url: "ignored").body == "ok"
+      assert Req.get!(url, base_url: "ignored").body == "ok"
     end
 
-    test "with base path", c do
-      Bypass.expect(c.bypass, "GET", "/api/v2/foo", fn conn ->
-        assert conn.request_path == "/api/v2/foo"
-        Plug.Conn.send_resp(conn, 200, "ok")
-      end)
+    test "with base path" do
+      %{url: url} =
+        start_server(fn conn ->
+          assert conn.request_path == "/api/v2/foo"
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
 
-      assert Req.get!("/foo", base_url: c.url <> "/api/v2", retry: false).body == "ok"
-      assert Req.get!("foo", base_url: c.url <> "/api/v2").body == "ok"
-      assert Req.get!("/foo", base_url: c.url <> "/api/v2/").body == "ok"
-      assert Req.get!("foo", base_url: c.url <> "/api/v2/").body == "ok"
-      assert Req.get!("", base_url: c.url <> "/api/v2/foo").body == "ok"
+      assert Req.get!("/foo", base_url: url <> "/api/v2", retry: false).body == "ok"
+      assert Req.get!("foo", base_url: url <> "/api/v2").body == "ok"
+      assert Req.get!("/foo", base_url: url <> "/api/v2/").body == "ok"
+      assert Req.get!("foo", base_url: url <> "/api/v2/").body == "ok"
+      assert Req.get!("", base_url: url <> "/api/v2/foo").body == "ok"
     end
 
     test "function" do
@@ -2124,5 +2127,12 @@ defmodule Req.StepsTest do
       assert resp.status == 200
       assert :ok = Req.cancel_async_response(resp)
     end
+  end
+
+  defp start_server(plug) do
+    plug = fn conn, _ -> plug.(conn) end
+    pid = start_supervised!({Bandit, scheme: :http, port: 0, startup_log: false, plug: plug})
+    {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)
+    %{pid: pid, url: "http://localhost:#{port}"}
   end
 end
