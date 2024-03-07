@@ -599,7 +599,7 @@ defmodule Req.StepsTest do
     @tag :tmp_dir
     test "decode_body with output", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
-        json(conn, 200, %{a: 1})
+        Req.Test.json(conn, %{a: 1})
       end)
 
       assert Req.get!(c.url, output: c.tmp_dir <> "/a.json").body == ""
@@ -633,7 +633,7 @@ defmodule Req.StepsTest do
 
     test "disables decoding", c do
       Bypass.expect_once(c.bypass, "GET", "/foo.json", fn conn ->
-        json(conn, 200, %{a: 1})
+        Req.Test.json(conn, %{a: 1})
       end)
 
       response = Req.get!(c.url <> "/foo.json", output: :remote_name)
@@ -671,7 +671,7 @@ defmodule Req.StepsTest do
 
     test "json", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
-        json(conn, 200, %{a: 1})
+        Req.Test.json(conn, %{a: 1})
       end)
 
       assert Req.get!(c.url).body == %{"a" => 1}
@@ -681,7 +681,7 @@ defmodule Req.StepsTest do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         conn
         |> Plug.Conn.put_resp_header("content-type", "application/vnd.api+json; charset=utf-8")
-        |> json(200, %{a: 1})
+        |> Req.Test.json(%{a: 1})
       end)
 
       assert Req.get!(c.url).body == %{"a" => 1}
@@ -689,7 +689,7 @@ defmodule Req.StepsTest do
 
     test "json with custom options", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
-        json(conn, 200, %{a: 1})
+        Req.Test.json(conn, %{a: 1})
       end)
 
       assert Req.get!(c.url, decode_json: [keys: :atoms]).body == %{a: 1}
@@ -1593,7 +1593,7 @@ defmodule Req.StepsTest do
 
           conn
           |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
-          |> json(200, %{a: 1})
+          |> Req.Test.json(%{a: 1})
 
         _ ->
           send(pid, :cache_hit)
@@ -2124,18 +2124,5 @@ defmodule Req.StepsTest do
       assert resp.status == 200
       assert :ok = Req.cancel_async_response(resp)
     end
-  end
-
-  defp json(conn, status, data) do
-    conn =
-      case Plug.Conn.get_resp_header(conn, "content-type") do
-        [] ->
-          Plug.Conn.put_resp_content_type(conn, "application/json")
-
-        _ ->
-          conn
-      end
-
-    Plug.Conn.send_resp(conn, status, Jason.encode_to_iodata!(data))
   end
 end
