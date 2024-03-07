@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## v0.4.13 (2024-03-07)
+
+  * [`run_finch`]: Default to `connect_options: [protocols: [:http1]]` due to regression
+    with HTTP/2 requests over HTTP/1 connections (`protocols: [:http1, :http2]`) with request body
+    size exceeding 64kib.
+
 ## v0.4.12 (2024-03-06)
 
   * [`Req`]: Add response body streaming via `into: :self`, `Req.parse_message/2`,
