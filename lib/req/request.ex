@@ -409,11 +409,15 @@ defmodule Req.Request do
         |> Keyword.update(:options, %{}, &Map.new/1)
         |> Keyword.update(
           :registered_options,
-          MapSet.new([:redact_auth]),
-          &MapSet.put(&1, :redact_auth)
-        )
+          MapSet.new([:redact_headers, :redact_options]),
+          fn registered_options -> 
+            MapSet.put(registered_options, :redact_headers)
+            MapSet.put(registered_options, :redact_options)
+        end)
 
-      struct!(__MODULE__, options)
+      opts = set_redact_defaults(options)
+      
+      struct!(__MODULE__, opts)
     end
   else
     def new(options \\ []) do
@@ -429,12 +433,23 @@ defmodule Req.Request do
         |> Keyword.update(:options, %{}, &Map.new/1)
         |> Keyword.update(
           :registered_options,
-          MapSet.new([:redact_auth]),
-          &MapSet.put(&1, :redact_auth)
-        )
+          MapSet.new([:redact_headers, :redact_options]),
+          fn registered_options -> 
+            MapSet.put(registered_options, :redact_headers)
+            MapSet.put(registered_options, :redact_options)
+        end)
 
-      struct!(__MODULE__, options)
+
+      opts = set_redact_defaults(options)
+
+      struct!(__MODULE__, opts)
     end
+  end
+
+  defp set_redact_defaults(request_options) do
+    request_options
+    |> put_in([:options, :redact_headers], ["authorization"])
+    |> put_in([:options, :redact_options], [:auth])
   end
 
   @doc """
@@ -1087,48 +1102,42 @@ defmodule Req.Request do
       sep = color(",", :map, opts)
       close = color("}", :map, opts)
 
-      {headers, options} =
-        if Req.Request.get_option(request, :redact_auth, true) do
-          headers =
-            if unquote(Req.MixProject.legacy_headers_as_lists?()) do
-              for {name, value} <- request.headers do
-                if Req.__ensure_header_downcase__(name) == "authorization" do
-                  {name, "[redacted]"}
-                else
-                  {name, value}
-                end
-              end
-            else
-              for {name, values} <- request.headers, into: %{} do
-                if Req.__ensure_header_downcase__(name) == "authorization" do
-                  [_] = values
-                  {name, ["[redacted]"]}
-                else
-                  {name, values}
-                end
-              end
+      redact_headers = Req.Request.get_option(request, :redact_headers, [])
+
+      headers =
+        if unquote(Req.MixProject.legacy_headers_as_lists?()) do
+          for {name, value} <- request.headers do
+            case Enum.member?(redact_headers, Req.__ensure_header_downcase__(name)) do
+              true -> {name, "[redacted]"}
+              _ -> {name, value}
             end
-
-          options =
-            case request.options do
-              %{auth: {:bearer, _bearer}} ->
-                %{request.options | auth: {:bearer, "[redacted]"}}
-
-              %{auth: {:basic, _userinfo}} ->
-                %{request.options | auth: {:basic, "[redacted]"}}
-
-              # TODO: remove on 1.0/1.1?
-              %{auth: {username, password}} when is_binary(username) and is_binary(password) ->
-                %{request.options | auth: {"[redacted]", "[redacted]"}}
-
-              _ ->
-                request.options
-            end
-
-          {headers, options}
+          end
         else
-          {request.headers, request.options}
+          for {name, values} <- request.headers, into: %{} do
+            case Enum.member?(redact_headers, Req.__ensure_header_downcase__(name)) do
+              true -> {name, ["[redacted]"]}
+              _ -> {name, values}
+            end
+          end
         end
+
+      options =
+        case request.options do
+          %{auth: {:bearer, _bearer}} ->
+            %{request.options | auth: {:bearer, "[redacted]"}}
+
+          %{auth: {:basic, _userinfo}} ->
+            %{request.options | auth: {:basic, "[redacted]"}}
+
+          # TODO: remove on 1.0/1.1?
+          %{auth: {username, password}} when is_binary(username) and is_binary(password) ->
+            %{request.options | auth: {"[redacted]", "[redacted]"}}
+
+          _ ->
+            request.options
+        end
+
+      {headers, options}
 
       list = [
         method: request.method,
