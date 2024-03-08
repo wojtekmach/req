@@ -330,6 +330,33 @@ defmodule Req.StepsTest do
                    end
     end
 
+    # TODO
+    @tag :skip
+    test "into: binary with gzip", c do
+      Bypass.stub(c.bypass, "GET", "/", fn conn ->
+        ["zstd, br, gzip"] = Plug.Conn.get_req_header(conn, "accept-encoding")
+
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "gzip")
+        |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
+      end)
+
+      req = Req.new(url: c.url)
+
+      resp = Req.get!(req, checksum: @foo_md5)
+      assert resp.body == "foo"
+
+      assert_raise Req.ChecksumMismatchError,
+                   """
+                   checksum mismatch
+                   expected: sha1:bad
+                   actual:   #{@foo_sha1}\
+                   """,
+                   fn ->
+                     Req.get!(req, checksum: "sha1:bad")
+                   end
+    end
+
     test "into: fun", c do
       Bypass.stub(c.bypass, "GET", "/", fn conn ->
         Plug.Conn.send_resp(conn, 200, "foo")
