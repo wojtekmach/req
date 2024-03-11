@@ -1923,8 +1923,8 @@ defmodule Req.Steps do
     * `:redirect_log_level` - the log level to emit redirect logs at. Can also be set
       to `false` to disable logging these messages. Defaults to `:debug`.
 
-    * `:max_redirects` - the maximum number of redirects, defaults to `10`.
-      If the limit is reached, an error is raised.
+    * `:max_redirects` - the maximum number of redirects, defaults to `10`. If the
+    limit is reached, the pipeline is halted and an exception struct is returned.
 
   ## Examples
 
@@ -1977,7 +1977,7 @@ defmodule Req.Steps do
           {_, result} = Req.Request.run(request)
           {Req.Request.halt(request), result}
         else
-          raise "too many redirects (#{max_redirects})"
+          {Req.Request.halt(request), %Req.TooManyRedirectsError{max_redirects: max_redirects}}
         end
 
       true ->
