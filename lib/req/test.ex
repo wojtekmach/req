@@ -218,6 +218,26 @@ defmodule Req.Test do
 
   @doc false
   def call(conn, stub_name) do
-    stub(stub_name).(conn)
+    case stub(stub_name) do
+      fun when is_function(fun) ->
+        fun.(conn)
+
+      module when is_atom(module) ->
+        module.call(conn, module.init([]))
+
+      {module, options} when is_atom(module) ->
+        module.call(conn, module.init(options))
+
+      other ->
+        raise """
+        expected stub to be one of:
+
+          * 0-arity function
+          * module
+          * {module, options}
+
+        got: #{inspect(other)}\
+        """
+    end
   end
 end

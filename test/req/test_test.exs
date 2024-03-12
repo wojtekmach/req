@@ -22,12 +22,25 @@ defmodule Req.TestTest do
     assert Req.Test.stub(:foo) == 2
   end
 
-  test "plug" do
-    Req.Test.stub(:foo, fn conn ->
-      Plug.Conn.send_resp(conn, 200, "hi")
-    end)
+  describe "plug" do
+    test "function" do
+      Req.Test.stub(:foo, fn conn ->
+        Plug.Conn.send_resp(conn, 200, "hi")
+      end)
 
-    assert Req.get!(plug: {Req.Test, :foo}).body == "hi"
+      assert Req.get!(plug: {Req.Test, :foo}).body == "hi"
+    end
+
+    test "module" do
+      defmodule Foo do
+        def init(options), do: options
+        def call(conn, []), do: Plug.Conn.send_resp(conn, 200, "hi")
+      end
+
+      Req.Test.stub(:foo, Foo)
+
+      assert Req.get!(plug: {Req.Test, :foo}).body == "hi"
+    end
   end
 
   describe "allow/3" do
