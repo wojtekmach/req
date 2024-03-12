@@ -1063,7 +1063,7 @@ defmodule Req.StepsTest do
 
       captured_log =
         ExUnit.CaptureLog.capture_log(fn ->
-          assert_raise RuntimeError, "too many redirects (3)", fn ->
+          assert_raise Req.TooManyRedirectsError, "too many redirects (3)", fn ->
             Req.get!(c.url, max_redirects: 3)
           end
         end)
