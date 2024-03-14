@@ -27,8 +27,7 @@ defmodule Req.MixProject do
           Plug.Test,
           Plug.Conn,
           :brotli,
-          :ezstd,
-          :aws_signature
+          :ezstd
         ]
       ]
     ]
@@ -59,10 +58,10 @@ defmodule Req.MixProject do
       {:jason, "~> 1.0"},
       {:nimble_ownership, "~> 0.2.0 or ~> 0.3.0"},
       {:nimble_csv, "~> 1.0", optional: true},
-      {:aws_signature, "~> 0.3.2", optional: true},
       {:plug, "~> 1.0", [optional: true] ++ plug_opts()},
       {:brotli, "~> 0.3.1", optional: true},
       {:ezstd, "~> 1.0", optional: true},
+      {:aws_signature, "~> 0.3.2", only: :test},
       {:bypass, "~> 2.1", only: :test},
       {:ex_doc, ">= 0.0.0", only: :docs},
       {:bandit, "~> 1.0", only: :test}

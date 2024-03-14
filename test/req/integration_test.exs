@@ -43,18 +43,18 @@ defmodule Req.IntegrationTest do
       handle_http_errors: 1
     ]
 
-  @aws_access_key_id System.get_env("REQ_AWS_ACCESS_KEY_ID")
-  @aws_secret_access_key System.get_env("REQ_AWS_SECRET_ACCESS_KEY")
-  @aws_bucket System.get_env("REQ_AWS_BUCKET")
-
   @tag :s3
   test "s3" do
+    aws_access_key_id = System.fetch_env!("REQ_AWS_ACCESS_KEY_ID")
+    aws_secret_access_key = System.fetch_env!("REQ_AWS_SECRET_ACCESS_KEY")
+    aws_bucket = System.fetch_env!("REQ_AWS_BUCKET")
+
     req =
       Req.new(
-        base_url: "https://#{@aws_bucket}.s3.amazonaws.com",
+        base_url: "https://#{aws_bucket}.s3.amazonaws.com",
         aws_sigv4: [
-          access_key_id: @aws_access_key_id,
-          secret_access_key: @aws_secret_access_key,
+          access_key_id: aws_access_key_id,
+          secret_access_key: aws_secret_access_key,
           service: :s3
         ]
       )
