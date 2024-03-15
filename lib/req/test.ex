@@ -110,6 +110,46 @@ defmodule Req.Test do
         assert get_weather(pid, "Krakow, Poland") == {:ok, :nice}
       end
 
+  ### Broadway
+
+  If you're using `Req.Test` with [Broadway](https://hex.pm/broadway), you may need to use
+  `allow/3` to make stubs available in the Broadway processors. A great way to do that is
+  to hook into the [Telemetry](https://hex.pm/telemetry) events that Broadway publishes to
+  manually allow the processors and batch processors to access the stubs. This approach is
+  similar to what is [documented in Broadway
+  itself](https://hexdocs.pm/broadway/Broadway.html#module-testing-with-ecto).
+
+  First, you should add the test PID (which is allowed to use the Req stub) to the metadata
+  for the test events you're publishing:
+
+      Broadway.test_message(MyApp.Pipeline, message, metadata: %{req_stub_owner: self()})
+
+  Then, you'll need to define a test helper to hook into the Telemetry events. For example,
+  in your `test/test_helper.exs` file:
+
+      defmodule BroadwayReqStubs do
+        def attach(stub) do
+          events = [
+            [:broadway, :processor, :start],
+            [:broadway, :batch_processor, :start],
+          ]
+
+          :telemetry.attach_many({__MODULE__, stub}, events, &__MODULE__.handle_event/4, %{stub: stub})
+        end
+
+        def handle_event(_event_name, _event_measurement, %{messages: messages}, %{stub: stub}) do
+          with [%Broadway.Message{metadata: %{req_stub_owner: pid}} | _] <- messages do
+            :ok = Req.Test.allow(stub, pid, self())
+          end
+
+          :ok
+        end
+      end
+
+  Last but not least, attach the helper in your `test/test_helper.exs`:
+
+      BroadwayReqStubs.attach(MyStub)
+
   """
 
   require Logger
