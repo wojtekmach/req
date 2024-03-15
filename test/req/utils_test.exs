@@ -23,11 +23,12 @@ defmodule Req.UtilsTest do
           Keyword.fetch!(options, :secret_access_key),
           Keyword.fetch!(options, :region),
           Keyword.fetch!(options, :service),
-          NaiveDateTime.to_erl(Keyword.fetch!(options, :datetime)),
-          String.upcase(Atom.to_string(Keyword.fetch!(options, :method))),
+          Keyword.fetch!(options, :datetime) |> NaiveDateTime.to_erl(),
+          Keyword.fetch!(options, :method) |> Atom.to_string() |> String.upcase(),
           Keyword.fetch!(options, :url),
           Keyword.fetch!(options, :headers),
-          Keyword.fetch!(options, :body)
+          Keyword.fetch!(options, :body),
+          Keyword.take(options, [:body_digest])
         )
 
       assert signature1 ==
