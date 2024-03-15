@@ -1180,7 +1180,7 @@ defmodule Req.Steps do
   You can simulate failure conditions by returning exception structs from your plugs.
   For network related issues, use `Req.TransportError` exception:
 
-      test "timeout" do
+      test "network issues" do
         plug = fn _conn ->
           %Req.TransportError{reason: :econnrefused}
         end
