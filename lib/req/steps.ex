@@ -1425,16 +1425,8 @@ defmodule Req.Steps do
   defp hash_init(:sha1), do: hash_init(:sha)
   defp hash_init(type), do: :crypto.hash_init(type)
 
-  defmacrop aws_signature_loaded? do
-    Code.ensure_loaded?(:aws_signature)
-  end
-
   @doc """
   Signs request with AWS Signature Version 4.
-
-  This step requires [`:aws_signature`](https://hex.pm/packages/aws_signature) dependency:
-
-      {:aws_signature, "~> 0.3.0"}
 
   ## Request Options
 
@@ -1480,18 +1472,6 @@ defmodule Req.Steps do
   @doc step: :request
   def put_aws_sigv4(request) do
     if aws_options = request.options[:aws_sigv4] do
-      unless aws_signature_loaded?() do
-        Logger.error("""
-        Could not find aws_signature dependency.
-
-        Please add :aws_signature to your dependencies:
-
-            {:aws_signature, "~> 0.3.0"}
-        """)
-
-        raise "missing aws_signature dependency"
-      end
-
       aws_options =
         case aws_options do
           list when is_list(list) ->
@@ -1505,8 +1485,12 @@ defmodule Req.Steps do
                   ":aws_sigv4 must be a keywords list or a map, got: #{inspect(other)}"
         end
 
-      # aws_credentials returns this key so let's ignore it
-      aws_options = Keyword.drop(aws_options, [:credential_provider])
+      aws_options =
+        aws_options
+        |> Keyword.put_new(:region, "us-east-1")
+        |> Keyword.put_new(:datetime, DateTime.utc_now())
+        # aws_credentials returns this key so let's ignore it
+        |> Keyword.drop([:credential_provider])
 
       Req.Request.validate_options(aws_options, [
         :access_key_id,
@@ -1515,17 +1499,6 @@ defmodule Req.Steps do
         :region,
         :datetime
       ])
-
-      access_key_id = Keyword.fetch!(aws_options, :access_key_id)
-      secret_access_key = Keyword.fetch!(aws_options, :secret_access_key)
-      service = Keyword.fetch!(aws_options, :service)
-      region = Keyword.get(aws_options, :region, "us-east-1")
-      datetime = Keyword.get(aws_options, :datetime)
-
-      now =
-        (datetime || DateTime.utc_now(:second))
-        |> DateTime.to_naive()
-        |> NaiveDateTime.to_erl()
 
       {body, options} =
         case request.body do
@@ -1548,17 +1521,14 @@ defmodule Req.Steps do
       headers = for {name, values} <- request.headers, value <- values, do: {name, value}
 
       headers =
-        :aws_signature.sign_v4(
-          access_key_id,
-          secret_access_key,
-          region,
-          to_string(service),
-          now,
-          to_string(request.method),
-          to_string(request.url),
-          headers,
-          body,
-          options
+        Req.Utils.aws_sigv4(
+          aws_options ++
+            [
+              method: request.method,
+              url: to_string(request.url),
+              headers: headers,
+              body: body
+            ] ++ options
         )
 
       Req.merge(request, headers: headers)

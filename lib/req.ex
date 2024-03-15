@@ -204,9 +204,7 @@ defmodule Req do
 
         * `:region` - if set, AWS region. Defaults to `"us-east-1"`.
 
-  This functionality requires [`:aws_signature`](https://hex.pm/packages/aws_signature) dependency:
-
-      {:aws_signature, "~> 0.3.0"}
+        * `:datetime` - the request datetime, defaults to `DateTime.utc_now(:second)`.
 
   Response body options:
 
