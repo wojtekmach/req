@@ -1928,6 +1928,9 @@ defmodule Req.StepsTest do
 
       req = Req.new(url: "http://localhost:#{ipv6_port}", inet6: true)
       assert Req.request!(req).body == "ok"
+
+      req = Req.new(url: "http://[::1]:#{ipv6_port}")
+      assert Req.request!(req).body == "ok"
     end
 
     test ":connect_options bad option", c do

@@ -709,8 +709,11 @@ defmodule Req.Steps do
         * `:client_settings` - Mint HTTP/2 client settings, see `Mint.HTTP.connect/4` for more
         information.
 
-    * `:inet6` - if set to true, uses IPv6. Defaults to `false`. This is a shortcut for
-      setting `connect_options: [transport_opts: [inet6: true]]`.
+    * `:inet6` - if set to true, uses IPv6.
+
+      If the request URL looks like IPv6 address, i.e., say, `[::1]`, it defaults to `true`
+      and otherwise defaults to `false`.
+      This is a shortcut for setting `connect_options: [transport_opts: [inet6: true]]`.
 
     * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
 
@@ -783,6 +786,18 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def run_finch(request) do
+    # URI.parse removes `[` and `]` so we can't check for these. The host
+    # should not have `:` so it should be safe to check for it.
+    request =
+      if !request.options[:inet6] and
+           (request.url.host || "") =~ ":" do
+        request = put_in(request.options[:inet6], true)
+        # ...and have to put them back for host header.
+        Req.Request.put_new_header(request, "host", "[#{request.url.host}]")
+      else
+        request
+      end
+
     finch_name = finch_name(request)
 
     request_headers =
