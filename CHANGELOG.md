@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## v0.4.14 (2024-03-15)
+
+  * [`redirect`]: Return `Req.TooManyRedirectsError` exception.
+
+    Previously we _always_ raised a `RuntimeError`. Besides changing the exception struct, now
+    it is _returned_:
+
+        iex> Req.get("https://httpbin.org/redirect/4", max_redirects: 3)
+        # 07:08:06.868 [debug] redirecting to /relative-redirect/3
+        # 07:08:06.988 [debug] redirecting to /relative-redirect/2
+        # 07:08:07.109 [debug] redirecting to /relative-redirect/1
+        {:error, %Req.TooManyRedirectsError{max_redirects: 3}}
+
+    When users where using functions like `Req.get!`, the exception will of course still be
+    raised.
+
+  * Relax `nimble_ownership` version requirement
+
+  * [`Req.Test`]: Allow plug stub to be a `module` or `{module, options}`
+
+  * [`Req.Test`]: Document stubbing with Broadway
+
 ## v0.4.13 (2024-03-07)
 
   * [`run_finch`]: Default to `connect_options: [protocols: [:http1]]` due to regression

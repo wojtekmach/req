@@ -1924,7 +1924,8 @@ defmodule Req.Steps do
       to `false` to disable logging these messages. Defaults to `:debug`.
 
     * `:max_redirects` - the maximum number of redirects, defaults to `10`. If the
-    limit is reached, the pipeline is halted and an exception struct is returned.
+      limit is reached, the pipeline is halted and a `Req.TooManyRedirectsError`
+      exception is returned.
 
   ## Examples
 
