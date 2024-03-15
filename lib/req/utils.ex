@@ -115,4 +115,41 @@ defmodule Req.Utils do
   def format_http_datetime(datetime) do
     Calendar.strftime(datetime, "%a, %d %b %Y %H:%M:%S GMT")
   end
+
+  @doc """
+  Returns a stream where each element is gzipped.
+
+  ## Examples
+
+      iex> gzipped = Req.Utils.stream_gzip(~w[foo bar baz]) |> Enum.to_list()
+      iex> :zlib.gunzip(gzipped)
+      "foobarbaz"
+  """
+  def stream_gzip(enumerable) do
+    eof = make_ref()
+
+    enumerable
+    |> Stream.concat([eof])
+    |> Stream.transform(
+      fn ->
+        z = :zlib.open()
+        # https://github.com/erlang/otp/blob/OTP-26.0/erts/preloaded/src/zlib.erl#L551
+        :ok = :zlib.deflateInit(z, :default, :deflated, 16 + 15, 8, :default)
+        z
+      end,
+      fn
+        ^eof, z ->
+          buf = :zlib.deflate(z, [], :finish)
+          {buf, z}
+
+        data, z ->
+          buf = :zlib.deflate(z, data)
+          {buf, z}
+      end,
+      fn z ->
+        :ok = :zlib.deflateEnd(z)
+        :ok = :zlib.close(z)
+      end
+    )
+  end
 end

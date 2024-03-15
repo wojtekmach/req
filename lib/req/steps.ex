@@ -620,7 +620,7 @@ defmodule Req.Steps do
             :zlib.gzip(iodata)
 
           enumerable ->
-            gzip_stream(enumerable)
+            Req.Utils.stream_gzip(enumerable)
         end
 
       request
@@ -629,34 +629,6 @@ defmodule Req.Steps do
     else
       request
     end
-  end
-
-  defp gzip_stream(enumerable) do
-    eof = make_ref()
-
-    enumerable
-    |> Stream.concat([eof])
-    |> Stream.transform(
-      fn ->
-        z = :zlib.open()
-        # https://github.com/erlang/otp/blob/OTP-26.0/erts/preloaded/src/zlib.erl#L551
-        :ok = :zlib.deflateInit(z, :default, :deflated, 16 + 15, 8, :default)
-        z
-      end,
-      fn
-        ^eof, z ->
-          buf = :zlib.deflate(z, [], :finish)
-          {buf, z}
-
-        data, z ->
-          buf = :zlib.deflate(z, data)
-          {buf, z}
-      end,
-      fn z ->
-        :ok = :zlib.deflateEnd(z)
-        :ok = :zlib.close(z)
-      end
-    )
   end
 
   @doc """
