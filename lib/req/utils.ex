@@ -103,4 +103,16 @@ defmodule Req.Utils do
   defp hmac(key, data) do
     :crypto.mac(:hmac, :sha256, key, data)
   end
+
+  @doc """
+  Formats a datetime as "HTTP Date".
+
+  ## Examples
+
+      iex> Req.Utils.format_http_datetime(~U[2024-01-01 09:00:00Z])
+      "Mon, 01 Jan 2024 09:00:00 GMT"
+  """
+  def format_http_datetime(datetime) do
+    Calendar.strftime(datetime, "%a, %d %b %Y %H:%M:%S GMT")
+  end
 end

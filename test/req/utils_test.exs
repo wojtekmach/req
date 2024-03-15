@@ -1,5 +1,6 @@
 defmodule Req.UtilsTest do
   use ExUnit.Case, async: true
+  doctest Req.Utils
 
   describe "aws_sigv4" do
     test "GET" do

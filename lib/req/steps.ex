@@ -578,7 +578,7 @@ defmodule Req.Steps do
           stat.mtime
           |> NaiveDateTime.from_erl!()
           |> DateTime.from_naive!("Etc/UTC")
-          |> format_http_datetime()
+          |> Req.Utils.format_http_datetime()
 
         Req.Request.put_new_header(request, "if-modified-since", http_datetime_string)
 
@@ -2331,10 +2331,5 @@ defmodule Req.Steps do
 
   defp load_cache(path) do
     path |> File.read!() |> :erlang.binary_to_term()
-  end
-
-  @doc false
-  def format_http_datetime(datetime) do
-    Calendar.strftime(datetime, "%a, %d %b %Y %H:%M:%S GMT")
   end
 end
