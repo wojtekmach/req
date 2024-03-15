@@ -241,8 +241,8 @@ defmodule Req.Steps do
     )
   end
 
-  defp authenticate_with_netrc(request, path) when is_binary(path) do
-    case Map.fetch(load_netrc(path), request.url.host) do
+  defp authenticate_with_netrc(request, path_or_device) do
+    case Map.fetch(Req.Utils.load_netrc(path_or_device), request.url.host) do
       {:ok, {username, password}} ->
         auth(request, {:basic, "#{username}:#{password}"})
 
@@ -250,33 +250,6 @@ defmodule Req.Steps do
         request
     end
   end
-
-  defp load_netrc(path) do
-    case File.read(path) do
-      {:ok, ""} ->
-        raise ".netrc file is empty"
-
-      {:ok, contents} ->
-        contents
-        |> String.trim()
-        |> String.split()
-        |> parse_netrc()
-
-      {:error, reason} ->
-        raise "error reading .netrc file: #{:file.format_error(reason)}"
-    end
-  end
-
-  defp parse_netrc(credentials), do: parse_netrc(credentials, %{})
-
-  defp parse_netrc([], acc), do: acc
-
-  defp parse_netrc([_, machine, _, login, _, password | tail], acc) do
-    acc = Map.put(acc, String.trim(machine), {String.trim(login), String.trim(password)})
-    parse_netrc(tail, acc)
-  end
-
-  defp parse_netrc(_, _), do: raise("error parsing .netrc file")
 
   @user_agent "req/#{Mix.Project.config()[:version]}"
 

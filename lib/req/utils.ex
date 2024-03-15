@@ -152,4 +152,53 @@ defmodule Req.Utils do
       end
     )
   end
+
+  @doc """
+  Loads .netrc file.
+
+  ## Examples
+
+      iex> {:ok, pid} = StringIO.open(\"""
+      ...> machine localhost
+      ...> login foo
+      ...> password bar
+      ...> \""")
+      iex> Req.Utils.load_netrc(pid)
+      %{"localhost" => {"foo", "bar"}}
+  """
+  def load_netrc(path_or_device) do
+    case read_netrc(path_or_device) do
+      {:ok, ""} ->
+        raise ".netrc file is empty"
+
+      {:ok, contents} ->
+        contents
+        |> String.trim()
+        |> String.split()
+        |> parse_netrc()
+
+      {:error, reason} ->
+        raise "error reading .netrc file: #{:file.format_error(reason)}"
+    end
+  end
+
+  defp read_netrc(path) when is_binary(path) do
+    File.read(path)
+  end
+
+  defp read_netrc(pid) when is_pid(pid) do
+    <<content::binary>> = IO.read(pid, :eof)
+    {:ok, content}
+  end
+
+  defp parse_netrc(credentials), do: parse_netrc(credentials, %{})
+
+  defp parse_netrc([], acc), do: acc
+
+  defp parse_netrc([_, machine, _, login, _, password | tail], acc) do
+    acc = Map.put(acc, String.trim(machine), {String.trim(login), String.trim(password)})
+    parse_netrc(tail, acc)
+  end
+
+  defp parse_netrc(_, _), do: raise("error parsing .netrc file")
 end
