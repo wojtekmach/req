@@ -666,6 +666,9 @@ defmodule Req.Steps do
   ["Adapter" section in the `Req.Request`](Req.Request.html#module-adapter) module documentation
   for more information on adapters.
 
+  Finch returns `Mint.TransportError` exceptions on HTTP connection problems. These are automatically
+  converted to `Req.TransportError` exceptions.
+
   ## HTTP/1 Pools
 
   On HTTP/1 connections, Finch creates a pool per `{scheme, host, port}` tuple. These pools
@@ -756,6 +759,11 @@ defmodule Req.Steps do
   Connecting with built-in CA store (requires OTP 25+):
 
       iex> Req.get!(url, connect_options: [transport_opts: [cacerts: :public_key.cacerts_get()]])
+
+  Transport errors are represented as `Req.TransportError` exceptions:
+
+      iex> Req.get("https://httpbin.org/delay/1", receive_timeout: 0, retry: false)
+      {:error, %Req.TransportError{reason: :timeout}}
 
   Stream response body using `Finch.stream/5`:
 
@@ -876,6 +884,9 @@ defmodule Req.Steps do
       {:ok, acc} ->
         acc
 
+      {:error, %Mint.TransportError{reason: reason}} ->
+        {req, %Req.TransportError{reason: reason}}
+
       {:error, exception} ->
         {req, exception}
     end
@@ -908,6 +919,9 @@ defmodule Req.Steps do
       {:ok, {acc, req, resp}} ->
         acc = collector.(acc, :done)
         {req, %{resp | body: acc}}
+
+      {:error, %Mint.TransportError{reason: reason}} ->
+        {req, %Req.TransportError{reason: reason}}
 
       {:error, exception} ->
         {req, exception}
@@ -977,8 +991,14 @@ defmodule Req.Steps do
 
   defp run_finch_request(finch_request, finch_name, finch_options) do
     case Finch.request(finch_request, finch_name, finch_options) do
-      {:ok, response} -> Req.Response.new(response)
-      {:error, exception} -> exception
+      {:ok, response} ->
+        Req.Response.new(response)
+
+      {:error, %Mint.TransportError{reason: reason}} ->
+        %Req.TransportError{reason: reason}
+
+      {:error, exception} ->
+        exception
     end
   end
 
@@ -1156,6 +1176,18 @@ defmodule Req.Steps do
 
         assert Req.get!(plug: plug, into: []).body == ["echoecho"]
       end
+
+  You can simulate failure conditions by returning exception structs from your plugs.
+  For network related issues, use `Req.TransportError` exception:
+
+      test "timeout" do
+        plug = fn _conn ->
+          %Req.TransportError{reason: :econnrefused}
+        end
+
+        assert Req.get(plug: plug, retry: false) ==
+                 {:error, %Req.TransportError{reason: :econnrefused}}
+      end
   """
   @doc step: :request
   def put_plug(request) do
@@ -1195,8 +1227,36 @@ defmodule Req.Steps do
       conn = Plug.Test.conn(request.method, request.url, req_body)
 
       conn = put_in(conn.req_headers, req_headers)
-      conn = call_plug(conn, plug)
 
+      case call_plug(conn, plug) do
+        %Plug.Conn{} = conn ->
+          handle_plug_result(conn, request)
+
+        %Req.TransportError{} = exception ->
+          validate_transport_error!(exception.reason)
+          {request, exception}
+
+        %_{__exception__: true} = exception ->
+          {request, exception}
+      end
+    end
+
+    defp validate_transport_error!(:protocol_not_negotiated), do: :ok
+    defp validate_transport_error!({:bad_alpn_protocol, _}), do: :ok
+    defp validate_transport_error!(:closed), do: :ok
+    defp validate_transport_error!(:timeout), do: :ok
+
+    defp validate_transport_error!(reason) do
+      case :ssl.format_error(reason) do
+        ~c"Unexpected error:" ++ _ ->
+          raise ArgumentError, "unexpected Req.Transport reason: #{inspect(reason)}"
+
+        _ ->
+          :ok
+      end
+    end
+
+    defp handle_plug_result(conn, request) do
       # consume messages sent by Plug.Test adapter
       {_, %{ref: ref}} = conn.adapter
 

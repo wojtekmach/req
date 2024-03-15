@@ -1777,6 +1777,33 @@ defmodule Req.StepsTest do
       assert ["defmodule Req.MixProject do" <> _] = resp.body
       refute_receive _
     end
+
+    test "errors" do
+      req =
+        Req.new(
+          plug: fn _conn ->
+            %Req.TransportError{reason: :timeout}
+          end,
+          retry: false
+        )
+
+      assert Req.request(req) ==
+               {:error, %Req.TransportError{reason: :timeout}}
+    end
+
+    test "validate Req.TransportError reason" do
+      req =
+        Req.new(
+          plug: fn _conn ->
+            %Req.TransportError{reason: :bad}
+          end,
+          retry: false
+        )
+
+      assert_raise ArgumentError, "unexpected Req.Transport reason: :bad", fn ->
+        Req.request(req)
+      end
+    end
   end
 
   describe "run_finch" do
@@ -1849,7 +1876,7 @@ defmodule Req.StepsTest do
         end)
 
       req = Req.new(url: url, receive_timeout: 50, retry: false)
-      assert {:error, %Mint.TransportError{reason: :timeout}} = Req.request(req)
+      assert {:error, %Req.TransportError{reason: :timeout}} = Req.request(req)
       assert_received :ping
     end
 
@@ -2044,7 +2071,7 @@ defmodule Req.StepsTest do
     test "into: fun handle error", %{bypass: bypass, url: url} do
       Bypass.down(bypass)
 
-      assert {:error, %Mint.TransportError{reason: :econnrefused}} =
+      assert {:error, %Req.TransportError{reason: :econnrefused}} =
                Req.get(
                  url: url,
                  retry: false,
@@ -2097,7 +2124,7 @@ defmodule Req.StepsTest do
     test "into: collectable handle error", %{bypass: bypass, url: url} do
       Bypass.down(bypass)
 
-      assert {:error, %Mint.TransportError{reason: :econnrefused}} =
+      assert {:error, %Req.TransportError{reason: :econnrefused}} =
                Req.get(
                  url: url,
                  retry: false,
