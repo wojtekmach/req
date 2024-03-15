@@ -1298,38 +1298,6 @@ defmodule Req.Steps do
     end
   end
 
-  defmodule CollectableWithChecksum do
-    @moduledoc false
-
-    defstruct [:collectable, :hash]
-
-    defimpl Collectable do
-      def into(%{collectable: collectable, hash: hash}) do
-        {acc, collector} = Collectable.into(collectable)
-
-        new_collector = fn
-          {acc, hash}, {:cont, element} ->
-            hash = :crypto.hash_update(hash, element)
-            {collector.(acc, {:cont, element}), hash}
-
-          {acc, hash}, :done ->
-            # verification happens in verify_checksum step (so it happens after retries,
-            # redirects, etc) and there's no other way to put the data there.
-            #
-            # TODO: maybe collectables return a map with :body and arbitrary keys,
-            # and we'd store checksum in such key instead?
-            Process.put(:req_checksum_hash, hash)
-            collector.(acc, :done)
-
-          {acc, _hash}, :halt ->
-            collector.(acc, :halt)
-        end
-
-        {{acc, hash}, new_collector}
-      end
-    end
-  end
-
   @doc """
   Sets expected response body checksum.
 
@@ -1399,18 +1367,11 @@ defmodule Req.Steps do
             raise ArgumentError, ":checksum cannot be used with `into: :self`"
 
           collectable ->
-            hash = hash_init(type)
-
-            into =
-              %CollectableWithChecksum{
-                collectable: collectable,
-                hash: hash
-              }
+            into = Req.Utils.collect_with_hash(collectable, type)
 
             request
             |> Req.Request.put_private(:req_checksum_type, type)
             |> Req.Request.put_private(:req_checksum_expected, checksum)
-            |> Req.Request.put_private(:req_checksum_hash, :pdict)
             |> Map.replace!(:into, into)
         end
     end
@@ -1544,28 +1505,23 @@ defmodule Req.Steps do
   """
   @doc step: :response
   def verify_checksum({request, response}) do
-    if hash = request.private[:req_checksum_hash] do
-      hash =
-        if hash == :pdict do
-          Process.delete(:req_checksum_hash)
+    if type = request.private[:req_checksum_type] do
+      {response, hash} =
+        if hash = request.private[:req_checksum_hash] do
+          {response, :crypto.hash_final(hash)}
         else
-          hash
+          {body, hash} = response.body
+          {put_in(response.body, body), hash}
         end
 
-      type = request.private.req_checksum_type
       expected = request.private.req_checksum_expected
-
-      actual =
-        "#{type}:" <>
-          (hash
-           |> :crypto.hash_final()
-           |> Base.encode16(case: :lower, padding: false))
+      actual = "#{type}:" <> Base.encode16(hash, case: :lower, padding: false)
 
       if expected == actual do
         request =
           update_in(
             request.private,
-            &Map.drop(&1, [:req_checksum_hash, :req_checksum_expected, :req_checksum_type])
+            &Map.drop(&1, [:req_checksum_type, :req_checksum_expected, :req_checksum_hash])
           )
 
         {request, response}

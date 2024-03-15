@@ -153,6 +153,50 @@ defmodule Req.Utils do
     )
   end
 
+  defmodule CollectWithHash do
+    @moduledoc false
+
+    defstruct [:collectable, :type]
+
+    defimpl Collectable do
+      def into(%{collectable: collectable, type: type}) do
+        {acc, collector} = Collectable.into(collectable)
+
+        new_collector = fn
+          {acc, hash}, {:cont, element} ->
+            hash = :crypto.hash_update(hash, element)
+            {collector.(acc, {:cont, element}), hash}
+
+          {acc, hash}, :done ->
+            hash = :crypto.hash_final(hash)
+            {collector.(acc, :done), hash}
+
+          {acc, hash}, :halt ->
+            {collector.(acc, :halt), hash}
+        end
+
+        hash = hash_init(type)
+        {{acc, hash}, new_collector}
+      end
+
+      defp hash_init(:sha1), do: :crypto.hash_init(:sha)
+      defp hash_init(type), do: :crypto.hash_init(type)
+    end
+  end
+
+  @doc """
+  Returns a collectable with hash.
+
+  ## Examples
+
+      iex> collectable = Req.Utils.collect_with_hash([], :md5)
+      iex> Enum.into(Stream.duplicate("foo", 2), collectable)
+      {~w[foo foo], :erlang.md5("foofoo")}
+  """
+  def collect_with_hash(collectable, type) do
+    %CollectWithHash{collectable: collectable, type: type}
+  end
+
   @doc """
   Loads .netrc file.
 
