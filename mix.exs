@@ -99,7 +99,7 @@ defmodule Req.MixProject do
       main: "readme",
       source_url: @source_url,
       source_ref: "v#{@version}",
-      groups_for_functions: [
+      groups_for_docs: [
         "Request Steps": &(&1[:step] == :request),
         "Response Steps": &(&1[:step] == :response),
         "Error Steps": &(&1[:step] == :error),
