@@ -611,6 +611,9 @@ defmodule Req.Steps do
   ["Adapter" section in the `Req.Request`](Req.Request.html#module-adapter) module documentation
   for more information on adapters.
 
+  Finch returns `Mint.TransportError` exceptions on HTTP connection problems. These are automatically
+  converted to `Req.TransportError` exceptions.
+
   ## HTTP/1 Pools
 
   On HTTP/1 connections, Finch creates a pool per `{scheme, host, port}` tuple. These pools
@@ -704,6 +707,11 @@ defmodule Req.Steps do
   Connecting with built-in CA store (requires OTP 25+):
 
       iex> Req.get!(url, connect_options: [transport_opts: [cacerts: :public_key.cacerts_get()]])
+
+  Transport errors are represented as `Req.TransportError` exceptions:
+
+      iex> Req.get("https://httpbin.org/delay/1", receive_timeout: 0, retry: false)
+      {:error, %Req.TransportError{reason: :timeout}}
 
   Stream response body using `Finch.stream/5`:
 
@@ -836,6 +844,9 @@ defmodule Req.Steps do
       {:ok, acc} ->
         acc
 
+      {:error, %Mint.TransportError{reason: reason}} ->
+        {req, %Req.TransportError{reason: reason}}
+
       {:error, exception} ->
         {req, exception}
     end
@@ -868,6 +879,9 @@ defmodule Req.Steps do
       {:ok, {acc, req, resp}} ->
         acc = collector.(acc, :done)
         {req, %{resp | body: acc}}
+
+      {:error, %Mint.TransportError{reason: reason}} ->
+        {req, %Req.TransportError{reason: reason}}
 
       {:error, exception} ->
         {req, exception}
@@ -937,8 +951,14 @@ defmodule Req.Steps do
 
   defp run_finch_request(finch_request, finch_name, finch_options) do
     case Finch.request(finch_request, finch_name, finch_options) do
-      {:ok, response} -> Req.Response.new(response)
-      {:error, exception} -> exception
+      {:ok, response} ->
+        Req.Response.new(response)
+
+      {:error, %Mint.TransportError{reason: reason}} ->
+        %Req.TransportError{reason: reason}
+
+      {:error, exception} ->
+        exception
     end
   end
 
@@ -1100,7 +1120,7 @@ defmodule Req.Steps do
         assert Req.get!("http:///hello", plug: echo).body == "hello"
       end
 
-  which is particularly useful to create HTTP service mocks, similar to tools like
+  which is particularly useful to create HTTP service stubs, similar to tools like
   [Bypass](https://github.com/PSPDFKit-labs/bypass).
 
   Response streaming is also supported however at the moment the entire response
@@ -1115,6 +1135,31 @@ defmodule Req.Steps do
         end
 
         assert Req.get!(plug: plug, into: []).body == ["echoecho"]
+      end
+
+  When testing JSON APIs, it's common to use the `Req.Test.json/2` helper:
+
+      test "JSON" do
+        plug = fn conn ->
+          Req.Test.json(conn, %{message: "Hello, World!"})
+        end
+
+        resp = Req.get!(plug: plug)
+        assert resp.status == 200
+        assert resp.headers["content-type"] == ["application/json; charset=utf-8"]
+        assert resp.body == %{"message" => "Hello, World!"}
+      end
+
+  You can simulate network errors by calling `Req.Test.transport_error/2`
+  in your plugs:
+
+      test "network issues" do
+        plug = fn conn ->
+          Req.Test.transport_error(conn, :timeout)
+        end
+
+        assert Req.get(plug: plug, retry: false) ==
+                 {:error, %Req.TransportError{reason: :timeout}}
       end
   """
   @doc step: :request
@@ -1152,11 +1197,19 @@ defmodule Req.Steps do
           end
         end
 
-      conn = Plug.Test.conn(request.method, request.url, req_body)
+      conn =
+        Plug.Test.conn(request.method, request.url, req_body)
+        |> Map.replace!(:req_headers, req_headers)
+        |> call_plug(plug)
 
-      conn = put_in(conn.req_headers, req_headers)
-      conn = call_plug(conn, plug)
+      if exception = conn.private[:req_test_exception] do
+        {request, exception}
+      else
+        handle_plug_result(conn, request)
+      end
+    end
 
+    defp handle_plug_result(conn, request) do
       # consume messages sent by Plug.Test adapter
       {_, %{ref: ref}} = conn.adapter
 
