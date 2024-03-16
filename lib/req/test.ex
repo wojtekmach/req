@@ -78,7 +78,7 @@ defmodule Req.Test do
         assert MyApp.Weather.get_rating("Krakow, Poland") == {:ok, :nice}
       end
 
-  ### Concurrency and Allowances
+  ## Concurrency and Allowances
 
   The example above works in concurrent tests because `MyApp.Weather.get_rating/1` calls
   directly to `Req.request/1` *in the same process*. It also works in many cases where the
@@ -110,7 +110,7 @@ defmodule Req.Test do
         assert get_weather(pid, "Krakow, Poland") == {:ok, :nice}
       end
 
-  ### Broadway
+  ## Broadway
 
   If you're using `Req.Test` with [Broadway](https://hex.pm/broadway), you may need to use
   `allow/3` to make stubs available in the Broadway processors. A great way to do that is
