@@ -280,18 +280,25 @@ defmodule Req.Test do
   def stub(stub_name) do
     case NimbleOwnership.fetch_owner(@ownership, callers(), stub_name) do
       {:ok, owner} when is_pid(owner) ->
+        result =
+          NimbleOwnership.get_and_update(@ownership, owner, stub_name, fn
+            %{expectations: [value | rest]} = map ->
+              {{:ok, value}, put_in(map[:expectations], rest)}
 
-        result = NimbleOwnership.get_and_update(@ownership, owner, stub_name, fn
-          %{expectations: [value | rest]} = map -> {{:ok, value}, put_in(map[:expectations], rest)}
-          %{stub: value} = map -> {{:ok, value}, map}
-          %{expectations: []} = map -> {{:error, :no_expectations_and_no_stub}, map}
-        end)
+            %{stub: value} = map ->
+              {{:ok, value}, map}
+
+            %{expectations: []} = map ->
+              {{:error, :no_expectations_and_no_stub}, map}
+          end)
 
         case result do
-          {:ok, {:ok, value}} -> value
-          {:ok, {:error, :no_expectations_and_no_stub}} -> raise "no stub or expectations for #{inspect(stub_name)}"
-        end
+          {:ok, {:ok, value}} ->
+            value
 
+          {:ok, {:error, :no_expectations_and_no_stub}} ->
+            raise "no stub or expectations for #{inspect(stub_name)}"
+        end
 
       :error ->
         raise "cannot find stub #{inspect(stub_name)} in process #{inspect(self())}"
@@ -323,7 +330,7 @@ defmodule Req.Test do
   @spec stub(stub(), term()) :: :ok | {:error, Exception.t()}
   def stub(stub_name, value) do
     NimbleOwnership.get_and_update(@ownership, self(), stub_name, fn map_or_nil ->
-      {:ok, put_in((map_or_nil || %{}), [:stub], value)}
+      {:ok, put_in(map_or_nil || %{}, [:stub], value)}
     end)
   end
 
