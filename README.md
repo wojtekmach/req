@@ -62,7 +62,7 @@ write new ones.
 
   * Easily create test stubs (see [`Req.Test`].)
 
-  * Running against a plug (via [`put_plug`] step.)
+  * Running against a plug (via [`run_plug`] step.)
 
   * Pluggable adapters. By default, Req uses [Finch] (via [`run_finch`] step.)
 
@@ -257,7 +257,7 @@ limitations under the License.
 [`put_base_url`]:       https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
 [`put_params`]:         https://hexdocs.pm/req/Req.Steps.html#put_params/1
 [`put_path_params`]:    https://hexdocs.pm/req/Req.Steps.html#put_path_params/1
-[`put_plug`]:           https://hexdocs.pm/req/Req.Steps.html#put_plug/1
+[`run_plug`]:           https://hexdocs.pm/req/Req.Steps.html#run_plug/1
 [`put_range`]:          https://hexdocs.pm/req/Req.Steps.html#put_range/1
 [`put_user_agent`]:     https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
 [`retry`]:              https://hexdocs.pm/req/Req.Steps.html#retry/1

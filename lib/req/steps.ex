@@ -1088,11 +1088,37 @@ defmodule Req.Steps do
   end
 
   @doc """
-  Runs the request against a plug instead of over the network.
+  Sets adapter to `run_plug/1`.
+
+  See `run_plug/1` for more information.
 
   ## Request Options
 
     * `:plug` - if set, the plug to run the request against.
+
+  """
+  @doc step: :request
+  def put_plug(request) do
+    if request.options[:plug] do
+      %{request | adapter: &run_plug/1}
+    else
+      request
+    end
+  end
+
+  @doc """
+  Runs the request against a plug instead of over the network.
+
+  This step is a Req _adapter_. It is set as the adapter by the `put_plug/1` step
+  if the `:plug` option is set.
+
+  It requires [`:plug`](https://hexdocs.pm/plug) dependency:
+
+      {:plug, "~> 1.0"}
+
+  ## Request Options
+
+    * `:plug` - the plug to run the request against.
 
   ## Examples
 
@@ -1162,18 +1188,11 @@ defmodule Req.Steps do
                  {:error, %Req.TransportError{reason: :timeout}}
       end
   """
-  @doc step: :request
-  def put_plug(request) do
-    if request.options[:plug] do
-      %{request | adapter: &run_plug/1}
-    else
-      request
-    end
-  end
+  def run_plug(request)
 
   if Code.ensure_loaded?(Plug.Test) do
-    defp run_plug(request) do
-      plug = request.options[:plug]
+    def run_plug(request) do
+      plug = request.options.plug
 
       req_body =
         case request.body do
@@ -1285,7 +1304,7 @@ defmodule Req.Steps do
       plug.(conn)
     end
   else
-    defp run_plug(_request) do
+    def run_plug(_request) do
       Logger.error("""
       Could not find plug dependency.
 

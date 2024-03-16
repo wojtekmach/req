@@ -293,9 +293,11 @@ defmodule Req do
   Request adapters:
 
     * `:adapter` - adapter to use to make the actual HTTP request. See `:adapter` field description
-      in the `Req.Request` module documentation for more information. Defaults to calling [`run_finch`](`Req.Steps.run_finch/1`).
+      in the `Req.Request` module documentation for more information.
 
-    * `:plug` - if set, calls the given Plug instead of making an HTTP request over the network (via [`put_plug`](`Req.Steps.put_plug/1`) step).
+      The default is [`run_finch`](`Req.Steps.run_finch/1`).
+
+    * `:plug` - if set, calls the given plug instead of making an HTTP request over the network (via [`run_plug`](`Req.Steps.run_plug/1`) step).
 
   Finch options ([`run_finch`](`Req.Steps.run_finch/1`) step)
 

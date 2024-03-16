@@ -7,7 +7,11 @@
 
   * [`run_finch`]: Set `inet6: true` if URL looks like IPv6 address.
 
-  * [`put_plug`]: Add support for simulating network issues using [`Req.Test.transport_error/2`].
+  * [`put_plug`]: Move most documentation to [`run_plug`].
+
+  * [`run_plug`]: Make public.
+
+  * [`run_plug`]: Add support for simulating network issues using [`Req.Test.transport_error/2`].
 
   * [`put_aws_sigv4`]: Drop `:aws_signature` dependency.
 
@@ -863,6 +867,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`put_params`]:          https://hexdocs.pm/req/Req.Steps.html#put_params/1
 [`put_path_params`]:     https://hexdocs.pm/req/Req.Steps.html#put_path_params/1
 [`put_plug`]:            https://hexdocs.pm/req/Req.Steps.html#put_plug/1
+[`run_plug`]:            https://hexdocs.pm/req/Req.Steps.html#run_plug/1
 [`put_user_agent`]:      https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
 [`put_range`]:           https://hexdocs.pm/req/Req.Steps.html#put_range/1
 [`retry`]:               https://hexdocs.pm/req/Req.Steps.html#retry/1
