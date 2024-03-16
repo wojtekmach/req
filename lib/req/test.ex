@@ -207,6 +207,46 @@ defmodule Req.Test do
   end
 
   @doc """
+  """
+  def transport_error(conn, reason)
+
+  if Code.ensure_loaded?(Plug.Conn) do
+    @spec transport_error(Plug.Conn.t(), reason :: atom()) :: Plug.Conn.t()
+    def transport_error(%Plug.Conn{} = conn, reason) do
+      validate_transport_error!(reason)
+      exception = Req.TransportError.exception(reason: reason)
+      put_in(conn.private[:req_test_exception], exception)
+    end
+
+    defp validate_transport_error!(:protocol_not_negotiated), do: :ok
+    defp validate_transport_error!({:bad_alpn_protocol, _}), do: :ok
+    defp validate_transport_error!(:closed), do: :ok
+    defp validate_transport_error!(:timeout), do: :ok
+
+    defp validate_transport_error!(reason) do
+      case :ssl.format_error(reason) do
+        ~c"Unexpected error:" ++ _ ->
+          raise ArgumentError, "unexpected Req.TransportError reason: #{inspect(reason)}"
+
+        _ ->
+          :ok
+      end
+    end
+  else
+    def transport_error(_conn, _reason) do
+      Logger.error("""
+      Could not find plug dependency.
+
+      Please add :plug to your dependencies:
+
+          {:plug, "~> 1.0"}
+      """)
+
+      raise "missing plug dependency"
+    end
+  end
+
+  @doc """
   Returns the stub created by `stub/2`.
   """
   def stub(stub_name) do

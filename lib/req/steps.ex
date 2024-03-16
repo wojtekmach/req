@@ -1177,16 +1177,16 @@ defmodule Req.Steps do
         assert Req.get!(plug: plug, into: []).body == ["echoecho"]
       end
 
-  You can simulate failure conditions by returning exception structs from your plugs.
-  For network related issues, use `Req.TransportError` exception:
+  You can simulate network errors by calling `Req.Test.transport_error/2`
+  in your plugs:
 
       test "network issues" do
-        plug = fn _conn ->
-          %Req.TransportError{reason: :econnrefused}
+        plug = fn conn ->
+          Req.Test.transport_error(conn, :timeout)
         end
 
         assert Req.get(plug: plug, retry: false) ==
-                 {:error, %Req.TransportError{reason: :econnrefused}}
+                 {:error, %Req.TransportError{reason: :timeout}}
       end
   """
   @doc step: :request
@@ -1224,35 +1224,15 @@ defmodule Req.Steps do
           end
         end
 
-      conn = Plug.Test.conn(request.method, request.url, req_body)
+      conn =
+        Plug.Test.conn(request.method, request.url, req_body)
+        |> Map.replace!(:req_headers, req_headers)
+        |> call_plug(plug)
 
-      conn = put_in(conn.req_headers, req_headers)
-
-      case call_plug(conn, plug) do
-        %Plug.Conn{} = conn ->
-          handle_plug_result(conn, request)
-
-        %Req.TransportError{} = exception ->
-          validate_transport_error!(exception.reason)
-          {request, exception}
-
-        %_{__exception__: true} = exception ->
-          {request, exception}
-      end
-    end
-
-    defp validate_transport_error!(:protocol_not_negotiated), do: :ok
-    defp validate_transport_error!({:bad_alpn_protocol, _}), do: :ok
-    defp validate_transport_error!(:closed), do: :ok
-    defp validate_transport_error!(:timeout), do: :ok
-
-    defp validate_transport_error!(reason) do
-      case :ssl.format_error(reason) do
-        ~c"Unexpected error:" ++ _ ->
-          raise ArgumentError, "unexpected Req.Transport reason: #{inspect(reason)}"
-
-        _ ->
-          :ok
+      if exception = conn.private[:req_test_exception] do
+        {request, exception}
+      else
+        handle_plug_result(conn, request)
       end
     end
 

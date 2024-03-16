@@ -1781,28 +1781,14 @@ defmodule Req.StepsTest do
     test "errors" do
       req =
         Req.new(
-          plug: fn _conn ->
-            %Req.TransportError{reason: :timeout}
+          plug: fn conn ->
+            Req.Test.transport_error(conn, :timeout)
           end,
           retry: false
         )
 
       assert Req.request(req) ==
                {:error, %Req.TransportError{reason: :timeout}}
-    end
-
-    test "validate Req.TransportError reason" do
-      req =
-        Req.new(
-          plug: fn _conn ->
-            %Req.TransportError{reason: :bad}
-          end,
-          retry: false
-        )
-
-      assert_raise ArgumentError, "unexpected Req.Transport reason: :bad", fn ->
-        Req.request(req)
-      end
     end
   end
 
