@@ -75,7 +75,7 @@ defmodule Req.IntegrationTest do
       Req.put!(req,
         url: "/key1",
         headers: [content_length: byte_size(now) * 2],
-        body: Stream.duplicate(now, 2)
+        body: Stream.take(Stream.cycle([now]), 2)
       )
 
     assert Req.get!(req, url: "/key1").body == String.duplicate(now, 2)
