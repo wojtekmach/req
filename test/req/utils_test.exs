@@ -1,6 +1,10 @@
 defmodule Req.UtilsTest do
   use ExUnit.Case, async: true
-  doctest Req.Utils
+
+  # TODO: Remove when we require Elixir 1.14
+  if Version.match?(System.version(), "~> 1.14") do
+    doctest Req.Utils
+  end
 
   describe "aws_sigv4" do
     test "GET" do
