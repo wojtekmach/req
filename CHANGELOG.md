@@ -1,8 +1,21 @@
 # CHANGELOG
 
+## HEAD
+
+  * [`run_finch`]: **(BREAKING CHANGE)** Return [`Req.TransportError`] instead of
+    `Mint.TransportError`.
+
+  * [`run_finch`]: Set `inet6: true` if URL looks like IPv6 address.
+
+  * [`put_plug`]: Add support for simulating network issues using [`Req.Test.transport_error/2`].
+
+  * [`put_aws_sigv4`]: Drop `:aws_signature` dependency.
+
+  * [`Req.Test`]: Add [`Req.Test.transport_error/2`].
+
 ## v0.4.14 (2024-03-15)
 
-  * [`redirect`]: Return `Req.TooManyRedirectsError` exception.
+  * [`redirect`]: Return [`Req.TooManyRedirectsError`] exception.
 
     Previously we _always_ raised a `RuntimeError`. Besides changing the exception struct, now
     it is _returned_:
@@ -883,6 +896,10 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Test`]: https://hexdocs.pm/req/Req.Test
 [`Req.Test.json/2`]: https://hexdocs.pm/req/Req.Test.html#json/2
 [`Req.Test.allow/3`]: https://hexdocs.pm/req/Req.Test.html#json/2
+[`Req.Test.transport_error/2`]: https://hexdocs.pm/req/Req.Test.html#transport_error/2
 
 [`Req.Steps`]:   https://hexdocs.pm/req/Req.Steps.html
 [`Collectable`]: https://hexdocs.pm/elixir/Collectable.html
+
+[`Req.TransportError`]: https://hexdocs.pm/req/Req.TransportError.html
+[`Req.TooManyRedirectsError`]: https://hexdocs.pm/req/Req.TooManyRedirectsError.html
