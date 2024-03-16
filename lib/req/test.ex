@@ -13,7 +13,9 @@ defmodule Req.Test do
     * Stub any value with [`Req.Test.stub(name, value)`](`stub/2`) and access it with
       [`Req.Test.stub(name)`](`stub/1`). These functions can be used in concurrent tests.
 
-    * Access plug stubs with `plug: {Req.Test, name}`.
+    * Access plug stubs with `plug: {Req.Test, name}`. This works because `Req.Test` itself
+      is a plug whose job is to fetch the stubbed value under `name`. That value is
+      usually a function that takes a `Plug.Conn` and returns a `Plug.Conn`.
 
     * Easily create JSON responses for Plug stubs with [`Req.Test.json(conn, body)`](`json/2`).
 
@@ -154,6 +156,17 @@ defmodule Req.Test do
 
   require Logger
 
+  @typedoc """
+  A stub is an atom that scopes stubbed requests.
+
+  A common choice for this is the module name for the Req-based client that you
+  are using `Req.Test` for. For example, if you are using `MyApp.Weather` as
+  your client, you can use `MyApp.Weather` as the stub name in functions
+  like `stub/1` and `stub/2`.
+  """
+  @typedoc since: "0.4.15"
+  @type stub() :: atom()
+
   @ownership Req.Ownership
 
   @doc """
@@ -171,6 +184,10 @@ defmodule Req.Test do
       iex> resp.body
       %{"celsius" => 25.0}
   """
+  if Code.ensure_loaded?(Plug.Conn) do
+    @spec json(Plug.Conn.t(), term()) :: Plug.Conn.t()
+  end
+
   def json(conn, data)
 
   if Code.ensure_loaded?(Plug.Test) do
@@ -209,6 +226,7 @@ defmodule Req.Test do
   @doc """
   Returns the stub created by `stub/2`.
   """
+  @spec stub(stub()) :: term()
   def stub(stub_name) do
     case NimbleOwnership.fetch_owner(@ownership, callers(), stub_name) do
       {:ok, owner} when is_pid(owner) ->
@@ -228,21 +246,32 @@ defmodule Req.Test do
 
   See [module documentation](`Req.Test`) for more examples.
 
+  While this function can store any `value` under `stub_name`, usually you'll want to store
+  a *plug*, that is, a function that takes a `Plug.Conn` and returns a `Plug.Conn`, a module plug,
+  or a `{module, options}` plug.
+
   ## Examples
 
       iex> Req.Test.stub(MyStub, :foo)
+      :ok
       iex> Req.Test.stub(MyStub)
       :foo
       iex> Task.async(fn -> Req.Test.stub(MyStub) end) |> Task.await()
       :foo
+
   """
+  @spec stub(stub(), term()) :: :ok | {:error, Exception.t()}
   def stub(stub_name, value) do
-    NimbleOwnership.get_and_update(@ownership, self(), stub_name, fn _ -> {:ok, value} end)
+    case NimbleOwnership.get_and_update(@ownership, self(), stub_name, fn _ -> {:ok, value} end) do
+      {:ok, :ok} -> :ok
+      {:error, error} -> {:error, error}
+    end
   end
 
   @doc """
   Allows `pid_to_allow` to access `stub_name` provided that `owner` is already allowed.
   """
+  @spec allow(stub(), pid(), pid() | (-> pid())) :: :ok | {:error, Exception.t()}
   def allow(stub_name, owner, pid_to_allow) when is_pid(owner) do
     NimbleOwnership.allow(@ownership, owner, pid_to_allow, stub_name)
   end
