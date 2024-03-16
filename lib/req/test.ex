@@ -280,8 +280,18 @@ defmodule Req.Test do
   def stub(stub_name) do
     case NimbleOwnership.fetch_owner(@ownership, callers(), stub_name) do
       {:ok, owner} when is_pid(owner) ->
-        %{^stub_name => value} = NimbleOwnership.get_owned(@ownership, owner)
-        value
+
+        result = NimbleOwnership.get_and_update(@ownership, owner, stub_name, fn
+          %{expectations: [value | rest]} = map -> {{:ok, value}, put_in(map[:expectations], rest)}
+          %{stub: value} = map -> {{:ok, value}, map}
+          %{expectations: []} = map -> {{:error, :no_expectations_and_no_stub}, map}
+        end)
+
+        case result do
+          {:ok, {:ok, value}} -> value
+          {:ok, {:error, :no_expectations_and_no_stub}} -> raise "no stub or expectations for #{inspect(stub_name)}"
+        end
+
 
       :error ->
         raise "cannot find stub #{inspect(stub_name)} in process #{inspect(self())}"
@@ -312,10 +322,38 @@ defmodule Req.Test do
   """
   @spec stub(stub(), term()) :: :ok | {:error, Exception.t()}
   def stub(stub_name, value) do
-    case NimbleOwnership.get_and_update(@ownership, self(), stub_name, fn _ -> {:ok, value} end) do
-      {:ok, :ok} -> :ok
-      {:error, error} -> {:error, error}
-    end
+    NimbleOwnership.get_and_update(@ownership, self(), stub_name, fn map_or_nil ->
+      {:ok, put_in((map_or_nil || %{}), [:stub], value)}
+    end)
+  end
+
+  @doc """
+  Creates an expectation with the given `name` and `value`, expected to be fetched at
+  most `n` times.
+
+  This function allows stubbing _any_ value and later accessing it with `stub/1`.
+  It is safe to use in concurrent tests. If you fetch the value under `stub_name`
+  more than `n` times, this function raises a `RuntimeError`.
+
+  ## Examples
+
+      iex> Req.Test.expect(MyStub, 2, :foo)
+      iex> Req.Test.stub(MyStub)
+      :foo
+      iex> Req.Test.stub(MyStub)
+      :foo
+      iex>   Req.Test.stub(MyStub)
+      ** (RuntimeError) no stub or expectations for MyStub
+
+  """
+  @doc since: "0.4.15"
+  @spec expect(atom(), pos_integer(), term()) :: term()
+  def expect(stub_name, n \\ 1, value) when is_integer(n) and n > 0 do
+    values = List.duplicate(value, n)
+
+    NimbleOwnership.get_and_update(@ownership, self(), stub_name, fn map_or_nil ->
+      {:ok, Map.update(map_or_nil || %{}, :expectations, values, &(values ++ &1))}
+    end)
   end
 
   @doc """
