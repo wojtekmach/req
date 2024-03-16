@@ -207,6 +207,16 @@ defmodule Req.Test do
   end
 
   @doc """
+  Simulates a network transport error.
+
+  ## Examples
+
+      iex> plug = fn conn ->
+      ...>   Req.Test.transport_error(conn, :timeout)
+      ...> end
+      iex>
+      iex> Req.get(plug: plug, retry: false)
+      {:error, %Req.TransportError{reason: :timeout}}
   """
   def transport_error(conn, reason)
 
