@@ -1160,7 +1160,7 @@ defmodule Req.Steps do
         assert Req.get!("http:///hello", plug: echo).body == "hello"
       end
 
-  which is particularly useful to create HTTP service mocks, similar to tools like
+  which is particularly useful to create HTTP service stubs, similar to tools like
   [Bypass](https://github.com/PSPDFKit-labs/bypass).
 
   Response streaming is also supported however at the moment the entire response
@@ -1175,6 +1175,19 @@ defmodule Req.Steps do
         end
 
         assert Req.get!(plug: plug, into: []).body == ["echoecho"]
+      end
+
+  When testing JSON APIs, it's common to use the `Req.Test.json/2` helper:
+
+      test "JSON" do
+        plug = fn conn ->
+          Req.Test.json(conn, %{message: "Hello, World!"})
+        end
+
+        resp = Req.get!(plug: plug)
+        assert resp.status == 200
+        assert resp.headers["content-type"] == ["application/json; charset=utf-8"]
+        assert resp.body == %{"message" => "Hello, World!"}
       end
 
   You can simulate network errors by calling `Req.Test.transport_error/2`
