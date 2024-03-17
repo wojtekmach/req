@@ -165,7 +165,7 @@ defmodule Req.Test do
   like `stub/1` and `stub/2`.
   """
   @typedoc since: "0.4.15"
-  @type stub() :: atom()
+  @opaque stub() :: atom()
 
   @ownership Req.Ownership
 
