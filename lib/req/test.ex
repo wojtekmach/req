@@ -297,8 +297,11 @@ defmodule Req.Test do
   See [module documentation](`Req.Test`) for more examples.
 
   While this function can store any `value` under `stub_name`, usually you'll want to store
-  a *plug*, that is, a function that takes a `Plug.Conn` and returns a `Plug.Conn`, a module plug,
-  or a `{module, options}` plug.
+  a *plug*, that is:
+
+    * `fun(conn)` - a function plug.
+
+    * `module` or `{module, options}` - a module plug.
 
   ## Examples
 

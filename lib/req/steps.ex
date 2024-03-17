@@ -1118,7 +1118,11 @@ defmodule Req.Steps do
 
   ## Request Options
 
-    * `:plug` - the plug to run the request against.
+    * `:plug` - the plug to run the request against. The plug can be one of:
+
+        * `fun(conn)` - a 1-arity function that accepts a `Plug.Conn` and returns it.
+
+        * `module` or `{module, options}` - a module plug.
 
   ## Examples
 

@@ -299,6 +299,12 @@ defmodule Req do
 
     * `:plug` - if set, calls the given plug instead of making an HTTP request over the network (via [`run_plug`](`Req.Steps.run_plug/1`) step).
 
+      The plug can be one of:
+
+        * `fun(conn)` - a function plug.
+
+        * `module` or `{module, options}` - a module plug.
+
   Finch options ([`run_finch`](`Req.Steps.run_finch/1`) step)
 
     * `:finch` - the Finch pool to use. Defaults to pool automatically started by `Req`.
