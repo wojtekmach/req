@@ -329,9 +329,10 @@ defmodule Req.Test do
   """
   @spec stub(stub(), term()) :: :ok | {:error, Exception.t()}
   def stub(stub_name, value) do
-    result = NimbleOwnership.get_and_update(@ownership, self(), stub_name, fn map_or_nil ->
-      {:ok, put_in(map_or_nil || %{}, [:stub], value)}
-    end)
+    result =
+      NimbleOwnership.get_and_update(@ownership, self(), stub_name, fn map_or_nil ->
+        {:ok, put_in(map_or_nil || %{}, [:stub], value)}
+      end)
 
     case result do
       {:ok, :ok} -> :ok
