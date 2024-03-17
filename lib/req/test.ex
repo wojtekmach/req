@@ -329,9 +329,14 @@ defmodule Req.Test do
   """
   @spec stub(stub(), term()) :: :ok | {:error, Exception.t()}
   def stub(stub_name, value) do
-    NimbleOwnership.get_and_update(@ownership, self(), stub_name, fn map_or_nil ->
+    result = NimbleOwnership.get_and_update(@ownership, self(), stub_name, fn map_or_nil ->
       {:ok, put_in(map_or_nil || %{}, [:stub], value)}
     end)
+
+    case result do
+      {:ok, :ok} -> :ok
+      {:error, error} -> {:error, error}
+    end
   end
 
   @doc """
@@ -354,7 +359,7 @@ defmodule Req.Test do
 
   """
   @doc since: "0.4.15"
-  @spec expect(atom(), pos_integer(), term()) :: term()
+  @spec expect(stub(), pos_integer(), term()) :: term()
   def expect(stub_name, n \\ 1, value) when is_integer(n) and n > 0 do
     values = List.duplicate(value, n)
 
