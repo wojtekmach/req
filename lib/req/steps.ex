@@ -1964,7 +1964,10 @@ defmodule Req.Steps do
           request.options[:redirect_trusted]
       end
 
-    location_url = URI.merge(request.url, URI.parse(location))
+    location_url =
+      request.url
+      |> URI.merge(URI.parse(location))
+      |> normalize_redirect_uri()
 
     request
     # assume put_params step already run so remove :params option so it's not applied again
@@ -1979,6 +1982,10 @@ defmodule Req.Steps do
   defp log_redirect(level, location) do
     Logger.log(level, ["redirecting to ", location])
   end
+
+  defp normalize_redirect_uri(%URI{scheme: "http", port: nil} = uri), do: %URI{uri | port: 80}
+  defp normalize_redirect_uri(%URI{scheme: "https", port: nil} = uri), do: %URI{uri | port: 443}
+  defp normalize_redirect_uri(%URI{} = uri), do: uri
 
   # https://www.rfc-editor.org/rfc/rfc9110#name-301-moved-permanently and 302:
   #
