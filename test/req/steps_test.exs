@@ -980,6 +980,20 @@ defmodule Req.StepsTest do
       end
     end
 
+    test "without location", c do
+      Bypass.expect(c.bypass, "POST", "/redirect", fn conn ->
+        Plug.Conn.send_resp(conn, 303, "")
+      end)
+
+      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert Req.post!(c.url <> "/redirect").status == 200
+             end) =~ "[debug] redirecting to #{c.url}/redirect"
+    end
+
     test "auth same host", c do
       auth_header = {"authorization", "Basic " <> Base.encode64("foo:bar")}
 
