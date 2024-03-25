@@ -1155,20 +1155,21 @@ defmodule Req.StepsTest do
              end) =~ ""
     end
 
-    test "inherit scheme", c do
-      "http:" <> no_scheme = c.url
+    test "inherit scheme" do
+      adapter = fn
+        request when request.url.path == "/redirect" ->
+          response = Req.Response.new(status: 302, headers: %{"location" => ["//localhost/ok"]})
+          {request, response}
 
-      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
-        redirect(conn, 302, "#{no_scheme}/ok")
-      end)
-
-      Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-        Plug.Conn.send_resp(conn, 200, "ok")
-      end)
+        request ->
+          assert request.url == URI.parse("http://localhost/ok")
+          response = Req.Response.new(status: 200)
+          {request, response}
+      end
 
       assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.get!(c.url <> "/redirect").status == 200
-             end) =~ "[debug] redirecting to #{no_scheme}/ok"
+               assert Req.get!(adapter: adapter, url: "http://localhost/redirect").status == 200
+             end) =~ "[debug] redirecting to //localhost/ok"
     end
   end
 
