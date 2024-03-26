@@ -1923,33 +1923,24 @@ defmodule Req.Steps do
           Req.Request.get_option(request, :redirect, true)
       end
 
-    cond do
-      !redirect? ->
-        {request, response}
+    with true <- redirect? && response.status in [301, 302, 303, 307, 308],
+         [location | _] <- Req.Response.get_header(response, "location") do
+      max_redirects = Req.Request.get_option(request, :max_redirects, 10)
+      redirect_count = Req.Request.get_private(request, :req_redirect_count, 0)
 
-      response.status in [301, 302, 303, 307, 308] ->
-        max_redirects = Req.Request.get_option(request, :max_redirects, 10)
-        redirect_count = Req.Request.get_private(request, :req_redirect_count, 0)
+      if redirect_count < max_redirects do
+        request =
+          request
+          |> build_redirect_request(response, location)
+          |> Req.Request.put_private(:req_redirect_count, redirect_count + 1)
 
-        if redirect_count < max_redirects do
-          case Req.Response.get_header(response, "location") do
-            [location | _] ->
-              request =
-                request
-                |> build_redirect_request(response, location)
-                |> Req.Request.put_private(:req_redirect_count, redirect_count + 1)
-
-              {_, result} = Req.Request.run(request)
-              {Req.Request.halt(request), result}
-
-            _ ->
-              {Req.Request.halt(request), response}
-          end
-        else
-          {Req.Request.halt(request), %Req.TooManyRedirectsError{max_redirects: max_redirects}}
-        end
-
-      true ->
+        {_, result} = Req.Request.run(request)
+        {Req.Request.halt(request), result}
+      else
+        {Req.Request.halt(request), %Req.TooManyRedirectsError{max_redirects: max_redirects}}
+      end
+    else
+      _ ->
         {request, response}
     end
   end

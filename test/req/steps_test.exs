@@ -900,6 +900,14 @@ defmodule Req.StepsTest do
   end
 
   describe "redirect" do
+    test "ignore when :redirect is false", c do
+      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+        redirect(conn, 302, c.url <> "/ok")
+      end)
+
+      assert Req.get!(c.url <> "/redirect", redirect: false).status == 302
+    end
+
     test "absolute", c do
       Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
         redirect(conn, 302, c.url <> "/ok")
