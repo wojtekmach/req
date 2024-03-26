@@ -586,7 +586,7 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def compress_body(request) do
-    if request.options[:compress_body] do
+    if request.body && request.options[:compress_body] do
       body =
         case request.body do
           iodata when is_binary(iodata) or is_list(iodata) ->
