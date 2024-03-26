@@ -900,6 +900,14 @@ defmodule Req.StepsTest do
   end
 
   describe "redirect" do
+    test "ignore when :redirect is false", c do
+      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+        redirect(conn, 302, c.url <> "/ok")
+      end)
+
+      assert Req.get!(c.url <> "/redirect", redirect: false).status == 302
+    end
+
     test "absolute", c do
       Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
         redirect(conn, 302, c.url <> "/ok")
@@ -988,6 +996,14 @@ defmodule Req.StepsTest do
                  assert Req.head!(c.url <> "/redirect").status == 200
                end) =~ "[debug] redirecting to #{c.url}/ok"
       end
+    end
+
+    test "without location", c do
+      Bypass.expect(c.bypass, "POST", "/redirect", fn conn ->
+        Plug.Conn.send_resp(conn, 303, "")
+      end)
+
+      assert Req.post!(c.url <> "/redirect").status == 303
     end
 
     test "auth same host", c do
