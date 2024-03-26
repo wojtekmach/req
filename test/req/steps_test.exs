@@ -296,6 +296,16 @@ defmodule Req.StepsTest do
 
       assert Req.post!(req).body == "foofoo"
     end
+
+    test "nil body", c do
+      Bypass.stub(c.bypass, "GET", "/", fn conn ->
+        assert Plug.Conn.get_req_header(conn, "content-encoding") == []
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+      req = Req.new(url: c.url, compress_body: true)
+      assert Req.get!(req).body == "ok"
+    end
   end
 
   describe "checksum" do
