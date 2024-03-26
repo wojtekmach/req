@@ -79,5 +79,11 @@ defmodule Req.IntegrationTest do
       )
 
     assert Req.get!(req, url: "/key1").body == String.duplicate(now, 2)
+
+    req = Req.merge(req, url: "/key1")
+    req = put_in(req.options[:aws_sigv4][:into], :url)
+    url = Req.Request.prepare(req).url
+
+    assert Req.get!(url).body == String.duplicate(now, 2)
   end
 end

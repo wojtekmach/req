@@ -40,4 +40,27 @@ defmodule Req.UtilsTest do
                Enum.map(signature2, fn {name, value} -> {String.downcase(name), value} end)
     end
   end
+
+  describe "aws_sigv4_url" do
+    test "GET" do
+      options = [
+        access_key_id: "dummy-access-key-id",
+        secret_access_key: "dummy-secret-access-key",
+        region: "dummy-region",
+        service: "s3",
+        datetime: ~U[2024-01-01 09:00:00Z],
+        method: :get,
+        url: "https://s3"
+      ]
+
+      assert to_string(Req.Utils.aws_sigv4_url(options)) ==
+               "https://s3?" <>
+                 "X-Amz-Algorithm=AWS4-HMAC-SHA256" <>
+                 "&X-Amz-Credential=dummy-access-key-id%2F20240101%2Fdummy-region%2Fs3%2Faws4_request" <>
+                 "&X-Amz-Date=20240101T090000Z" <>
+                 "&X-Amz-Expires=86400" <>
+                 "&X-Amz-SignedHeaders=host" <>
+                 "&X-Amz-Signature=684b112675beaf7f858dbf650cc12c5aa3d0eeb15fa4038ea809149f3c6476e3"
+    end
+  end
 end

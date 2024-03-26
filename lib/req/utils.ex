@@ -92,6 +92,83 @@ defmodule Req.Utils do
     ] ++ headers
   end
 
+  @doc """
+  Create AWS Signature v4 URL.
+
+  https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
+  """
+  def aws_sigv4_url(options) do
+    {access_key_id, options} = Keyword.pop!(options, :access_key_id)
+    {secret_access_key, options} = Keyword.pop!(options, :secret_access_key)
+    {region, options} = Keyword.pop!(options, :region)
+    {service, options} = Keyword.pop!(options, :service)
+    {datetime, options} = Keyword.pop!(options, :datetime)
+    {method, options} = Keyword.pop!(options, :method)
+    {url, options} = Keyword.pop!(options, :url)
+    [] = options
+
+    datetime = DateTime.truncate(datetime, :second)
+    datetime_string = DateTime.to_iso8601(datetime, :basic)
+    date_string = Date.to_iso8601(datetime, :basic)
+    method = method |> Atom.to_string() |> String.upcase()
+    url = URI.parse(url)
+    service = to_string(service)
+
+    canonical_query_string =
+      URI.encode_query([
+        {"X-Amz-Algorithm", "AWS4-HMAC-SHA256"},
+        {"X-Amz-Credential", "#{access_key_id}/#{date_string}/#{region}/#{service}/aws4_request"},
+        {"X-Amz-Date", datetime_string},
+        {"X-Amz-Expires", 86400},
+        {"X-Amz-SignedHeaders", "host"}
+      ])
+
+    canonical_headers = [{"host", URI.parse(url).host}]
+
+    signed_headers =
+      Enum.map_intersperse(
+        Enum.sort(canonical_headers),
+        ";",
+        &String.downcase(elem(&1, 0), :ascii)
+      )
+
+    true = url.query in [nil, ""]
+
+    canonical_request =
+      iodata("""
+      #{String.upcase(method)}
+      #{url.path || "/"}
+      #{canonical_query_string}
+      #{Enum.map_intersperse(canonical_headers, "\n", fn {name, value} -> [name, ":", value] end)}
+
+      #{signed_headers}
+      UNSIGNED-PAYLOAD\
+      """)
+
+    string_to_sign =
+      iodata("""
+      AWS4-HMAC-SHA256
+      #{datetime_string}
+      #{date_string}/#{region}/#{service}/aws4_request
+      #{hex(sha256(canonical_request))}\
+      """)
+
+    signature =
+      ["AWS4", secret_access_key]
+      |> hmac(date_string)
+      |> hmac(region)
+      |> hmac(service)
+      |> hmac("aws4_request")
+      |> hmac(string_to_sign)
+      |> hex()
+
+    put_in(
+      url.query,
+      canonical_query_string <>
+        "&X-Amz-Signature=#{signature}"
+    )
+  end
+
   defp hex(data) do
     Base.encode16(data, case: :lower)
   end
