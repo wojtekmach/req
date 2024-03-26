@@ -586,7 +586,7 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def compress_body(request) do
-    if request.options[:compress_body] do
+    if request.body && request.options[:compress_body] do
       body =
         case request.body do
           iodata when is_binary(iodata) or is_list(iodata) ->
@@ -1932,15 +1932,19 @@ defmodule Req.Steps do
         redirect_count = Req.Request.get_private(request, :req_redirect_count, 0)
 
         if redirect_count < max_redirects do
-          location_url = resolve_redirect_location(request, response)
+          case Req.Response.get_header(response, "location") do
+            [location | _] ->
+              request =
+                request
+                |> build_redirect_request(response, location)
+                |> Req.Request.put_private(:req_redirect_count, redirect_count + 1)
 
-          request =
-            request
-            |> build_redirect_request(response, location_url)
-            |> Req.Request.put_private(:req_redirect_count, redirect_count + 1)
+              {_, result} = Req.Request.run(request)
+              {Req.Request.halt(request), result}
 
-          {_, result} = Req.Request.run(request)
-          {Req.Request.halt(request), result}
+            _ ->
+              {Req.Request.halt(request), response}
+          end
         else
           {Req.Request.halt(request), %Req.TooManyRedirectsError{max_redirects: max_redirects}}
         end
@@ -1950,7 +1954,10 @@ defmodule Req.Steps do
     end
   end
 
-  defp build_redirect_request(request, response, location_url) do
+  defp build_redirect_request(request, response, location) do
+    log_level = Req.Request.get_option(request, :redirect_log_level, :debug)
+    log_redirect(log_level, location)
+
     redirect_trusted =
       case Req.Request.fetch_option(request, :location_trusted) do
         {:ok, trusted} ->
@@ -1961,29 +1968,17 @@ defmodule Req.Steps do
           request.options[:redirect_trusted]
       end
 
+    location_url =
+      request.url
+      |> URI.merge(URI.parse(location))
+      |> normalize_redirect_uri()
+
     request
     # assume put_params step already run so remove :params option so it's not applied again
     |> Req.Request.delete_option(:params)
     |> remove_credentials_if_untrusted(redirect_trusted, location_url)
     |> put_redirect_method(response.status)
     |> Map.replace!(:url, location_url)
-  end
-
-  defp resolve_redirect_location(request, response) do
-    log_level = Req.Request.get_option(request, :redirect_log_level, :debug)
-
-    case Req.Response.get_header(response, "location") do
-      [location | _] ->
-        log_redirect(log_level, location)
-
-        request.url
-        |> URI.merge(URI.parse(location))
-        |> normalize_redirect_uri()
-
-      _ ->
-        log_redirect(log_level, URI.to_string(request.url))
-        request.url
-    end
   end
 
   defp log_redirect(false, _location), do: :ok

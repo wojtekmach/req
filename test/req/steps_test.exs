@@ -985,13 +985,7 @@ defmodule Req.StepsTest do
         Plug.Conn.send_resp(conn, 303, "")
       end)
 
-      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
-        Plug.Conn.send_resp(conn, 200, "ok")
-      end)
-
-      assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.post!(c.url <> "/redirect").status == 200
-             end) =~ "[debug] redirecting to #{c.url}/redirect"
+      assert Req.post!(c.url <> "/redirect").status == 303
     end
 
     test "auth same host", c do
