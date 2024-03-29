@@ -522,7 +522,7 @@ defmodule Req.StepsTest do
   ## Response steps
 
   describe "decompress_body" do
-    test "gzip", c do
+    test "gzip success", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         conn
         |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
@@ -532,6 +532,18 @@ defmodule Req.StepsTest do
       resp = Req.get!(c.url)
       assert Req.Response.get_header(resp, "content-encoding") == []
       assert resp.body == "foo"
+    end
+
+    test "gzip error", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
+        |> Plug.Conn.send_resp(200, "bad")
+      end)
+
+      assert_raise Req.DecompressError, "decompression failed with format 'gzip'", fn ->
+        Req.get!(c.url)
+      end
     end
 
     test "identity", c do
@@ -546,7 +558,7 @@ defmodule Req.StepsTest do
       assert resp.body == "foo"
     end
 
-    test "brotli", c do
+    test "brotli success", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         {:ok, body} = :brotli.encode("foo")
 
@@ -559,7 +571,19 @@ defmodule Req.StepsTest do
       assert resp.body == "foo"
     end
 
-    test "zstd", c do
+    test "brotli error", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "br")
+        |> Plug.Conn.send_resp(200, "bad")
+      end)
+
+      assert_raise Req.DecompressError, "decompression failed with format 'br'", fn ->
+        Req.get!(c.url)
+      end
+    end
+
+    test "zstd success", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
         conn
         |> Plug.Conn.put_resp_header("content-encoding", "zstd")
@@ -568,6 +592,18 @@ defmodule Req.StepsTest do
 
       resp = Req.get!(c.url)
       assert resp.body == "foo"
+    end
+
+    test "zstd error", c do
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "zstd")
+        |> Plug.Conn.send_resp(200, "bad")
+      end)
+
+      assert_raise Req.DecompressError, "decompression failed with format 'zstd'", fn ->
+        Req.get!(c.url)
+      end
     end
 
     test "multiple codecs", c do
