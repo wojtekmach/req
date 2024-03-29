@@ -1639,7 +1639,7 @@ defmodule Req.Steps do
 
       case decompress_body(codecs, response.body, []) do
         %Req.DecompressError{} = exception ->
-          {Req.Request.halt(request), exception}
+          {request, exception}
 
         {decompressed_body, unknown_codecs} ->
           response = put_in(response.body, decompressed_body)
