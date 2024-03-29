@@ -1698,8 +1698,8 @@ defmodule Req.Steps do
         Logger.debug(":ezstd library not loaded, skipping zstd decompression")
         decompress_body(rest, body, ["zstd" | acc])
 
-      {:error, _reason} ->
-        %Req.DecompressError{format: :zstd, data: body}
+      {:error, reason} ->
+        %Req.DecompressError{format: :zstd, data: body, reason: reason}
     end
   end
 

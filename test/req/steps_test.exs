@@ -601,9 +601,11 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, "bad")
       end)
 
-      assert_raise Req.DecompressError, "decompression failed with format 'zstd'", fn ->
-        Req.get!(c.url)
-      end
+      assert_raise Req.DecompressError,
+                   ~S[decompression failed with format 'zstd', reason: "failed to decompress: ZSTD_CONTENTSIZE_ERROR"],
+                   fn ->
+                     Req.get!(c.url)
+                   end
     end
 
     test "multiple codecs", c do
