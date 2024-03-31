@@ -181,6 +181,7 @@ defmodule Req.Request do
 
   Any step can call `halt/1` to halt the pipeline. This will prevent any further steps
   from being invoked.
+  You need to return a tuple with an exception or a response. Otherwise the halt is ignored.
 
   Examples:
 
@@ -360,6 +361,13 @@ defmodule Req.Request do
   @typep error_step() :: fun() | {module(), atom(), [term()]}
   @typep options() :: term()
 
+  @type step_function() :: [step() | atom()]
+  @type step() ::
+          {atom(),
+           (t() ->
+              Req.Request.t()
+              | {t(), Req.Response.t()}
+              | {t(), Exception.t()})}
   defstruct method: :get,
             url: URI.parse(""),
             headers: if(Req.MixProject.legacy_headers_as_lists?(), do: [], else: %{}),
@@ -598,6 +606,7 @@ defmodule Req.Request do
   @doc """
   Halts the request pipeline preventing any further steps from executing.
   """
+  @spec halt(Req.Request.t()) :: Req.Request.t()
   def halt(request) do
     %{request | halted: true}
   end
@@ -623,6 +632,8 @@ defmodule Req.Request do
   @doc """
   Prepends request steps.
 
+  The name of the `key` can be anything.
+
   ## Examples
 
       Req.Request.prepend_request_steps(request,
@@ -630,6 +641,7 @@ defmodule Req.Request do
         inspect: &IO.inspect/1
       )
   """
+  @spec prepend_request_steps(t(), step_function()) :: t()
   def prepend_request_steps(request, steps) do
     %{
       request
@@ -929,6 +941,7 @@ defmodule Req.Request do
       Req.get!(req, url: "/status/201", foo: :bar).status
       #=> 201
   """
+  @spec register_options(t(), [atom()]) :: t()
   def register_options(%Req.Request{} = request, options) when is_list(options) do
     update_in(request.registered_options, &MapSet.union(&1, MapSet.new(options)))
   end

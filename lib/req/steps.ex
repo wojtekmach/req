@@ -14,6 +14,7 @@ defmodule Req.Steps do
   require Logger
 
   @doc false
+  @spec attach(Req.Request.t()) :: Req.Request.t()
   def attach(req) do
     req
     |> Req.Request.register_options([
