@@ -1636,30 +1636,54 @@ defmodule Req.Steps do
       {request, response}
     else
       codecs = compression_algorithms(Req.Response.get_header(response, "content-encoding"))
-      {decompressed_body, unknown_codecs} = decompress_body(codecs, response.body, [])
-      response = put_in(response.body, decompressed_body)
 
-      response =
-        if unknown_codecs == [] do
-          response
-          |> Req.Response.delete_header("content-encoding")
-          |> Req.Response.delete_header("content-length")
-        else
-          Req.Response.put_header(response, "content-encoding", Enum.join(unknown_codecs, ", "))
-        end
+      case decompress_body(codecs, response.body, []) do
+        %Req.DecompressError{} = exception ->
+          {request, exception}
 
-      {request, response}
+        {decompressed_body, unknown_codecs} ->
+          response = put_in(response.body, decompressed_body)
+
+          response =
+            if unknown_codecs == [] do
+              response
+              |> Req.Response.delete_header("content-encoding")
+              |> Req.Response.delete_header("content-length")
+            else
+              Req.Response.put_header(
+                response,
+                "content-encoding",
+                Enum.join(unknown_codecs, ", ")
+              )
+            end
+
+          {request, response}
+      end
     end
   end
 
   defp decompress_body([gzip | rest], body, acc) when gzip in ["gzip", "x-gzip"] do
-    decompress_body(rest, :zlib.gunzip(body), acc)
+    try do
+      decompress_body(rest, :zlib.gunzip(body), acc)
+    rescue
+      e in ErlangError ->
+        if e.original == :data_error do
+          %Req.DecompressError{format: :gzip, data: body}
+        else
+          reraise e, __STACKTRACE__
+        end
+    end
   end
 
   defp decompress_body(["br" | rest], body, acc) do
     if brotli_loaded?() do
-      {:ok, decompressed} = :brotli.decode(body)
-      decompress_body(rest, decompressed, acc)
+      case :brotli.decode(body) do
+        {:ok, decompressed} ->
+          decompress_body(rest, decompressed, acc)
+
+        :error ->
+          %Req.DecompressError{format: :br, data: body}
+      end
     else
       Logger.debug(":brotli library not loaded, skipping brotli decompression")
       decompress_body(rest, body, ["br" | acc])
@@ -1668,7 +1692,13 @@ defmodule Req.Steps do
 
   defp decompress_body(["zstd" | rest], body, acc) do
     if ezstd_loaded?() do
-      decompress_body(rest, :ezstd.decompress(body), acc)
+      case :ezstd.decompress(body) do
+        decompressed when is_binary(decompressed) ->
+          decompress_body(rest, decompressed, acc)
+
+        {:error, reason} ->
+          %Req.DecompressError{format: :zstd, data: body, reason: reason}
+      end
     else
       Logger.debug(":ezstd library not loaded, skipping zstd decompression")
       decompress_body(rest, body, ["zstd" | acc])
