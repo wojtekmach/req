@@ -541,7 +541,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, "bad")
       end)
 
-      assert_raise Req.DecompressError, "decompression failed with format 'gzip'", fn ->
+      assert_raise Req.DecompressError, "gzip decompression failed", fn ->
         Req.get!(c.url)
       end
     end
@@ -578,7 +578,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, "bad")
       end)
 
-      assert_raise Req.DecompressError, "decompression failed with format 'br'", fn ->
+      assert_raise Req.DecompressError, "br decompression failed", fn ->
         Req.get!(c.url)
       end
     end
@@ -602,7 +602,7 @@ defmodule Req.StepsTest do
       end)
 
       assert_raise Req.DecompressError,
-                   ~S[decompression failed with format 'zstd', reason: "failed to decompress: ZSTD_CONTENTSIZE_ERROR"],
+                   ~S[zstd decompression failed, reason: "failed to decompress: ZSTD_CONTENTSIZE_ERROR"],
                    fn ->
                      Req.get!(c.url)
                    end
