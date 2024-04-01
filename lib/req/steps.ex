@@ -1676,30 +1676,32 @@ defmodule Req.Steps do
   end
 
   defp decompress_body(["br" | rest], body, acc) do
-    with true <- brotli_loaded?(),
-         {:ok, decompressed} <- :brotli.decode(body) do
-      decompress_body(rest, decompressed, acc)
-    else
-      false ->
-        Logger.debug(":brotli library not loaded, skipping brotli decompression")
-        decompress_body(rest, body, ["br" | acc])
+    if brotli_loaded?() do
+      case :brotli.decode(body) do
+        {:ok, decompressed} ->
+          decompress_body(rest, decompressed, acc)
 
-      :error ->
-        %Req.DecompressError{format: :br, data: body}
+        :error ->
+          %Req.DecompressError{format: :br, data: body}
+      end
+    else
+      Logger.debug(":brotli library not loaded, skipping brotli decompression")
+      decompress_body(rest, body, ["br" | acc])
     end
   end
 
   defp decompress_body(["zstd" | rest], body, acc) do
-    with true <- ezstd_loaded?(),
-         decompressed when is_binary(decompressed) <- :ezstd.decompress(body) do
-      decompress_body(rest, decompressed, acc)
-    else
-      false ->
-        Logger.debug(":ezstd library not loaded, skipping zstd decompression")
-        decompress_body(rest, body, ["zstd" | acc])
+    if ezstd_loaded?() do
+      case :ezstd.decompress(body) do
+        decompressed when is_binary(decompressed) ->
+          decompress_body(rest, decompressed, acc)
 
-      {:error, reason} ->
-        %Req.DecompressError{format: :zstd, data: body, reason: reason}
+        {:error, reason} ->
+          %Req.DecompressError{format: :zstd, data: body, reason: reason}
+      end
+    else
+      Logger.debug(":ezstd library not loaded, skipping zstd decompression")
+      decompress_body(rest, body, ["zstd" | acc])
     end
   end
 
