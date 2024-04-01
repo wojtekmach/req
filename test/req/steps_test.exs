@@ -522,27 +522,27 @@ defmodule Req.StepsTest do
   ## Response steps
 
   describe "decompress_body" do
-    test "gzip success", c do
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+    test "gzip success" do
+      plug = fn conn ->
         conn
         |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
         |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
-      end)
+      end
 
-      resp = Req.get!(c.url)
+      resp = Req.get!(plug: plug)
       assert Req.Response.get_header(resp, "content-encoding") == []
       assert resp.body == "foo"
     end
 
-    test "gzip error", c do
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+    test "gzip error" do
+      plug = fn conn ->
         conn
         |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
         |> Plug.Conn.send_resp(200, "bad")
-      end)
+      end
 
       assert_raise Req.DecompressError, "gzip decompression failed", fn ->
-        Req.get!(c.url)
+        Req.get!(plug: plug)
       end
     end
 
@@ -558,53 +558,53 @@ defmodule Req.StepsTest do
       assert resp.body == "foo"
     end
 
-    test "brotli success", c do
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+    test "brotli success" do
+      plug = fn conn ->
         {:ok, body} = :brotli.encode("foo")
 
         conn
         |> Plug.Conn.put_resp_header("content-encoding", "br")
         |> Plug.Conn.send_resp(200, body)
-      end)
+      end
 
-      resp = Req.get!(c.url)
+      resp = Req.get!(plug: plug)
       assert resp.body == "foo"
     end
 
-    test "brotli error", c do
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+    test "brotli error" do
+      plug = fn conn ->
         conn
         |> Plug.Conn.put_resp_header("content-encoding", "br")
         |> Plug.Conn.send_resp(200, "bad")
-      end)
+      end
 
       assert_raise Req.DecompressError, "br decompression failed", fn ->
-        Req.get!(c.url)
+        Req.get!(plug: plug)
       end
     end
 
-    test "zstd success", c do
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+    test "zstd success" do
+      plug = fn conn ->
         conn
         |> Plug.Conn.put_resp_header("content-encoding", "zstd")
         |> Plug.Conn.send_resp(200, :ezstd.compress("foo"))
-      end)
+      end
 
-      resp = Req.get!(c.url)
+      resp = Req.get!(plug: plug)
       assert resp.body == "foo"
     end
 
-    test "zstd error", c do
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+    test "zstd error" do
+      plug = fn conn ->
         conn
         |> Plug.Conn.put_resp_header("content-encoding", "zstd")
         |> Plug.Conn.send_resp(200, "bad")
-      end)
+      end
 
       assert_raise Req.DecompressError,
                    ~S[zstd decompression failed, reason: "failed to decompress: ZSTD_CONTENTSIZE_ERROR"],
                    fn ->
-                     Req.get!(c.url)
+                     Req.get!(plug: plug)
                    end
     end
 
