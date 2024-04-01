@@ -6,12 +6,12 @@ defmodule Req.DecompressError do
   defexception [:format, :data, :reason]
 
   @impl true
-  def message(%{format: format, reason: reason}) when not is_nil(reason) do
-    "#{message(%{format: format})}, reason: #{inspect(reason)}"
+  def message(%{format: format, reason: nil}) do
+    "#{format} decompression failed"
   end
 
   @impl true
-  def message(%{format: format}) do
-    "decompression failed with format \'#{format}\'"
+  def message(%{format: format, reason: reason}) do
+    "#{format} decompression failed, reason: #{inspect(reason)}"
   end
 end
