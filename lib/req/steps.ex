@@ -2143,8 +2143,13 @@ defmodule Req.Steps do
 
     * `:retry` - can be one of the following:
 
-        * `:safe_transient` (default) - retry safe (GET/HEAD) requests on HTTP 408/429/500/502/503/504 responses
-          or exceptions with `reason` field set to `:timeout`/`:econnrefused`/`:closed`.
+        * `:safe_transient` (default) - retry safe (GET/HEAD) requests on one of:
+
+            * HTTP 408/429/500/502/503/504 responses
+
+            * `Req.TransportError` with `reason: :timeout | :econnrefused | :closed`
+
+            * `Req.HTTPError` with `protocol: :http2, reason: :unprocessed`
 
         * `:transient` - same as `:safe_transient` except retries all HTTP methods (POST, DELETE, etc.)
 
@@ -2262,8 +2267,12 @@ defmodule Req.Steps do
     false
   end
 
-  defp transient?(%{__exception__: true, reason: reason})
+  defp transient?(%Req.TransportError{reason: reason})
        when reason in [:timeout, :econnrefused, :closed] do
+    true
+  end
+
+  defp transient?(%Req.HTTPError{protocol: :http2, reason: :unprocessed}) do
     true
   end
 

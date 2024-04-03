@@ -2,27 +2,32 @@
 
 ## HEAD
 
-  * [`run_finch`]: **(BREAKING CHANGE)** Return [`Req.TransportError`] instead of
-    `Mint.TransportError`.
+  * [`Req.Request`]: Deprecate `halt/1` in favour of `Req.Request.halt/2`.
 
-  * [`run_finch`]: **(BREAKING CHANGE)** Return [`Req.HTTPError`] instead of
-    `Mint.HTTPError`.
-
-  * [`run_finch`]: Set `inet6: true` if URL looks like IPv6 address.
-
-  * [`put_plug`]: Move most documentation to [`run_plug`].
-
-  * [`run_plug`]: Make public.
-
-  * [`run_plug`]: Add support for simulating network issues using [`Req.Test.transport_error/2`].
-
-  * [`put_aws_sigv4`]: Drop `:aws_signature` dependency.
+  * [`Req.Test`]: Add [`Req.Test.transport_error/2`].
 
   * [`decompress_body`]: Return [`Req.DecompressError`].
 
-  * [`Req.Request`]: Deprecate `Req.Request.halt/1` in favour of `Req.Request.halt/2`.
+  * [`put_aws_sigv4`]: Drop `:aws_signature` dependency.
 
-  * [`Req.Test`]: Add [`Req.Test.transport_error/2`].
+  * [`put_plug`]: Move most documentation to [`run_plug`].
+
+  * [`retry`]: **(BREAKING CHANGE)** Consider
+    `%Req.TransportError{reason: :closed | :econnrefused | :timeout}` as transient. Previously
+    _any_ exceptions with those reason values were consider as such.
+
+  * [`retry`]: **(BREAKING CHANGE)** Consider
+    `%Req.HTTPError{protocol: :http2, reason: :unprocessed}` as transient.
+
+  * [`run_finch`]: **(BREAKING CHANGE)** Return [`Req.HTTPError`] instead of `Mint.HTTPError`.
+
+  * [`run_finch`]: **(BREAKING CHANGE)** Return [`Req.TransportError`] instead of `Mint.TransportError`.
+
+  * [`run_finch`]: Set `inet6: true` if URL looks like IPv6 address.
+
+  * [`run_plug`]: Add support for simulating network issues using [`Req.Test.transport_error/2`].
+
+  * [`run_plug`]: Make public.
 
 ## v0.4.14 (2024-03-15)
 
@@ -914,5 +919,6 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Collectable`]: https://hexdocs.pm/elixir/Collectable.html
 
 [`Req.TransportError`]: https://hexdocs.pm/req/Req.TransportError.html
+[`Req.HTTPError`]: https://hexdocs.pm/req/Req.HTTPError.html
 [`Req.TooManyRedirectsError`]: https://hexdocs.pm/req/Req.TooManyRedirectsError.html
 [`Req.DecompressError`]: https://hexdocs.pm/req/Req.DecompressError.html

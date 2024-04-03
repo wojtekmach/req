@@ -1931,6 +1931,17 @@ defmodule Req.StepsTest do
       assert_received :ping
     end
 
+    test "Req.HTTPError" do
+      %{url: url} =
+        TestSocket.serve(fn socket ->
+          assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
+          :ok = :gen_tcp.send(socket, "bad\r\n")
+        end)
+
+      req = Req.new(url: url, retry: false)
+      {:error, %Req.HTTPError{protocol: :http1, reason: :invalid_status_line}} = Req.request(req)
+    end
+
     test ":connect_options :protocol", c do
       Bypass.stub(c.bypass, "GET", "/", fn conn ->
         {_, %{version: :"HTTP/2"}} = conn.adapter
