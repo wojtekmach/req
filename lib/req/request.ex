@@ -93,7 +93,7 @@ defmodule Req.Request do
       `update_in(request.options[key], fun)` is allowed. `get_option/3` and `delete_option/2`
       are also available for additional ways to manipulate the internal representation.
 
-    * `:halted` - whether the request pipeline is halted. See `halt/1`
+    * `:halted` - whether the request pipeline is halted. See `halt/2`.
 
     * `:adapter` - a request step that makes the actual HTTP request. Defaults to
       `Req.Steps.run_finch/1`. See ["Adapter"](#module-adapter) section below for more information.
@@ -179,14 +179,14 @@ defmodule Req.Request do
 
   ### Halting
 
-  Any step can call `halt/1` to halt the pipeline. This will prevent any further steps
+  Any step can call `halt/2` to halt the pipeline. This will prevent any further steps
   from being invoked.
 
   Examples:
 
       def circuit_breaker(request) do
         if CircuitBreaker.open?() do
-          {Req.Request.halt(request), RuntimeError.exception("circuit breaker is open")}
+          Req.Request.halt(request, RuntimeError.exception("circuit breaker is open"))
         else
           request
         end
@@ -595,11 +595,33 @@ defmodule Req.Request do
     put_in(request.private[key], value)
   end
 
-  @doc """
-  Halts the request pipeline preventing any further steps from executing.
-  """
+  @doc false
+  @deprecated "Use Req.Request.halt/2 instead"
   def halt(request) do
     %{request | halted: true}
+  end
+
+  @doc """
+  Halts the request pipeline preventing any further steps from executing.
+
+  ## Examples
+
+      def circuit_breaker(request) do
+        if CircuitBreaker.open?() do
+          Req.Request.halt(request, RuntimeError.exception("circuit breaker is open"))
+        else
+          request
+        end
+      end
+  """
+  def halt(request, response_or_exception)
+
+  def halt(%Req.Request{} = request, %Req.Response{} = response) do
+    {put_in(request.halted, true), response}
+  end
+
+  def halt(%Req.Request{} = request, %_{__exception__: true} = exception) do
+    {put_in(request.halted, true), exception}
   end
 
   @doc """

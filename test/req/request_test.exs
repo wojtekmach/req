@@ -98,7 +98,7 @@ defmodule Req.RequestTest do
       new(url: c.url <> "/ok")
       |> Req.Request.prepend_request_steps(
         foo: fn request ->
-          {Req.Request.halt(request), %Req.Response{status: 200, body: "from cache"}}
+          Req.Request.halt(request, %Req.Response{status: 200, body: "from cache"})
         end,
         bar: &unreachable/1
       )
@@ -113,7 +113,7 @@ defmodule Req.RequestTest do
       new(url: c.url <> "/ok")
       |> Req.Request.prepend_request_steps(
         foo: fn request ->
-          {Req.Request.halt(request), RuntimeError.exception("oops")}
+          Req.Request.halt(request, RuntimeError.exception("oops"))
         end,
         bar: &unreachable/1
       )
@@ -170,7 +170,7 @@ defmodule Req.RequestTest do
       new(url: c.url <> "/ok")
       |> Req.Request.prepend_response_steps(
         foo: fn {request, response} ->
-          {Req.Request.halt(request), update_in(response.body, &(&1 <> " - updated"))}
+          Req.Request.halt(request, update_in(response.body, &(&1 <> " - updated")))
         end,
         bar: &unreachable/1
       )
@@ -189,7 +189,7 @@ defmodule Req.RequestTest do
       |> Req.Request.prepend_response_steps(
         foo: fn {request, response} ->
           assert response.body == "ok"
-          {Req.Request.halt(request), RuntimeError.exception("oops")}
+          Req.Request.halt(request, RuntimeError.exception("oops"))
         end,
         bar: &unreachable/1
       )
@@ -243,7 +243,7 @@ defmodule Req.RequestTest do
       |> Req.Request.prepend_error_steps(
         foo: fn {request, exception} ->
           assert exception.reason == :econnrefused
-          {Req.Request.halt(request), %Req.Response{status: 200, body: "ok"}}
+          Req.Request.halt(request, %Req.Response{status: 200, body: "ok"})
         end,
         bar: &unreachable/1
       )

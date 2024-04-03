@@ -1983,9 +1983,9 @@ defmodule Req.Steps do
           |> Req.Request.put_private(:req_redirect_count, redirect_count + 1)
 
         {_, result} = Req.Request.run(request)
-        {Req.Request.halt(request), result}
+        Req.Request.halt(request, result)
       else
-        {Req.Request.halt(request), %Req.TooManyRedirectsError{max_redirects: max_redirects}}
+        Req.Request.halt(request, %Req.TooManyRedirectsError{max_redirects: max_redirects})
       end
     else
       _ ->
@@ -2264,7 +2264,7 @@ defmodule Req.Steps do
       Process.sleep(delay)
       request = Req.Request.put_private(request, :req_retry_count, retry_count + 1)
       {request, response_or_exception} = Req.Request.run_request(request)
-      {Req.Request.halt(request), response_or_exception}
+      Req.Request.halt(request, response_or_exception)
     else
       {request, response_or_exception}
     end

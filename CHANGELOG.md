@@ -17,6 +17,8 @@
 
   * [`decompress_body`]: Return [`Req.DecompressError`].
 
+  * [`Req.Request`]: Deprecate `Req.Request.halt/1` in favour of `Req.Request.halt/2`.
+
   * [`Req.Test`]: Add [`Req.Test.transport_error/2`].
 
 ## v0.4.14 (2024-03-15)
