@@ -15,6 +15,8 @@
 
   * [`put_aws_sigv4`]: Drop `:aws_signature` dependency.
 
+  * [`decompress_body`]: Return [`Req.DecompressError`].
+
   * [`Req.Test`]: Add [`Req.Test.transport_error/2`].
 
 ## v0.4.14 (2024-03-15)
@@ -908,3 +910,4 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
 [`Req.TransportError`]: https://hexdocs.pm/req/Req.TransportError.html
 [`Req.TooManyRedirectsError`]: https://hexdocs.pm/req/Req.TooManyRedirectsError.html
+[`Req.DecompressError`]: https://hexdocs.pm/req/Req.DecompressError.html
