@@ -612,7 +612,8 @@ defmodule Req.Steps do
   for more information on adapters.
 
   Finch returns `Mint.TransportError` exceptions on HTTP connection problems. These are automatically
-  converted to `Req.TransportError` exceptions.
+  converted to `Req.TransportError` exceptions. Similarly, HTTP-protocol-related errors,
+  `Mint.HTTPError` and `Finch.Error`, and converted to `Req.HTTPError`.
 
   ## HTTP/1 Pools
 
@@ -847,6 +848,15 @@ defmodule Req.Steps do
       {:error, %Mint.TransportError{reason: reason}} ->
         {req, %Req.TransportError{reason: reason}}
 
+      {:error, %Mint.HTTPError{module: Mint.HTTP1, reason: reason}} ->
+        {req, %Req.HTTPError{protocol: :http1, reason: reason}}
+
+      {:error, %Mint.HTTPError{module: Mint.HTTP2, reason: reason}} ->
+        {req, %Req.HTTPError{protocol: :http2, reason: reason}}
+
+      {:error, %Finch.Error{reason: reason}} ->
+        {req, %Req.HTTPError{protocol: :http2, reason: reason}}
+
       {:error, exception} ->
         {req, exception}
     end
@@ -882,6 +892,15 @@ defmodule Req.Steps do
 
       {:error, %Mint.TransportError{reason: reason}} ->
         {req, %Req.TransportError{reason: reason}}
+
+      {:error, %Mint.HTTPError{module: Mint.HTTP1, reason: reason}} ->
+        {req, %Req.HTTPError{protocol: :http1, reason: reason}}
+
+      {:error, %Mint.HTTPError{module: Mint.HTTP2, reason: reason}} ->
+        {req, %Req.HTTPError{protocol: :http2, reason: reason}}
+
+      {:error, %Finch.Error{reason: reason}} ->
+        {req, %Req.HTTPError{protocol: :http2, reason: reason}}
 
       {:error, exception} ->
         {req, exception}
@@ -956,6 +975,15 @@ defmodule Req.Steps do
 
       {:error, %Mint.TransportError{reason: reason}} ->
         %Req.TransportError{reason: reason}
+
+      {:error, %Mint.HTTPError{module: Mint.HTTP1, reason: reason}} ->
+        %Req.HTTPError{protocol: :http1, reason: reason}
+
+      {:error, %Mint.HTTPError{module: Mint.HTTP2, reason: reason}} ->
+        %Req.HTTPError{protocol: :http2, reason: reason}
+
+      {:error, %Finch.Error{reason: reason}} ->
+        %Req.HTTPError{protocol: :http2, reason: reason}
 
       {:error, exception} ->
         exception

@@ -5,6 +5,9 @@
   * [`run_finch`]: **(BREAKING CHANGE)** Return [`Req.TransportError`] instead of
     `Mint.TransportError`.
 
+  * [`run_finch`]: **(BREAKING CHANGE)** Return [`Req.HTTPError`] instead of
+    `Mint.HTTPError`.
+
   * [`run_finch`]: Set `inet6: true` if URL looks like IPv6 address.
 
   * [`put_plug`]: Move most documentation to [`run_plug`].
