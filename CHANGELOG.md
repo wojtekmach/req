@@ -6,6 +6,10 @@
 
   * [`Req.Test`]: Add [`Req.Test.transport_error/2`].
 
+  * [`decode_body`]: Return `Jason.DecodeError` on JSON errors instead of raising it.
+
+  * [`decode_body`]: Return [`Req.ArchiveError`] on tar/zip errors.
+
   * [`decompress_body`]: Return [`Req.DecompressError`].
 
   * [`put_aws_sigv4`]: Drop `:aws_signature` dependency.
@@ -922,3 +926,4 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.HTTPError`]: https://hexdocs.pm/req/Req.HTTPError.html
 [`Req.TooManyRedirectsError`]: https://hexdocs.pm/req/Req.TooManyRedirectsError.html
 [`Req.DecompressError`]: https://hexdocs.pm/req/Req.DecompressError.html
+[`Req.ArchiveError`]: https://hexdocs.pm/req/Req.ArchiveError.html
