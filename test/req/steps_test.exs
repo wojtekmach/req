@@ -669,69 +669,6 @@ defmodule Req.StepsTest do
     end
   end
 
-  describe "output" do
-    unless System.get_env("REQ_NOWARN_OUTPUT") do
-      @describetag :skip
-    end
-
-    @tag :tmp_dir
-    test "decode_body with output", c do
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
-        Req.Test.json(conn, %{a: 1})
-      end)
-
-      assert Req.get!(c.url, output: c.tmp_dir <> "/a.json").body == ""
-      assert File.read!(c.tmp_dir <> "/a.json") == ~s|{"a":1}|
-    end
-
-    @tag :tmp_dir
-    test "path (compressed)", c do
-      Bypass.expect_once(c.bypass, "GET", "/foo.txt", fn conn ->
-        conn
-        |> Plug.Conn.put_resp_header("content-encoding", "gzip")
-        |> Plug.Conn.send_resp(200, :zlib.gzip("bar"))
-      end)
-
-      response = Req.get!(c.url <> "/foo.txt", output: c.tmp_dir <> "/foo.txt")
-      assert response.body == ""
-      assert File.read!(c.tmp_dir <> "/foo.txt") == "bar"
-    end
-
-    test ":remote_name", c do
-      Bypass.expect_once(c.bypass, "GET", "/directory/does/not/matter/foo.txt", fn conn ->
-        Plug.Conn.send_resp(conn, 200, "bar")
-      end)
-
-      response = Req.get!(c.url <> "/directory/does/not/matter/foo.txt", output: :remote_name)
-      assert response.body == ""
-      assert File.read!("foo.txt") == "bar"
-    after
-      File.rm("foo.txt")
-    end
-
-    test "disables decoding", c do
-      Bypass.expect_once(c.bypass, "GET", "/foo.json", fn conn ->
-        Req.Test.json(conn, %{a: 1})
-      end)
-
-      response = Req.get!(c.url <> "/foo.json", output: :remote_name)
-      assert response.body == ""
-      assert File.read!("foo.json") == ~s|{"a":1}|
-    after
-      File.rm("foo.json")
-    end
-
-    test "empty filename", c do
-      Bypass.expect_once(c.bypass, "GET", "", fn conn ->
-        Plug.Conn.send_resp(conn, 200, "body contents")
-      end)
-
-      assert_raise RuntimeError, "cannot write to file \"\"", fn ->
-        Req.get!(c.url, output: :remote_name)
-      end
-    end
-  end
-
   describe "decode_body" do
     test "multiple types", c do
       Bypass.expect(c.bypass, "GET", "/", fn conn ->
