@@ -732,16 +732,6 @@ defmodule Req.StepsTest do
       assert {:error, %Jason.DecodeError{}} = Req.get(plug: plug)
     end
 
-    test "gzip" do
-      plug = fn conn ->
-        conn
-        |> Plug.Conn.put_resp_content_type("application/x-gzip", nil)
-        |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
-      end
-
-      assert Req.get!(plug: plug).body == "foo"
-    end
-
     test "tar (content-type)" do
       files = [{~c"foo.txt", "bar"}]
 

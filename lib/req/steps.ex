@@ -1795,7 +1795,6 @@ defmodule Req.Steps do
   | Format       | Decoder                                                           |
   | ------------ | ----------------------------------------------------------------- |
   | `json`       | `Jason.decode/2`                                                  |
-  | `gzip`       | `:zlib.gunzip/1`                                                  |
   | `tar`, `tgz` | `:erl_tar.extract/2`                                              |
   | `zip`        | `:zip.unzip/2`                                                    |
   | `csv`        | `NimbleCSV.RFC4180.parse_string/2` (if [nimble_csv] is installed) |
@@ -1868,10 +1867,6 @@ defmodule Req.Steps do
       {:error, e} ->
         {request, e}
     end
-  end
-
-  defp decode_body({request, response}, "gz") do
-    {request, update_in(response.body, &:zlib.gunzip/1)}
   end
 
   defp decode_body({request, response}, "tar") do
