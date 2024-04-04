@@ -2242,8 +2242,14 @@ defmodule Req.StepsTest do
   end
 
   defp create_tar(files) when is_list(files) do
+    fun = fn
+      :write, {pid, data} -> IO.write(pid, data)
+      :position, {_pid, {:cur, 0}} -> {:ok, 0}
+      :close, _pid -> :ok
+    end
+
     {:ok, pid} = StringIO.open("")
-    {:ok, tar} = :erl_tar.init(pid, :write, &fun/2)
+    {:ok, tar} = :erl_tar.init(pid, :write, fun)
 
     for {path, content} <- files do
       :ok = :erl_tar.add(tar, content, to_charlist(path), [])
@@ -2251,18 +2257,6 @@ defmodule Req.StepsTest do
 
     :ok = :erl_tar.close(tar)
     StringIO.flush(pid)
-  end
-
-  defp fun(:write, {pid, data}) do
-    :file.write(pid, data)
-  end
-
-  defp fun(:position, {_pid, {:cur, 0}}) do
-    {:ok, 0}
-  end
-
-  defp fun(:close, _pid) do
-    :ok
   end
 
   defp create_zip(files) when is_list(files) do
