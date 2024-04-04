@@ -634,7 +634,7 @@ defmodule Req.StepsTest do
 
     test "multiple codecs with multiple headers" do
       %{url: url} =
-        TestSocket.serve(fn socket ->
+        start_socket(fn socket ->
           assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
 
           body = "foo" |> :zlib.gzip() |> :ezstd.compress()
@@ -1877,7 +1877,7 @@ defmodule Req.StepsTest do
       pid = self()
 
       %{url: url} =
-        TestSocket.serve(fn socket ->
+        start_socket(fn socket ->
           assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
           send(pid, :ping)
           body = "ok"
@@ -1901,7 +1901,7 @@ defmodule Req.StepsTest do
 
     test "Req.HTTPError" do
       %{url: url} =
-        TestSocket.serve(fn socket ->
+        start_socket(fn socket ->
           assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
           :ok = :gen_tcp.send(socket, "bad\r\n")
         end)
@@ -2030,7 +2030,7 @@ defmodule Req.StepsTest do
 
     test "into: fun" do
       %{url: url} =
-        TestSocket.serve(fn socket ->
+        start_socket(fn socket ->
           {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
 
           data = """
@@ -2117,7 +2117,7 @@ defmodule Req.StepsTest do
 
     test "into: collectable" do
       %{url: url} =
-        TestSocket.serve(fn socket ->
+        start_socket(fn socket ->
           {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
 
           data = """
@@ -2229,6 +2229,26 @@ defmodule Req.StepsTest do
     pid = start_supervised!({Bandit, options})
     {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)
     %{pid: pid, url: "http://localhost:#{port}"}
+  end
+
+  defp start_socket(fun) do
+    {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, active: false)
+    {:ok, port} = :inet.port(listen_socket)
+    pid = ExUnit.Callbacks.start_supervised!({Task, fn -> accept(listen_socket, fun) end})
+    %{pid: pid, url: "http://localhost:#{port}"}
+  end
+
+  defp accept(listen_socket, fun) do
+    case :gen_tcp.accept(listen_socket) do
+      {:ok, socket} ->
+        fun.(socket)
+        :ok = :gen_tcp.close(socket)
+
+      {:error, :closed} ->
+        :ok
+    end
+
+    accept(listen_socket, fun)
   end
 
   defp create_tar(files) when is_list(files) do
