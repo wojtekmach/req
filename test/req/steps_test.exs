@@ -747,30 +747,40 @@ defmodule Req.StepsTest do
       assert Req.get!(c.url).body == "ok"
     end
 
-    test "json", c do
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+    test "json" do
+      plug = fn conn ->
         Req.Test.json(conn, %{a: 1})
-      end)
+      end
 
-      assert Req.get!(c.url).body == %{"a" => 1}
+      assert Req.get!(plug: plug).body == %{"a" => 1}
     end
 
-    test "json-api", c do
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+    test "json-api" do
+      plug = fn conn ->
         conn
         |> Plug.Conn.put_resp_header("content-type", "application/vnd.api+json; charset=utf-8")
         |> Req.Test.json(%{a: 1})
-      end)
+      end
 
-      assert Req.get!(c.url).body == %{"a" => 1}
+      assert Req.get!(plug: plug).body == %{"a" => 1}
     end
 
-    test "json with custom options", c do
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+    test "json with custom options" do
+      plug = fn conn ->
         Req.Test.json(conn, %{a: 1})
-      end)
+      end
 
-      assert Req.get!(c.url, decode_json: [keys: :atoms]).body == %{a: 1}
+      assert Req.get!(plug: plug, decode_json: [keys: :atoms]).body == %{a: 1}
+    end
+
+    test "json invalid" do
+      plug = fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(200, "bad")
+      end
+
+      assert {:error, %Jason.DecodeError{}} = Req.get(plug: plug)
     end
 
     test "gzip", c do

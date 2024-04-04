@@ -1794,7 +1794,7 @@ defmodule Req.Steps do
 
   | Format       | Decoder                                                           |
   | ------------ | ----------------------------------------------------------------- |
-  | `json`       | `Jason.decode!/2`                                                 |
+  | `json`       | `Jason.decode/2`                                                  |
   | `gzip`       | `:zlib.gunzip/1`                                                  |
   | `tar`, `tgz` | `:erl_tar.extract/2`                                              |
   | `zip`        | `:zip.unzip/2`                                                    |
@@ -1814,7 +1814,7 @@ defmodule Req.Steps do
     * `:decode_body` - if set to `false`, disables automatic response body decoding.
       Defaults to `true`.
 
-    * `:decode_json` - options to pass to `Jason.decode!/2`, defaults to `[]`.
+    * `:decode_json` - options to pass to `Jason.decode/2`, defaults to `[]`.
 
     * `:raw` - if set to `true`, disables response body decoding. Defaults to `false`.
 
@@ -1860,7 +1860,14 @@ defmodule Req.Steps do
 
   defp decode_body({request, response}, format) when format in ~w(json json-api) do
     options = Req.Request.get_option(request, :decode_json, [])
-    {request, update_in(response.body, &Jason.decode!(&1, options))}
+
+    case Jason.decode(response.body, options) do
+      {:ok, decoded} ->
+        {request, put_in(response.body, decoded)}
+
+      {:error, e} ->
+        {request, e}
+    end
   end
 
   defp decode_body({request, response}, "gz") do
