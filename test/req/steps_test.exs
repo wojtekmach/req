@@ -730,83 +730,88 @@ defmodule Req.StepsTest do
       assert Req.get!(c.url).body == "foo"
     end
 
-    @tag :tmp_dir
-    test "tar (content-type)", c do
+    test "tar (content-type)" do
       files = [{~c"foo.txt", "bar"}]
 
-      path = ~c"#{c.tmp_dir}/foo.tar"
-      :ok = :erl_tar.create(path, files)
-      tar = File.read!(path)
-
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      plug = fn conn ->
         conn
         |> Plug.Conn.put_resp_content_type("application/x-tar")
-        |> Plug.Conn.send_resp(200, tar)
-      end)
+        |> Plug.Conn.send_resp(200, create_tar(files))
+      end
 
-      assert Req.get!(c.url).body == files
+      assert Req.get!(plug: plug).body == files
     end
 
-    @tag :tmp_dir
-    test "tar (path)", c do
+    test "tar (path)" do
       files = [{~c"foo.txt", "bar"}]
 
-      path = ~c"#{c.tmp_dir}/foo.tar"
-      :ok = :erl_tar.create(path, files)
-      tar = File.read!(path)
-
-      Bypass.expect(c.bypass, "GET", "/foo.tar", fn conn ->
+      plug = fn conn ->
         conn
         |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
-        |> Plug.Conn.send_resp(200, tar)
-      end)
+        |> Plug.Conn.send_resp(200, create_tar(files))
+      end
 
-      assert Req.get!(c.url <> "/foo.tar").body == files
+      assert Req.get!(plug: plug, url: "/foo.tar").body == files
     end
 
-    @tag :tmp_dir
-    test "tar.gz (path)", c do
+    test "tar.gz (path)" do
       files = [{~c"foo.txt", "bar"}]
 
-      path = ~c"#{c.tmp_dir}/foo.tar"
-      :ok = :erl_tar.create(path, files, [:compressed])
-      tar = File.read!(path)
-
-      Bypass.expect(c.bypass, "GET", "/foo.tar.gz", fn conn ->
+      plug = fn conn ->
         conn
         |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
-        |> Plug.Conn.send_resp(200, tar)
-      end)
+        |> Plug.Conn.send_resp(200, create_tar(files))
+      end
 
-      assert Req.get!(c.url <> "/foo.tar.gz").body == files
+      assert Req.get!(plug: plug, url: "/foo.tar.gz").body == files
     end
 
-    test "zip (content-type)", c do
+    test "tar invalid" do
+      plug = fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/x-tar", nil)
+        |> Plug.Conn.send_resp(200, "invalid")
+      end
+
+      assert {:error, e} = Req.get(plug: plug)
+      assert e == %Req.ArchiveError{format: :tar, reason: :eof, data: "invalid"}
+      assert Exception.message(e) == "tar unpacking failed: Unexpected end of file"
+    end
+
+    test "zip (content-type)" do
       files = [{~c"foo.txt", "bar"}]
 
-      Bypass.expect(c.bypass, "GET", "/", fn conn ->
-        {:ok, {~c"foo.zip", data}} = :zip.create(~c"foo.zip", files, [:memory])
-
+      plug = fn conn ->
         conn
         |> Plug.Conn.put_resp_content_type("application/zip", nil)
-        |> Plug.Conn.send_resp(200, data)
-      end)
+        |> Plug.Conn.send_resp(200, create_zip(files))
+      end
 
-      assert Req.get!(c.url).body == files
+      assert Req.get!(plug: plug).body == files
     end
 
-    test "zip (path)", c do
+    test "zip (path)" do
       files = [{~c"foo.txt", "bar"}]
 
-      Bypass.expect(c.bypass, "GET", "/foo.zip", fn conn ->
-        {:ok, {~c"foo.zip", data}} = :zip.create(~c"foo.zip", files, [:memory])
-
+      plug = fn conn ->
         conn
         |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
-        |> Plug.Conn.send_resp(200, data)
-      end)
+        |> Plug.Conn.send_resp(200, create_zip(files))
+      end
 
-      assert Req.get!(c.url <> "/foo.zip").body == files
+      assert Req.get!(plug: plug, url: "/foo.zip").body == files
+    end
+
+    test "zip invalid" do
+      plug = fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/zip", nil)
+        |> Plug.Conn.send_resp(200, "invalid")
+      end
+
+      assert {:error, e} = Req.get(plug: plug)
+      assert e == %Req.ArchiveError{format: :zip, reason: nil, data: "invalid"}
+      assert Exception.message(e) == "zip unpacking failed"
     end
 
     test "csv", c do
@@ -2200,5 +2205,34 @@ defmodule Req.StepsTest do
     pid = start_supervised!({Bandit, scheme: :http, port: 0, startup_log: false, plug: plug})
     {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)
     %{pid: pid, url: "http://localhost:#{port}"}
+  end
+
+  defp create_tar(files) when is_list(files) do
+    {:ok, pid} = StringIO.open("")
+    {:ok, tar} = :erl_tar.init(pid, :write, &fun/2)
+
+    for {path, content} <- files do
+      :ok = :erl_tar.add(tar, content, to_charlist(path), [])
+    end
+
+    :ok = :erl_tar.close(tar)
+    StringIO.flush(pid)
+  end
+
+  defp fun(:write, {pid, data}) do
+    :file.write(pid, data)
+  end
+
+  defp fun(:position, {_pid, {:cur, 0}}) do
+    {:ok, 0}
+  end
+
+  defp fun(:close, _pid) do
+    :ok
+  end
+
+  defp create_zip(files) when is_list(files) do
+    {:ok, {"a.zip", files}} = :zip.create("a.zip", files, [:memory])
+    files
   end
 end

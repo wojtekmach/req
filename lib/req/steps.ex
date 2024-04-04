@@ -1875,18 +1875,33 @@ defmodule Req.Steps do
   end
 
   defp decode_body({request, response}, "tar") do
-    {:ok, files} = :erl_tar.extract({:binary, response.body}, [:memory])
-    {request, put_in(response.body, files)}
+    case :erl_tar.extract({:binary, response.body}, [:memory]) do
+      {:ok, files} ->
+        {request, put_in(response.body, files)}
+
+      {:error, reason} ->
+        {request, %Req.ArchiveError{format: :tar, data: response.body, reason: reason}}
+    end
   end
 
   defp decode_body({request, response}, "tgz") do
-    {:ok, files} = :erl_tar.extract({:binary, response.body}, [:memory, :compressed])
-    {request, put_in(response.body, files)}
+    case :erl_tar.extract({:binary, response.body}, [:memory, :compressed]) do
+      {:ok, files} ->
+        {request, put_in(response.body, files)}
+
+      {:error, reason} ->
+        {request, %Req.ArchiveError{format: :tar, data: response.body, reason: reason}}
+    end
   end
 
   defp decode_body({request, response}, "zip") do
-    {:ok, files} = :zip.extract(response.body, [:memory])
-    {request, put_in(response.body, files)}
+    case :zip.extract(response.body, [:memory]) do
+      {:ok, files} ->
+        {request, put_in(response.body, files)}
+
+      {:error, _} ->
+        {request, %Req.ArchiveError{format: :zip, data: response.body}}
+    end
   end
 
   defp decode_body({request, response}, "csv") do
