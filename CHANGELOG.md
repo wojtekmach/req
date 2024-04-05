@@ -2,7 +2,7 @@
 
 ## HEAD
 
-  * [`Req`]: Deprecate setting `:redact_auth`. It now has no effect. Instead of allowing
+  * [`Req.Request`]: Deprecate setting `:redact_auth`. It now has no effect. Instead of allowing
     to opt out of, we give an idea what the secret was without revealing it fully:
 
         iex> Req.new(auth: {:basic, "foo:bar"})

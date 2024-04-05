@@ -1121,28 +1121,15 @@ defmodule Req.Request do
           end
         end
 
-      options =
-        case request.options do
-          %{auth: {:bearer, bearer}} ->
-            %{request.options | auth: {:bearer, redact(bearer)}}
-
-          %{auth: {:basic, userinfo}} ->
-            %{request.options | auth: {:basic, redact(userinfo)}}
-
-          # TODO: remove on 1.0/1.1?
-          %{auth: {username, password}} when is_binary(username) and is_binary(password) ->
-            %{request.options | auth: {redact(username), redact(password)}}
-
-          _ ->
-            request.options
-        end
-
       list = [
         method: request.method,
         url: request.url,
         headers: headers,
         body: request.body,
-        options: options,
+        options:
+          Map.new(request.options, fn {name, value} ->
+            {name, redact_option(name, value)}
+          end),
         registered_options: request.registered_options,
         halted: request.halted,
         adapter: request.adapter,
@@ -1166,6 +1153,30 @@ defmodule Req.Request do
       end
 
       container_doc(open, list, close, opts, fun, separator: sep, break: :strict)
+    end
+
+    defp redact_option(:auth, {:bearer, bearer}) do
+      {:bearer, redact(bearer)}
+    end
+
+    defp redact_option(:auth, {:basic, userinfo}) do
+      {:basic, redact(userinfo)}
+    end
+
+    # TODO: remove on 1.0/1.1?
+    defp redact_option(:auth, {username, password})
+         when is_binary(username) and is_binary(password) do
+      {redact(username), redact(password)}
+    end
+
+    defp redact_option(:aws_sigv4, options) do
+      Enum.map(options, fn {name, value} ->
+        if name in [:access_key_id, :secret_access_key] do
+          {name, redact(value)}
+        else
+          {name, value}
+        end
+      end)
     end
 
     defp redact(string) do
