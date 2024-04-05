@@ -50,6 +50,8 @@
 
   * [`run_plug`]: Make public.
 
+  * [`verify_checksum`]: Fix handling compressed responses
+
 ## v0.4.14 (2024-03-15)
 
   * [`redirect`]: Return [`Req.TooManyRedirectsError`] exception.
