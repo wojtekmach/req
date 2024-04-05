@@ -80,8 +80,8 @@ defmodule Req.Steps do
     |> Req.Request.prepend_response_steps(
       retry: &Req.Steps.retry/1,
       redirect: &Req.Steps.redirect/1,
-      verify_checksum: &Req.Steps.verify_checksum/1,
       decompress_body: &Req.Steps.decompress_body/1,
+      verify_checksum: &Req.Steps.verify_checksum/1,
       decode_body: &Req.Steps.decode_body/1,
       handle_http_errors: &Req.Steps.handle_http_errors/1,
       output: &Req.Steps.output/1
@@ -1384,34 +1384,27 @@ defmodule Req.Steps do
 
         case request.into do
           nil ->
-            hash = hash_init(type)
-
-            into =
-              fn {:data, chunk}, {req, resp} ->
-                req = update_in(req.private.req_checksum_hash, &:crypto.hash_update(&1, chunk))
-                resp = update_in(resp.body, &(&1 <> chunk))
-                {:cont, {req, resp}}
-              end
-
-            request
-            |> Req.Request.put_private(:req_checksum_type, type)
-            |> Req.Request.put_private(:req_checksum_expected, checksum)
-            |> Req.Request.put_private(:req_checksum_hash, hash)
-            |> Map.replace!(:into, into)
+            Req.Request.put_private(request, :req_checksum, %{
+              type: type,
+              expected: checksum,
+              hash: :body
+            })
 
           fun when is_function(fun, 2) ->
             hash = hash_init(type)
 
             into =
               fn {:data, chunk}, {req, resp} ->
-                req = update_in(req.private.req_checksum_hash, &:crypto.hash_update(&1, chunk))
+                req = update_in(req.private.req_checksum.hash, &:crypto.hash_update(&1, chunk))
                 fun.({:data, chunk}, {req, resp})
               end
 
             request
-            |> Req.Request.put_private(:req_checksum_type, type)
-            |> Req.Request.put_private(:req_checksum_expected, checksum)
-            |> Req.Request.put_private(:req_checksum_hash, hash)
+            |> Req.Request.put_private(:req_checksum, %{
+              type: type,
+              expected: checksum,
+              hash: hash
+            })
             |> Map.replace!(:into, into)
 
           :self ->
@@ -1421,8 +1414,11 @@ defmodule Req.Steps do
             into = Req.Utils.collect_with_hash(collectable, type)
 
             request
-            |> Req.Request.put_private(:req_checksum_type, type)
-            |> Req.Request.put_private(:req_checksum_expected, checksum)
+            |> Req.Request.put_private(:req_checksum, %{
+              type: type,
+              expected: checksum,
+              hash: :collectable
+            })
             |> Map.replace!(:into, into)
         end
     end
@@ -1574,28 +1570,31 @@ defmodule Req.Steps do
   """
   @doc step: :response
   def verify_checksum({request, response}) do
-    if type = request.private[:req_checksum_type] do
+    if config = request.private[:req_checksum] do
       {response, hash} =
-        if hash = request.private[:req_checksum_hash] do
-          {response, :crypto.hash_final(hash)}
-        else
-          {body, hash} = response.body
-          {put_in(response.body, body), hash}
+        case config.hash do
+          # The most efficient way to do this would be to calculate checksum one chunk
+          # at a time but it's not easy to implemenet.
+          :body ->
+            hash = hash_init(config.type)
+            hash = :crypto.hash_update(hash, response.body)
+            {response, :crypto.hash_final(hash)}
+
+          :collectable ->
+            {body, hash} = response.body
+            {put_in(response.body, body), hash}
+
+          hash ->
+            {response, :crypto.hash_final(hash)}
         end
 
-      expected = request.private.req_checksum_expected
-      actual = "#{type}:" <> Base.encode16(hash, case: :lower, padding: false)
+      actual = "#{config.type}:" <> Base.encode16(hash, case: :lower, padding: false)
 
-      if expected == actual do
-        request =
-          update_in(
-            request.private,
-            &Map.drop(&1, [:req_checksum_type, :req_checksum_expected, :req_checksum_hash])
-          )
-
+      if config.expected == actual do
+        request = Req.Request.delete_option(request, :req_checksum)
         {request, response}
       else
-        exception = Req.ChecksumMismatchError.exception(expected: expected, actual: actual)
+        exception = Req.ChecksumMismatchError.exception(expected: config.expected, actual: actual)
         {request, exception}
       end
     else

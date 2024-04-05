@@ -348,8 +348,6 @@ defmodule Req.StepsTest do
                    end
     end
 
-    # TODO
-    @tag :skip
     test "into: binary with gzip" do
       %{url: url} =
         start_server(fn conn ->
