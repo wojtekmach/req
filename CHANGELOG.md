@@ -2,6 +2,21 @@
 
 ## HEAD
 
+  * [`Req`]: Deprecate setting `:redact_auth`. It now has no effect. Instead of allowing
+    to opt out of, we give an idea what the secret was without revealing it fully:
+
+        iex> Req.new(auth: {:basic, "foo:bar"})
+        %Req.Request{
+          options: %{auth: {:basic, "foo****"}},
+          ...
+        }
+
+        iex> Req.new(headers: [authorization: "bearer foobar"])
+        %Req.Request{
+          headers: %{"authorization" => ["bearer foo***"]},
+          ...
+        }
+
   * [`Req.Request`]: Deprecate `halt/1` in favour of `Req.Request.halt/2`.
 
   * [`Req.Test`]: Add [`Req.Test.transport_error/2`].

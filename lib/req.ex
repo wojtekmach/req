@@ -180,9 +180,6 @@ defmodule Req do
 
         * `string` - sets to this value.
 
-    * `:redact_auth` - if set to `true`, when `Req.Request` struct is inspected, authentication credentials
-      are redacted. Defaults to `true`.
-
   Request body options:
 
     * `:form` - if set, encodes the request body as form data ([`encode_body`](`Req.Steps.encode_body/1`) step.)
@@ -370,7 +367,7 @@ defmodule Req do
 
     @req
     |> run_plugins(plugins)
-    |> update(options)
+    |> merge(options)
   end
 
   defp new(%Req.Request{} = request, options) when is_list(options) do
@@ -438,6 +435,11 @@ defmodule Req do
   """
   @spec merge(Req.Request.t(), options :: keyword()) :: Req.Request.t()
   def merge(%Req.Request{} = request, options) when is_list(options) do
+    # TODO: Remove on Req 1.0
+    if Keyword.has_key?(options, :redact_auth) do
+      IO.warn("Setting :redact_auth is deprecated and has no effect")
+    end
+
     request_option_names = [:method, :url, :headers, :body, :adapter, :into]
 
     {request_options, options} = Keyword.split(options, request_option_names)

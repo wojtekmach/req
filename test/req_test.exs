@@ -51,16 +51,16 @@ defmodule ReqTest do
   end
 
   test "redact" do
-    assert inspect(Req.new(auth: {:bearer, "foo"})) =~ ~s|auth: {:bearer, "[redacted]"}|
+    assert inspect(Req.new(auth: {:bearer, "foo"})) =~ ~s|auth: {:bearer, "***"}|
 
-    assert inspect(Req.new(auth: {:basic, "foo:bar"})) =~ ~s|auth: {:basic, "[redacted]"}|
+    assert inspect(Req.new(auth: {:basic, "foo:bar"})) =~ ~s|auth: {:basic, "foo****"}|
 
     if Req.MixProject.legacy_headers_as_lists?() do
-      assert inspect(Req.new(headers: [authorization: "bearer foo"])) =~
-               ~s|{"authorization", "[redacted]"}|
+      assert inspect(Req.new(headers: [authorization: "bearer foobar"])) =~
+               ~s|{"authorization", "bearer ***"}|
     else
       assert inspect(Req.new(headers: [authorization: "bearer foo"])) =~
-               ~s|"authorization" => ["[redacted]"]|
+               ~s|"authorization" => ["bearer ***"]|
     end
   end
 

@@ -55,12 +55,12 @@ defmodule Req.Steps do
       :receive_timeout,
       :pool_timeout,
       :unix_socket,
-      :redact_auth,
 
       # TODO: Remove on Req 1.0
       :output,
       :follow_redirects,
-      :location_trusted
+      :location_trusted,
+      :redact_auth
     ])
     |> Req.Request.prepend_request_steps(
       put_user_agent: &Req.Steps.put_user_agent/1,

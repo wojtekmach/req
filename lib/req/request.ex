@@ -407,11 +407,6 @@ defmodule Req.Request do
         |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
         |> Keyword.update(:url, URI.new!(""), &URI.parse/1)
         |> Keyword.update(:options, %{}, &Map.new/1)
-        |> Keyword.update(
-          :registered_options,
-          MapSet.new([:redact_auth]),
-          &MapSet.put(&1, :redact_auth)
-        )
 
       struct!(__MODULE__, options)
     end
@@ -427,11 +422,6 @@ defmodule Req.Request do
           end)
         end)
         |> Keyword.update(:options, %{}, &Map.new/1)
-        |> Keyword.update(
-          :registered_options,
-          MapSet.new([:redact_auth]),
-          &MapSet.put(&1, :redact_auth)
-        )
 
       struct!(__MODULE__, options)
     end
@@ -1109,47 +1099,42 @@ defmodule Req.Request do
       sep = color(",", :map, opts)
       close = color("}", :map, opts)
 
-      {headers, options} =
-        if Req.Request.get_option(request, :redact_auth, true) do
-          headers =
-            if unquote(Req.MixProject.legacy_headers_as_lists?()) do
-              for {name, value} <- request.headers do
-                if Req.__ensure_header_downcase__(name) == "authorization" do
-                  {name, "[redacted]"}
-                else
-                  {name, value}
-                end
-              end
+      headers =
+        if unquote(Req.MixProject.legacy_headers_as_lists?()) do
+          for {name, value} <- request.headers do
+            if Req.__ensure_header_downcase__(name) == "authorization" do
+              [scheme, value] = String.split(value, " ", parts: 2)
+              {name, scheme <> " " <> redact(value)}
             else
-              for {name, values} <- request.headers, into: %{} do
-                if Req.__ensure_header_downcase__(name) == "authorization" do
-                  [_] = values
-                  {name, ["[redacted]"]}
-                else
-                  {name, values}
-                end
-              end
+              {name, value}
             end
-
-          options =
-            case request.options do
-              %{auth: {:bearer, _bearer}} ->
-                %{request.options | auth: {:bearer, "[redacted]"}}
-
-              %{auth: {:basic, _userinfo}} ->
-                %{request.options | auth: {:basic, "[redacted]"}}
-
-              # TODO: remove on 1.0/1.1?
-              %{auth: {username, password}} when is_binary(username) and is_binary(password) ->
-                %{request.options | auth: {"[redacted]", "[redacted]"}}
-
-              _ ->
-                request.options
-            end
-
-          {headers, options}
+          end
         else
-          {request.headers, request.options}
+          for {name, values} <- request.headers, into: %{} do
+            if Req.__ensure_header_downcase__(name) == "authorization" do
+              [value] = values
+              [scheme, value] = String.split(value, " ", parts: 2)
+              {name, [scheme <> " " <> redact(value)]}
+            else
+              {name, values}
+            end
+          end
+        end
+
+      options =
+        case request.options do
+          %{auth: {:bearer, bearer}} ->
+            %{request.options | auth: {:bearer, redact(bearer)}}
+
+          %{auth: {:basic, userinfo}} ->
+            %{request.options | auth: {:basic, redact(userinfo)}}
+
+          # TODO: remove on 1.0/1.1?
+          %{auth: {username, password}} when is_binary(username) and is_binary(password) ->
+            %{request.options | auth: {redact(username), redact(password)}}
+
+          _ ->
+            request.options
         end
 
       list = [
@@ -1181,6 +1166,16 @@ defmodule Req.Request do
       end
 
       container_doc(open, list, close, opts, fun, separator: sep, break: :strict)
+    end
+
+    defp redact(string) do
+      len = String.length(string)
+
+      if len < 4 do
+        String.duplicate("*", len)
+      else
+        String.slice(string, 0, 3) <> String.duplicate("*", len - 3)
+      end
     end
   end
 end
