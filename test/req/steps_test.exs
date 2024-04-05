@@ -762,7 +762,7 @@ defmodule Req.StepsTest do
       plug = fn conn ->
         conn
         |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
-        |> Plug.Conn.send_resp(200, create_tar(files))
+        |> Plug.Conn.send_resp(200, create_tar(files, compressed: true))
       end
 
       assert Req.get!(plug: plug, url: "/foo.tar.gz").body == files
@@ -2241,11 +2241,19 @@ defmodule Req.StepsTest do
     accept(listen_socket, fun)
   end
 
-  defp create_tar(files) when is_list(files) do
+  defp create_tar(files, options \\ []) when is_list(files) do
+    [compressed: compressed] =
+      Keyword.validate!(options, compressed: false)
+
     fun = fn
-      :write, {pid, data} -> IO.write(pid, data)
-      :position, {_pid, {:cur, 0}} -> {:ok, 0}
-      :close, _pid -> :ok
+      :write, {pid, data} ->
+        IO.write(pid, data)
+
+      :position, {_pid, {:cur, 0}} ->
+        {:ok, 0}
+
+      :close, _pid ->
+        :ok
     end
 
     {:ok, pid} = StringIO.open("")
@@ -2256,7 +2264,13 @@ defmodule Req.StepsTest do
     end
 
     :ok = :erl_tar.close(tar)
-    StringIO.flush(pid)
+    data = StringIO.flush(pid)
+
+    if compressed do
+      :zlib.gzip(data)
+    else
+      data
+    end
   end
 
   defp create_zip(files) when is_list(files) do
