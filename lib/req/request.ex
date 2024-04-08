@@ -1179,6 +1179,10 @@ defmodule Req.Request do
       end)
     end
 
+    defp redact_option(name, value) when is_atom(name) do
+      value
+    end
+
     defp redact(string) do
       len = String.length(string)
 
