@@ -2218,7 +2218,7 @@ defmodule Req.Steps do
     retry =
       case Map.get(request.options, :retry, :safe_transient) do
         :safe_transient ->
-          safe_transient?(request, response_or_exception)
+          request.method in [:get, :head] and transient?(response_or_exception)
 
         :transient ->
           transient?(response_or_exception)
@@ -2231,7 +2231,7 @@ defmodule Req.Steps do
 
         :safe ->
           IO.warn("setting `retry: :safe` is deprecated in favour of `retry: :safe_transient`")
-          safe_transient?(request, response_or_exception)
+          request.method in [:get, :head] and transient?(response_or_exception)
 
         :never ->
           IO.warn("setting `retry: :never` is deprecated in favour of `retry: false`")
@@ -2269,10 +2269,6 @@ defmodule Req.Steps do
 
   defp apply_retry(fun, request, response_or_exception) when is_function(fun, 2) do
     fun.(request, response_or_exception)
-  end
-
-  defp safe_transient?(request, response_or_exception) do
-    request.method in [:get, :head] and transient?(response_or_exception)
   end
 
   defp transient?(%Req.Response{status: status}) when status in [408, 429, 500, 502, 503, 504] do
