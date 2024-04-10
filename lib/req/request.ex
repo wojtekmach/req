@@ -1130,7 +1130,6 @@ defmodule Req.Request do
           Map.new(request.options, fn {name, value} ->
             {name, redact_option(name, value)}
           end),
-        registered_options: request.registered_options,
         halted: request.halted,
         adapter: request.adapter,
         request_steps: request.request_steps,
