@@ -1460,7 +1460,7 @@ defmodule Req.Steps do
       ...>     ]
       ...>   )
       iex>
-      iex> %{status: 200} = Req.put!(req, "/bucket1/key1", body: "Hello, World!")
+      iex> %{status: 200} = Req.put!(req, url: "/bucket1/key1", body: "Hello, World!")
       iex> resp = Req.get!(req, "/bucket1/key1").body
       "Hello, World!"
 
