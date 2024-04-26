@@ -1107,12 +1107,8 @@ defmodule Req.StepsTest do
         redirect(conn, 302, c.url)
       end)
 
-      captured_log =
-        ExUnit.CaptureLog.capture_log(fn ->
-          assert_raise Req.TooManyRedirectsError, "too many redirects (3)", fn ->
-            Req.get!(c.url, max_redirects: 3)
-          end
-        end)
+      req = Req.new(url: c.url, max_redirects: 3, redirect_log_level: false)
+      {req, e} = Req.Request.run_request(req)
 
       assert_receive :ping
       assert_receive :ping
@@ -1120,7 +1116,8 @@ defmodule Req.StepsTest do
       assert_receive :ping
       refute_receive _
 
-      assert captured_log =~ "redirecting to " <> c.url
+      assert req.private == %{req_redirect_count: 3}
+      assert Exception.message(e) == "too many redirects (3)"
     end
 
     test "redirect_log_level, default to :debug", c do

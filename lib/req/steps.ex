@@ -2026,8 +2026,8 @@ defmodule Req.Steps do
           |> build_redirect_request(response, location)
           |> Req.Request.put_private(:req_redirect_count, redirect_count + 1)
 
-        {request, result} = Req.Request.run_request(request)
-        Req.Request.halt(request, result)
+        {request, response_or_exception} = Req.Request.run_request(request)
+        Req.Request.halt(request, response_or_exception)
       else
         Req.Request.halt(request, %Req.TooManyRedirectsError{max_redirects: max_redirects})
       end
