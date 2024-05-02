@@ -31,8 +31,6 @@
 
   * [`put_aws_sigv4`]: Drop `:aws_signature` dependency.
 
-  * [`put_plug`]: Move most documentation to [`run_plug`].
-
   * [`retry`]: **(BREAKING CHANGE)** Consider
     `%Req.TransportError{reason: :closed | :econnrefused | :timeout}` as transient. Previously
     _any_ exceptions with those reason values were consider as such.
@@ -46,7 +44,9 @@
 
   * [`run_finch`]: Set `inet6: true` if URL looks like IPv6 address.
 
-  * [`run_plug`]: Make public and move most documention from [`put_plug`] there.
+  * [`put_plug`]: Move most documentation to [`run_plug`].
+
+  * [`run_plug`]: Make public.
 
   * [`run_plug`]: Add support for simulating network issues using [`Req.Test.transport_error/2`].
 
