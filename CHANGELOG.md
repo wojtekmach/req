@@ -5,15 +5,15 @@
   * [`Req.Request`]: Deprecate setting `:redact_auth`. It now has no effect. Instead of allowing
     to opt out of, we give an idea what the secret was without revealing it fully:
 
-        iex> Req.new(auth: {:basic, "foo:bar"})
+        iex> Req.new(auth: {:basic, "foobar:baz"})
         %Req.Request{
-          options: %{auth: {:basic, "foo****"}},
+          options: %{auth: {:basic, "foo*******"}},
           ...
         }
 
-        iex> Req.new(headers: [authorization: "bearer foobar"])
+        iex> Req.new(headers: [authorization: "bearer foobarbaz"])
         %Req.Request{
-          headers: %{"authorization" => ["bearer foo***"]},
+          headers: %{"authorization" => ["bearer foo******"]},
           ...
         }
 
@@ -46,11 +46,11 @@
 
   * [`run_finch`]: Set `inet6: true` if URL looks like IPv6 address.
 
+  * [`run_plug`]: Make public and move most documention from [`put_plug`] there.
+
   * [`run_plug`]: Add support for simulating network issues using [`Req.Test.transport_error/2`].
 
-  * [`run_plug`]: Make public.
-
-  * [`verify_checksum`]: Fix handling compressed responses
+  * [`verify_checksum`]: Fix handling compressed responses.
 
 ## v0.4.14 (2024-03-15)
 
