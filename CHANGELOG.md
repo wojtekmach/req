@@ -908,6 +908,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`retry`]:               https://hexdocs.pm/req/Req.Steps.html#retry/1
 [`run_finch`]:           https://hexdocs.pm/req/Req.Steps.html#run_finch/1
 [`checksum`]:            https://hexdocs.pm/req/Req.Steps.html#checksum/1
+[`verify_checksum`]:     https://hexdocs.pm/req/Req.Steps.html#verify_checksum/1
 [`put_aws_sigv4`]:       https://hexdocs.pm/req/Req.Steps.html#put_aws_sigv4/1
 
 [`Req`]:                        https://hexdocs.pm/req/Req.html
