@@ -1144,7 +1144,20 @@ defmodule Req do
     Req.Utils.format_http_datetime(datetime)
   end
 
+  defp encode_header_value(value) when is_binary(value) do
+    value
+  end
+
+  defp encode_header_value(value) when is_integer(value) do
+    Integer.to_string(value)
+  end
+
   defp encode_header_value(value) do
+    IO.warn(
+      "setting header to value other than string, integer, or %DateTime{} is deprecated," <>
+        " got: #{inspect(value)}"
+    )
+
     String.Chars.to_string(value)
   end
 
