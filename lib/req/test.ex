@@ -7,17 +7,17 @@ defmodule Req.Test do
   >
   > ["Mocks Aren't Stubs" by Martin Fowler](https://martinfowler.com/articles/mocksArentStubs.html#TheDifferenceBetweenMocksAndStubs)
 
-  Req already has built-in support for stubs via `:plug`, `:adapter`, and (indirectly) `:base_url`
-  options. This module enhances these capabilities by providing:
+  Req already has built-in support for different variants of stubs via `:plug`, `:adapter`,
+  and (indirectly) `:base_url` options. This module enhances these capabilities by providing:
 
-    * Stub any value with [`Req.Test.stub(name, value)`](`stub/2`) and access it with
-      [`Req.Test.stub(name)`](`stub/1`). These functions can be used in concurrent tests.
+    * Stubbing request handling with [`Req.Test.stub(name, handler)`](`stub/2`) (which can be
+      used in concurrent tests).
 
-    * Access plug stubs with `plug: {Req.Test, name}`. This works because `Req.Test` itself
-      is a plug whose job is to fetch the stubbed value under `name`. That value is
-      usually a function that takes a `Plug.Conn` and returns a `Plug.Conn`.
+    * Providing a plug that you can pass as `plug: {Req.Test, name}`, so that requests
+      go through the stubbed request flow you defined with `stub/2`. This works because
+      `Req.Test` itself is a plug whose job is to fetch the stubbed handler under `name`.
 
-    * Easily create JSON responses for Plug stubs with [`Req.Test.json(conn, body)`](`json/2`).
+    * Easily create JSON responses for plug stubs with [`Req.Test.json(conn, body)`](`json/2`).
 
   This module bases stubs on the ownership model of
   [nimble_ownership](https://hex.pm/packages/nimble_ownership), also used by
@@ -167,6 +167,12 @@ defmodule Req.Test do
   @typedoc since: "0.4.15"
   @opaque stub() :: atom()
 
+  if Code.ensure_loaded?(Plug.Conn) do
+    @type plug() :: {module(), [term()]} | module() | (Plug.Conn.t() -> Plug.Conn.t())
+  else
+    @type plug() :: {module(), [term()]} | module() | (term() -> term())
+  end
+
   @ownership Req.Ownership
 
   @doc """
@@ -273,11 +279,17 @@ defmodule Req.Test do
     end
   end
 
-  @doc """
-  Returns the stub created by `stub/2`.
-  """
-  @spec stub(stub()) :: term()
+  @deprecated "Use `fetch_stub!/1` instead."
   def stub(stub_name) do
+    fetch_stub!(stub_name)
+  end
+
+  @doc """
+  Fetches the stubbed request handler (plug) for the given `stub_name`.
+  """
+  @doc since: "0.5.0"
+  @spec fetch_stub!(stub()) :: plug()
+  def fetch_stub!(stub_name) do
     case NimbleOwnership.fetch_owner(@ownership, callers(), stub_name) do
       {:ok, owner} when is_pid(owner) ->
         result =
@@ -305,36 +317,39 @@ defmodule Req.Test do
     end
   end
 
-  @doc """
-  Creates a stub with given `name` and `value`.
+  defguardp is_plug(value)
+            when is_function(value, 1) or is_atom(value) or
+                   (is_tuple(value) and tuple_size(value) == 2 and is_atom(elem(value, 0)))
 
-  This function allows stubbing _any_ value and later access it with `stub/1`. It is safe to use
-  in concurrent tests.
+  @doc """
+  Stubs the given request handler for the given `stub_name`.
+
+  This function is safe to use in concurrent tests.
 
   See [module documentation](`Req.Test`) for more examples.
 
-  While this function can store any `value` under `stub_name`, usually you'll want to store
-  a *plug*, that is:
+  The `request_handler` should be a plug in the form of:
 
-    * `fun(conn)` - a function plug.
-
-    * `module` or `{module, options}` - a module plug.
+    * A function that takes a `Plug.Conn` and returns a `Plug.Conn`.
+    * A `module` plug, equivalent to `{module, []}`.
+    * A `{module, args}` plug, equivalent to defining the `Plug` module with `init/1` and
+      `call/2`.
 
   ## Examples
 
-      iex> Req.Test.stub(MyStub, :foo)
+      iex> Req.Test.stub(MyStub, Plug.Logger)
       :ok
-      iex> Req.Test.stub(MyStub)
-      :foo
-      iex> Task.async(fn -> Req.Test.stub(MyStub) end) |> Task.await()
-      :foo
+      iex> Req.Test.fetch_stub!(MyStub)
+      Plug.Logger
+      iex> Task.async(fn -> Req.Test.fetch_stub!(MyStub) end) |> Task.await()
+      Plug.Logger
 
   """
-  @spec stub(stub(), term()) :: :ok | {:error, Exception.t()}
-  def stub(stub_name, value) do
+  @spec stub(stub(), plug()) :: :ok | {:error, Exception.t()}
+  def stub(stub_name, plug) when is_plug(plug) do
     result =
       NimbleOwnership.get_and_update(@ownership, self(), stub_name, fn map_or_nil ->
-        {:ok, put_in(map_or_nil || %{}, [:stub], value)}
+        {:ok, put_in(map_or_nil || %{}, [:stub], plug)}
       end)
 
     case result do
@@ -347,29 +362,35 @@ defmodule Req.Test do
   Creates an expectation with the given `name` and `value`, expected to be fetched at
   most `n` times.
 
-  This function allows stubbing _any_ value and later accessing it with `stub/1`.
-  It is safe to use in concurrent tests. If you fetch the value under `stub_name`
+  This function allows you to expect a `n` number of request and handle them via the given
+  `plug`. It is safe to use in concurrent tests. If you fetch the value under `stub_name`
   more than `n` times, this function raises a `RuntimeError`.
 
   ## Examples
 
-      iex> Req.Test.expect(MyStub, 2, :foo)
-      iex> Req.Test.stub(MyStub)
-      :foo
-      iex> Req.Test.stub(MyStub)
-      :foo
-      iex>   Req.Test.stub(MyStub)
+      iex> Req.Test.expect(MyStub, 2, Plug.Head)
+      iex> Req.Test.fetch_stub!(MyStub)
+      Plug.Head
+      iex> Req.Test.fetch_stub!(MyStub)
+      Plug.Head
+      iex> Req.Test.fetch_stub!(MyStub)
       ** (RuntimeError) no stub or expectations for MyStub
 
   """
   @doc since: "0.4.15"
-  @spec expect(stub(), pos_integer(), term()) :: term()
-  def expect(stub_name, n \\ 1, value) when is_integer(n) and n > 0 do
-    values = List.duplicate(value, n)
+  @spec expect(stub(), pos_integer(), plug()) :: :ok | {:error, Exception.t()}
+  def expect(stub_name, n \\ 1, plug) when is_integer(n) and n > 0 do
+    plugs = List.duplicate(plug, n)
 
-    NimbleOwnership.get_and_update(@ownership, self(), stub_name, fn map_or_nil ->
-      {:ok, Map.update(map_or_nil || %{}, :expectations, values, &(values ++ &1))}
-    end)
+    result =
+      NimbleOwnership.get_and_update(@ownership, self(), stub_name, fn map_or_nil ->
+        {:ok, Map.update(map_or_nil || %{}, :expectations, plugs, &(plugs ++ &1))}
+      end)
+
+    case result do
+      {:ok, :ok} -> :ok
+      {:error, error} -> {:error, error}
+    end
   end
 
   @doc """
@@ -380,8 +401,49 @@ defmodule Req.Test do
     NimbleOwnership.allow(@ownership, owner, pid_to_allow, stub_name)
   end
 
+  @doc """
+  Sets the `Req.Test` mode to "global", meaning that the stubs are shared across all tests
+  and cannot be used concurrently.
+  """
+  @doc since: "0.5.0"
+  @spec set_req_test_to_shared(ex_unit_context :: term()) :: :ok
+  def set_req_test_to_shared(_context \\ %{}) do
+    NimbleOwnership.set_mode_to_shared(@ownership, self())
+  end
+
+  @doc """
+  Sets the `Req.Test` mode to "private", meaning that stubs can be shared across
+  tests concurrently.
+  """
+  @doc since: "0.5.0"
+  @spec set_req_test_to_private(ex_unit_context :: term()) :: :ok
+  def set_req_test_to_private(_context \\ %{}) do
+    NimbleOwnership.set_mode_to_private(@ownership)
+  end
+
+  @doc """
+  Sets the `Req.Test` mode based on the given `ExUnit` context.
+
+  This works as a ExUnit callback:
+
+      setup :set_req_test_from_context
+
+  """
+  @doc since: "0.5.0"
+  @spec set_req_test_from_context(ex_unit_context :: term()) :: :ok
+  def set_req_test_from_context(_context \\ %{})
+
+  def set_req_test_from_context(%{async: true} = context), do: set_req_test_to_private(context)
+  def set_req_test_from_context(context), do: set_req_test_to_shared(context)
+
   defp callers do
     [self() | Process.get(:"$callers") || []]
+  end
+
+  ## Plug callbacks
+
+  if Code.ensure_loaded?(Plug) do
+    @behaviour Plug
   end
 
   @doc false
