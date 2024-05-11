@@ -1461,7 +1461,7 @@ defmodule Req.Steps do
       ...>   )
       iex>
       iex> %{status: 200} = Req.put!(req, url: "/bucket1/key1", body: "Hello, World!")
-      iex> resp = Req.get!(req, "/bucket1/key1").body
+      iex> resp = Req.get!(req, url: "/bucket1/key1").body
       "Hello, World!"
 
   Request body streaming also works though `content-length` header must be explicitly set:
