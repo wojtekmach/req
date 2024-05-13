@@ -4,41 +4,41 @@ defmodule Req.TestTest do
 
   test "stub/2 and fetch_stub!/1" do
     assert_raise RuntimeError, ~r/cannot find stub/, fn ->
-      Req.Test.fetch_stub!(:foo)
+      Req.Test.__fetch_stub__(:foo)
     end
 
     Req.Test.stub(:foo, {MyPlug, [1]})
-    assert Req.Test.fetch_stub!(:foo) == {MyPlug, [1]}
+    assert Req.Test.__fetch_stub__(:foo) == {MyPlug, [1]}
 
     Req.Test.stub(:foo, {MyPlug, [2]})
-    assert Req.Test.fetch_stub!(:foo) == {MyPlug, [2]}
+    assert Req.Test.__fetch_stub__(:foo) == {MyPlug, [2]}
 
     Task.async(fn ->
-      assert Req.Test.fetch_stub!(:foo) == {MyPlug, [2]}
+      assert Req.Test.__fetch_stub__(:foo) == {MyPlug, [2]}
       Req.Test.stub(:foo, {MyPlug, [3]})
     end)
     |> Task.await()
 
-    assert Req.Test.fetch_stub!(:foo) == {MyPlug, [2]}
+    assert Req.Test.__fetch_stub__(:foo) == {MyPlug, [2]}
   end
 
   describe "expect/3" do
     test "works in the normal expectation-based way" do
       Req.Test.expect(:foo, 2, 1)
-      assert Req.Test.fetch_stub!(:foo) == 1
-      assert Req.Test.fetch_stub!(:foo) == 1
+      assert Req.Test.__fetch_stub__(:foo) == 1
+      assert Req.Test.__fetch_stub__(:foo) == 1
 
       assert_raise RuntimeError, "no stub or expectations for :foo", fn ->
-        Req.Test.fetch_stub!(:foo)
+        Req.Test.__fetch_stub__(:foo)
       end
     end
 
     test "works with the default expected count of 1" do
       Req.Test.expect(:foo_default, 1)
-      assert Req.Test.fetch_stub!(:foo_default) == 1
+      assert Req.Test.__fetch_stub__(:foo_default) == 1
 
       assert_raise RuntimeError, "no stub or expectations for :foo_default", fn ->
-        assert Req.Test.fetch_stub!(:foo_default)
+        assert Req.Test.__fetch_stub__(:foo_default)
       end
     end
   end
@@ -77,7 +77,7 @@ defmodule Req.TestTest do
           Process.delete(:"$callers")
 
           receive do
-            :go -> send(test_pid, {ref, Req.Test.fetch_stub!(:foo)})
+            :go -> send(test_pid, {ref, Req.Test.__fetch_stub__(:foo)})
           end
         end)
 

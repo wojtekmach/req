@@ -189,6 +189,7 @@ defmodule Req.Test do
       ["application/json; charset=utf-8"]
       iex> resp.body
       %{"celsius" => 25.0}
+
   """
   if Code.ensure_loaded?(Plug.Conn) do
     @spec json(Plug.Conn.t(), term()) :: Plug.Conn.t()
@@ -240,6 +241,7 @@ defmodule Req.Test do
       iex>
       iex> Req.get(plug: plug, retry: false)
       {:error, %Req.TransportError{reason: :timeout}}
+
   """
   def transport_error(conn, reason)
 
@@ -279,17 +281,12 @@ defmodule Req.Test do
     end
   end
 
-  @deprecated "Use `fetch_stub!/1` instead."
+  @deprecated "Don't manually fetch stubs. See the documentation for Req.Test instead."
   def stub(name) do
-    fetch_stub!(name)
+    __fetch_stub__(name)
   end
 
-  @doc """
-  Fetches the stubbed request handler (plug) for the given `name`.
-  """
-  @doc since: "0.5.0"
-  @spec fetch_stub!(stub()) :: plug()
-  def fetch_stub!(name) do
+  def __fetch_stub__(name) do
     case NimbleOwnership.fetch_owner(@ownership, callers(), name) do
       {:ok, owner} when is_pid(owner) ->
         result =
@@ -339,12 +336,17 @@ defmodule Req.Test do
 
   ## Examples
 
-      iex> Req.Test.stub(MyStub, Plug.Logger)
+      iex> Req.Test.stub(MyStub, fn conn ->
+      ...>   send(self(), :req_happened)
+      ...>   Req.Test.json(conn, %{})
+      ...> end)
       :ok
-      iex> Req.Test.fetch_stub!(MyStub)
-      Plug.Logger
-      iex> Task.async(fn -> Req.Test.fetch_stub!(MyStub) end) |> Task.await()
-      Plug.Logger
+      iex> Req.get!(plug: {Req.Test, MyStub}).body
+      %{}
+      iex> receive do
+      ...>   :req_happened -> :ok
+      ...> end
+      :ok
 
   """
   @spec stub(stub(), plug()) :: :ok | {:error, Exception.t()}
@@ -371,11 +373,9 @@ defmodule Req.Test do
   ## Examples
 
       iex> Req.Test.expect(MyStub, 2, Plug.Head)
-      iex> Req.Test.fetch_stub!(MyStub)
-      Plug.Head
-      iex> Req.Test.fetch_stub!(MyStub)
-      Plug.Head
-      iex> Req.Test.fetch_stub!(MyStub)
+      iex> Req.request!(plug: {Req.Test, MyStub})
+      iex> Req.request!(plug: {Req.Test, MyStub})
+      iex> Req.request!(plug: {Req.Test, MyStub})
       ** (RuntimeError) no stub or expectations for MyStub
 
   """
