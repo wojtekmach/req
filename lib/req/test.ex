@@ -168,9 +168,17 @@ defmodule Req.Test do
   @opaque stub() :: atom()
 
   if Code.ensure_loaded?(Plug.Conn) do
-    @type plug() :: {module(), [term()]} | module() | (Plug.Conn.t() -> Plug.Conn.t() | (Plug.Conn.t(), term() -> Plug.Conn.t())
+    @type plug() ::
+            {module(), [term()]}
+            | module()
+            | (Plug.Conn.t() -> Plug.Conn.t())
+            | (Plug.Conn.t(), term() -> Plug.Conn.t())
   else
-    @type plug() :: {module(), [term()]} | module() | (term() -> term() | (term(), term() -> term())
+    @type plug() ::
+            {module(), [term()]}
+            | module()
+            | (term() -> term())
+            | (term(), term() -> term())
   end
 
   @ownership Req.Ownership
