@@ -181,7 +181,7 @@ defmodule Req.Test do
             | (term(), term() -> term())
   end
 
-  @ownership Req.Ownership
+  @ownership Req.Test.Ownership
 
   @doc """
   Sends JSON response.
@@ -295,10 +295,10 @@ defmodule Req.Test do
   end
 
   def __fetch_stub__(name) do
-    case NimbleOwnership.fetch_owner(@ownership, callers(), name) do
+    case Req.Test.Ownership.fetch_owner(@ownership, callers(), name) do
       {:ok, owner} when is_pid(owner) ->
         result =
-          NimbleOwnership.get_and_update(@ownership, owner, name, fn
+          Req.Test.Ownership.get_and_update(@ownership, owner, name, fn
             %{expectations: [value | rest]} = map ->
               {{:ok, value}, put_in(map[:expectations], rest)}
 
@@ -360,7 +360,7 @@ defmodule Req.Test do
   @spec stub(stub(), plug()) :: :ok | {:error, Exception.t()}
   def stub(name, plug) when is_plug(plug) do
     result =
-      NimbleOwnership.get_and_update(@ownership, self(), name, fn map_or_nil ->
+      Req.Test.Ownership.get_and_update(@ownership, self(), name, fn map_or_nil ->
         {:ok, put_in(map_or_nil || %{}, [:stub], plug)}
       end)
 
@@ -393,7 +393,7 @@ defmodule Req.Test do
     plugs = List.duplicate(plug, n)
 
     result =
-      NimbleOwnership.get_and_update(@ownership, self(), name, fn map_or_nil ->
+      Req.Test.Ownership.get_and_update(@ownership, self(), name, fn map_or_nil ->
         {:ok, Map.update(map_or_nil || %{}, :expectations, plugs, &(plugs ++ &1))}
       end)
 
@@ -408,7 +408,7 @@ defmodule Req.Test do
   """
   @spec allow(stub(), pid(), pid() | (-> pid())) :: :ok | {:error, Exception.t()}
   def allow(name, owner, pid_to_allow) when is_pid(owner) do
-    NimbleOwnership.allow(@ownership, owner, pid_to_allow, name)
+    Req.Test.Ownership.allow(@ownership, owner, pid_to_allow, name)
   end
 
   @doc """
@@ -418,7 +418,7 @@ defmodule Req.Test do
   @doc since: "0.5.0"
   @spec set_req_test_to_shared(ex_unit_context :: term()) :: :ok
   def set_req_test_to_shared(_context \\ %{}) do
-    NimbleOwnership.set_mode_to_shared(@ownership, self())
+    Req.Test.Ownership.set_mode_to_shared(@ownership, self())
   end
 
   @doc """
@@ -428,7 +428,7 @@ defmodule Req.Test do
   @doc since: "0.5.0"
   @spec set_req_test_to_private(ex_unit_context :: term()) :: :ok
   def set_req_test_to_private(_context \\ %{}) do
-    NimbleOwnership.set_mode_to_private(@ownership)
+    Req.Test.Ownership.set_mode_to_private(@ownership)
   end
 
   @doc """

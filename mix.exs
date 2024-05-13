@@ -56,7 +56,6 @@ defmodule Req.MixProject do
       {:finch, "~> 0.17", finch_opts()},
       {:mime, "~> 1.6 or ~> 2.0"},
       {:jason, "~> 1.0"},
-      {:nimble_ownership, "~> 0.2.0 or ~> 0.3.0"},
       {:nimble_csv, "~> 1.0", optional: true},
       {:plug, "~> 1.0", [optional: true] ++ plug_opts()},
       {:brotli, "~> 0.3.1", optional: true},

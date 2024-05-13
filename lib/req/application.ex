@@ -14,7 +14,7 @@ defmodule Req.Application do
          ]
        }},
       {DynamicSupervisor, strategy: :one_for_one, name: Req.FinchSupervisor},
-      {NimbleOwnership, name: Req.Ownership}
+      {Req.Test.Ownership, name: Req.Test.Ownership}
     ]
 
     Supervisor.start_link(children, strategy: :one_for_one)
