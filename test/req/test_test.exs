@@ -96,4 +96,55 @@ defmodule Req.TestTest do
       end
     end
   end
+
+  describe "verify!/0" do
+    test "verifies all mocks for the current process in private mode" do
+      Req.Test.set_req_test_to_private()
+      Req.Test.verify!()
+
+      Req.Test.expect(:foo, 2, &Req.Test.json(&1, %{}))
+      Req.Test.expect(:bar, 1, &Req.Test.json(&1, %{}))
+
+      error = assert_raise(RuntimeError, &Req.Test.verify!/0)
+      assert error.message =~ "error while verifying Req.Test expectations for"
+      assert error.message =~ "* expected :foo to be still used 2 more times"
+      assert error.message =~ "* expected :bar to be still used 1 more times"
+
+      Req.request!(plug: {Req.Test, :foo})
+
+      error = assert_raise(RuntimeError, &Req.Test.verify!/0)
+      assert error.message =~ "error while verifying Req.Test expectations for"
+      assert error.message =~ "* expected :foo to be still used 1 more times"
+      assert error.message =~ "* expected :bar to be still used 1 more times"
+
+      Req.request!(plug: {Req.Test, :foo})
+      Req.request!(plug: {Req.Test, :bar})
+      Req.Test.verify!()
+    end
+  end
+
+  describe "verify!/1" do
+    test "verifies all mocks for the current process in private mode" do
+      Req.Test.set_req_test_to_private()
+      Req.Test.verify!(:foo)
+
+      Req.Test.expect(:foo, 2, &Req.Test.json(&1, %{}))
+
+      # Verifying a different key is fine.
+      Req.Test.verify!(:bar)
+
+      error = assert_raise(RuntimeError, fn -> Req.Test.verify!(:foo) end)
+      assert error.message =~ "error while verifying Req.Test expectations for"
+      assert error.message =~ "* expected :foo to be still used 2 more times"
+
+      Req.request!(plug: {Req.Test, :foo})
+
+      error = assert_raise(RuntimeError, fn -> Req.Test.verify!(:foo) end)
+      assert error.message =~ "error while verifying Req.Test expectations for"
+      assert error.message =~ "* expected :foo to be still used 1 more times"
+
+      Req.request!(plug: {Req.Test, :foo})
+      Req.Test.verify!(:foo)
+    end
+  end
 end

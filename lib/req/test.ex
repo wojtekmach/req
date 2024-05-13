@@ -446,6 +446,62 @@ defmodule Req.Test do
   def set_req_test_from_context(%{async: true} = context), do: set_req_test_to_private(context)
   def set_req_test_from_context(context), do: set_req_test_to_shared(context)
 
+  @doc """
+  Sets a ExUnit callback to verify the expectations on exit.
+
+  Similar to calling `verify!/0` at the end of your test.
+  """
+  @doc since: "0.5.0"
+  @spec verify_on_exit!(term()) :: :ok
+  def verify_on_exit!(_context \\ %{}) do
+    pid = self()
+    Req.Test.Ownership.set_owner_to_manual_cleanup(@ownership, pid)
+
+    ExUnit.Callbacks.on_exit(Mox, fn ->
+      verify(pid, :all)
+      Req.Test.Ownership.cleanup_owner(@ownership, pid)
+    end)
+  end
+
+  @doc """
+  Verifies that all the plugs expected to be executed within any scope have been executed.
+  """
+  @doc since: "0.5.0"
+  @spec verify!() :: :ok
+  def verify! do
+    verify(self(), :all)
+  end
+
+  @doc """
+  Verifies that all the plugs expected to be executed within the scope of `name` have been
+  executed.
+  """
+  @doc since: "0.5.0"
+  @spec verify!(stub()) :: :ok
+  def verify!(name) do
+    verify(self(), name)
+  end
+
+  defp verify(owner_pid, mock_or_all) do
+    messages =
+      for {name, stubs_and_expecs} <-
+            Req.Test.Ownership.get_owned(@ownership, owner_pid, _default = %{}, 5000),
+          name == mock_or_all or mock_or_all == :all,
+          pending_count = stubs_and_expecs |> Map.get(:expectations, []) |> length(),
+          pending_count > 0 do
+        "  * expected #{inspect(name)} to be still used #{pending_count} more times"
+      end
+
+    if messages != [] do
+      raise "error while verifying Req.Test expectations for #{inspect(owner_pid)}:\n\n" <>
+              Enum.join(messages, "\n")
+    end
+
+    :ok
+  end
+
+  ## Helpers
+
   defp callers do
     [self() | Process.get(:"$callers") || []]
   end
@@ -463,7 +519,7 @@ defmodule Req.Test do
 
   @doc false
   def call(conn, name) do
-    case stub(name) do
+    case __fetch_stub__(name) do
       fun when is_function(fun) ->
         fun.(conn)
 
