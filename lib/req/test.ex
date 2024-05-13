@@ -297,7 +297,8 @@ defmodule Req.Test do
     end
   end
 
-  @deprecated "Don't manually fetch stubs. See the documentation for Req.Test instead"
+  @doc false
+  @deprecated "Don't manually fetch stubs. See the documentation for Req.Test instead."
   def stub(name) do
     __fetch_stub__(name)
   end
