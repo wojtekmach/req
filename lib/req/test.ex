@@ -164,9 +164,16 @@ defmodule Req.Test do
   your client, you can use `MyApp.Weather` as the stub name in functions
   like `stub/1` and `stub/2`.
   """
-  @typedoc since: "0.4.15"
+  @typedoc since: "0.5.0"
   @opaque stub() :: atom()
 
+  @typedoc """
+  A plug to use as the value for a mock or stub in `Req.Test`.
+
+  This is generally what you expect from plug, with the exception of the
+  1-arity function variant, which takes a `Plug.Conn` and returns a `Plug.Conn`.
+  """
+  @typedoc since: "0.5.0"
   if Code.ensure_loaded?(Plug.Conn) do
     @type plug() ::
             {module(), [term()]}
@@ -251,6 +258,7 @@ defmodule Req.Test do
       {:error, %Req.TransportError{reason: :timeout}}
 
   """
+  @doc since: "0.5.0"
   def transport_error(conn, reason)
 
   if Code.ensure_loaded?(Plug.Conn) do
@@ -289,7 +297,7 @@ defmodule Req.Test do
     end
   end
 
-  @deprecated "Don't manually fetch stubs. See the documentation for Req.Test instead."
+  @deprecated "Don't manually fetch stubs. See the documentation for Req.Test instead"
   def stub(name) do
     __fetch_stub__(name)
   end
