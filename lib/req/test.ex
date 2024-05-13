@@ -280,20 +280,20 @@ defmodule Req.Test do
   end
 
   @deprecated "Use `fetch_stub!/1` instead."
-  def stub(stub_name) do
-    fetch_stub!(stub_name)
+  def stub(name) do
+    fetch_stub!(name)
   end
 
   @doc """
-  Fetches the stubbed request handler (plug) for the given `stub_name`.
+  Fetches the stubbed request handler (plug) for the given `name`.
   """
   @doc since: "0.5.0"
   @spec fetch_stub!(stub()) :: plug()
-  def fetch_stub!(stub_name) do
-    case NimbleOwnership.fetch_owner(@ownership, callers(), stub_name) do
+  def fetch_stub!(name) do
+    case NimbleOwnership.fetch_owner(@ownership, callers(), name) do
       {:ok, owner} when is_pid(owner) ->
         result =
-          NimbleOwnership.get_and_update(@ownership, owner, stub_name, fn
+          NimbleOwnership.get_and_update(@ownership, owner, name, fn
             %{expectations: [value | rest]} = map ->
               {{:ok, value}, put_in(map[:expectations], rest)}
 
@@ -309,11 +309,11 @@ defmodule Req.Test do
             value
 
           {:ok, {:error, :no_expectations_and_no_stub}} ->
-            raise "no stub or expectations for #{inspect(stub_name)}"
+            raise "no stub or expectations for #{inspect(name)}"
         end
 
       :error ->
-        raise "cannot find stub #{inspect(stub_name)} in process #{inspect(self())}"
+        raise "cannot find stub #{inspect(name)} in process #{inspect(self())}"
     end
   end
 
@@ -322,9 +322,11 @@ defmodule Req.Test do
                    (is_tuple(value) and tuple_size(value) == 2 and is_atom(elem(value, 0)))
 
   @doc """
-  Stubs the given request handler for the given `stub_name`.
+  Registers a stub with the given request handler for the given `name`.
 
-  This function is safe to use in concurrent tests.
+  This function is safe to use in concurrent tests. `name` is any term that can identify
+  the stub or mock. In general, this is going to be something like the name of the module
+  that calls Req, in order to "scope" the stub to that module.
 
   See [module documentation](`Req.Test`) for more examples.
 
@@ -346,9 +348,9 @@ defmodule Req.Test do
 
   """
   @spec stub(stub(), plug()) :: :ok | {:error, Exception.t()}
-  def stub(stub_name, plug) when is_plug(plug) do
+  def stub(name, plug) when is_plug(plug) do
     result =
-      NimbleOwnership.get_and_update(@ownership, self(), stub_name, fn map_or_nil ->
+      NimbleOwnership.get_and_update(@ownership, self(), name, fn map_or_nil ->
         {:ok, put_in(map_or_nil || %{}, [:stub], plug)}
       end)
 
@@ -363,7 +365,7 @@ defmodule Req.Test do
   most `n` times.
 
   This function allows you to expect a `n` number of request and handle them via the given
-  `plug`. It is safe to use in concurrent tests. If you fetch the value under `stub_name`
+  `plug`. It is safe to use in concurrent tests. If you fetch the value under `name`
   more than `n` times, this function raises a `RuntimeError`.
 
   ## Examples
@@ -379,11 +381,11 @@ defmodule Req.Test do
   """
   @doc since: "0.4.15"
   @spec expect(stub(), pos_integer(), plug()) :: :ok | {:error, Exception.t()}
-  def expect(stub_name, n \\ 1, plug) when is_integer(n) and n > 0 do
+  def expect(name, n \\ 1, plug) when is_integer(n) and n > 0 do
     plugs = List.duplicate(plug, n)
 
     result =
-      NimbleOwnership.get_and_update(@ownership, self(), stub_name, fn map_or_nil ->
+      NimbleOwnership.get_and_update(@ownership, self(), name, fn map_or_nil ->
         {:ok, Map.update(map_or_nil || %{}, :expectations, plugs, &(plugs ++ &1))}
       end)
 
@@ -394,11 +396,11 @@ defmodule Req.Test do
   end
 
   @doc """
-  Allows `pid_to_allow` to access `stub_name` provided that `owner` is already allowed.
+  Allows `pid_to_allow` to access `name` provided that `owner` is already allowed.
   """
   @spec allow(stub(), pid(), pid() | (-> pid())) :: :ok | {:error, Exception.t()}
-  def allow(stub_name, owner, pid_to_allow) when is_pid(owner) do
-    NimbleOwnership.allow(@ownership, owner, pid_to_allow, stub_name)
+  def allow(name, owner, pid_to_allow) when is_pid(owner) do
+    NimbleOwnership.allow(@ownership, owner, pid_to_allow, name)
   end
 
   @doc """
@@ -447,13 +449,13 @@ defmodule Req.Test do
   end
 
   @doc false
-  def init(stub_name) do
-    stub_name
+  def init(name) do
+    name
   end
 
   @doc false
-  def call(conn, stub_name) do
-    case stub(stub_name) do
+  def call(conn, name) do
+    case stub(name) do
       fun when is_function(fun) ->
         fun.(conn)
 
