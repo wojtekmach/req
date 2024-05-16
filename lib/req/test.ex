@@ -343,10 +343,10 @@ defmodule Req.Test do
 
   The `plug` can be one of:
 
-    * A _function_ plug: a 1-arity or 2-arity function that takes a `Plug.Conn` and returns
-      a `Plug.Conn`.
+    * A _function_ plug: a `fun(conn)` or `fun(conn, options)` function that takes a
+      `Plug.Conn` and returns a `Plug.Conn`.
 
-    * A _module_ plug: a `module` name or a `{module, args}` tuple.
+    * A _module_ plug: a `module` name or a `{module, options}` tuple.
 
   ## Examples
 
@@ -389,10 +389,10 @@ defmodule Req.Test do
 
   The `plug` can be one of:
 
-    * A _function_ plug: a 1-arity or 2-arity function that takes a `Plug.Conn` and returns
-      a `Plug.Conn`.
+    * A _function_ plug: a `fun(conn)` or `fun(conn, options)` function that takes a
+      `Plug.Conn` and returns a `Plug.Conn`.
 
-    * A _module_ plug: a `module` name or a `{module, args}` tuple.
+    * A _module_ plug: a `module` name or a `{module, options}` tuple.
 
   See `stub/2` and module documentation for more information.
 

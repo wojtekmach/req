@@ -305,9 +305,10 @@ defmodule Req do
 
       The plug can be one of:
 
-        * `fun(conn)` - a function plug.
+        * A _function_ plug: a `fun(conn)` or `fun(conn, options)` function that takes a
+          `Plug.Conn` and returns a `Plug.Conn`.
 
-        * `module` or `{module, options}` - a module plug.
+        * A _module_ plug: a `module` name or a `{module, options}` tuple.
 
   Finch options ([`run_finch`](`Req.Steps.run_finch/1`) step)
 

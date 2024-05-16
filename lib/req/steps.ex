@@ -1124,7 +1124,7 @@ defmodule Req.Steps do
 
   ## Request Options
 
-    * `:plug` - if set, the plug to run the request against.
+    * `:plug` - if set, the plug to run the request through.
 
   """
   @doc step: :request
@@ -1148,11 +1148,12 @@ defmodule Req.Steps do
 
   ## Request Options
 
-    * `:plug` - the plug to run the request against. The plug can be one of:
+    * `:plug` - the plug to run the request through. It can be one of:
 
-        * `fun(conn)` - a 1-arity function that accepts a `Plug.Conn` and returns it.
+        * A _function_ plug: a `fun(conn)` or `fun(conn, options)` function that takes a
+          `Plug.Conn` and returns a `Plug.Conn`.
 
-        * `module` or `{module, options}` - a module plug.
+        * A _module_ plug: a `module` name or a `{module, options}` tuple.
 
   ## Examples
 
