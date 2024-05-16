@@ -2,13 +2,15 @@ defmodule Req.Steps do
   @moduledoc """
   The collection of built-in steps.
 
-  Req is composed of three main pieces:
+  Req is composed of:
 
     * `Req` - the high-level API
 
     * `Req.Request` - the low-level API and the request struct
 
     * `Req.Steps` - the collection of built-in steps (you're here!)
+
+    * `Req.Test` - the testing conveniences
   """
 
   require Logger
@@ -1220,6 +1222,7 @@ defmodule Req.Steps do
                  {:error, %Req.TransportError{reason: :timeout}}
       end
   """
+  @doc step: :request
   def run_plug(request)
 
   if Code.ensure_loaded?(Plug.Test) do
