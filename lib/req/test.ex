@@ -175,8 +175,8 @@ defmodule Req.Test do
     @typep plug() ::
              module()
              | {module, term()}
-             | (conn -> conn when conn: term())
-             | (conn, term() -> conn when conn: term())
+             | (conn :: term() -> term())
+             | (conn :: term(), term() -> term())
   end
 
   @ownership Req.Test.Ownership
