@@ -1155,6 +1155,9 @@ defmodule Req.Steps do
 
         * A _module_ plug: a `module` name or a `{module, options}` tuple.
 
+      Req automatically calls `Plug.Conn.fetch_query_params/2` before your plug, so you can
+      get query params using `conn.query_params`.
+
   ## Examples
 
   This step is particularly useful to test plugs:
@@ -1255,6 +1258,7 @@ defmodule Req.Steps do
       conn =
         Plug.Test.conn(request.method, request.url, req_body)
         |> Map.replace!(:req_headers, req_headers)
+        |> Plug.Conn.fetch_query_params()
         |> call_plug(plug)
 
       if exception = conn.private[:req_test_exception] do

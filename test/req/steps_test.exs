@@ -1677,7 +1677,7 @@ defmodule Req.StepsTest do
     refute_received _
   end
 
-  describe "put_plug" do
+  describe "run_plug" do
     test "request" do
       plug = fn conn ->
         {:ok, body, conn} = Plug.Conn.read_body(conn)
@@ -1701,6 +1701,15 @@ defmodule Req.StepsTest do
 
       assert Req.request!(req).body == "foofoo"
       refute_receive _
+    end
+
+    test "fetches query params" do
+      plug = fn conn ->
+        assert conn.query_params == %{"a" => "1"}
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end
+
+      assert Req.request!(plug: plug, params: [a: 1]).body == "ok"
     end
 
     test "into: fun" do
