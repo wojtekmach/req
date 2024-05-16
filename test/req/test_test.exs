@@ -71,12 +71,15 @@ defmodule Req.TestTest do
 
     test "module" do
       defmodule Foo do
-        def init(options), do: options
-        def call(conn, []), do: Plug.Conn.send_resp(conn, 200, "hi")
+        def init([]), do: "default"
+        def init(other), do: other
+        def call(conn, string), do: Plug.Conn.send_resp(conn, 200, string)
       end
 
       Req.Test.stub(:foo, Foo)
+      assert Req.get!(plug: {Req.Test, :foo}).body == "default"
 
+      Req.Test.stub(:foo, {Foo, "hi"})
       assert Req.get!(plug: {Req.Test, :foo}).body == "hi"
     end
   end
