@@ -1338,6 +1338,10 @@ defmodule Req.Steps do
     defp call_plug(conn, plug) when is_function(plug, 1) do
       plug.(conn)
     end
+
+    defp call_plug(conn, plug) when is_function(plug, 2) do
+      plug.(conn, [])
+    end
   else
     def run_plug(_request) do
       Logger.error("""
