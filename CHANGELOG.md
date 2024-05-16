@@ -2,6 +2,9 @@
 
 ## HEAD
 
+  * [`Req`]: Deprecate setting `:headers` to values other than string/integer/`DateTime`.
+    This is to potentially allow special handling of atom values in the future.
+
   * [`Req.Request`]: Deprecate setting `:redact_auth`. It now has no effect. Instead of allowing
     to opt out of, we give an idea what the secret was without revealing it fully:
 
@@ -19,7 +22,18 @@
 
   * [`Req.Request`]: Deprecate `halt/1` in favour of `Req.Request.halt/2`.
 
-  * [`Req.Test`]: Add [`Req.Test.transport_error/2`].
+  * [`Req.Test`]: Add [`Req.Test.transport_error/2`] to simulate transport errors.
+
+  * [`Req.Test`]: Add [`Req.Test.expect/3`].
+
+  * [`Req.Test`]: Add `set_req_test_from_context/1`, `set_req_test_to_private/1`,
+    `set_req_test_to_shared/1`, `verify!/0`, `verify!/1`, and `verify_on_exit!/1` for parity
+    with [Mox](https://hexdocs.pm/mox).
+
+  * [`Req.Test`]: Drop `:nimble_ownership` dependency.
+
+  * [`Req.Test`]: Deprecate `Req.Test.stub/1`, i.e. the intended use case is to only work
+    with _plug_ stubs/mocks.
 
   * [`decode_body`]: Return `Jason.DecodeError` on JSON errors instead of raising it.
 
@@ -49,6 +63,10 @@
   * [`run_plug`]: Make public.
 
   * [`run_plug`]: Add support for simulating network issues using [`Req.Test.transport_error/2`].
+
+  * [`run_plug`]: Support passing 2-arity functions as plugs.
+
+  * [`run_plug`]: Automatically fetch query params.
 
   * [`verify_checksum`]: Fix handling compressed responses.
 
@@ -937,6 +955,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Test`]: https://hexdocs.pm/req/Req.Test
 [`Req.Test.json/2`]: https://hexdocs.pm/req/Req.Test.html#json/2
 [`Req.Test.allow/3`]: https://hexdocs.pm/req/Req.Test.html#json/2
+[`Req.Test.expect/3`]: https://hexdocs.pm/req/Req.Test.html#expect/3
 [`Req.Test.transport_error/2`]: https://hexdocs.pm/req/Req.Test.html#transport_error/2
 
 [`Req.Steps`]:   https://hexdocs.pm/req/Req.Steps.html
