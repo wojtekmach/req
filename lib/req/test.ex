@@ -318,7 +318,7 @@ defmodule Req.Test do
         end
 
       :error ->
-        raise "cannot find stub #{inspect(name)} in process #{inspect(self())}"
+        raise "cannot find mock/stub #{inspect(name)} in process #{inspect(self())}"
     end
   end
 
@@ -381,9 +381,9 @@ defmodule Req.Test do
   Creates a request expectation with the given `name` and `plug`, expected to be fetched at
   most `n` times.
 
-  This function allows you to expect a `n` number of request and handle them via the given
-  `plug`. It is safe to use in concurrent tests. If you fetch the value under `name`
-  more than `n` times, this function raises a `RuntimeError`.
+  This function allows you to expect a `n` number of request and handle them via the given `plug`.
+  It is safe to use in concurrent tests. If you fetch the value under `name` more than `n` times,
+  this function raises a `RuntimeError`.
 
   The `name` can be any term.
 

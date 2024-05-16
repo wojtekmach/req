@@ -3,7 +3,7 @@ defmodule Req.TestTest do
   doctest Req.Test
 
   test "__fetch_plug__" do
-    assert_raise RuntimeError, ~r/cannot find stub/, fn ->
+    assert_raise RuntimeError, ~r/cannot find mock/, fn ->
       Req.Test.__fetch_plug__(:foo)
     end
 
@@ -64,7 +64,7 @@ defmodule Req.TestTest do
 
       assert Req.get!(plug: {Req.Test, :foo}).body == "2"
 
-      assert_raise RuntimeError, ~r/cannot find stub/, fn ->
+      assert_raise RuntimeError, ~r/cannot find mock/, fn ->
         Req.get(plug: {Req.Test, :bad})
       end
     end
