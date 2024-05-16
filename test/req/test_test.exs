@@ -2,54 +2,71 @@ defmodule Req.TestTest do
   use ExUnit.Case, async: true
   doctest Req.Test
 
-  test "stub/2 and fetch_stub!/1" do
+  test "__fetch_plug__" do
     assert_raise RuntimeError, ~r/cannot find stub/, fn ->
-      Req.Test.__fetch_stub__(:foo)
+      Req.Test.__fetch_plug__(:foo)
     end
 
     Req.Test.stub(:foo, {MyPlug, [1]})
-    assert Req.Test.__fetch_stub__(:foo) == {MyPlug, [1]}
+    assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [1]}
 
     Req.Test.stub(:foo, {MyPlug, [2]})
-    assert Req.Test.__fetch_stub__(:foo) == {MyPlug, [2]}
+    assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [2]}
 
     Task.async(fn ->
-      assert Req.Test.__fetch_stub__(:foo) == {MyPlug, [2]}
+      assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [2]}
       Req.Test.stub(:foo, {MyPlug, [3]})
     end)
     |> Task.await()
 
-    assert Req.Test.__fetch_stub__(:foo) == {MyPlug, [2]}
+    assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [2]}
   end
 
   describe "expect/3" do
     test "works in the normal expectation-based way" do
       Req.Test.expect(:foo, 2, 1)
-      assert Req.Test.__fetch_stub__(:foo) == 1
-      assert Req.Test.__fetch_stub__(:foo) == 1
+      assert Req.Test.__fetch_plug__(:foo) == 1
+      assert Req.Test.__fetch_plug__(:foo) == 1
 
       assert_raise RuntimeError, "no mock or stub for :foo", fn ->
-        Req.Test.__fetch_stub__(:foo)
+        Req.Test.__fetch_plug__(:foo)
       end
     end
 
     test "works with the default expected count of 1" do
       Req.Test.expect(:foo_default, 1)
-      assert Req.Test.__fetch_stub__(:foo_default) == 1
+      assert Req.Test.__fetch_plug__(:foo_default) == 1
 
       assert_raise RuntimeError, "no mock or stub for :foo_default", fn ->
-        assert Req.Test.__fetch_stub__(:foo_default)
+        assert Req.Test.__fetch_plug__(:foo_default)
       end
     end
   end
 
   describe "plug" do
     test "function" do
-      Req.Test.stub(:foo, fn conn ->
-        Plug.Conn.send_resp(conn, 200, "hi")
+      Req.Test.stub(:foo, &Plug.Conn.send_resp(&1, 200, "1"))
+      assert Req.get!(plug: {Req.Test, :foo}).body == "1"
+
+      Req.Test.stub(:foo, fn conn, _ ->
+        Plug.Conn.send_resp(conn, 200, "2")
       end)
 
-      assert Req.get!(plug: {Req.Test, :foo}).body == "hi"
+      assert Req.get!(plug: {Req.Test, :foo}).body == "2"
+
+      Task.async(fn ->
+        assert Req.get!(plug: {Req.Test, :foo}).body == "2"
+
+        Req.Test.stub(:foo, &Plug.Conn.send_resp(&1, 200, "3"))
+        assert Req.get!(plug: {Req.Test, :foo}).body == "3"
+      end)
+      |> Task.await()
+
+      assert Req.get!(plug: {Req.Test, :foo}).body == "2"
+
+      assert_raise RuntimeError, ~r/cannot find stub/, fn ->
+        Req.get(plug: {Req.Test, :bad})
+      end
     end
 
     test "module" do
@@ -77,7 +94,7 @@ defmodule Req.TestTest do
           Process.delete(:"$callers")
 
           receive do
-            :go -> send(test_pid, {ref, Req.Test.__fetch_stub__(:foo)})
+            :go -> send(test_pid, {ref, Req.Test.__fetch_plug__(:foo)})
           end
         end)
 

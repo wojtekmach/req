@@ -291,10 +291,10 @@ defmodule Req.Test do
   @doc false
   @deprecated "Don't manually fetch stubs. See the documentation for Req.Test instead."
   def stub(name) do
-    __fetch_stub__(name)
+    __fetch_plug__(name)
   end
 
-  def __fetch_stub__(name) do
+  def __fetch_plug__(name) do
     case Req.Test.Ownership.fetch_owner(@ownership, callers(), name) do
       {:ok, owner} when is_pid(owner) ->
         result =
@@ -547,9 +547,12 @@ defmodule Req.Test do
 
   @doc false
   def call(conn, name) do
-    case __fetch_stub__(name) do
-      fun when is_function(fun) ->
+    case __fetch_plug__(name) do
+      fun when is_function(fun, 1) ->
         fun.(conn)
+
+      fun when is_function(fun, 2) ->
+        fun.(conn, [])
 
       module when is_atom(module) ->
         module.call(conn, module.init([]))
@@ -559,9 +562,10 @@ defmodule Req.Test do
 
       other ->
         raise """
-        expected stub to be one of:
+        expected plug to be one of:
 
-          * 0-arity function
+          * fun(conn)
+          * fun(conn, options)
           * module
           * {module, options}
 
