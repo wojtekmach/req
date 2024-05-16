@@ -1,28 +1,35 @@
 defmodule Req.Test do
   @moduledoc """
-  Functions for creating test stubs.
+  Req testing conveniences.
 
-  > Stubs provide canned answers to calls made during the test, usually not responding at all to
-  > anything outside what's programmed in for the test.
-  >
-  > ["Mocks Aren't Stubs" by Martin Fowler](https://martinfowler.com/articles/mocksArentStubs.html#TheDifferenceBetweenMocksAndStubs)
+  Req is composed of:
+
+    * `Req` - the high-level API
+
+    * `Req.Request` - the low-level API and the request struct
+
+    * `Req.Steps` - the collection of built-in steps
+
+    * `Req.Test` - the testing conveniences (you're here!)
 
   Req already has built-in support for different variants of stubs via `:plug`, `:adapter`,
-  and (indirectly) `:base_url` options. This module enhances these capabilities by providing:
+  and (indirectly) `:base_url` options. With this module you can:
 
-    * Stubbing request handling with [`Req.Test.stub(name, handler)`](`stub/2`) (which can be
-      used in concurrent tests).
+    * Create request stubs using [`Req.Test.stub(name, plug)`](`stub/2`) and mocks
+      using [`Req.Test.expect(name, count, plug)`](`expect/3`). Both can be used in concurrent
+      tests.
 
-    * Providing a plug that you can pass as `plug: {Req.Test, name}`, so that requests
-      go through the stubbed request flow you defined with `stub/2`. This works because
-      `Req.Test` itself is a plug whose job is to fetch the stubbed handler under `name`.
+    * Configure Req to run requests through mocks/stubs by setting `plug: {Req.Test, name}`.
+      This works because `Req.Test` itself is a plug whose job is to fetch the mocks/stubs under
+      `name`.
 
-    * Easily create JSON responses for plug stubs with [`Req.Test.json(conn, body)`](`json/2`).
+    * Easily create JSON responses with [`Req.Test.json(conn, body)`](`json/2`).
 
-  This module bases stubs on the ownership model of
+    * Simulate network errors with [`Req.Test.transport_error(conn, reason)`](`transport_error/2`).
+
+  Mocks and stubs are using the same ownership model of
   [nimble_ownership](https://hex.pm/packages/nimble_ownership), also used by
-  [Mox](https://hex.pm/packages/mox) for example. This allows `Req.Test` to be used in concurrent
-  tests.
+  [Mox](https://hex.pm/packages/mox). This allows `Req.Test` to be used in concurrent tests.
 
   ## Example
 
@@ -61,7 +68,7 @@ defmodule Req.Test do
       ]
 
   In tests, instead of hitting the network, we make the request against
-  a [plug](`Req.Steps.put_plug/1`) _stub_ named `MyApp.Weather`:
+  a [plug](`Req.Steps.run_plug/1`) _stub_ named `MyApp.Weather`:
 
       # config/test.exs
       config :myapp, weather_req_options: [
@@ -156,36 +163,20 @@ defmodule Req.Test do
 
   require Logger
 
-  @typedoc """
-  A stub is an atom that scopes stubbed requests.
+  @typep name() :: term()
 
-  A common choice for this is the module name for the Req-based client that you
-  are using `Req.Test` for. For example, if you are using `MyApp.Weather` as
-  your client, you can use `MyApp.Weather` as the stub name in functions
-  like `stub/1` and `stub/2`.
-  """
-  @typedoc since: "0.5.0"
-  @opaque stub() :: atom()
-
-  @typedoc """
-  A plug to use as the value for a mock or stub in `Req.Test`.
-
-  This is generally what you expect from plug, with the exception of the
-  1-arity function variant, which takes a `Plug.Conn` and returns a `Plug.Conn`.
-  """
-  @typedoc since: "0.5.0"
   if Code.ensure_loaded?(Plug.Conn) do
-    @type plug() ::
-            {module(), [term()]}
-            | module()
-            | (Plug.Conn.t() -> Plug.Conn.t())
-            | (Plug.Conn.t(), term() -> Plug.Conn.t())
+    @typep plug() ::
+             module()
+             | {module(), term()}
+             | (Plug.Conn.t() -> Plug.Conn.t())
+             | (Plug.Conn.t(), term() -> Plug.Conn.t())
   else
-    @type plug() ::
-            {module(), [term()]}
-            | module()
-            | (term() -> term())
-            | (term(), term() -> term())
+    @typep plug() ::
+             module()
+             | {module, term()}
+             | (conn -> conn when conn: term())
+             | (conn, term() -> conn when conn: term())
   end
 
   @ownership Req.Test.Ownership
@@ -323,7 +314,7 @@ defmodule Req.Test do
             value
 
           {:ok, {:error, :no_expectations_and_no_stub}} ->
-            raise "no stub or expectations for #{inspect(name)}"
+            raise "no mock or stub for #{inspect(name)}"
         end
 
       :error ->
@@ -332,24 +323,30 @@ defmodule Req.Test do
   end
 
   defguardp is_plug(value)
-            when is_function(value, 1) or is_atom(value) or
+            when is_function(value, 1) or
+                   is_function(value, 2) or
+                   is_atom(value) or
                    (is_tuple(value) and tuple_size(value) == 2 and is_atom(elem(value, 0)))
 
   @doc """
-  Registers a stub with the given request handler for the given `name`.
+  Creates a request stub with the given `name` and `plug`.
 
-  This function is safe to use in concurrent tests. `name` is any term that can identify
-  the stub or mock. In general, this is going to be something like the name of the module
-  that calls Req, in order to "scope" the stub to that module.
+  Req allows running requests against _plugs_ (instead of over the network) using the
+  [`:plug`](`Req.Steps.run_plug/1`) option. However, passing the `:plug` value throughout the
+  system can be cumbersome. Instead, you can tell Req to find plugs by `name` by setting
+  `plug: {Req.Test, name}`, and register plug stubs for that `name` by calling
+  `Req.Test.stub(name, plug)`. In other words, multiple concurrent tests can register test stubs
+  under the same `name`, and when Req makes the request, it will find the appropriate
+  implementation, even when invoked from different processes than the test process.
 
-  See [module documentation](`Req.Test`) for more examples.
+  The `name` can be any term.
 
-  The `request_handler` should be a plug in the form of:
+  The `plug` can be one of:
 
-    * A function that takes a `Plug.Conn` and returns a `Plug.Conn`.
-    * A `module` plug, equivalent to `{module, []}`.
-    * A `{module, args}` plug, equivalent to defining the `Plug` module with `init/1` and
-      `call/2`.
+    * A _function_ plug: a 1-arity or 2-arity function that takes a `Plug.Conn` and returns
+      a `Plug.Conn`.
+
+    * A _module_ plug: a `module` name or a `{module, args}` tuple.
 
   ## Examples
 
@@ -366,7 +363,8 @@ defmodule Req.Test do
       :ok
 
   """
-  @spec stub(stub(), plug()) :: :ok | {:error, Exception.t()}
+  @doc type: :mock
+  @spec stub(name(), plug()) :: :ok | {:error, Exception.t()}
   def stub(name, plug) when is_plug(plug) do
     result =
       Req.Test.Ownership.get_and_update(@ownership, self(), name, fn map_or_nil ->
@@ -380,24 +378,38 @@ defmodule Req.Test do
   end
 
   @doc """
-  Creates an expectation with the given `name` and `value`, expected to be fetched at
+  Creates a request expectation with the given `name` and `plug`, expected to be fetched at
   most `n` times.
 
   This function allows you to expect a `n` number of request and handle them via the given
   `plug`. It is safe to use in concurrent tests. If you fetch the value under `name`
   more than `n` times, this function raises a `RuntimeError`.
 
+  The `name` can be any term.
+
+  The `plug` can be one of:
+
+    * A _function_ plug: a 1-arity or 2-arity function that takes a `Plug.Conn` and returns
+      a `Plug.Conn`.
+
+    * A _module_ plug: a `module` name or a `{module, args}` tuple.
+
+  See `stub/2` and module documentation for more information.
+
   ## Examples
 
-      iex> Req.Test.expect(MyStub, 2, Plug.Head)
+      iex> Req.Test.expect(MyStub, 2, &Plug.Conn.send_resp(&1, 200, "hi"))
+      iex> Req.request!(plug: {Req.Test, MyStub}).body
+      "hi"
+      iex> Req.request!(plug: {Req.Test, MyStub}).body
+      "hi"
       iex> Req.request!(plug: {Req.Test, MyStub})
-      iex> Req.request!(plug: {Req.Test, MyStub})
-      iex> Req.request!(plug: {Req.Test, MyStub})
-      ** (RuntimeError) no stub or expectations for MyStub
+      ** (RuntimeError) no mock or stub for MyStub
 
   """
   @doc since: "0.4.15"
-  @spec expect(stub(), pos_integer(), plug()) :: :ok | {:error, Exception.t()}
+  @doc type: :mock
+  @spec expect(name(), pos_integer(), plug()) :: :ok | {:error, Exception.t()}
   def expect(name, n \\ 1, plug) when is_integer(n) and n > 0 do
     plugs = List.duplicate(plug, n)
 
@@ -415,7 +427,8 @@ defmodule Req.Test do
   @doc """
   Allows `pid_to_allow` to access `name` provided that `owner` is already allowed.
   """
-  @spec allow(stub(), pid(), pid() | (-> pid())) :: :ok | {:error, Exception.t()}
+  @doc type: :mock
+  @spec allow(name(), pid(), pid() | (-> pid())) :: :ok | {:error, Exception.t()}
   def allow(name, owner, pid_to_allow) when is_pid(owner) do
     Req.Test.Ownership.allow(@ownership, owner, pid_to_allow, name)
   end
@@ -425,6 +438,7 @@ defmodule Req.Test do
   and cannot be used concurrently.
   """
   @doc since: "0.5.0"
+  @doc type: :mock
   @spec set_req_test_to_shared(ex_unit_context :: term()) :: :ok
   def set_req_test_to_shared(_context \\ %{}) do
     Req.Test.Ownership.set_mode_to_shared(@ownership, self())
@@ -434,6 +448,7 @@ defmodule Req.Test do
   Sets the `Req.Test` mode to "private", meaning that stubs can be shared across
   tests concurrently.
   """
+  @doc type: :mock
   @doc since: "0.5.0"
   @spec set_req_test_to_private(ex_unit_context :: term()) :: :ok
   def set_req_test_to_private(_context \\ %{}) do
@@ -449,6 +464,7 @@ defmodule Req.Test do
 
   """
   @doc since: "0.5.0"
+  @doc type: :mock
   @spec set_req_test_from_context(ex_unit_context :: term()) :: :ok
   def set_req_test_from_context(_context \\ %{})
 
@@ -461,6 +477,7 @@ defmodule Req.Test do
   Similar to calling `verify!/0` at the end of your test.
   """
   @doc since: "0.5.0"
+  @doc type: :mock
   @spec verify_on_exit!(term()) :: :ok
   def verify_on_exit!(_context \\ %{}) do
     pid = self()
@@ -476,6 +493,7 @@ defmodule Req.Test do
   Verifies that all the plugs expected to be executed within any scope have been executed.
   """
   @doc since: "0.5.0"
+  @doc type: :mock
   @spec verify!() :: :ok
   def verify! do
     verify(self(), :all)
@@ -485,8 +503,9 @@ defmodule Req.Test do
   Verifies that all the plugs expected to be executed within the scope of `name` have been
   executed.
   """
+  @doc type: :mock
   @doc since: "0.5.0"
-  @spec verify!(stub()) :: :ok
+  @spec verify!(name()) :: :ok
   def verify!(name) do
     verify(self(), name)
   end

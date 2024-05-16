@@ -2,13 +2,15 @@ defmodule Req.Request do
   @moduledoc ~S"""
   The low-level API and the request struct.
 
-  Req is composed of three main pieces:
+  Req is composed of:
 
     * `Req` - the high-level API
 
     * `Req.Request` - the low-level API and the request struct (you're here!)
 
     * `Req.Steps` - the collection of built-in steps
+
+    * `Req.Test` - the testing conveniences
 
   The low-level API and the request struct is the foundation of Req's extensibility. Virtually all
   of the functionality is broken down into individual pieces - steps. Req works by running the

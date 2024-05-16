@@ -2,13 +2,15 @@ defmodule Req do
   @moduledoc ~S"""
   The high-level API.
 
-  Req is composed of three main pieces:
+  Req is composed of:
 
     * `Req` - the high-level API (you're here!)
 
     * `Req.Request` - the low-level API and the request struct
 
     * `Req.Steps` - the collection of built-in steps
+
+    * `Req.Test` - the testing conveniences
 
   The high-level API is what most users of Req will use most of the time.
 

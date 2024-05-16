@@ -28,7 +28,7 @@ defmodule Req.TestTest do
       assert Req.Test.__fetch_stub__(:foo) == 1
       assert Req.Test.__fetch_stub__(:foo) == 1
 
-      assert_raise RuntimeError, "no stub or expectations for :foo", fn ->
+      assert_raise RuntimeError, "no mock or stub for :foo", fn ->
         Req.Test.__fetch_stub__(:foo)
       end
     end
@@ -37,7 +37,7 @@ defmodule Req.TestTest do
       Req.Test.expect(:foo_default, 1)
       assert Req.Test.__fetch_stub__(:foo_default) == 1
 
-      assert_raise RuntimeError, "no stub or expectations for :foo_default", fn ->
+      assert_raise RuntimeError, "no mock or stub for :foo_default", fn ->
         assert Req.Test.__fetch_stub__(:foo_default)
       end
     end

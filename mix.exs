@@ -99,10 +99,14 @@ defmodule Req.MixProject do
       source_url: @source_url,
       source_ref: "v#{@version}",
       groups_for_docs: [
+        Types: &(&1[:kind] == :type),
+        Callbacks: &(&1[:kind] == :callback),
         "Request Steps": &(&1[:step] == :request),
         "Response Steps": &(&1[:step] == :response),
         "Error Steps": &(&1[:step] == :error),
-        "Making Requests": &(&1[:type] == :request)
+        Functions: &(&1[:kind] == :function and &1[:type] not in [:request, :mock]),
+        "Functions (Making Requests)": &(&1[:type] == :request),
+        "Functions (Mocks & Stubs)": &(&1[:type] == :mock)
       ],
       extras: [
         "README.md",
