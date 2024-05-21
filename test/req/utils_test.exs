@@ -6,7 +6,7 @@ defmodule Req.UtilsTest do
     doctest Req.Utils
   end
 
-  describe "aws_sigv4" do
+  describe "aws_sigv4_headers" do
     test "GET" do
       options = [
         access_key_id: "dummy-access-key-id",
@@ -20,7 +20,7 @@ defmodule Req.UtilsTest do
         body: ""
       ]
 
-      signature1 = Req.Utils.aws_sigv4(options)
+      signature1 = Req.Utils.aws_sigv4_headers(options)
 
       signature2 =
         :aws_signature.sign_v4(

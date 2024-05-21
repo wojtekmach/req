@@ -1544,7 +1544,7 @@ defmodule Req.Steps do
           headers = for {name, values} <- request.headers, value <- values, do: {name, value}
 
           headers =
-            Req.Utils.aws_sigv4(
+            Req.Utils.aws_sigv4_headers(
               aws_options ++
                 [
                   method: request.method,
