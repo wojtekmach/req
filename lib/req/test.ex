@@ -199,13 +199,8 @@ defmodule Req.Test do
       %{"celsius" => 25.0}
 
   """
-  if Code.ensure_loaded?(Plug.Conn) do
-    @spec json(Plug.Conn.t(), term()) :: Plug.Conn.t()
-  end
-
-  def json(conn, data)
-
   if Code.ensure_loaded?(Plug.Test) do
+    @spec json(Plug.Conn.t(), term()) :: Plug.Conn.t()
     def json(%Plug.Conn{} = conn, data) do
       send_resp(conn, conn.status || 200, "application/json", Jason.encode_to_iodata!(data))
     end
@@ -254,13 +249,8 @@ defmodule Req.Test do
       "<h1>Hello, World!</h1>"
 
   """
-  if Code.ensure_loaded?(Plug.Conn) do
-    @spec html(Plug.Conn.t(), iodata()) :: Plug.Conn.t()
-  end
-
-  def html(conn, data)
-
   if Code.ensure_loaded?(Plug.Test) do
+    @spec html(Plug.Conn.t(), iodata()) :: Plug.Conn.t()
     def html(%Plug.Conn{} = conn, data) do
       send_resp(conn, conn.status || 200, "text/html", data)
     end
@@ -294,13 +284,8 @@ defmodule Req.Test do
       "Hello, World!"
 
   """
-  if Code.ensure_loaded?(Plug.Conn) do
-    @spec text(Plug.Conn.t(), iodata()) :: Plug.Conn.t()
-  end
-
-  def text(conn, data)
-
   if Code.ensure_loaded?(Plug.Test) do
+    @spec text(Plug.Conn.t(), iodata()) :: Plug.Conn.t()
     def text(%Plug.Conn{} = conn, data) do
       send_resp(conn, conn.status || 200, "text/plain", data)
     end
