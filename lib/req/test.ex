@@ -23,7 +23,9 @@ defmodule Req.Test do
       This works because `Req.Test` itself is a plug whose job is to fetch the mocks/stubs under
       `name`.
 
-    * Easily create JSON responses with [`Req.Test.json(conn, body)`](`json/2`).
+    * Easily create JSON responses with [`Req.Test.json(conn, body)`](`json/2`),
+      HTML responses with [`Req.Test.html(conn, body)`](`html/2`), and
+      text responses with [`Req.Test.text(conn, body)`](`text/2`).
 
     * Simulate network errors with [`Req.Test.transport_error(conn, reason)`](`transport_error/2`).
 
