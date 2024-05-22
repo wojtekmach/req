@@ -237,6 +237,46 @@ defmodule Req.Test do
   end
 
   @doc """
+  Sends HTML response.
+
+  ## Examples
+
+      iex> plug = fn conn ->
+      ...>   Req.Test.html(conn, "<h1>Hello, World!</h1>")
+      ...> end
+      iex>
+      iex> resp = Req.get!(plug: plug)
+      iex> resp.headers["content-type"]
+      ["text/html; charset=utf-8"]
+      iex> resp.body
+      "<h1>Hello, World!</h1>"
+
+  """
+  if Code.ensure_loaded?(Plug.Conn) do
+    @spec html(Plug.Conn.t(), iodata()) :: Plug.Conn.t()
+  end
+
+  def html(conn, data)
+
+  if Code.ensure_loaded?(Plug.Test) do
+    def html(%Plug.Conn{} = conn, data) do
+      send_resp(conn, conn.status || 200, "text/html", data)
+    end
+  else
+    def html(_conn, _data) do
+      Logger.error("""
+      Could not find plug dependency.
+
+      Please add :plug to your dependencies:
+
+          {:plug, "~> 1.0"}
+      """)
+
+      raise "missing plug dependency"
+    end
+  end
+
+  @doc """
   Simulates a network transport error.
 
   ## Examples
