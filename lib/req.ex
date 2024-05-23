@@ -84,6 +84,8 @@ defmodule Req do
   Same as above, using enumerable API:
 
       iex> resp = Req.get!("http://httpbin.org/stream/2", into: :self)
+      iex> resp.body
+      #Req.Async<...>
       iex> Enum.map(resp.body, & &1["id"])
       [0, 1]
 
