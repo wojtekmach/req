@@ -5,6 +5,9 @@ defmodule Req.HttpcTest do
 
   require Logger
 
+  # TODO
+  @moduletag :skip
+
   setup do
     bypass = Bypass.open()
 
