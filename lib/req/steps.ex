@@ -966,7 +966,7 @@ defmodule Req.Steps do
     }
 
     resp = Req.Response.new(status: status, headers: headers)
-    resp = put_in(resp.async, async)
+    resp = put_in(resp.body, async)
     {req, resp}
   end
 
@@ -1008,16 +1008,19 @@ defmodule Req.Steps do
   end
 
   defp finch_parse_message(ref, {ref, {:data, data}}) do
-    {:ok, [{:data, data}]}
+    {:ok, [data: data]}
   end
 
   defp finch_parse_message(ref, {ref, :done}) do
     {:ok, [:done]}
   end
 
-  # TODO: handle remaining possible Finch results
-  defp finch_parse_message(_ref, _other) do
-    :unknown
+  defp finch_parse_message(ref, {ref, {:trailers, trailers}}) do
+    {:ok, [trailers: trailers]}
+  end
+
+  defp finch_parse_message(ref, {ref, {:error, reason}}) do
+    {:error, reason}
   end
 
   defp finch_cancel(ref) do

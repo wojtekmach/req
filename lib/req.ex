@@ -81,6 +81,12 @@ defmodule Req do
       {:ok, [:done]}
       ""
 
+  Same as above, using enumerable API:
+
+      iex> resp = Req.get!("http://httpbin.org/stream/2", into: :self)
+      iex> Enum.map(resp.body, & &1["id"])
+      [0, 1]
+
   ## Header Names
 
   The HTTP specification requires that header names should be case-insensitive.
@@ -1180,8 +1186,8 @@ defmodule Req do
       iex> Req.parse_message(resp, receive do message -> message end)
       {:ok, [:done]}
   """
-  def parse_message(%Req.Response{} = resp, message) do
-    resp.async.stream_fun.(resp.async.ref, message)
+  def parse_message(%Req.Response{body: %Req.Async{stream_fun: fun, ref: ref}}, message) do
+    fun.(ref, message)
   end
 
   def parse_message(%Req.Request{} = request, message) do
@@ -1201,8 +1207,8 @@ defmodule Req do
       iex> Req.cancel_async_response(resp)
       :ok
   """
-  def cancel_async_response(%Req.Response{} = response) do
-    response.async.cancel_fun.(response.async.ref)
+  def cancel_async_response(%Req.Response{body: %Req.Async{cancel_fun: fun, ref: ref}}) do
+    fun.(ref)
   end
 
   @deprecated "use Req.cancel_async_response(resp)) instead"
