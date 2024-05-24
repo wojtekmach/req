@@ -32,7 +32,8 @@ defmodule Req.Response.Async do
 
     def slice(_async), do: {:error, __MODULE__}
 
-    def reduce(_async, {:halt, acc}, _fun) do
+    def reduce(async, {:halt, acc}, _fun) do
+      cancel(async)
       {:halted, acc}
     end
 
@@ -49,7 +50,16 @@ defmodule Req.Response.Async do
         message ->
           case async.stream_fun.(async.ref, message) do
             {:ok, [data: data]} ->
-              reduce(async, fun.(data, acc), fun)
+              result =
+                try do
+                  fun.(data, acc)
+                rescue
+                  e ->
+                    cancel(async)
+                    reraise e, __STACKTRACE__
+                end
+
+              reduce(async, result, fun)
 
             {:ok, [:done]} ->
               {:done, acc}
@@ -61,6 +71,10 @@ defmodule Req.Response.Async do
               raise e
           end
       end
+    end
+
+    defp cancel(async) do
+      async.cancel_fun.(async.ref)
     end
   end
 end
