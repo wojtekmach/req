@@ -1,5 +1,6 @@
 defmodule ReqTest do
   use ExUnit.Case, async: true
+  import TestHelper, only: [start_server: 1]
 
   doctest Req,
     only: [
@@ -71,5 +72,30 @@ defmodule ReqTest do
 
     req = Req.new(plugins: [foo], foo: 42)
     assert req.options.foo == 42
+  end
+
+  test "async enumerable" do
+    %{url: origin_url} =
+      start_server(fn conn ->
+        conn = Plug.Conn.send_chunked(conn, 200)
+        {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+        {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+        {:ok, conn} = Plug.Conn.chunk(conn, "baz")
+        conn
+      end)
+
+    %{url: proxy_url} =
+      start_server(fn conn ->
+        %{status: 200, body: async} = Req.get!(url: origin_url, into: :self)
+        conn = Plug.Conn.send_chunked(conn, 200)
+        Enum.reduce(async, conn, &chunk(&2, &1))
+      end)
+
+    assert Req.get!(proxy_url, into: []).body == ~w[foo bar baz]
+  end
+
+  defp chunk(conn, data) do
+    {:ok, conn} = Plug.Conn.chunk(conn, data)
+    conn
   end
 end

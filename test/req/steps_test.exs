@@ -1,6 +1,6 @@
 defmodule Req.StepsTest do
   use ExUnit.Case, async: true
-
+  import TestHelper, only: [start_server: 1]
   require Logger
 
   setup do
@@ -2209,20 +2209,6 @@ defmodule Req.StepsTest do
       assert resp.status == 200
       assert :ok = Req.cancel_async_response(resp)
     end
-  end
-
-  defp start_server(plug) do
-    options = [
-      scheme: :http,
-      port: 0,
-      plug: fn conn, _ -> plug.(conn) end,
-      startup_log: false,
-      http_options: [compress: false]
-    ]
-
-    pid = start_supervised!({Bandit, options})
-    {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)
-    %{pid: pid, url: "http://localhost:#{port}"}
   end
 
   defp start_socket(fun) do
