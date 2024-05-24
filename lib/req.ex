@@ -27,7 +27,7 @@ defmodule Req do
       iex> Req.get!(req, url: "/repos/wojtekmach/req").body["description"]
       "Req is a batteries-included HTTP client for Elixir."
 
-  Return the request that was sent:
+  Return the request that was sent using `Req.run!/2`:
 
       iex> {req, resp} = Req.run!("https://httpbin.org/basic-auth/foo/bar", auth: {:basic, "foo:bar"})
       iex> req.headers["authorization"]
@@ -70,7 +70,7 @@ defmodule Req do
       iex> resp.body
       %IO.Stream{}
 
-  Stream response body to the current process:
+  Stream response body to the current process and parse incoming messages using `Req.parse_message/2`.
 
       iex> resp = Req.get!("http://httpbin.org/stream/2", into: :self)
       iex> Req.parse_message(resp, receive do message -> message end)
