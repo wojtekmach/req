@@ -1,6 +1,6 @@
 defmodule Req.TestTest do
   use ExUnit.Case, async: true
-  doctest Req.Test
+  doctest Req.Test, except: [expect: 3]
 
   test "__fetch_plug__" do
     assert_raise RuntimeError, ~r/cannot find mock/, fn ->
@@ -40,6 +40,16 @@ defmodule Req.TestTest do
       assert_raise RuntimeError, "no mock or stub for :foo_default", fn ->
         assert Req.Test.__fetch_plug__(:foo_default)
       end
+    end
+
+    test "works in order" do
+      Req.Test.expect(:foo, :a)
+      Req.Test.expect(:foo, 2, :b)
+      Req.Test.expect(:foo, :c)
+      assert Req.Test.__fetch_plug__(:foo) == :a
+      assert Req.Test.__fetch_plug__(:foo) == :b
+      assert Req.Test.__fetch_plug__(:foo) == :b
+      assert Req.Test.__fetch_plug__(:foo) == :c
     end
   end
 

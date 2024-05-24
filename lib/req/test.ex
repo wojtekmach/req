@@ -446,11 +446,11 @@ defmodule Req.Test do
 
   @doc """
   Creates a request expectation with the given `name` and `plug`, expected to be fetched at
-  most `n` times.
+  most `n` times, **in order**.
 
-  This function allows you to expect a `n` number of request and handle them via the given `plug`.
-  It is safe to use in concurrent tests. If you fetch the value under `name` more than `n` times,
-  this function raises a `RuntimeError`.
+  This function allows you to expect a `n` number of request and handle them **in order** via the
+  given `plug`. It is safe to use in concurrent tests. If you fetch the value under `name` more
+  than `n` times, this function raises a `RuntimeError`.
 
   The `name` can be any term.
 
@@ -465,11 +465,21 @@ defmodule Req.Test do
 
   ## Examples
 
-      iex> Req.Test.expect(MyStub, 2, &Plug.Conn.send_resp(&1, 200, "hi"))
-      iex> Req.request!(plug: {Req.Test, MyStub}).body
-      "hi"
-      iex> Req.request!(plug: {Req.Test, MyStub}).body
-      "hi"
+  Let's simulate a server that is having issues: on the first request it is not responding
+  and on the following two requests it returns an HTTP 500. Only on the third request it returns
+  an HTTP 200. Req by default automatically retries transient errors (using `Req.Steps.retry/1`)
+  so it will make multiple requests exercising all of our request expectations:
+
+      iex> Req.Test.expect(MyStub, &Req.Test.transport_error(&1, :econnrefused))
+      iex> Req.Test.expect(MyStub, 2, &Plug.Conn.send_resp(&1, 500, "internal server error"))
+      iex> Req.Test.expect(MyStub, &Plug.Conn.send_resp(&1, 200, "ok"))
+      iex> Req.get!(plug: {Req.Test, MyStub}).body
+      # 15:57:06.309 [error] retry: got exception, will retry in 1000ms, 3 attempts left
+      # 15:57:06.309 [error] ** (Req.TransportError) connection refused
+      # 15:57:07.310 [error] retry: got response with status 500, will retry in 2000ms, 2 attempts left
+      # 15:57:09.311 [error] retry: got response with status 500, will retry in 4000ms, 1 attempt left
+      "ok"
+
       iex> Req.request!(plug: {Req.Test, MyStub})
       ** (RuntimeError) no mock or stub for MyStub
 
@@ -482,7 +492,7 @@ defmodule Req.Test do
 
     result =
       Req.Test.Ownership.get_and_update(@ownership, self(), name, fn map_or_nil ->
-        {:ok, Map.update(map_or_nil || %{}, :expectations, plugs, &(plugs ++ &1))}
+        {:ok, Map.update(map_or_nil || %{}, :expectations, plugs, &(&1 ++ plugs))}
       end)
 
     case result do
