@@ -252,7 +252,8 @@ defmodule Req.HttpcTest do
             _ -> 200
           end
 
-        async = %Req.Async{
+        async = %Req.Response.Async{
+          pid: self(),
           ref: ref,
           stream_fun: &httpc_stream/2,
           cancel_fun: &httpc_cancel/1

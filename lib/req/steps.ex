@@ -928,7 +928,8 @@ defmodule Req.Steps do
           end)
       end
 
-    async = %Req.Async{
+    async = %Req.Response.Async{
+      pid: self(),
       ref: ref,
       stream_fun: &finch_parse_message/2,
       cancel_fun: &finch_cancel/1
@@ -959,7 +960,8 @@ defmodule Req.Steps do
           end)
       end
 
-    async = %Req.Async{
+    async = %Req.Response.Async{
+      pid: self(),
       ref: ref,
       stream_fun: &finch_parse_message/2,
       cancel_fun: &finch_cancel/1

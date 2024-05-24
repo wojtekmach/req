@@ -85,7 +85,7 @@ defmodule Req do
 
       iex> resp = Req.get!("http://httpbin.org/stream/2", into: :self)
       iex> resp.body
-      #Req.Async<...>
+      #Req.Response.Async<...>
       iex> Enum.map(resp.body, & &1["id"])
       [0, 1]
 
@@ -250,8 +250,13 @@ defmodule Req do
 
         * `collectable` - stream response body into a `t:Collectable.t/0`.
 
-        * `:self` - stream response body into the process mailbox. The messages should be parsed using
-          `Req.parse_message/2`.
+        * `:self` - stream response body into the current process mailbox.
+
+          Received messages should be parsed with `Req.parse_message/2`.
+
+          `response.body` is set to opaque data structure `Req.Response.Async` which implements
+          `Enumerable` that receives and automatically parses messages. See module documentation
+          for example usage.
 
   Response redirect options ([`redirect`](`Req.Steps.redirect/1`) step):
 
@@ -1188,7 +1193,7 @@ defmodule Req do
       iex> Req.parse_message(resp, receive do message -> message end)
       {:ok, [:done]}
   """
-  def parse_message(%Req.Response{body: %Req.Async{stream_fun: fun, ref: ref}}, message) do
+  def parse_message(%Req.Response{body: %Req.Response.Async{stream_fun: fun, ref: ref}}, message) do
     fun.(ref, message)
   end
 
@@ -1209,7 +1214,7 @@ defmodule Req do
       iex> Req.cancel_async_response(resp)
       :ok
   """
-  def cancel_async_response(%Req.Response{body: %Req.Async{cancel_fun: fun, ref: ref}}) do
+  def cancel_async_response(%Req.Response{body: %Req.Response.Async{cancel_fun: fun, ref: ref}}) do
     fun.(ref)
   end
 

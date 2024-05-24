@@ -21,7 +21,7 @@ defmodule Req.Response do
   @type t() :: %__MODULE__{
           status: non_neg_integer(),
           headers: %{optional(binary()) => [binary()]},
-          body: binary() | %Req.Async{} | term(),
+          body: binary() | %Req.Response.Async{} | term(),
           trailers: %{optional(binary()) => [binary()]},
           private: map()
         }
