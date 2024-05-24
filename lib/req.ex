@@ -89,6 +89,8 @@ defmodule Req do
       iex> Enum.map(resp.body, & &1["id"])
       [0, 1]
 
+  See `:into` option in `Req.new/1` documentation for more information on response body streaming.
+
   ## Header Names
 
   The HTTP specification requires that header names should be case-insensitive.
@@ -257,6 +259,12 @@ defmodule Req do
           `response.body` is set to opaque data structure `Req.Response.Async` which implements
           `Enumerable` that receives and automatically parses messages. See module documentation
           for example usage.
+
+          If the request is sent using HTTP/1, an extra process is spawned to consume messages
+          from the underlying socket. On both HTTP/1 and HTTP/2 the messages are sent to the
+          current process as soon as they arrive, as a firehose. If you wish to maximize request
+          rate or have more control over how messages are streamed, use `into: fun` or
+          `into: collectable` instead.
 
   Response redirect options ([`redirect`](`Req.Steps.redirect/1`) step):
 

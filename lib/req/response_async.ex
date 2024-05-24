@@ -8,7 +8,12 @@ defmodule Req.Response.Async do
   This struct implements the `Enumerale` protocol where each element is a body chunk received
   from the current process mailbox. HTTP Trailer fields are ignored.
 
-  **Note:** this feature is currently experimental and it may change in future releases.
+  If the request is sent using HTTP/11, an extra process is spawned to consume messages from the
+  underlying socket. The messages are sent to the current process as soon as they arrive, as a
+  firehose. If you wish to maximize request rate or have more control over how messages are
+  streamed, use `into: fun` or `into: collectable` instead.
+
+  **Note:** This feature is currently experimental and it may change in future releases.
 
   ## Examples
 
