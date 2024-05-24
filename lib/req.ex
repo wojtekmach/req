@@ -141,8 +141,6 @@ defmodule Req do
 
         * `%DateTime{}` header values are encoded as "HTTP date".
 
-        * other header values are encoded with `String.Chars.to_string/1`.
-
       If you set `:headers` options both in `Req.new/1` and `request/2`, the header lists are merged.
 
       See also "Header Names" section in the module documentation.
