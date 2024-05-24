@@ -6,7 +6,9 @@ defmodule Req.Response.Async do
   streaming response body chunks to the current process mailbox.
 
   This struct implements the `Enumerale` protocol where each element is a body chunk received
-  from the current process mailbox. Note: HTTP Trailer fields are ignored.
+  from the current process mailbox. HTTP Trailer fields are ignored.
+
+  **Note:** this feature is currently experimental and it may change in future releases.
 
   ## Examples
 
