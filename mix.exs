@@ -111,6 +111,9 @@ defmodule Req.MixProject do
       extras: [
         "README.md",
         "CHANGELOG.md"
+      ],
+      skip_code_autolink_to: [
+        "Req.Test.stub/1"
       ]
     ]
   end
