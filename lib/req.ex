@@ -86,8 +86,10 @@ defmodule Req do
       iex> resp = Req.get!("http://httpbin.org/stream/2", into: :self)
       iex> resp.body
       #Req.Response.Async<...>
-      iex> Enum.map(resp.body, & &1["id"])
-      [0, 1]
+      iex> Enum.each(resp.body, &IO.puts/1)
+      # {"url": "http://httpbin.org/stream/2", ..., "id": 0}
+      # {"url": "http://httpbin.org/stream/2", ..., "id": 1}
+      :ok
 
   See `:into` option in `Req.new/1` documentation for more information on response body streaming.
 
