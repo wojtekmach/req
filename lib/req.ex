@@ -27,6 +27,14 @@ defmodule Req do
       iex> Req.get!(req, url: "/repos/wojtekmach/req").body["description"]
       "Req is a batteries-included HTTP client for Elixir."
 
+  Return the request that was sent:
+
+      iex> {req, resp} = Req.run!("https://httpbin.org/basic-auth/foo/bar", auth: {:basic, "foo:bar"})
+      iex> req.headers["authorization"]
+      ["Basic Zm9vOmJhcg=="]
+      iex> resp.status
+      200
+
   Making a POST request with `Req.post!/2`:
 
       iex> Req.post!("https://httpbin.org/post", form: [comments: "hello!"]).body["form"]
@@ -494,8 +502,10 @@ defmodule Req do
 
   `request` can be one of:
 
-    * a `String` or `URI`;
+    * an url (`String` or `URI`);
+
     * a `Keyword` options;
+
     * a `Req.Request` struct
 
   See `new/1` for a list of available options.
@@ -534,8 +544,10 @@ defmodule Req do
 
   `request` can be one of:
 
-    * a `String` or `URI`;
+    * an url (`String` or `URI`);
+
     * a `Keyword` options;
+
     * a `Req.Request` struct
 
   See `new/1` for a list of available options.
@@ -570,8 +582,10 @@ defmodule Req do
 
   `request` can be one of:
 
-    * a `String` or `URI`;
+    * an url (`String` or `URI`);
+
     * a `Keyword` options;
+
     * a `Req.Request` struct
 
   See `new/1` for a list of available options.
@@ -610,8 +624,10 @@ defmodule Req do
 
   `request` can be one of:
 
-    * a `String` or `URI`;
+    * an url (`String` or `URI`);
+
     * a `Keyword` options;
+
     * a `Req.Request` struct
 
   See `new/1` for a list of available options.
@@ -645,8 +661,10 @@ defmodule Req do
 
   `request` can be one of:
 
-    * a `String` or `URI`;
+    * an url (`String` or `URI`);
+
     * a `Keyword` options;
+
     * a `Req.Request` struct
 
   See `new/1` for a list of available options.
@@ -692,8 +710,10 @@ defmodule Req do
 
   `request` can be one of:
 
-    * a `String` or `URI`;
+    * an url (`String` or `URI`);
+
     * a `Keyword` options;
+
     * a `Req.Request` struct
 
   See `new/1` for a list of available options.
@@ -733,8 +753,10 @@ defmodule Req do
 
   `request` can be one of:
 
-    * a `String` or `URI`;
+    * an url (`String` or `URI`);
+
     * a `Keyword` options;
+
     * a `Req.Request` struct
 
   See `new/1` for a list of available options.
@@ -772,8 +794,10 @@ defmodule Req do
 
   `request` can be one of:
 
-    * a `String` or `URI`;
+    * an url (`String` or `URI`);
+
     * a `Keyword` options;
+
     * a `Req.Request` struct
 
   See `new/1` for a list of available options.
@@ -807,8 +831,10 @@ defmodule Req do
 
   `request` can be one of:
 
-    * a `String` or `URI`;
+    * an url (`String` or `URI`);
+
     * a `Keyword` options;
+
     * a `Req.Request` struct
 
   See `new/1` for a list of available options.
@@ -846,8 +872,10 @@ defmodule Req do
 
   `request` can be one of:
 
-    * a `String` or `URI`;
+    * an url (`String` or `URI`);
+
     * a `Keyword` options;
+
     * a `Req.Request` struct
 
   See `new/1` for a list of available options.
@@ -881,8 +909,10 @@ defmodule Req do
 
   `request` can be one of:
 
-    * a `String` or `URI`;
+    * an url (`String` or `URI`);
+
     * a `Keyword` options;
+
     * a `Req.Request` struct
 
   See `new/1` for a list of available options.
@@ -920,8 +950,10 @@ defmodule Req do
 
   `request` can be one of:
 
-    * a `String` or `URI`;
+    * an url (`String` or `URI`);
+
     * a `Keyword` options;
+
     * a `Req.Request` struct
 
   See `new/1` for a list of available options.
@@ -960,6 +992,8 @@ defmodule Req do
 
   See `new/1` for a list of available options.
 
+  See `run/2` for a similar functions that returns the request and the response or error.
+
   ## Examples
 
   With options keywords list:
@@ -989,6 +1023,8 @@ defmodule Req do
 
   See `new/1` for a list of available options.
 
+  See `run!/2` for a similar functions that returns the request and the response or error.
+
   ## Examples
 
   With options keywords list:
@@ -1008,6 +1044,108 @@ defmodule Req do
     case request(request, options) do
       {:ok, response} -> response
       {:error, exception} -> raise exception
+    end
+  end
+
+  @doc """
+  Makes an HTTP request and returns the request and response or error.
+
+  `request` can be one of:
+
+    * an url (`String` or `URI`);
+
+    * a `Keyword` options;
+
+    * a `Req.Request` struct
+
+  See `new/1` for a list of available options.
+
+  See `request/2` for a similar functions that returns the response or error (without the request).
+
+  ## Examples
+
+  With options keywords list:
+
+      iex> {req, resp} = Req.run(url: "https://api.github.com/repos/elixir-lang/elixir")
+      iex> req.url.host
+      "api.github.com"
+      iex> resp.status
+      200
+
+  With request struct and options:
+
+      iex> req = Req.new(base_url: "https://api.github.com")
+      iex> {req, resp} = Req.run(req, url: "/repos/elixir-lang/elixir")
+      iex> req.url.host
+      "api.github.com"
+      iex> resp.status
+      200
+
+  Returns an error:
+
+      iex> {_req, exception} = Req.run("http://localhost:9999", retry: false)
+      iex> exception
+      %Req.TransportError{reason: :econnrefused}
+
+  """
+  @spec run(request :: url() | keyword() | Req.Request.t(), options :: keyword()) ::
+          {Req.Request.t(), Req.Response.t() | Exception.t()}
+  def run(request, options \\ [])
+
+  def run(request, options) when is_list(options) do
+    Req.Request.run_request(new(request, options))
+  end
+
+  def run(_request, options) do
+    raise ArgumentError,
+          "expected 2nd argument to be an options keywords list, got: #{inspect(options)}"
+  end
+
+  @doc """
+  Makes an HTTP request and returns the request and response or raises on errors.
+
+  `request` can be one of:
+
+    * an url (`String` or `URI`);
+
+    * a `Keyword` options;
+
+    * a `Req.Request` struct
+
+  See `new/1` for a list of available options.
+
+  See `request!/2` for a similar functions that returns the response or error (without the request).
+
+  ## Examples
+
+  With options keywords list:
+
+      iex> {req, resp} = Req.run!(url: "https://api.github.com/repos/elixir-lang/elixir")
+      iex> req.url.host
+      "api.github.com"
+      iex> resp.status
+      200
+
+  With request struct and options:
+
+      iex> req = Req.new(base_url: "https://api.github.com")
+      iex> {req, resp} = Req.run!(req, url: "/repos/elixir-lang/elixir")
+      iex> req.url.host
+      "api.github.com"
+      iex> resp.status
+      200
+
+  Raises an error:
+
+      iex> Req.run!("http://localhost:9999", retry: false)
+      ** (Req.TransportError) connection refused
+  """
+  @spec run(request :: url() | keyword() | Req.Request.t(), options :: keyword()) ::
+          {Req.Request.t(), Req.Response.t()}
+  def run!(request, options \\ []) do
+    case run(request, options) do
+      {req, %Req.Response{} = resp} -> {req, resp}
+      {_req, exception} -> raise exception
     end
   end
 
