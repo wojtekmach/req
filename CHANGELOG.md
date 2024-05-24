@@ -5,6 +5,8 @@
   * [`Req`]: Deprecate setting `:headers` to values other than string/integer/`DateTime`.
     This is to potentially allow special handling of atom values in the future.
 
+  * [`Req`]: Add `Req.run/2` and `Req.run!/2`.
+
   * [`Req.Request`]: Deprecate setting `:redact_auth`. It now has no effect. Instead of allowing
     to opt out of, we give an idea what the secret was without revealing it fully:
 
@@ -932,6 +934,8 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req`]:                        https://hexdocs.pm/req/Req.html
 [`Req.new/1`]:                  https://hexdocs.pm/req/Req.html#new/1
 [`Req.request/2`]:              https://hexdocs.pm/req/Req.html#request/2
+[`Req.run/2`]:                  https://hexdocs.pm/req/Req.html#run/2
+[`Req.run!/2`]:                 https://hexdocs.pm/req/Req.html#run!/2
 [`Req.merge/2`]:                https://hexdocs.pm/req/Req.html#merge/2
 [`Req.parse_message/2`]:        https://hexdocs.pm/req/Req.html#merge/2
 [`Req.cancel_async_request/1`]: https://hexdocs.pm/req/Req.html#merge/2
