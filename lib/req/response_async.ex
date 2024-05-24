@@ -10,11 +10,14 @@ defmodule Req.Response.Async do
 
   ## Examples
 
-      iex> resp = Req.get!("http://httpbin.org/stream/2", into: :self)
+      iex> resp = Req.get!("https://reqbin.org/ndjson?delay=1000", into: :self)
       iex> resp.body
       #Req.Response.Async<...>
-      iex> Enum.map(resp.body, & &1["id"])
-      [0, 1]
+      iex> Enum.each(resp.body, &IO.puts/1)
+      # {"id":0}
+      # {"id":1}
+      # {"id":2}
+      :ok
   """
 
   @derive {Inspect, only: []}
