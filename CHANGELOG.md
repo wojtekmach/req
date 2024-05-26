@@ -1,11 +1,132 @@
 # CHANGELOG
 
-## HEAD
+## v0.5.0-dev
+
+Req v0.5.0 brings testing enhancements, errors standardization, enumerable streaming response
+body, and more improvements and bug fixes.
+
+### `Req.Test` Improvements
+
+In previous releases, we could only create test _stubs_ (using [`Req.Test.stub/2`]), that is, fake
+HTTP servers which had predefined behaviour. Let's say we're integrating with a third-party
+weather service and we might create a stub for it like below:
+
+```elixir
+Req.Test.stub(MyApp.Weather, fn conn ->
+  Req.Test.json(conn, %{"celsius" => 25.0})
+end)
+```
+
+Anytime we hit this fake we'll get the same result. This works extremely well for simple
+integrations however it's not quite enough for more complicated ones. Imagine we're using
+something like AWS S3 and we test uploading some data and reading it back again. While we could do
+this:
+
+```elixir
+Req.Test.stub(MyApp.S3, fn
+  conn when conn.method == "PUT" ->
+    # ...
+
+  conn when conn.method == "GET" ->
+    # ...
+end)
+```
+
+making the test just a little bit more thorough will make it MUCH more complicated, for example:
+the first request GET should return a 404, we then make a PUT, and now GET should return a 200.
+We could solve it by adding some some state to our test (e.g. an agent) but there is a simpler way
+and that is to set request expectations using the new [`Req.Test.expect/3`] function:
+
+```elixir
+Req.Test.expect(MyApp.S3, fn conn when conn.method == "GET" ->
+  Plug.Conn.send_resp(conn, 404, "not found")
+end)
+
+Req.Test.expect(MyApp.S3, fn conn when conn.method == "PUT" ->
+  {:ok, body, conn} = Plug.Conn.read_body(conn)
+  assert body == "foo"
+  Plug.Conn.send_resp(conn, 200, "")
+end)
+
+Req.Test.expect(MyApp.S3, fn conn when conn.method == "GET" ->
+  Plug.Conn.send_resp(conn, 200, "foo")
+end)
+```
+
+The important part is the request expectations are meant to (and fail if they aren't) be running
+in order.
+
+In this release we're also adding [`Req.Test.transport_error/2`], a way to simulate network
+errors.
+
+Here is another example using both of the new features, let's simulate a server that is
+having issues: on the first request it is not responding and on the following two requests it
+returns an HTTP 500. Only on the third request it returns an HTTP 200. Req by default
+automatically retries transient errors (using `Req.Steps.retry/1`) so it will make multiple
+requests exercising all of our request expectations:
+
+```elixir
+iex> Req.Test.expect(MyApp.S3, &Req.Test.transport_error(&1, :econnrefused))
+iex> Req.Test.expect(MyApp.S3, 2, &Plug.Conn.send_resp(&1, 500, "internal server error"))
+iex> Req.Test.expect(MyApp.S3, &Plug.Conn.send_resp(&1, 200, "ok"))
+iex> Req.get!(plug: {Req.Test, MyApp.S3}).body
+# 15:57:06.309 [error] retry: got exception, will retry in 1000ms, 3 attempts left
+# 15:57:06.309 [error] ** (Req.TransportError) connection refused
+# 15:57:07.310 [error] retry: got response with status 500, will retry in 2000ms, 2 attempts left
+# 15:57:09.311 [error] retry: got response with status 500, will retry in 4000ms, 1 attempt left
+"ok"
+```
+
+### Standardized Errors
+
+In previous releases, when using the default adapter, Finch, Req could return these exceptions on
+network/protocol errors: `Mint.TransportError`, `Mint.HTTPError`, and `Finch.Error`. They have
+now been standardized into: [`Req.TransportError`] and [`Req.HTTPError`] for more consistent
+experience. In fact, this standardization was the pre-requisite of adding
+[`Req.Test.transport_error/2`]!
+
+Two additional exception structs have been added: [`Req.ArchiveError`] and [`Req.DecompressError`]
+for zip/tar/etc errors in [`decode_body`] and gzip/br/zstd/etc errors in [`decompress_body`]
+respectively. Additionally, [`decode_body`] now returns `Jason.DecodeError` instead of raising it.
+
+### `Req.Response.Async`
+
+In previous releases we added ability to stream response body chunks into the current process
+mailbox using the `into: :self` option. When such is used, the `response.body` is now set to
+[`Req.Response.Async`] struct which implements the [`Enumerable`] protocol.
+
+      iex> resp = Req.get!("http://httpbin.org/stream/2", into: :self)
+      iex> resp.body
+      #Req.Response.Async<...>
+      iex> Enum.each(resp.body, &IO.puts/1)
+      # {"url": "http://httpbin.org/stream/2", ..., "id": 0}
+      # {"url": "http://httpbin.org/stream/2", ..., "id": 1}
+      :ok
+
+`Req.Response.Async` is an experimental feature which may change before or after Req v1.0.
+
+The existing caveats to `into: :self` still apply, that is:
+
+  * If the request is sent using HTTP/1, an extra process is spawned to consume messages from the
+    underlying socket.
+
+  * On both HTTP/1 and HTTP/2 the messages are sent to the current process as soon as they arrive,
+    as a firehose.
+
+If you wish to maximize request rate or have more control over how messages are streamed, use
+`into: fun` or `into: collectable` instead.
+
+### Full CHANGELOG
 
   * [`Req`]: Deprecate setting `:headers` to values other than string/integer/`DateTime`.
     This is to potentially allow special handling of atom values in the future.
 
   * [`Req`]: Add `Req.run/2` and `Req.run!/2`.
+
+  * [`Req`]: Add `Req.run/2` and `Req.run!/2`.
+
+  * [`Req`]: `into: :self` now sets `response.body` as `Req.Response.Async` which implements
+    enumerable.
 
   * [`Req.Request`]: Deprecate setting `:redact_auth`. It now has no effect. Instead of allowing
     to opt out of, we give an idea what the secret was without revealing it fully:
@@ -31,6 +152,10 @@
   * [`Req.Test`]: Add `set_req_test_from_context/1`, `set_req_test_to_private/1`,
     `set_req_test_to_shared/1`, `verify!/0`, `verify!/1`, and `verify_on_exit!/1` for parity
     with [Mox](https://hexdocs.pm/mox).
+
+  * [`Req.Test`]: Add [`Req.Test.html/2`].
+
+  * [`Req.Test`]: Add [`Req.Test.text/2`].
 
   * [`Req.Test`]: Drop `:nimble_ownership` dependency.
 
@@ -955,18 +1080,31 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Response.get_header/2`]:     https://hexdocs.pm/req/Req.Response.html#get_response/2
 [`Req.Response.delete_header/2`]:  https://hexdocs.pm/req/Req.Response.html#delete_header/2
 [`Req.Response.update_private/4`]: https://hexdocs.pm/req/Req.Response.html#update_private/4
+[`Req.Response.Async`]:            https://hexdocs.pm/req/Req.Response.Async.html
 
-[`Req.Test`]: https://hexdocs.pm/req/Req.Test
+[`Req.Test`]: https://hexdocs.pm/req/Req.Test.html
+[`Req.Test.stub/2`]: https://hexdocs.pm/req/Req.Test.html#stub/2
 [`Req.Test.json/2`]: https://hexdocs.pm/req/Req.Test.html#json/2
-[`Req.Test.allow/3`]: https://hexdocs.pm/req/Req.Test.html#json/2
-[`Req.Test.expect/3`]: https://hexdocs.pm/req/Req.Test.html#expect/3
+[`Req.Test.html/2`]: https://hexdocs.pm/req/Req.Test.html#html/2
+[`Req.Test.text/2`]: https://hexdocs.pm/req/Req.Test.html#text/2
+[`Req.Test.allow/3`]: https://hexdocs.pm/req/Req.Test.html#allow/3
 [`Req.Test.transport_error/2`]: https://hexdocs.pm/req/Req.Test.html#transport_error/2
+[`Req.Test.expect/3`]: https://hexdocs.pm/req/Req.Test.html#expect/3
+[`Req.Test.verify!/0`]: https://hexdocs.pm/req/Req.Test.html#verify!/0
+[`Req.Test.verify!/1`]: https://hexdocs.pm/req/Req.Test.html#verify!/1
+[`Req.Test.verify_on_exit!/1`]: https://hexdocs.pm/req/Req.Test.html#verify_on_exit!/1
+[`Req.Test.set_req_test_from_context/1`]: https://hexdocs.pm/req/Req.Test.html#set_req_test_from_context/1
+[`Req.Test.set_req_test_to_private/1`]: https://hexdocs.pm/req/Req.Test.html#set_req_test_to_private/1
+[`Req.Test.set_req_test_to_shared/1`]: https://hexdocs.pm/req/Req.Test.html#set_req_test_to_shared/1
+
 
 [`Req.Steps`]:   https://hexdocs.pm/req/Req.Steps.html
-[`Collectable`]: https://hexdocs.pm/elixir/Collectable.html
 
 [`Req.TransportError`]: https://hexdocs.pm/req/Req.TransportError.html
 [`Req.HTTPError`]: https://hexdocs.pm/req/Req.HTTPError.html
 [`Req.TooManyRedirectsError`]: https://hexdocs.pm/req/Req.TooManyRedirectsError.html
 [`Req.DecompressError`]: https://hexdocs.pm/req/Req.DecompressError.html
 [`Req.ArchiveError`]: https://hexdocs.pm/req/Req.ArchiveError.html
+
+[`Enumerable`]:  https://hexdocs.pm/elixir/Enumerable.html
+[`Collectable`]: https://hexdocs.pm/elixir/Collectable.html
