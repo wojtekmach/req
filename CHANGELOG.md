@@ -33,9 +33,9 @@ end)
 ```
 
 making the test just a little bit more thorough will make it MUCH more complicated, for example:
-the first request GET should return a 404, we then make a PUT, and now GET should return a 200.
-We could solve it by adding some some state to our test (e.g. an agent) but there is a simpler way
-and that is to set request expectations using the new [`Req.Test.expect/3`] function:
+the first GET request should return a 404, we then make a PUT, and now GET should return a 200.
+We could solve it by adding some state to our test (e.g. an agent) but there is a simpler way and
+that is to set request expectations using the new [`Req.Test.expect/3`] function:
 
 ```elixir
 Req.Test.expect(MyApp.S3, fn conn when conn.method == "GET" ->
@@ -95,13 +95,15 @@ In previous releases we added ability to stream response body chunks into the cu
 mailbox using the `into: :self` option. When such is used, the `response.body` is now set to
 [`Req.Response.Async`] struct which implements the [`Enumerable`] protocol.
 
-      iex> resp = Req.get!("http://httpbin.org/stream/2", into: :self)
-      iex> resp.body
-      #Req.Response.Async<...>
-      iex> Enum.each(resp.body, &IO.puts/1)
-      # {"url": "http://httpbin.org/stream/2", ..., "id": 0}
-      # {"url": "http://httpbin.org/stream/2", ..., "id": 1}
-      :ok
+```elixir
+iex> resp = Req.get!("http://httpbin.org/stream/2", into: :self)
+iex> resp.body
+#Req.Response.Async<...>
+iex> Enum.each(resp.body, &IO.puts/1)
+# {"url": "http://httpbin.org/stream/2", ..., "id": 0}
+# {"url": "http://httpbin.org/stream/2", ..., "id": 1}
+:ok
+```
 
 `Req.Response.Async` is an experimental feature which may change before or after Req v1.0.
 
@@ -123,25 +125,25 @@ If you wish to maximize request rate or have more control over how messages are 
 
   * [`Req`]: Add `Req.run/2` and `Req.run!/2`.
 
-  * [`Req`]: Add `Req.run/2` and `Req.run!/2`.
-
   * [`Req`]: `into: :self` now sets `response.body` as `Req.Response.Async` which implements
     enumerable.
 
   * [`Req.Request`]: Deprecate setting `:redact_auth`. It now has no effect. Instead of allowing
     to opt out of, we give an idea what the secret was without revealing it fully:
 
-        iex> Req.new(auth: {:basic, "foobar:baz"})
-        %Req.Request{
-          options: %{auth: {:basic, "foo*******"}},
-          ...
-        }
+    ```elixir
+    iex> Req.new(auth: {:basic, "foobar:baz"})
+    %Req.Request{
+      options: %{auth: {:basic, "foo*******"}},
+      ...
+    }
 
-        iex> Req.new(headers: [authorization: "bearer foobarbaz"])
-        %Req.Request{
-          headers: %{"authorization" => ["bearer foo******"]},
-          ...
-        }
+    iex> Req.new(headers: [authorization: "bearer foobarbaz"])
+    %Req.Request{
+      headers: %{"authorization" => ["bearer foo******"]},
+      ...
+    }
+    ```
 
   * [`Req.Request`]: Deprecate `halt/1` in favour of `Req.Request.halt/2`.
 
