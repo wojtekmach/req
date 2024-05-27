@@ -170,8 +170,6 @@ If you wish to maximize request rate or have more control over how messages are 
 
   * [`decode_body`]: Return [`Req.ArchiveError`] on tar/zip errors.
 
-  * [`decode_body`]: **(BREAKING CHANGE)** Remove support for decoding `content-type: gzip`.
-
   * [`decompress_body`]: Return [`Req.DecompressError`].
 
   * [`put_aws_sigv4`]: Drop `:aws_signature` dependency.

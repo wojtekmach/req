@@ -814,6 +814,28 @@ defmodule Req.StepsTest do
       assert Exception.message(e) == "zip unpacking failed"
     end
 
+    test "gzip (content-type)" do
+      plug = fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/x-gzip", nil)
+        |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
+      end
+
+      assert Req.get!(plug: plug).body == "foo"
+    end
+
+    test "gzip invalid" do
+      plug = fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/x-gzip", nil)
+        |> Plug.Conn.send_resp(200, "bad")
+      end
+
+      assert_raise ErlangError, "Erlang error: :data_error", fn ->
+        Req.get(plug: plug)
+      end
+    end
+
     test "csv" do
       csv = [
         ["x", "y"],

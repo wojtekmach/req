@@ -1806,6 +1806,7 @@ defmodule Req.Steps do
   | `json`       | `Jason.decode/2`                                                  |
   | `tar`, `tgz` | `:erl_tar.extract/2`                                              |
   | `zip`        | `:zip.unzip/2`                                                    |
+  | `gzip`       | `:zlib.gunzip/1`                                                  |
   | `csv`        | `NimbleCSV.RFC4180.parse_string/2` (if [nimble_csv] is installed) |
 
   The format is determined based on the `content-type` header of the response. For example,
@@ -1906,6 +1907,10 @@ defmodule Req.Steps do
       {:error, _} ->
         {request, %Req.ArchiveError{format: :zip, data: response.body}}
     end
+  end
+
+  defp decode_body({request, response}, "gz") do
+    {request, update_in(response.body, &:zlib.gunzip/1)}
   end
 
   defp decode_body({request, response}, "csv") do
