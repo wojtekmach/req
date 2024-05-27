@@ -77,6 +77,8 @@ iex> Req.get!(plug: {Req.Test, MyApp.S3}).body
 "ok"
 ```
 
+Thanks to Andrea Leopardi for driving the testing improvements.
+
 ### Standardized Errors
 
 In previous releases, when using the default adapter, Finch, Req could return these exceptions on
