@@ -483,19 +483,16 @@ defmodule Req.Test do
   """
   @doc since: "0.4.15"
   @doc type: :mock
-  @spec expect(name(), pos_integer(), plug()) :: :ok | {:error, Exception.t()}
+  @spec expect(name(), pos_integer(), plug()) :: name()
   def expect(name, n \\ 1, plug) when is_integer(n) and n > 0 do
     plugs = List.duplicate(plug, n)
 
-    result =
+    {:ok, :ok} =
       Req.Test.Ownership.get_and_update(@ownership, self(), name, fn map_or_nil ->
         {:ok, Map.update(map_or_nil || %{}, :expectations, plugs, &(&1 ++ plugs))}
       end)
 
-    case result do
-      {:ok, :ok} -> :ok
-      {:error, error} -> {:error, error}
-    end
+    name
   end
 
   @doc """
