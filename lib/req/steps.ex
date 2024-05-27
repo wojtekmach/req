@@ -1243,6 +1243,10 @@ defmodule Req.Steps do
         |> Plug.Conn.fetch_query_params()
         |> call_plug(plug)
 
+      unless match?(%Plug.Conn{}, conn) do
+        raise ArgumentError, "expected to return %Plug.Conn{}, got: #{inspect(conn)}"
+      end
+
       if exception = conn.private[:req_test_exception] do
         {request, exception}
       else
@@ -1253,6 +1257,18 @@ defmodule Req.Steps do
     defp handle_plug_result(conn, request) do
       # consume messages sent by Plug.Test adapter
       {_, %{ref: ref}} = conn.adapter
+
+      if conn.state == :unset do
+        raise """
+        expected connection to have a response but no response was set/sent.
+
+        Please verify that you are using Plug.Conn.send_resp/3 in your plug:
+
+            Req.Test.stub(MyStub, fn conn, ->
+              Plug.Conn.send_resp(conn, 200, "Hello, World!")
+            end)
+        """
+      end
 
       receive do
         {^ref, {_status, _headers, _body}} -> :ok

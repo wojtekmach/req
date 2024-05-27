@@ -74,6 +74,9 @@ defmodule Req.Response.Async do
 
             {:error, e} ->
               raise e
+
+            other ->
+              raise "unexpected message: #{inspect(other)}"
           end
       end
     end

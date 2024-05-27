@@ -86,8 +86,11 @@ defmodule ReqTest do
 
     %{url: proxy_url} =
       start_server(fn conn ->
-        %{status: 200, body: async} = Req.get!(url: origin_url, into: :self)
+        %{status: 200, body: async} = Req.get!(url: origin_url, into: :self, retry: false)
+
         conn = Plug.Conn.send_chunked(conn, 200)
+        assert_received {:plug_conn, :sent}
+
         Enum.reduce(async, conn, &chunk(&2, &1))
       end)
 

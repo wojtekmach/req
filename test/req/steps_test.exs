@@ -1815,6 +1815,26 @@ defmodule Req.StepsTest do
       assert Req.request(req) ==
                {:error, %Req.TransportError{reason: :timeout}}
     end
+
+    test "bad return" do
+      plug = fn _ ->
+        :bad
+      end
+
+      assert_raise ArgumentError, "expected to return %Plug.Conn{}, got: :bad", fn ->
+        Req.request!(plug: plug)
+      end
+    end
+
+    test "no response" do
+      plug = fn conn ->
+        conn
+      end
+
+      assert_raise RuntimeError, ~r"expected connection to have a response", fn ->
+        Req.request!(plug: plug)
+      end
+    end
   end
 
   describe "run_finch" do
