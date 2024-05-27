@@ -431,17 +431,14 @@ defmodule Req.Test do
 
   """
   @doc type: :mock
-  @spec stub(name(), plug()) :: :ok | {:error, Exception.t()}
+  @spec stub(name(), plug()) :: :ok
   def stub(name, plug) when is_plug(plug) do
-    result =
+    {:ok, :ok} =
       Req.Test.Ownership.get_and_update(@ownership, self(), name, fn map_or_nil ->
         {:ok, put_in(map_or_nil || %{}, [:stub], plug)}
       end)
 
-    case result do
-      {:ok, :ok} -> :ok
-      {:error, error} -> {:error, error}
-    end
+    :ok
   end
 
   @doc """
