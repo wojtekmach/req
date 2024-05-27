@@ -91,6 +91,7 @@ defmodule Req.Utils do
     {datetime, options} = Keyword.pop!(options, :datetime)
     {method, options} = Keyword.pop!(options, :method)
     {url, options} = Keyword.pop!(options, :url)
+    {expires, options} = Keyword.pop(options, :expires, 86400)
     [] = options
 
     datetime = DateTime.truncate(datetime, :second)
@@ -104,7 +105,7 @@ defmodule Req.Utils do
         {"X-Amz-Algorithm", "AWS4-HMAC-SHA256"},
         {"X-Amz-Credential", "#{access_key_id}/#{date_string}/#{region}/#{service}/aws4_request"},
         {"X-Amz-Date", datetime_string},
-        {"X-Amz-Expires", 86400},
+        {"X-Amz-Expires", expires},
         {"X-Amz-SignedHeaders", "host"}
       ])
 

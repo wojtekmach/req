@@ -1514,7 +1514,10 @@ defmodule Req.Steps do
         :service,
         :region,
         :datetime,
-        :into
+        :into,
+
+        # for req_s3
+        :expires
       ])
 
       {into, aws_options} = Keyword.pop(aws_options, :into, :headers)
