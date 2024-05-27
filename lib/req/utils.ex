@@ -39,6 +39,8 @@ defmodule Req.Utils do
     body_digest = options[:body_digest] || hex(sha256(body))
     service = to_string(service)
 
+    method = method |> Atom.to_string() |> String.upcase()
+
     canonical_headers =
       headers ++
         [
@@ -53,14 +55,22 @@ defmodule Req.Utils do
         &String.downcase(elem(&1, 0), :ascii)
       )
 
+    canonical_headers =
+      Enum.map_intersperse(canonical_headers, "\n", fn {name, value} -> [name, ":", value] end)
+
+    canonical_request = """
+    #{method}
+    #{url.path || "/"}
+    #{url.query || ""}
+    #{canonical_headers}
+
+    #{signed_headers}
+    #{body_digest}\
+    """
+
     signature =
       aws_sigv4(
-        method,
-        url.path || "/",
-        url.query || "",
-        canonical_headers,
-        signed_headers,
-        body_digest,
+        canonical_request,
         date_string,
         datetime_string,
         region,
@@ -68,8 +78,10 @@ defmodule Req.Utils do
         secret_access_key
       )
 
+    credential = "#{access_key_id}/#{date_string}/#{region}/#{service}/aws4_request"
+
     authorization =
-      "AWS4-HMAC-SHA256 Credential=#{access_key_id}/#{date_string}/#{region}/#{service}/aws4_request,SignedHeaders=#{signed_headers},Signature=#{signature}"
+      "AWS4-HMAC-SHA256 Credential=#{credential},SignedHeaders=#{signed_headers},Signature=#{signature}"
 
     [
       {"authorization", authorization},
@@ -120,14 +132,24 @@ defmodule Req.Utils do
 
     true = url.query in [nil, ""]
 
+    method = method |> Atom.to_string() |> String.upcase()
+
+    canonical_headers =
+      Enum.map_intersperse(canonical_headers, "\n", fn {name, value} -> [name, ":", value] end)
+
+    canonical_request = """
+    #{method}
+    #{url.path || "/"}
+    #{canonical_query_string}
+    #{canonical_headers}
+
+    #{signed_headers}
+    UNSIGNED-PAYLOAD\
+    """
+
     signature =
       aws_sigv4(
-        method,
-        url.path || "/",
-        canonical_query_string,
-        canonical_headers,
-        signed_headers,
-        "UNSIGNED-PAYLOAD",
+        canonical_request,
         date_string,
         datetime_string,
         region,
@@ -138,49 +160,32 @@ defmodule Req.Utils do
     put_in(url.query, canonical_query_string <> "&X-Amz-Signature=#{signature}")
   end
 
-  defp aws_sigv4(
-         method,
-         canonical_url,
-         canonical_query_string,
-         canonical_headers,
-         signed_headers,
-         body_digest,
-         date_string,
-         datetime_string,
-         region,
-         service,
-         secret_access_key
-       ) do
-    method = method |> Atom.to_string() |> String.upcase()
-
-    canonical_headers =
-      Enum.map_intersperse(canonical_headers, "\n", fn {name, value} -> [name, ":", value] end)
-
-    canonical_request = """
-    #{method}
-    #{canonical_url}
-    #{canonical_query_string}
-    #{canonical_headers}
-
-    #{signed_headers}
-    #{body_digest}\
-    """
-
+  def aws_sigv4(
+        request,
+        date_string,
+        datetime_string,
+        region,
+        service,
+        secret_access_key
+      ) do
     string_to_sign =
       iodata("""
       AWS4-HMAC-SHA256
       #{datetime_string}
       #{date_string}/#{region}/#{service}/aws4_request
-      #{hex(sha256(canonical_request))}\
+      #{hex(sha256(request))}\
       """)
 
-    ["AWS4", secret_access_key]
-    |> hmac(date_string)
-    |> hmac(region)
-    |> hmac(service)
-    |> hmac("aws4_request")
-    |> hmac(string_to_sign)
-    |> hex()
+    signature =
+      ["AWS4", secret_access_key]
+      |> hmac(date_string)
+      |> hmac(region)
+      |> hmac(service)
+      |> hmac("aws4_request")
+      |> hmac(string_to_sign)
+      |> hex()
+
+    signature
   end
 
   defp hex(data) do
