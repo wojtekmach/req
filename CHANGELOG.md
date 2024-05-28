@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v0.5.0-dev
+## v0.4.0 (2024-05-28)
 
 Req v0.5.0 brings testing enhancements, errors standardization, `%Req.Response.Async{}`, and more improvements and bug fixes.
 
@@ -52,8 +52,7 @@ Req.Test.expect(MyApp.S3, fn conn when conn.method == "GET" ->
 end)
 ```
 
-The important part is the request expectations are meant to (and fail if they aren't) be running
-in order.
+The important part is the request expectations are meant to run in order (and fail if they don't).
 
 In this release we're also adding [`Req.Test.transport_error/2`], a way to simulate network
 errors.

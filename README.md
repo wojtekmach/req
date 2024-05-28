@@ -72,7 +72,7 @@ The easiest way to use Req is with [`Mix.install/2`] (requires Elixir v1.12+):
 
 ```elixir
 Mix.install([
-  {:req, "~> 0.4.0"}
+  {:req, "~> 0.5.0"}
 ])
 
 Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
@@ -157,7 +157,7 @@ And here is how they can be used:
 
 ```elixir
 Mix.install([
-  {:req, "~> 0.4.0"},
+  {:req, "~> 0.5.0"},
   {:req_easyhtml, "~> 0.1.0"},
   {:req_s3, "~> 0.1.0"},
   {:req_hex, "~> 0.1.0"},
