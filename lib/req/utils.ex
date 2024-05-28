@@ -68,11 +68,18 @@ defmodule Req.Utils do
     #{body_digest}\
     """
 
+    string_to_sign =
+      iodata("""
+      AWS4-HMAC-SHA256
+      #{datetime_string}
+      #{date_string}/#{region}/#{service}/aws4_request
+      #{hex(sha256(canonical_request))}\
+      """)
+
     signature =
       aws_sigv4(
-        canonical_request,
+        string_to_sign,
         date_string,
-        datetime_string,
         region,
         service,
         secret_access_key
@@ -147,11 +154,18 @@ defmodule Req.Utils do
     UNSIGNED-PAYLOAD\
     """
 
+    string_to_sign =
+      iodata("""
+      AWS4-HMAC-SHA256
+      #{datetime_string}
+      #{date_string}/#{region}/#{service}/aws4_request
+      #{hex(sha256(canonical_request))}\
+      """)
+
     signature =
       aws_sigv4(
-        canonical_request,
+        string_to_sign,
         date_string,
-        datetime_string,
         region,
         service,
         secret_access_key
@@ -161,21 +175,12 @@ defmodule Req.Utils do
   end
 
   def aws_sigv4(
-        request,
+        string_to_sign,
         date_string,
-        datetime_string,
         region,
         service,
         secret_access_key
       ) do
-    string_to_sign =
-      iodata("""
-      AWS4-HMAC-SHA256
-      #{datetime_string}
-      #{date_string}/#{region}/#{service}/aws4_request
-      #{hex(sha256(request))}\
-      """)
-
     signature =
       ["AWS4", secret_access_key]
       |> hmac(date_string)
