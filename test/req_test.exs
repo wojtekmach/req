@@ -84,21 +84,13 @@ defmodule ReqTest do
         conn
       end)
 
-    %{url: proxy_url} =
+    %{url: echo_url} =
       start_server(fn conn ->
-        %{status: 200, body: async} = Req.get!(url: origin_url, into: :self, retry: false)
-
-        conn = Plug.Conn.send_chunked(conn, 200)
-        assert_received {:plug_conn, :sent}
-
-        Enum.reduce(async, conn, &chunk(&2, &1))
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        Plug.Conn.send_resp(conn, 200, body)
       end)
 
-    assert Req.get!(proxy_url, into: []).body == ~w[foo bar baz]
-  end
-
-  defp chunk(conn, data) do
-    {:ok, conn} = Plug.Conn.chunk(conn, data)
-    conn
+    resp = Req.get!(origin_url, into: :self)
+    assert Req.put!(echo_url, body: resp.body).body == "foobarbaz"
   end
 end
