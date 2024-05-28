@@ -1,6 +1,5 @@
 # CHANGELOG
 
-## v0.5.0 (2024-05-28)
 
 Req v0.5.0 brings testing enhancements, errors standardization, `%Req.Response.Async{}`, and more improvements and bug fixes.
 
@@ -59,7 +58,7 @@ errors.
 
 Here is another example using both of the new features, let's simulate a server that is
 having issues: on the first request it is not responding and on the following two requests it
-returns an HTTP 500. Only on the third request it returns an HTTP 200. Req by default
+returns an HTTP 500. Only on the fourth request it returns an HTTP 200. Req by default
 automatically retries transient errors (using [`retry`] step) so it will make multiple
 requests exercising all of our request expectations:
 
