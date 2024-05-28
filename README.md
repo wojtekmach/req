@@ -12,7 +12,7 @@ With just a couple lines of code:
 
 ```elixir
 Mix.install([
-  {:req, "~> 0.4.0"}
+  {:req, "~> 0.5.0"}
 ])
 
 Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]

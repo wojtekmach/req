@@ -2,10 +2,9 @@
 
 ## v0.5.0-dev
 
-Req v0.5.0 brings testing enhancements, errors standardization, enumerable streaming response
-body, and more improvements and bug fixes.
+Req v0.5.0 brings testing enhancements, errors standardization, `%Req.Response.Async{}`, and more improvements and bug fixes.
 
-### `Req.Test` Improvements
+### Testing Enhancements
 
 In previous releases, we could only create test _stubs_ (using [`Req.Test.stub/2`]), that is, fake
 HTTP servers which had predefined behaviour. Let's say we're integrating with a third-party
@@ -62,7 +61,7 @@ errors.
 Here is another example using both of the new features, let's simulate a server that is
 having issues: on the first request it is not responding and on the following two requests it
 returns an HTTP 500. Only on the third request it returns an HTTP 200. Req by default
-automatically retries transient errors (using `Req.Steps.retry/1`) so it will make multiple
+automatically retries transient errors (using [`retry`] step) so it will make multiple
 requests exercising all of our request expectations:
 
 ```elixir
@@ -76,6 +75,19 @@ iex> Req.get!(plug: {Req.Test, MyApp.S3}).body
 # 15:57:09.311 [error] retry: got response with status 500, will retry in 4000ms, 1 attempt left
 "ok"
 ```
+
+Finally, for parity with [Mox](https://hexdocs.pm/mox), we add functions for setting ownership
+mode:
+
+  * [`Req.Test.set_req_test_from_context/1`]
+  * [`Req.Test.set_req_test_to_private/1`]
+  * [`Req.Test.set_req_test_to_shared/1`]
+
+And for verifying expectations:
+
+  * [`Req.Test.verify!/0`]
+  * [`Req.Test.verify!/1`]
+  * [`Req.Test.verify_on_exit!/1`]
 
 Thanks to Andrea Leopardi for driving the testing improvements.
 
@@ -91,23 +103,64 @@ Two additional exception structs have been added: [`Req.ArchiveError`] and [`Req
 for zip/tar/etc errors in [`decode_body`] and gzip/br/zstd/etc errors in [`decompress_body`]
 respectively. Additionally, [`decode_body`] now returns `Jason.DecodeError` instead of raising it.
 
-### `Req.Response.Async`
+### `%Req.Response.Async{}`
 
 In previous releases we added ability to stream response body chunks into the current process
 mailbox using the `into: :self` option. When such is used, the `response.body` is now set to
 [`Req.Response.Async`] struct which implements the [`Enumerable`] protocol.
 
+Here's a quick example:
+
 ```elixir
-iex> resp = Req.get!("http://httpbin.org/stream/2", into: :self)
-iex> resp.body
-#Req.Response.Async<...>
-iex> Enum.each(resp.body, &IO.puts/1)
+resp = Req.get!("http://httpbin.org/stream/2", into: :self)
+resp.body
+#=> #Req.Response.Async<...>
+Enum.each(resp.body, &IO.puts/1)
 # {"url": "http://httpbin.org/stream/2", ..., "id": 0}
 # {"url": "http://httpbin.org/stream/2", ..., "id": 1}
-:ok
 ```
 
-`Req.Response.Async` is an experimental feature which may change before or after Req v1.0.
+Here is another example where we use Req to talk to two different servers. The first server
+produces some test data, strings `"foo"`, `"bar"` and `"baz"`. The second one is an "echo" server, it simply
+responds with the request body it returned. We then stream data from one server, transform it, and
+stream it to the other one:
+
+```elixir
+Mix.install([
+  {:req, "~> 0.5"},
+  {:bandit, "~> 1.0"}
+])
+
+{:ok, _} =
+  Bandit.start_link(
+    scheme: :http,
+    port: 4000,
+    plug: fn conn, _ ->
+      conn = Plug.Conn.send_chunked(conn, 200)
+      {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+      {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+      {:ok, conn} = Plug.Conn.chunk(conn, "baz")
+      conn
+    end
+  )
+
+{:ok, _} =
+  Bandit.start_link(
+    scheme: :http,
+    port: 4001,
+    plug: fn conn, _ ->
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      Plug.Conn.send_resp(conn, 200, body)
+    end
+  )
+
+resp = Req.get!("http://localhost:4000", into: :self)
+stream = resp.body |> Stream.with_index() |> Stream.map(fn {data, idx} -> "[#{idx}]#{data}" end)
+Req.put!("http://localhost:4001", body: stream).body
+#=> "[0]foo[1]bar[2]baz"
+```
+
+`Req.Response.Async` is an experimental feature which may change in the future.
 
 The existing caveats to `into: :self` still apply, that is:
 
@@ -115,12 +168,12 @@ The existing caveats to `into: :self` still apply, that is:
     underlying socket.
 
   * On both HTTP/1 and HTTP/2 the messages are sent to the current process as soon as they arrive,
-    as a firehose.
+    as a firehose with no back-pressure.
 
 If you wish to maximize request rate or have more control over how messages are streamed, use
 `into: fun` or `into: collectable` instead.
 
-### Full CHANGELOG
+### Full v0.5.0 CHANGELOG
 
   * [`Req`]: Deprecate setting `:headers` to values other than string/integer/`DateTime`.
     This is to potentially allow special handling of atom values in the future.
@@ -153,9 +206,8 @@ If you wish to maximize request rate or have more control over how messages are 
 
   * [`Req.Test`]: Add [`Req.Test.expect/3`].
 
-  * [`Req.Test`]: Add `set_req_test_from_context/1`, `set_req_test_to_private/1`,
-    `set_req_test_to_shared/1`, `verify!/0`, `verify!/1`, and `verify_on_exit!/1` for parity
-    with [Mox](https://hexdocs.pm/mox).
+  * [`Req.Test`]: Add functions for setting ownership mode: [`Req.Test.set_req_test_from_context/1`], [`Req.Test.set_req_test_to_private/1`],
+    [`Req.Test.set_req_test_to_shared/1`] and for verifying expectations: [`Req.Test.verify!/0`], [`Req.Test.verify!/1`], and [`Req.Test.verify_on_exit!/1`].
 
   * [`Req.Test`]: Add [`Req.Test.html/2`].
 
