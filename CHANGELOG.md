@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## v0.4.0 (2024-05-28)
+## v0.5.0 (2024-05-28)
 
 Req v0.5.0 brings testing enhancements, errors standardization, `%Req.Response.Async{}`, and more improvements and bug fixes.
 
