@@ -596,16 +596,22 @@ defmodule Req.Request do
   @doc """
   Halts the request pipeline preventing any further steps from executing.
 
+  This function returns an updated request and the response or exception that caused the halt.
+  It's perfect when used in a request step to stop the pipeline.
+
   ## Examples
 
-      def circuit_breaker(request) do
+      Req.Request.prepend_request_steps(request, circuit_breaker: fn request ->
         if CircuitBreaker.open?() do
           Req.Request.halt(request, RuntimeError.exception("circuit breaker is open"))
         else
           request
         end
-      end
+      end)
+
   """
+  @spec halt(t(), response_or_exception) :: {t(), response_or_exception}
+        when response_or_exception: Req.Response.t() | Exception.t()
   def halt(request, response_or_exception)
 
   def halt(%Req.Request{} = request, %Req.Response{} = response) do
