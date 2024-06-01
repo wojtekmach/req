@@ -122,20 +122,26 @@ defmodule Req.Request do
 
   Nothing is actually executed until we run the pipeline with `Req.Request.run_request/1`.
 
-  ### Request steps
+  ### Request Steps
 
-  A request step is a function that accepts a `request` and returns one of the following:
+  A **request step** is a function that accepts a `request` and returns one of the following:
 
-    * A `request`
+    * A `request`.
 
-    * A `{request, response_or_error}` tuple. In that case no further request steps are executed
-      and the return value goes through response or error steps
+    * A `{request, response_or_error}` tuple. In this case no further request steps are executed
+      and the return value goes through response or error steps.
 
-  Examples:
+  #### Examples
+
+  A request step that adds a `user-agent` header if it's not there already:
 
       def put_default_headers(request) do
-        update_in(request.headers, &[{"user-agent", "req"} | &1])
+        Req.Request.put_new_header(request, "user-agent", "req")
       end
+
+  The next is a request step that reads the response from cache if available. Note how, if the
+  cached response is available, this step returns a `{request, response}` tuple so that the
+  request doesn't actually go through:
 
       def read_from_cache(request) do
         case ResponseCache.fetch(request) do
@@ -144,15 +150,15 @@ defmodule Req.Request do
         end
       end
 
-  ### Response and error steps
+  ### Response and Error Steps
 
   A response step is a function that accepts a `{request, response}` tuple and returns one of the
   following:
 
-    * A `{request, response}` tuple
+    * A `{request, response}` tuple.
 
     * A `{request, exception}` tuple. In that case, no further response steps are executed but the
-      exception goes through error steps
+      exception goes through error steps.
 
   Similarly, an error step is a function that accepts a `{request, exception}` tuple and returns one
   of the following:
@@ -160,7 +166,7 @@ defmodule Req.Request do
     * A `{request, exception}` tuple
 
     * A `{request, response}` tuple. In that case, no further error steps are executed but the
-      response goes through response steps
+      response goes through response steps.
 
   Examples:
 
@@ -181,7 +187,7 @@ defmodule Req.Request do
 
   ### Halting
 
-  Any step can call `halt/2` to halt the pipeline. This will prevent any further steps
+  Any step can call `halt/2` to halt the pipeline. This prevents any further steps
   from being invoked.
 
   Examples:
@@ -207,6 +213,7 @@ defmodule Req.Request do
         ## Request Options
 
           * `:print_headers` - if `true`, prints the headers. Defaults to `false`.
+
         \"""
         def attach(%Req.Request{} = request, options \\ []) do
           request
@@ -283,7 +290,7 @@ defmodule Req.Request do
 
   ## Adapter
 
-  As noted in the ["Request steps"](#module-request-steps) section, a request step besides returning the request,
+  As noted in the ["Request Steps"](#module-request-steps) section, a request step besides returning the request,
   might also return `{request, response}` or `{request, exception}`, thus invoking either response or error steps next.
   This is exactly how Req makes the underlying HTTP call, by invoking a request step that follows this contract.
 
@@ -335,8 +342,12 @@ defmodule Req.Request do
 
       Req.get!("https://api.github.com/repos/wojtekmach/req", adapter: hackney).body["description"]
       #=> "Req is a batteries-included HTTP client for Elixir."
+
   """
 
+  @typedoc """
+  The request struct.
+  """
   @type t() :: %Req.Request{
           method: atom(),
           url: URI.t(),
@@ -402,8 +413,11 @@ defmodule Req.Request do
       iex> resp.status
       200
   """
+  @spec new(keyword()) :: t()
+  def new(options \\ [])
+
   if Req.MixProject.legacy_headers_as_lists?() do
-    def new(options \\ []) do
+    def new(options) do
       options =
         options
         |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
@@ -413,7 +427,7 @@ defmodule Req.Request do
       struct!(__MODULE__, options)
     end
   else
-    def new(options \\ []) do
+    def new(options) do
       options =
         options
         |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
@@ -556,6 +570,7 @@ defmodule Req.Request do
   @doc """
   Gets the value for a specific private `key`.
   """
+  @spec get_private(t(), atom(), default) :: term() | default when default: var
   def get_private(request, key, default \\ nil) when is_atom(key) do
     Map.get(request.private, key, default)
   end
@@ -575,7 +590,7 @@ defmodule Req.Request do
       iex> Req.Request.update_private(req, :b, 11, & &1 + 1).private
       %{a: 1, b: 11}
   """
-  @spec update_private(t(), key :: atom(), default :: term(), (atom() -> term())) :: t()
+  @spec update_private(t(), key :: atom(), default :: term(), (term() -> term())) :: t()
   def update_private(request, key, default, fun) when is_atom(key) and is_function(fun, 1) do
     update_in(request.private, &Map.update(&1, key, default, fun))
   end
@@ -583,6 +598,7 @@ defmodule Req.Request do
   @doc """
   Assigns a private `key` to `value`.
   """
+  @spec put_private(t(), atom(), term()) :: t()
   def put_private(request, key, value) when is_atom(key) do
     put_in(request.private[key], value)
   end
@@ -598,6 +614,8 @@ defmodule Req.Request do
 
   This function returns an updated request and the response or exception that caused the halt.
   It's perfect when used in a request step to stop the pipeline.
+
+  See the ["Halting"](#module-halting) section in the module documentation for more information.
 
   ## Examples
 
@@ -623,7 +641,10 @@ defmodule Req.Request do
   end
 
   @doc """
-  Appends request steps.
+  Appends **request steps** to the existing request steps.
+
+  See the ["Request Steps"](#module-request-steps) section in the module documentation
+  for more information.
 
   ## Examples
 
@@ -632,6 +653,7 @@ defmodule Req.Request do
         inspect: &IO.inspect/1
       )
   """
+  @spec append_request_steps(t(), keyword(fun())) :: t()
   def append_request_steps(request, steps) do
     %{
       request
@@ -641,7 +663,10 @@ defmodule Req.Request do
   end
 
   @doc """
-  Prepends request steps.
+  Prepends **request steps** to the existing request steps.
+
+  See the ["Request Steps"](#module-request-steps) section in the module documentation
+  for more information.
 
   ## Examples
 
@@ -650,6 +675,7 @@ defmodule Req.Request do
         inspect: &IO.inspect/1
       )
   """
+  @spec prepend_request_steps(t(), keyword(fun())) :: t()
   def prepend_request_steps(request, steps) do
     %{
       request
@@ -659,7 +685,10 @@ defmodule Req.Request do
   end
 
   @doc """
-  Appends response steps.
+  Appends **response steps** to the existing response steps.
+
+  See the ["Response and Error Steps"](#module-response-and-error-steps) section in the
+  module documentation for more information.
 
   ## Examples
 
@@ -668,6 +697,7 @@ defmodule Req.Request do
         inspect: &IO.inspect/1
       )
   """
+  @spec append_response_steps(t(), keyword(fun())) :: t()
   def append_response_steps(request, steps) do
     %{
       request
@@ -676,7 +706,10 @@ defmodule Req.Request do
   end
 
   @doc """
-  Prepends response steps.
+  Prepends **response steps** to the existing response steps.
+
+  See the ["Response and Error Steps"](#module-response-and-error-steps) section in the
+  module documentation for more information.
 
   ## Examples
 
@@ -685,6 +718,7 @@ defmodule Req.Request do
         inspect: &IO.inspect/1
       )
   """
+  @spec prepend_response_steps(t(), keyword(fun())) :: t()
   def prepend_response_steps(request, steps) do
     %{
       request
@@ -693,7 +727,10 @@ defmodule Req.Request do
   end
 
   @doc """
-  Appends error steps.
+  Appends **error steps** to the existing error steps.
+
+  See the ["Response and Error Steps"](#module-response-and-error-steps) section in the
+  module documentation for more information.
 
   ## Examples
 
@@ -702,6 +739,7 @@ defmodule Req.Request do
         inspect: &IO.inspect/1
       )
   """
+  @spec append_error_steps(t(), keyword(fun())) :: t()
   def append_error_steps(request, steps) do
     %{
       request
@@ -710,7 +748,10 @@ defmodule Req.Request do
   end
 
   @doc """
-  Prepends error steps.
+  Prepends **error steps** to the existing error steps.
+
+  See the ["Response and Error Steps"](#module-response-and-error-steps) section in the
+  module documentation for more information.
 
   ## Examples
 
@@ -719,6 +760,7 @@ defmodule Req.Request do
         inspect: &IO.inspect/1
       )
   """
+  @spec prepend_error_steps(t(), keyword(fun())) :: t()
   def prepend_error_steps(request, steps) do
     %{
       request
@@ -915,6 +957,9 @@ defmodule Req.Request do
       []
 
   """
+  @spec delete_header(t(), binary()) :: t()
+  def delete_header(request, name)
+
   if Req.MixProject.legacy_headers_as_lists?() do
     def delete_header(%Req.Request{} = request, name) when is_binary(name) do
       name = Req.__ensure_header_downcase__(name)
@@ -949,6 +994,7 @@ defmodule Req.Request do
       Req.get!(req, url: "/status/201", foo: :bar).status
       #=> 201
   """
+  @spec register_options(t(), keyword()) :: t()
   def register_options(%Req.Request{} = request, options) when is_list(options) do
     update_in(request.registered_options, &MapSet.union(&1, MapSet.new(options)))
   end
@@ -989,6 +1035,7 @@ defmodule Req.Request do
       iex> response.status
       200
   """
+  @spec run_request(t()) :: {t(), Req.Response.t() | Exception.t()}
   def run_request(request)
 
   def run_request(%{current_request_steps: [step | rest]} = request) do
