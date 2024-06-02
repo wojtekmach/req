@@ -124,7 +124,8 @@ defmodule Req.Request do
 
   ### Request Steps
 
-  A **request step** is a function that accepts a `request` and returns one of the following:
+  A **request step** (`t:request_step/0`) is a function that accepts a `request` and returns one
+  of the following:
 
     * A `request`.
 
@@ -152,8 +153,8 @@ defmodule Req.Request do
 
   ### Response and Error Steps
 
-  A response step is a function that accepts a `{request, response}` tuple and returns one of the
-  following:
+  A response step (`t:response_step/0`) is a function that accepts a `{request, response}` tuple
+  and returns one of the following:
 
     * A `{request, response}` tuple.
 
@@ -368,9 +369,49 @@ defmodule Req.Request do
           private: map()
         }
 
-  @typep request_step() :: fun() | {module(), atom(), [term()]}
-  @typep response_step() :: fun() | {module(), atom(), [term()]}
-  @typep error_step() :: fun() | {module(), atom(), [term()]}
+  @typedoc """
+  A request step is a function that takes a request and returns a request or a tuple of request
+  and response/exception.
+
+  The function can be an anonymous function, or a `{module, function, args}` tuple. In the latter
+  case, the step is invoked as `apply(module, function, [request | args])`.
+
+  See also the ["Request Steps"](#module-request-steps) section in the module documentation.
+  """
+  @typedoc since: "0.6.0"
+  @type request_step() ::
+          (t() -> t() | {t(), Req.Response.t() | Exception.t()}) | {module(), atom(), [term()]}
+
+  @typedoc """
+  A response step is a function that takes a request/response tuple and returns a request/response
+  or a request/exception tuple.
+
+  The function can be an anonymous function, or a `{module, function, args}` tuple. In the latter
+  case, the step is invoked as `apply(module, function, [request | args])`.
+
+  See also the ["Response and Error Steps"](#module-response-and-error-steps) section in the
+  module documentation.
+  """
+  @typedoc since: "0.6.0"
+  @type response_step() ::
+          ({t(), Req.Response.t()} -> {t(), Req.Response.t() | Exception.t()})
+          | {module(), atom(), [term()]}
+
+  @typedoc """
+  An error step is a function that takes a request/exception tuple and returns a request/response
+  or a request/exception tuple.
+
+  The function can be an anonymous function, or a `{module, function, args}` tuple. In the latter
+  case, the step is invoked as `apply(module, function, [request | args])`.
+
+  See also the ["Response and Error Steps"](#module-response-and-error-steps) section in the
+  module documentation.
+  """
+  @typedoc since: "0.6.0"
+  @type error_step() ::
+          ({t(), Exception.t()} -> {t(), Req.Response.t() | Exception.t()})
+          | {module(), atom(), [term()]}
+
   @typep options() :: term()
 
   defstruct method: :get,
@@ -653,7 +694,7 @@ defmodule Req.Request do
         inspect: &IO.inspect/1
       )
   """
-  @spec append_request_steps(t(), keyword(fun())) :: t()
+  @spec append_request_steps(t(), keyword(request_step())) :: t()
   def append_request_steps(request, steps) do
     %{
       request
@@ -675,7 +716,7 @@ defmodule Req.Request do
         inspect: &IO.inspect/1
       )
   """
-  @spec prepend_request_steps(t(), keyword(fun())) :: t()
+  @spec prepend_request_steps(t(), keyword(request_step())) :: t()
   def prepend_request_steps(request, steps) do
     %{
       request
@@ -697,7 +738,7 @@ defmodule Req.Request do
         inspect: &IO.inspect/1
       )
   """
-  @spec append_response_steps(t(), keyword(fun())) :: t()
+  @spec append_response_steps(t(), keyword(response_step())) :: t()
   def append_response_steps(request, steps) do
     %{
       request
@@ -718,7 +759,7 @@ defmodule Req.Request do
         inspect: &IO.inspect/1
       )
   """
-  @spec prepend_response_steps(t(), keyword(fun())) :: t()
+  @spec prepend_response_steps(t(), keyword(response_step())) :: t()
   def prepend_response_steps(request, steps) do
     %{
       request
@@ -739,7 +780,7 @@ defmodule Req.Request do
         inspect: &IO.inspect/1
       )
   """
-  @spec append_error_steps(t(), keyword(fun())) :: t()
+  @spec append_error_steps(t(), keyword(error_step())) :: t()
   def append_error_steps(request, steps) do
     %{
       request
@@ -760,7 +801,7 @@ defmodule Req.Request do
         inspect: &IO.inspect/1
       )
   """
-  @spec prepend_error_steps(t(), keyword(fun())) :: t()
+  @spec prepend_error_steps(t(), keyword(error_step())) :: t()
   def prepend_error_steps(request, steps) do
     %{
       request
