@@ -2206,7 +2206,7 @@ defmodule Req.Steps do
       and returns the delay, the number of milliseconds to sleep before making another attempt.
 
     * `:retry_log_level` - the log level to emit retry logs at. Can also be set to `false` to disable
-      logging these messages. Defaults to `:error`.
+      logging these messages. Defaults to `:warning`.
 
     * `:max_retries` - maximum number of retry attempts, defaults to `3` (for a total of `4`
       requests to the server, including the initial one.)
@@ -2324,7 +2324,7 @@ defmodule Req.Steps do
     retry_count = Req.Request.get_private(request, :req_retry_count, 0)
     {request, delay} = delay_getter.(request, response_or_exception, retry_count)
     max_retries = Req.Request.get_option(request, :max_retries, 3)
-    log_level = Req.Request.get_option(request, :retry_log_level, :error)
+    log_level = Req.Request.get_option(request, :retry_log_level, :warning)
 
     if retry_count < max_retries do
       log_retry(response_or_exception, retry_count, max_retries, delay, log_level)
