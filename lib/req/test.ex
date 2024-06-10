@@ -471,10 +471,10 @@ defmodule Req.Test do
       iex> Req.Test.expect(MyStub, 2, &Plug.Conn.send_resp(&1, 500, "internal server error"))
       iex> Req.Test.expect(MyStub, &Plug.Conn.send_resp(&1, 200, "ok"))
       iex> Req.get!(plug: {Req.Test, MyStub}).body
-      # 15:57:06.309 [error] retry: got exception, will retry in 1000ms, 3 attempts left
-      # 15:57:06.309 [error] ** (Req.TransportError) connection refused
-      # 15:57:07.310 [error] retry: got response with status 500, will retry in 2000ms, 2 attempts left
-      # 15:57:09.311 [error] retry: got response with status 500, will retry in 4000ms, 1 attempt left
+      # 15:57:06.309 [warning] retry: got exception, will retry in 1000ms, 3 attempts left
+      # 15:57:06.309 [warning] ** (Req.TransportError) connection refused
+      # 15:57:07.310 [warning] retry: got response with status 500, will retry in 2000ms, 2 attempts left
+      # 15:57:09.311 [warning] retry: got response with status 500, will retry in 4000ms, 1 attempt left
       "ok"
 
       iex> Req.request!(plug: {Req.Test, MyStub})

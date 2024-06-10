@@ -2216,16 +2216,16 @@ defmodule Req.Steps do
   With default options:
 
       iex> Req.get!("https://httpbin.org/status/500,200").status
-      # 19:02:08.463 [error] retry: got response with status 500, will retry in 2000ms, 2 attempts left
-      # 19:02:10.710 [error] retry: got response with status 500, will retry in 4000ms, 1 attempt left
+      # 19:02:08.463 [warning] retry: got response with status 500, will retry in 2000ms, 2 attempts left
+      # 19:02:10.710 [warning] retry: got response with status 500, will retry in 4000ms, 1 attempt left
       200
 
   Delay with jitter:
 
       iex> delay = fn n -> trunc(Integer.pow(2, n) * 1000 * (1 - 0.1 * :rand.uniform())) end
       iex> Req.get!("https://httpbin.org/status/500,200", retry_delay: delay).status
-      # 08:43:19.101 [error] retry: got response with status 500, will retry in 941ms, 2 attempts left
-      # 08:43:22.958 [error] retry: got response with status 500, will retry in 1877s, 1 attempt left
+      # 08:43:19.101 [warning] retry: got response with status 500, will retry in 941ms, 2 attempts left
+      # 08:43:22.958 [warning] retry: got response with status 500, will retry in 1877s, 1 attempt left
       200
 
   """
