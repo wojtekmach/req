@@ -1371,7 +1371,7 @@ defmodule Req.StepsTest do
 
       assert String.match?(
                log,
-               ~r/\[error\][[:blank:]]+retry: got response with status 500, will retry in 1ms, 3 attempts left/u
+               ~r/\[warning\][[:blank:]]+retry: got response with status 500, will retry in 1ms, 3 attempts left/u
              )
     end
 

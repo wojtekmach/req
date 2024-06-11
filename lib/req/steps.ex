@@ -2206,7 +2206,7 @@ defmodule Req.Steps do
       and returns the delay, the number of milliseconds to sleep before making another attempt.
 
     * `:retry_log_level` - the log level to emit retry logs at. Can also be set to `false` to disable
-      logging these messages. Defaults to `:error`.
+      logging these messages. Defaults to `:warning`.
 
     * `:max_retries` - maximum number of retry attempts, defaults to `3` (for a total of `4`
       requests to the server, including the initial one.)
@@ -2216,16 +2216,16 @@ defmodule Req.Steps do
   With default options:
 
       iex> Req.get!("https://httpbin.org/status/500,200").status
-      # 19:02:08.463 [error] retry: got response with status 500, will retry in 2000ms, 2 attempts left
-      # 19:02:10.710 [error] retry: got response with status 500, will retry in 4000ms, 1 attempt left
+      # 19:02:08.463 [warning] retry: got response with status 500, will retry in 2000ms, 2 attempts left
+      # 19:02:10.710 [warning] retry: got response with status 500, will retry in 4000ms, 1 attempt left
       200
 
   Delay with jitter:
 
       iex> delay = fn n -> trunc(Integer.pow(2, n) * 1000 * (1 - 0.1 * :rand.uniform())) end
       iex> Req.get!("https://httpbin.org/status/500,200", retry_delay: delay).status
-      # 08:43:19.101 [error] retry: got response with status 500, will retry in 941ms, 2 attempts left
-      # 08:43:22.958 [error] retry: got response with status 500, will retry in 1877s, 1 attempt left
+      # 08:43:19.101 [warning] retry: got response with status 500, will retry in 941ms, 2 attempts left
+      # 08:43:22.958 [warning] retry: got response with status 500, will retry in 1877s, 1 attempt left
       200
 
   """
@@ -2324,7 +2324,7 @@ defmodule Req.Steps do
     retry_count = Req.Request.get_private(request, :req_retry_count, 0)
     {request, delay} = delay_getter.(request, response_or_exception, retry_count)
     max_retries = Req.Request.get_option(request, :max_retries, 3)
-    log_level = Req.Request.get_option(request, :retry_log_level, :error)
+    log_level = Req.Request.get_option(request, :retry_log_level, :warning)
 
     if retry_count < max_retries do
       log_retry(response_or_exception, retry_count, max_retries, delay, log_level)
