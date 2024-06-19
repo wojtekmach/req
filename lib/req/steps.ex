@@ -411,6 +411,7 @@ defmodule Req.Steps do
   ## Request Options
 
     * `:path_params` - params to add to the templated path. Defaults to `[]`.
+
     * `:path_params_style` (*available since v0.5.1*) - how path params are expressed.
       Can be one of:
 
