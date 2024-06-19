@@ -26,6 +26,7 @@ defmodule Req.Steps do
       :base_url,
       :params,
       :path_params,
+      :path_params_style,
       :auth,
       :form,
       :json,
@@ -398,13 +399,31 @@ defmodule Req.Steps do
   @doc """
   Uses a templated request path.
 
+  By default, params in the URL path are expressed as strings prefixed with `:`. For example,
+  `:code` in `https://httpbin.org/status/:code`. If you want to use the `{code}` syntax,
+  set `path_params_style: :curly`. Param names must start with a letter and can contain letters,
+  digits, and underscores; this is true both for `:colon_params` as well as `{curly_params}`.
+
+  Path params are replaced in the request URL path. The path params are specified as a keyword
+  list of parameter names and values, as in the examples below. The values of the parameters are
+  converted to strings using the `String.Chars` protocol (`to_string/1`).
+
   ## Request Options
 
     * `:path_params` - params to add to the templated path. Defaults to `[]`.
 
+    * `:path_params_style` (*available since v0.5.1*) - how path params are expressed. Can be one of:
+
+         * `:colon` (default) for Plug-style parameters, such as `https://httpbin.org/status/:code`.
+
+         * `:curly` for OpenAPI-style parameters, such as `https://httpbin.org/status/{code}`.
+
   ## Examples
 
       iex> Req.get!("https://httpbin.org/status/:code", path_params: [code: 200]).status
+      200
+
+      iex> Req.get!("https://httpbin.org/status/{code}", path_params: [code: 201], path_params_style: :curly).status
       200
 
   """
@@ -424,18 +443,21 @@ defmodule Req.Steps do
   end
 
   defp apply_path_params(request, params) do
+    regex =
+      case Req.Request.get_option(request, :path_params_style, :colon) do
+        :colon -> ~r/:([a-zA-Z]{1}[\w_]*)/
+        :curly -> ~r/\{([a-zA-Z]{1}[\w_]*)\}/
+      end
+
     update_in(request.url.path, fn
       nil ->
         nil
 
       path ->
-        Regex.replace(~r/:([a-zA-Z]{1}[\w_]*)/, path, fn match, key ->
+        Regex.replace(regex, path, fn match, key ->
           case params[String.to_existing_atom(key)] do
-            nil ->
-              match
-
-            value ->
-              value |> to_string() |> URI.encode()
+            nil -> match
+            value -> value |> to_string() |> URI.encode()
           end
         end)
     end)
