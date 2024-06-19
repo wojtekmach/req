@@ -262,8 +262,18 @@ defmodule Req.StepsTest do
   end
 
   test "put_path_params" do
-    req = Req.new(url: "http://foo/:id", path_params: [id: "abc|def"]) |> Req.Request.prepare()
-    assert URI.to_string(req.url) == "http://foo/abc%7Cdef"
+    req =
+      Req.new(url: "http://foo/:id{ola}", path_params: [id: "abc|def"]) |> Req.Request.prepare()
+
+    assert URI.to_string(req.url) == "http://foo/abc%7Cdef{ola}"
+  end
+
+  test "put_path_params_style" do
+    req =
+      Req.new(url: "http://foo/{id}:bar", path_params: [id: "abc|def"], path_params_style: :curly)
+      |> Req.Request.prepare()
+
+    assert URI.to_string(req.url) == "http://foo/abc%7Cdef:bar"
   end
 
   test "put_range" do
@@ -1138,7 +1148,7 @@ defmodule Req.StepsTest do
       assert_receive :ping
       refute_receive _
 
-      assert req.private == %{req_redirect_count: 3}
+      assert %{req_redirect_count: 3} = req.private
       assert Exception.message(e) == "too many redirects (3)"
     end
 

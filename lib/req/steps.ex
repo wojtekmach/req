@@ -26,6 +26,7 @@ defmodule Req.Steps do
       :base_url,
       :params,
       :path_params,
+      :path_params_style,
       :auth,
       :form,
       :json,
@@ -71,6 +72,7 @@ defmodule Req.Steps do
       put_base_url: &Req.Steps.put_base_url/1,
       auth: &Req.Steps.auth/1,
       put_params: &Req.Steps.put_params/1,
+      put_path_params_style: &Req.Steps.put_path_params_style/1,
       put_path_params: &Req.Steps.put_path_params/1,
       put_range: &Req.Steps.put_range/1,
       cache: &Req.Steps.cache/1,
@@ -398,6 +400,14 @@ defmodule Req.Steps do
   @doc """
   Uses a templated request path.
 
+  By default, params in the URL path are expressed as strings prefixed with `:`. For example,
+  `:code` in `https://httpbin.org/status/:code`. If you want to use the `{code}` syntax,
+  set `path_params_style: :curly` (see `put_path_params_style/1`).
+
+  Path params are replaced in the request URL path. The path params are specified as a keyword
+  list of parameter names and values, as in the examples below. The values of the parameters are
+  converted to strings using the `String.Chars` protocol (`to_string/1`).
+
   ## Request Options
 
     * `:path_params` - params to add to the templated path. Defaults to `[]`.
@@ -424,21 +434,37 @@ defmodule Req.Steps do
   end
 
   defp apply_path_params(request, params) do
+    regex =
+      case Req.Request.get_private(request, :path_params_style) || raise("missing") do
+        :colon -> ~r/:([a-zA-Z]{1}[\w_]*)/
+        :curly -> ~r/\{([a-zA-Z]{1}[\w_]*)\}/
+      end
+
     update_in(request.url.path, fn
       nil ->
         nil
 
       path ->
-        Regex.replace(~r/:([a-zA-Z]{1}[\w_]*)/, path, fn match, key ->
+        Regex.replace(regex, path, fn match, key ->
           case params[String.to_existing_atom(key)] do
-            nil ->
-              match
-
-            value ->
-              value |> to_string() |> URI.encode()
+            nil -> match
+            value -> value |> to_string() |> URI.encode()
           end
         end)
     end)
+  end
+
+  @doc """
+  TODO
+  """
+  @doc since: "0.5.1"
+  @doc step: :request
+  def put_path_params_style(request) do
+    Req.Request.put_private(
+      request,
+      :path_params_style,
+      Req.Request.get_option(request, :path_params_style, :colon)
+    )
   end
 
   @doc """
