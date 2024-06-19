@@ -414,17 +414,19 @@ defmodule Req.Steps do
 
     * `:path_params_style` (*available since v0.5.1*) - how path params are expressed. Can be one of:
 
-         * `:colon` (default) for Plug-style parameters, such as `https://httpbin.org/status/:code`.
+         * `:colon` - (default) for Plug-style parameters, such as `:code` in
+           `https://httpbin.org/status/:code`.
 
-         * `:curly` for OpenAPI-style parameters, such as `https://httpbin.org/status/{code}`.
+         * `:curly` - for [OpenAPI](https://swagger.io/specification/)-style parameters, such as
+           `{code}` in `https://httpbin.org/status/{code}`.
 
   ## Examples
 
-      iex> Req.get!("https://httpbin.org/status/:code", path_params: [code: 200]).status
-      200
+      iex> Req.get!("https://httpbin.org/status/:code", path_params: [code: 201]).status
+      201
 
       iex> Req.get!("https://httpbin.org/status/{code}", path_params: [code: 201], path_params_style: :curly).status
-      200
+      201
 
   """
   @doc step: :request

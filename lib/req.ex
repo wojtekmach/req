@@ -184,14 +184,14 @@ defmodule Req do
     * `:path_params` - if set, uses a templated request path (via
       [`put_path_params`](`Req.Steps.put_path_params/1`) step.)
 
-    * `:path_params_style` - configures how `:path_params` are expressed (via
+    * `:path_params_style` (*available since v0.5.1*) - how path params are expressed (via
       [`put_path_params`](`Req.Steps.put_path_params/1`) step). Can be one of:
 
-        * `:colon` - default, params are expressed as `:name` in the path.
+         * `:colon` - (default) for Plug-style parameters, such as `:code` in
+           `https://httpbin.org/status/:code`.
 
-        * `:curly` - uses [OpenAPI](https://swagger.io/specification/)-style `{name}` parameters.
-
-      *Available since v0.5.1*.
+         * `:curly` - for [OpenAPI](https://swagger.io/specification/)-style parameters, such as
+           `{code}` in `https://httpbin.org/status/{code}`.
 
   Authentication options:
 
