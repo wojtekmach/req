@@ -412,13 +412,11 @@ defmodule Req.Steps do
 
     * `:path_params` - params to add to the templated path. Defaults to `[]`.
 
-    * `:path_params_style` (*available since v0.5.1*) - how path params are expressed.
-      Can be one of:
+    * `:path_params_style` (*available since v0.5.1*) - how path params are expressed. Can be one of:
 
-        * `:colon` (default) for Plug-style parameters, such as
-          `https://httpbin.org/status/:code`.
+         * `:colon` (default) for Plug-style parameters, such as `https://httpbin.org/status/:code`.
 
-        * `:curly` for OpenAPI-style parameters, such as `https://httpbin.org/status/{code}`.
+         * `:curly` for OpenAPI-style parameters, such as `https://httpbin.org/status/{code}`.
 
   ## Examples
 
