@@ -433,6 +433,7 @@ defmodule Req do
           "expected 2nd argument to be an options keywords list, got: #{inspect(options)}"
   end
 
+  @doc false
   @deprecated "Use Req.merge/2 instead"
   def update(request, options) do
     Req.merge(request, options)
