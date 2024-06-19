@@ -1148,7 +1148,7 @@ defmodule Req.StepsTest do
       assert_receive :ping
       refute_receive _
 
-      assert %{req_redirect_count: 3} = req.private
+      assert req.private == %{req_redirect_count: 3}
       assert Exception.message(e) == "too many redirects (3)"
     end
 
