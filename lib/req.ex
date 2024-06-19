@@ -138,7 +138,11 @@ defmodule Req do
   @doc """
   Returns a new request struct with built-in steps.
 
-  See `Req.Request` module documentation for more information on the underlying request struct.
+  See `request/2`, `run/2`, as well as `get/2`, `post/2`, and similar functions for
+  making requests.
+
+  Also see `Req.Request` module documentation for more information on the underlying request
+  struct.
 
   ## Options
 
@@ -1025,7 +1029,7 @@ defmodule Req do
 
   See `new/1` for a list of available options.
 
-  See `run/2` for a similar functions that returns the request and the response or error.
+  Also see `run/2` for a similar function that returns the request and the response or error.
 
   ## Examples
 
@@ -1056,7 +1060,7 @@ defmodule Req do
 
   See `new/1` for a list of available options.
 
-  See `run!/2` for a similar functions that returns the request and the response or error.
+  Also see `run!/2` for a similar function that returns the request and the response or error.
 
   ## Examples
 
@@ -1093,7 +1097,8 @@ defmodule Req do
 
   See `new/1` for a list of available options.
 
-  See `request/2` for a similar functions that returns the response or error (without the request).
+  Also see `request/2` for a similar function that returns the response or error
+  (without the request).
 
   ## Examples
 
@@ -1121,6 +1126,7 @@ defmodule Req do
       %Req.TransportError{reason: :econnrefused}
 
   """
+  @doc type: :request
   @spec run(request :: url() | keyword() | Req.Request.t(), options :: keyword()) ::
           {Req.Request.t(), Req.Response.t() | Exception.t()}
   def run(request, options \\ [])
@@ -1147,7 +1153,7 @@ defmodule Req do
 
   See `new/1` for a list of available options.
 
-  See `request!/2` for a similar functions that returns the response or error (without the request).
+  Also see `request!/2` for a similar function that returns the response (without the request).
 
   ## Examples
 
@@ -1173,6 +1179,7 @@ defmodule Req do
       iex> Req.run!("http://localhost:9999", retry: false)
       ** (Req.TransportError) connection refused
   """
+  @doc type: :request
   @spec run(request :: url() | keyword() | Req.Request.t(), options :: keyword()) ::
           {Req.Request.t(), Req.Response.t()}
   def run!(request, options \\ []) do
