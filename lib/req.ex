@@ -1180,7 +1180,7 @@ defmodule Req do
       ** (Req.TransportError) connection refused
   """
   @doc type: :request
-  @spec run(request :: url() | keyword() | Req.Request.t(), options :: keyword()) ::
+  @spec run!(request :: url() | keyword() | Req.Request.t(), options :: keyword()) ::
           {Req.Request.t(), Req.Response.t()}
   def run!(request, options \\ []) do
     case run(request, options) do
