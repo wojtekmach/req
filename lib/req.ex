@@ -1201,18 +1201,21 @@ defmodule Req do
   end
 
   @doc """
-  Parses asynchronous response body message.
+  Parses asynchronous response message.
+
+  An asynchronous response is a result of request with `into: :self`.
 
   ## Examples
 
-      iex> resp = Req.get!("http://httpbin.org/stream/2", into: self())
+      iex> resp = Req.get!("http://httpbin.org/stream/2", into: :self)
       iex> Req.parse_message(resp, receive do message -> message end)
-      {:ok, [data: "{\"url\": \"http://httpbin.org/stream/2\", ..., \"id\": 0}\n"]}
+      {:ok, [data: "{\"url\": \"http://httpbin.org/stream/2\", ..., \"id\": 0}\\n"]}
       iex> Req.parse_message(resp, receive do message -> message end)
-      {:ok, [data: "{\"url\": \"http://httpbin.org/stream/2\", ..., \"id\": 1}\n"]}
+      {:ok, [data: "{\"url\": \"http://httpbin.org/stream/2\", ..., \"id\": 1}\\n"]}
       iex> Req.parse_message(resp, receive do message -> message end)
       {:ok, [:done]}
   """
+  @doc type: :async
   def parse_message(%Req.Response{body: %Req.Response.Async{stream_fun: fun, ref: ref}}, message) do
     fun.(ref, message)
   end
@@ -1228,12 +1231,15 @@ defmodule Req do
   @doc """
   Cancels an asynchronous response.
 
+  An asynchronous response is a result of request with `into: :self`.
+
   ## Examples
 
-      iex> resp = Req.get!("http://httpbin.org/stream/2", into: self())
+      iex> resp = Req.get!("http://httpbin.org/stream/2", into: :self)
       iex> Req.cancel_async_response(resp)
       :ok
   """
+  @doc type: :async
   def cancel_async_response(%Req.Response{body: %Req.Response.Async{cancel_fun: fun, ref: ref}}) do
     fun.(ref)
   end
