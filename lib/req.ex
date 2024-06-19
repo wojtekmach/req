@@ -1204,6 +1204,7 @@ defmodule Req do
   Parses asynchronous response message.
 
   An asynchronous response is a result of request with `into: :self`.
+  See also `Req.Response.Async`.
 
   ## Examples
 
@@ -1232,6 +1233,7 @@ defmodule Req do
   Cancels an asynchronous response.
 
   An asynchronous response is a result of request with `into: :self`.
+  See also `Req.Response.Async`.
 
   ## Examples
 

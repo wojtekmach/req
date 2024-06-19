@@ -5,7 +5,7 @@ defmodule Req.Response.Async do
   This is the `response.body` when making a request with `into: :self`, that is,
   streaming response body chunks to the current process mailbox.
 
-  This struct implements the `Enumerale` protocol where each element is a body chunk received
+  This struct implements the `Enumerable` protocol where each element is a body chunk received
   from the current process mailbox. HTTP Trailer fields are ignored.
 
   If the request is sent using HTTP/1, an extra process is spawned to consume messages from the
