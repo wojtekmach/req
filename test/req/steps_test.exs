@@ -266,9 +266,9 @@ defmodule Req.StepsTest do
       Req.new(url: "http://foo/:id{ola}", path_params: [id: "abc|def"]) |> Req.Request.prepare()
 
     assert URI.to_string(req.url) == "http://foo/abc%7Cdef{ola}"
-  end
 
-  test "put_path_params_style" do
+    # With :curly style.
+
     req =
       Req.new(url: "http://foo/{id}:bar", path_params: [id: "abc|def"], path_params_style: :curly)
       |> Req.Request.prepare()

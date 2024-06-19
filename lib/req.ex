@@ -185,7 +185,7 @@ defmodule Req do
       [`put_path_params`](`Req.Steps.put_path_params/1`) step.)
 
     * `:path_params_style` - configures how `:path_params` are expressed (via
-      [`put_path_params_style`](`Req.Steps.put_path_params_style/1`) step). Can be one of:
+      [`put_path_params`](`Req.Steps.put_path_params/1`) step). Can be one of:
 
         * `:colon` - default, params are expressed as `:name` in the path.
 
