@@ -58,9 +58,11 @@ defmodule Req.Utils do
     canonical_headers =
       Enum.map_intersperse(canonical_headers, "\n", fn {name, value} -> [name, ":", value] end)
 
+    path = URI.encode(url.path || "/", &(&1 == ?/ or URI.char_unreserved?(&1)))
+
     canonical_request = """
     #{method}
-    #{url.path || "/"}
+    #{path}
     #{url.query || ""}
     #{canonical_headers}
 
@@ -137,6 +139,8 @@ defmodule Req.Utils do
         &String.downcase(elem(&1, 0), :ascii)
       )
 
+    path = URI.encode(url.path || "/", &(&1 == ?/ or URI.char_unreserved?(&1)))
+
     true = url.query in [nil, ""]
 
     method = method |> Atom.to_string() |> String.upcase()
@@ -146,7 +150,7 @@ defmodule Req.Utils do
 
     canonical_request = """
     #{method}
-    #{url.path || "/"}
+    #{path}
     #{canonical_query_string}
     #{canonical_headers}
 
