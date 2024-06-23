@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## v0.5.1-dev
+
+  * [`retry`]: Default `:retry_log_level` to `:warning`
+
+  * [`put_path_params`]: Add `:path_params_style` option
+
+  * [`put_aws_sigv4`]: Fix path encoding
+
+## v0.5.0 (2024-05-28)
 
 Req v0.5.0 brings testing enhancements, errors standardization, `%Req.Response.Async{}`, and more improvements and bug fixes.
 
