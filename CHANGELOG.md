@@ -1,12 +1,16 @@
 # CHANGELOG
 
-## v0.5.1-dev
+## v0.5.1 (2024-06-24)
 
   * [`retry`]: Default `:retry_log_level` to `:warning`
 
   * [`put_path_params`]: Add `:path_params_style` option
 
   * [`put_aws_sigv4`]: Fix path encoding
+
+  * [`decode_body`]: Improve tar detection
+
+  * [`run_finch`]: Fix defaulting to using just HTTP/1
 
 ## v0.5.0 (2024-05-28)
 
