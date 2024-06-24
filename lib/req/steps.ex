@@ -1954,7 +1954,6 @@ defmodule Req.Steps do
   end
 
   defp format(request, response) do
-    # TODO: remove ` || ` when we require Elixir v1.13
     path = request.url.path || ""
 
     case Req.Response.get_header(response, "content-type") do
