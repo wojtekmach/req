@@ -524,7 +524,7 @@ defmodule Req.Request do
       iex> Req.Request.get_option_lazy(req, :b, fun)
       42
   """
-  @spec get_option_lazy(t(), atom(), (-> term())) :: term()
+  @spec get_option_lazy(t(), atom(), (() -> term())) :: term()
   def get_option_lazy(request, key, fun) when is_function(fun, 0) do
     Map.get_lazy(request.options, key, fun)
   end
@@ -1035,7 +1035,7 @@ defmodule Req.Request do
       Req.get!(req, url: "/status/201", foo: :bar).status
       #=> 201
   """
-  @spec register_options(t(), keyword()) :: t()
+  @spec register_options(t(), [atom()]) :: t()
   def register_options(%Req.Request{} = request, options) when is_list(options) do
     update_in(request.registered_options, &MapSet.union(&1, MapSet.new(options)))
   end
