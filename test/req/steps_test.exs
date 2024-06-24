@@ -773,7 +773,9 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, create_tar(files))
       end
 
-      assert Req.get!(plug: plug, url: "/foo.tar").body == files
+      resp = Req.get!(plug: plug, url: "/foo.tar")
+      assert resp.headers["content-type"] == ["application/octet-stream; charset=utf-8"]
+      assert resp.body == files
     end
 
     test "tar (path, no content-type)" do
