@@ -1954,22 +1954,25 @@ defmodule Req.Steps do
   end
 
   defp format(request, response) do
+    # TODO: remove ` || ` when we require Elixir v1.13
+    path = request.url.path || ""
+
     case Req.Response.get_header(response, "content-type") do
       [content_type | _] ->
-        # TODO: remove ` || ` when we require Elixir v1.13
-        path = request.url.path || ""
-
         case extensions(content_type, path) do
           [ext | _] -> ext
           [] -> nil
         end
 
       [] ->
-        []
+        case extensions("application/octet-stream", path) do
+          [ext | _] -> ext
+          [] -> nil
+        end
     end
   end
 
-  defp extensions("application/octet-stream", path) do
+  defp extensions("application/octet-stream" <> _, path) do
     if tgz?(path) do
       ["tgz"]
     else
