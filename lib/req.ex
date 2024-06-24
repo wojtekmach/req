@@ -361,7 +361,7 @@ defmodule Req do
 
         * `:timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
 
-        * `:protocols` - the HTTP protocols to use, defaults to `[:http1]`.
+        * `:protocols` - the HTTP protocols to use, defaults to `#{inspect(Req.Application.__default_protocols__())}`.
 
         * `:hostname` - Mint explicit hostname.
 

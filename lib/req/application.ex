@@ -10,7 +10,7 @@ defmodule Req.Application do
        name: Req.Finch,
        pools: %{
          default: [
-           protocols: [:http1]
+           protocols: __default_protocols__()
          ]
        }},
       {DynamicSupervisor, strategy: :one_for_one, name: Req.FinchSupervisor},
@@ -18,5 +18,9 @@ defmodule Req.Application do
     ]
 
     Supervisor.start_link(children, strategy: :one_for_one)
+  end
+
+  def __default_protocols__ do
+    [:http1]
   end
 end
