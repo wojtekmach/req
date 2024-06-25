@@ -1035,7 +1035,7 @@ defmodule Req.Request do
       Req.get!(req, url: "/status/201", foo: :bar).status
       #=> 201
   """
-  @spec register_options(t(), keyword()) :: t()
+  @spec register_options(t(), [atom()]) :: t()
   def register_options(%Req.Request{} = request, options) when is_list(options) do
     update_in(request.registered_options, &MapSet.union(&1, MapSet.new(options)))
   end
