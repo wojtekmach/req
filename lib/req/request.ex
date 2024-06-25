@@ -524,7 +524,7 @@ defmodule Req.Request do
       iex> Req.Request.get_option_lazy(req, :b, fun)
       42
   """
-  @spec get_option_lazy(t(), atom(), (() -> term())) :: term()
+  @spec get_option_lazy(t(), atom(), (-> term())) :: term()
   def get_option_lazy(request, key, fun) when is_function(fun, 0) do
     Map.get_lazy(request.options, key, fun)
   end
