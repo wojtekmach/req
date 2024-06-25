@@ -48,6 +48,9 @@ defmodule Req.Utils do
           {"x-amz-date", datetime_string}
         ]
 
+    ## canonical_headers needs to be sorted for canonical_request construction
+    canonical_headers = Enum.sort(canonical_headers)
+
     signed_headers =
       Enum.map_intersperse(
         Enum.sort(canonical_headers),
