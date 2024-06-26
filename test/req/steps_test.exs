@@ -1,6 +1,6 @@
 defmodule Req.StepsTest do
   use ExUnit.Case, async: true
-  import TestHelper, only: [start_server: 1]
+  import TestHelper, only: [start_server: 1, start_https_server: 1]
   require Logger
 
   setup do
@@ -1978,6 +1978,51 @@ defmodule Req.StepsTest do
 
       req = Req.new(url: url, retry: false)
       {:error, %Req.HTTPError{protocol: :http1, reason: :invalid_status_line}} = Req.request(req)
+    end
+
+    test "wip" do
+      start_supervised!(
+        {Finch,
+         name: :finch_https,
+         pools: %{
+           default: [
+             conn_opts: [
+               transport_opts: [
+                 cacertfile: Path.expand("test/ca.pem"),
+                 customize_hostname_check: []
+               ]
+             ]
+           ]
+         }}
+      )
+
+      %{url: url} =
+        start_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      %{url: url} =
+        start_https_server(fn conn ->
+          redirect(conn, 302, url)
+        end)
+
+      req =
+        Req.new()
+        |> Req.Request.prepend_request_steps(
+          foo: fn req ->
+            dbg(:yo)
+
+            case req.url.scheme do
+              "http" ->
+                req
+
+              "https" ->
+                Req.merge(req, finch: :finch_https)
+            end
+          end
+        )
+
+      assert Req.get!(req, url: url).body == "ok"
     end
 
     test ":connect_options :protocol", c do

@@ -12,6 +12,22 @@ defmodule TestHelper do
     {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)
     %{pid: pid, url: "http://localhost:#{port}"}
   end
+
+  def start_https_server(plug) do
+    options = [
+      scheme: :https,
+      keyfile: Path.expand("test/key.pem"),
+      certfile: Path.expand("test/cert.pem"),
+      port: 0,
+      plug: fn conn, _ -> plug.(conn) end,
+      startup_log: false,
+      http_options: [compress: false]
+    ]
+
+    pid = ExUnit.Callbacks.start_supervised!({Bandit, options})
+    {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)
+    %{pid: pid, url: "https://localhost:#{port}"}
+  end
 end
 
 defmodule EzstdFilter do
