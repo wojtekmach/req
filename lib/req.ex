@@ -135,6 +135,8 @@ defmodule Req do
   @req Req.Request.new()
        |> Req.Steps.attach()
 
+  @default_finch_options Req.Finch.pool_options(%{})
+
   @doc """
   Returns a new request struct with built-in steps.
 
@@ -361,7 +363,8 @@ defmodule Req do
 
         * `:timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
 
-        * `:protocols` - the HTTP protocols to use, defaults to `#{inspect(Req.Application.__default_protocols__())}`.
+        * `:protocols` - the HTTP protocols to use, defaults to
+          `#{inspect(Keyword.fetch!(@default_finch_options, :protocols))}`.
 
         * `:hostname` - Mint explicit hostname.
 
