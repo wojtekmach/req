@@ -1,5 +1,5 @@
 defmodule TestHelper do
-  def start_server(plug) do
+  def start_http_server(plug) do
     options = [
       scheme: :http,
       port: 0,
@@ -10,7 +10,27 @@ defmodule TestHelper do
 
     pid = ExUnit.Callbacks.start_supervised!({Bandit, options})
     {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)
-    %{pid: pid, url: "http://localhost:#{port}"}
+    %{pid: pid, url: URI.new!("http://localhost:#{port}")}
+  end
+
+  def start_tcp_server(fun) do
+    {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, active: false)
+    {:ok, port} = :inet.port(listen_socket)
+    pid = ExUnit.Callbacks.start_supervised!({Task, fn -> accept(listen_socket, fun) end})
+    %{pid: pid, url: URI.new!("http://localhost:#{port}")}
+  end
+
+  defp accept(listen_socket, fun) do
+    case :gen_tcp.accept(listen_socket) do
+      {:ok, socket} ->
+        fun.(socket)
+        :ok = :gen_tcp.close(socket)
+
+      {:error, :closed} ->
+        :ok
+    end
+
+    accept(listen_socket, fun)
   end
 end
 

@@ -1,6 +1,6 @@
 defmodule ReqTest do
   use ExUnit.Case, async: true
-  import TestHelper, only: [start_server: 1]
+  import TestHelper, only: [start_http_server: 1]
 
   doctest Req,
     only: [
@@ -76,7 +76,7 @@ defmodule ReqTest do
 
   test "async enumerable" do
     %{url: origin_url} =
-      start_server(fn conn ->
+      start_http_server(fn conn ->
         conn = Plug.Conn.send_chunked(conn, 200)
         {:ok, conn} = Plug.Conn.chunk(conn, "foo")
         {:ok, conn} = Plug.Conn.chunk(conn, "bar")
@@ -85,7 +85,7 @@ defmodule ReqTest do
       end)
 
     %{url: echo_url} =
-      start_server(fn conn ->
+      start_http_server(fn conn ->
         {:ok, body, conn} = Plug.Conn.read_body(conn)
         Plug.Conn.send_resp(conn, 200, body)
       end)
