@@ -1102,9 +1102,11 @@ defmodule Req.Steps do
 
         * `:secret_access_key` - the AWS secret access key.
 
+        * `:token` - if set, the AWS session token, returned from AWS STS.
+
         * `:service` - the AWS service. Defaults to `:s3`.
 
-        * `:region` - if set, AWS region. Defaults to `"us-east-1"`.
+        * `:region` - the AWS region. Defaults to `"us-east-1"`.
 
         * `:datetime` - the request datetime, defaults to `DateTime.utc_now(:second)`.
 
@@ -1161,6 +1163,7 @@ defmodule Req.Steps do
       Req.Request.validate_options(aws_options, [
         :access_key_id,
         :secret_access_key,
+        :session_token,
         :service,
         :region,
         :datetime,

@@ -23,6 +23,7 @@ defmodule Req.Utils do
   def aws_sigv4_headers(options) do
     {access_key_id, options} = Keyword.pop!(options, :access_key_id)
     {secret_access_key, options} = Keyword.pop!(options, :secret_access_key)
+    {session_token, options} = Keyword.pop(options, :session_token)
     {region, options} = Keyword.pop!(options, :region)
     {service, options} = Keyword.pop!(options, :service)
     {datetime, options} = Keyword.pop!(options, :datetime)
@@ -41,12 +42,19 @@ defmodule Req.Utils do
 
     method = method |> Atom.to_string() |> String.upcase()
 
-    canonical_headers =
-      headers ++
-        [
-          {"x-amz-content-sha256", body_digest},
-          {"x-amz-date", datetime_string}
-        ]
+    aws_headers = [
+      {"x-amz-content-sha256", body_digest},
+      {"x-amz-date", datetime_string}
+    ]
+
+    aws_headers =
+      if session_token do
+        aws_headers ++ [{"x-amz-security-token", session_token}]
+      else
+        aws_headers
+      end
+
+    canonical_headers = headers ++ aws_headers
 
     ## canonical_headers needs to be sorted for canonical_request construction
     canonical_headers = Enum.sort(canonical_headers)
@@ -95,11 +103,7 @@ defmodule Req.Utils do
     authorization =
       "AWS4-HMAC-SHA256 Credential=#{credential},SignedHeaders=#{signed_headers},Signature=#{signature}"
 
-    [
-      {"authorization", authorization},
-      {"x-amz-content-sha256", body_digest},
-      {"x-amz-date", datetime_string}
-    ] ++ headers
+    [{"authorization", authorization}] ++ aws_headers ++ headers
   end
 
   @doc """
