@@ -1102,9 +1102,11 @@ defmodule Req.Steps do
 
         * `:secret_access_key` - the AWS secret access key.
 
+        * `:token` - if set, the AWS secret token, returned from for example AWS STS.
+
         * `:service` - the AWS service. Defaults to `:s3`.
 
-        * `:region` - if set, AWS region. Defaults to `"us-east-1"`.
+        * `:region` - the AWS region. Defaults to `"us-east-1"`.
 
         * `:datetime` - the request datetime, defaults to `DateTime.utc_now(:second)`.
 
@@ -1161,6 +1163,7 @@ defmodule Req.Steps do
       Req.Request.validate_options(aws_options, [
         :access_key_id,
         :secret_access_key,
+        :session_token,
         :service,
         :region,
         :datetime,
@@ -1188,6 +1191,15 @@ defmodule Req.Steps do
                 end
 
                 {"", [body_digest: "UNSIGNED-PAYLOAD"]}
+            end
+
+          {session_token, aws_options} = Keyword.pop(aws_options, :session_token)
+
+          request =
+            if session_token do
+              update_in(request.url, &append_query(&1, "X-Amz-Security-Token=#{session_token}"))
+            else
+              request
             end
 
           request = Req.Request.put_new_header(request, "host", request.url.host)
@@ -1221,6 +1233,19 @@ defmodule Req.Steps do
       end
     else
       request
+    end
+  end
+
+  # TODO: Use URI.append_query/2 on Elixir 1.14
+  defp append_query(%URI{} = uri, query) when is_binary(query) and uri.query in [nil, ""] do
+    %{uri | query: query}
+  end
+
+  defp append_query(%URI{} = uri, query) when is_binary(query) do
+    if String.ends_with?(uri.query, "&") do
+      %{uri | query: uri.query <> query}
+    else
+      %{uri | query: uri.query <> "&" <> query}
     end
   end
 
