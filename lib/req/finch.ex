@@ -194,8 +194,8 @@ defmodule Req.Finch do
     async = %Req.Response.Async{
       pid: self(),
       ref: ref,
-      stream_fun: &finch_parse_message/2,
-      cancel_fun: &finch_cancel/1
+      stream_fun: &parse_message/2,
+      cancel_fun: &cancel/1
     }
 
     req = put_in(req.async, async)
@@ -226,8 +226,8 @@ defmodule Req.Finch do
     async = %Req.Response.Async{
       pid: self(),
       ref: ref,
-      stream_fun: &finch_parse_message/2,
-      cancel_fun: &finch_cancel/1
+      stream_fun: &parse_message/2,
+      cancel_fun: &cancel/1
     }
 
     resp = Req.Response.new(status: status, headers: headers)
@@ -274,23 +274,23 @@ defmodule Req.Finch do
     end)
   end
 
-  defp finch_parse_message(ref, {ref, {:data, data}}) do
+  defp parse_message(ref, {ref, {:data, data}}) do
     {:ok, [data: data]}
   end
 
-  defp finch_parse_message(ref, {ref, :done}) do
+  defp parse_message(ref, {ref, :done}) do
     {:ok, [:done]}
   end
 
-  defp finch_parse_message(ref, {ref, {:trailers, trailers}}) do
+  defp parse_message(ref, {ref, {:trailers, trailers}}) do
     {:ok, [trailers: trailers]}
   end
 
-  defp finch_parse_message(ref, {ref, {:error, reason}}) do
+  defp parse_message(ref, {ref, {:error, reason}}) do
     {:error, reason}
   end
 
-  defp finch_cancel(ref) do
+  defp cancel(ref) do
     Finch.cancel_async_request(ref)
     clean_responses(ref)
     :ok
