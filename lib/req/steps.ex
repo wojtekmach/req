@@ -1691,6 +1691,10 @@ defmodule Req.Steps do
       redirect_count = Req.Request.get_private(request, :req_redirect_count, 0)
 
       if redirect_count < max_redirects do
+        with %Req.Response.Async{} <- response.body do
+          Req.cancel_async_response(response)
+        end
+
         request =
           request
           |> build_redirect_request(response, location)

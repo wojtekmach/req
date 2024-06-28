@@ -292,6 +292,16 @@ defmodule Req.Finch do
 
   defp finch_cancel(ref) do
     Finch.cancel_async_request(ref)
+    clean_responses(ref)
+    :ok
+  end
+
+  defp clean_responses(ref) do
+    receive do
+      {^ref, _} -> clean_responses(ref)
+    after
+      0 -> :ok
+    end
   end
 
   defp finch_name(request) do

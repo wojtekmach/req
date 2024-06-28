@@ -401,6 +401,29 @@ defmodule Req.FinchTest do
       assert resp.status == 200
       assert :ok = Req.cancel_async_response(resp)
     end
+
+    @tag :capture_log
+    test "into: :self with redirect" do
+      %{url: url} =
+        TestHelper.start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      %{url: url} =
+        TestHelper.start_http_server(fn conn ->
+          conn
+          |> Plug.Conn.put_resp_header("location", to_string(url))
+          |> Plug.Conn.send_resp(307, "redirecting to #{url}")
+        end)
+
+      req =
+        Req.new(
+          url: url,
+          into: :self
+        )
+
+      assert Req.get!(req).body |> Enum.to_list() == ["ok"]
+    end
   end
 
   describe "pool_options" do
