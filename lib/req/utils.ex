@@ -23,7 +23,7 @@ defmodule Req.Utils do
   def aws_sigv4_headers(options) do
     {access_key_id, options} = Keyword.pop!(options, :access_key_id)
     {secret_access_key, options} = Keyword.pop!(options, :secret_access_key)
-    {session_token, options} = Keyword.pop(options, :session_token)
+    {security_token, options} = Keyword.pop(options, :token)
     {region, options} = Keyword.pop!(options, :region)
     {service, options} = Keyword.pop!(options, :service)
     {datetime, options} = Keyword.pop!(options, :datetime)
@@ -48,8 +48,8 @@ defmodule Req.Utils do
     ]
 
     aws_headers =
-      if session_token do
-        aws_headers ++ [{"x-amz-security-token", session_token}]
+      if security_token do
+        aws_headers ++ [{"x-amz-security-token", security_token}]
       else
         aws_headers
       end
