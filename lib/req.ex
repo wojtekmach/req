@@ -232,7 +232,7 @@ defmodule Req do
 
         * `:secret_access_key` - the AWS secret access key.
 
-        * `:service` - the AWS service.
+        * `:service` - the AWS service. Defaults to `:s3`.
 
         * `:region` - if set, AWS region. Defaults to `"us-east-1"`.
 
