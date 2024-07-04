@@ -1569,6 +1569,20 @@ defmodule Req.Steps do
     {request, update_in(response.body, &:zlib.gunzip/1)}
   end
 
+  defp decode_body({request, response}, "zst") do
+    if ezstd_loaded?() do
+      case :ezstd.decompress(response.body) do
+        decompressed when is_binary(decompressed) ->
+          {request, put_in(response.body, decompressed)}
+
+        {:error, reason} ->
+          {request, %Req.ArchiveError{format: :zstd, data: response.body}}
+      end
+    else
+      {request, response}
+    end
+  end
+
   defp decode_body({request, response}, "csv") do
     if nimble_csv_loaded?() do
       options = [skip_headers: false]
