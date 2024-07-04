@@ -1575,7 +1575,7 @@ defmodule Req.Steps do
         decompressed when is_binary(decompressed) ->
           {request, put_in(response.body, decompressed)}
 
-        {:error, reason} ->
+        {:error, _} ->
           {request, %Req.ArchiveError{format: :zstd, data: response.body}}
       end
     else
