@@ -1463,6 +1463,7 @@ defmodule Req.Steps do
   | `tar`, `tgz` | `:erl_tar.extract/2`                                              |
   | `zip`        | `:zip.unzip/2`                                                    |
   | `gzip`       | `:zlib.gunzip/1`                                                  |
+  | `zst`        | `:ezstd.decompress/1` (if [ezstd] is installed)                   |
   | `csv`        | `NimbleCSV.RFC4180.parse_string/2` (if [nimble_csv] is installed) |
 
   The format is determined based on the `content-type` header of the response. For example,
@@ -1498,6 +1499,7 @@ defmodule Req.Steps do
       true
 
   [nimble_csv]: https://hex.pm/packages/nimble_csv
+  [ezstd]: https://hex.pm/packages/ezstd
   """
   @doc step: :response
   def decode_body(request_response)
@@ -1575,8 +1577,9 @@ defmodule Req.Steps do
         decompressed when is_binary(decompressed) ->
           {request, put_in(response.body, decompressed)}
 
-        {:error, _} ->
-          {request, %Req.ArchiveError{format: :zstd, data: response.body}}
+        {:error, reason} ->
+          err = %RuntimeError{message: "Could not decompress Zstandard data: #{inspect(reason)}"}
+          {request, err}
       end
     else
       {request, response}
