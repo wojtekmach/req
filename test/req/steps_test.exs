@@ -870,6 +870,40 @@ defmodule Req.StepsTest do
       end
     end
 
+    test "zstd (content-type)" do
+      plug = fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/zstd", nil)
+        |> Plug.Conn.send_resp(200, :ezstd.compress("foo"))
+      end
+
+      assert Req.get!(plug: plug).body == "foo"
+    end
+
+    test "zstd (path)" do
+      plug = fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+        |> Plug.Conn.send_resp(200, :ezstd.compress("foo"))
+      end
+
+      assert Req.get!(plug: plug, url: "/foo.zst").body == "foo"
+    end
+
+    test "zstd invalid" do
+      plug = fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/zstd", nil)
+        |> Plug.Conn.send_resp(200, "bad")
+      end
+
+      assert {:error, e} = Req.get(plug: plug)
+      assert %RuntimeError{} = e
+
+      assert Exception.message(e) ==
+               "Could not decompress Zstandard data: \"failed to decompress: ZSTD_CONTENTSIZE_ERROR\""
+    end
+
     test "csv" do
       csv = [
         ["x", "y"],
