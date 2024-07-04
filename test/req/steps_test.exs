@@ -898,7 +898,7 @@ defmodule Req.StepsTest do
       end
 
       assert {:error, e} = Req.get(plug: plug)
-      assert match?(%RuntimeError{}, e)
+      assert %RuntimeError{} = e
 
       assert Exception.message(e) ==
                "Could not decompress Zstandard data: \"failed to decompress: ZSTD_CONTENTSIZE_ERROR\""
