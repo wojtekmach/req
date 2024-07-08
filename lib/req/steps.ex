@@ -1104,7 +1104,7 @@ defmodule Req.Steps do
 
         * `:token` - if set, the AWS security token, returned from AWS STS.
 
-        * `:service` - the AWS service. Defaults to `:s3`.
+        * `:service` - the AWS service.
 
         * `:region` - the AWS region. Defaults to `"us-east-1"`.
 
@@ -1118,6 +1118,7 @@ defmodule Req.Steps do
       ...>     aws_sigv4: [
       ...>       access_key_id: System.get_env("AWS_ACCESS_KEY_ID"),
       ...>       secret_access_key: System.get_env("AWS_SECRET_ACCESS_KEY"),
+      ...>       service: :s3
       ...>     ]
       ...>   )
       iex>
@@ -1154,7 +1155,6 @@ defmodule Req.Steps do
 
       aws_options =
         aws_options
-        |> Keyword.put_new(:service, :s3)
         |> Keyword.put_new(:region, "us-east-1")
         |> Keyword.put_new(:datetime, DateTime.utc_now())
         # aws_credentials returns this key so let's ignore it
