@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v0.5.2 (2024-07-08)
+
+  * [`put_aws_sigv4`]: Fix bug when using custom headers
+
+  * [`put_aws_sigv4`]: Add `:token` option
+
+  * [`redirect`]: Cancel async request before redirecting
+
+  * [`decode_body`]: Support `application/zstd` and `.zst`
+
 ## v0.5.1 (2024-06-24)
 
   * [`retry`]: Default `:retry_log_level` to `:warning`

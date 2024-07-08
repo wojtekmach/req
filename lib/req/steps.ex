@@ -1102,7 +1102,7 @@ defmodule Req.Steps do
 
         * `:secret_access_key` - the AWS secret access key.
 
-        * `:token` - if set, the AWS security token, returned from AWS STS.
+        * `:token` - if set, the AWS security token, for example returned from AWS STS.
 
         * `:service` - the AWS service.
 
