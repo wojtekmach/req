@@ -384,6 +384,17 @@ defmodule Req.Test do
             raise "no mock or stub for #{inspect(name)}"
         end
 
+      {:shared_owner, owner} when is_pid(owner) ->
+        result = Req.Test.Ownership.get_owned(@ownership, owner)[name]
+
+        case result do
+          %{stub: value} ->
+            value
+
+          {:ok, {:error, :no_expectations_and_no_stub}} ->
+            raise "no mock or stub for #{inspect(name)}"
+        end
+
       :error ->
         raise "cannot find mock/stub #{inspect(name)} in process #{inspect(self())}"
     end
