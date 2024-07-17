@@ -20,6 +20,16 @@ defmodule Req.TestTest do
     |> Task.await()
 
     assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [2]}
+
+    Req.Test.stub(:bar, {SharedPlug, [1]})
+    Req.Test.set_req_test_to_shared()
+
+    Task.async(fn ->
+      assert Req.Test.__fetch_plug__(:bar) == {SharedPlug, [1]}
+    end)
+    |> Task.await()
+  after
+    Req.Test.set_req_test_to_private()
   end
 
   describe "expect/3" do
