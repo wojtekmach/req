@@ -215,11 +215,15 @@ defmodule Req do
 
         * `string` - sets to this value.
 
-  Request body options:
+  Request body encoding options ([`encode_body`](`Req.Steps.encode_body/1`)):
 
-    * `:form` - if set, encodes the request body as form data ([`encode_body`](`Req.Steps.encode_body/1`) step.)
+    * `:form` - if set, encodes the request body as `application/x-www-form-urlencoded`
 
-    * `:json` - if set, encodes the request body as JSON ([`encode_body`](`Req.Steps.encode_body/1`) step.)
+    * `:form_multipart` - if set, encodes the request body as `multipart/form-data`.
+
+    * `:json` - if set, encodes the request body as JSON
+
+  Other request body options:
 
     * `:compress_body` - if set to `true`, compresses the request body using gzip (via [`compress_body`](`Req.Steps.compress_body/1`) step.)
       Defaults to `false`.

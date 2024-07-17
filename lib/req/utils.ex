@@ -310,6 +310,85 @@ defmodule Req.Utils do
   end
 
   @doc """
+  Encodes fields into "multipart/form-data" format.
+  """
+  def encode_form_multipart(fields, options \\ []) do
+    options = Keyword.validate!(options, [:boundary])
+
+    boundary =
+      options[:boundary] ||
+        Base.encode16(:crypto.strong_rand_bytes(16), padding: false, case: :lower)
+
+    crlf = "\r\n"
+
+    body =
+      fields
+      |> Enum.reduce([], &add_form_parts(&2, encode_form_part(&1, boundary)))
+      |> add_form_parts([[crlf, "--", boundary, "--", crlf]])
+
+    %{
+      content_type: "multipart/form-data; boundary=#{boundary}",
+      body: body
+    }
+  end
+
+  defp add_form_parts(parts1, parts2) when is_list(parts1) and is_list(parts2) do
+    [parts1, parts2]
+  end
+
+  defp add_form_parts(parts1, parts2) do
+    Stream.concat(parts1, parts2)
+  end
+
+  defp encode_form_part({name, {value, options}}, boundary) do
+    options = Keyword.validate!(options, [:filename, :content_type])
+
+    {parts, options} =
+      case value do
+        integer when is_integer(integer) ->
+          {[Integer.to_string(integer)], options}
+
+        value when is_binary(value) or is_list(value) ->
+          {[value], options}
+
+        stream = %File.Stream{} ->
+          filename = Path.basename(stream.path)
+
+          options =
+            options
+            |> Keyword.put_new(:filename, filename)
+            |> Keyword.put_new_lazy(:content_type, fn ->
+              MIME.from_path(filename)
+            end)
+
+          {stream, options}
+      end
+
+    params =
+      if filename = options[:filename] do
+        ["; filename=\"", filename, "\""]
+      else
+        []
+      end
+
+    crlf = "\r\n"
+
+    headers =
+      if content_type = options[:content_type] do
+        ["content-type: ", content_type, crlf]
+      else
+        []
+      end
+
+    headers = ["content-disposition: form-data; name=\"#{name}\"", params, crlf, headers]
+    add_form_parts([[crlf, "--", boundary, crlf, headers, crlf]], parts)
+  end
+
+  defp encode_form_part({name, value}, boundary) do
+    encode_form_part({name, {value, []}}, boundary)
+  end
+
+  @doc """
   Loads .netrc file.
 
   ## Examples

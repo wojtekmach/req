@@ -69,4 +69,93 @@ defmodule Req.UtilsTest do
       assert url1 == url2
     end
   end
+
+  describe "encode_form_multipart" do
+    test "it works" do
+      %{content_type: content_type, body: body} =
+        Req.Utils.encode_form_multipart(
+          [
+            field1: 1,
+            field2: {"22", filename: "2.txt"},
+            field3: {["3", ?3, ?3], filename: "3.txt", content_type: "text/plain"}
+          ],
+          boundary: "foo"
+        )
+
+      assert content_type == "multipart/form-data; boundary=foo"
+
+      assert IO.iodata_to_binary(body) == """
+             \r\n\
+             --foo\r\n\
+             content-disposition: form-data; name=\"field1\"\r\n\
+             \r\n\
+             1\r\n\
+             --foo\r\n\
+             content-disposition: form-data; name=\"field2\"; filename=\"2.txt\"\r\n\
+             \r\n\
+             22\r\n\
+             --foo\r\n\
+             content-disposition: form-data; name=\"field3\"; filename=\"3.txt\"\r\n\
+             content-type: text/plain\r\n\
+             \r\n\
+             333\r\n\
+             --foo--\r\n\
+             """
+    end
+
+    @tag :tmp_dir
+    test "can return stream", %{tmp_dir: tmp_dir} do
+      File.write!("#{tmp_dir}/2.txt", "22")
+
+      %{body: body} =
+        Req.Utils.encode_form_multipart(
+          [
+            field1: 1,
+            field2: File.stream!("#{tmp_dir}/2.txt")
+          ],
+          boundary: "foo"
+        )
+
+      assert is_function(body)
+
+      assert body |> Enum.to_list() |> IO.iodata_to_binary() == """
+             \r\n\
+             --foo\r\n\
+             content-disposition: form-data; name=\"field1\"\r\n\
+             \r\n\
+             1\r\n\
+             --foo\r\n\
+             content-disposition: form-data; name=\"field2\"; filename=\"2.txt\"\r\n\
+             content-type: text/plain\r\n\
+             \r\n\
+             22\r\n\
+             --foo--\r\n\
+             """
+
+      %{body: body} =
+        Req.Utils.encode_form_multipart(
+          [
+            field2: File.stream!("#{tmp_dir}/2.txt"),
+            field1: 1
+          ],
+          boundary: "foo"
+        )
+
+      assert is_function(body)
+
+      assert body |> Enum.to_list() |> IO.iodata_to_binary() == """
+             \r\n\
+             --foo\r\n\
+             content-disposition: form-data; name=\"field2\"; filename=\"2.txt\"\r\n\
+             content-type: text/plain\r\n\
+             \r\n\
+             22\r\n\
+             --foo\r\n\
+             content-disposition: form-data; name=\"field1\"\r\n\
+             \r\n\
+             1\r\n\
+             --foo--\r\n\
+             """
+    end
+  end
 end

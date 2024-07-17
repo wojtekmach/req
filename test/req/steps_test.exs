@@ -248,6 +248,37 @@ defmodule Req.StepsTest do
       req = Req.new(form: %{a: 1}) |> Req.Request.prepare()
       assert req.body == "a=1"
     end
+
+    @tag :tmp_dir
+    test "form_multipart", %{tmp_dir: tmp_dir} do
+      File.write!("#{tmp_dir}/b.txt", "bbb")
+      File.write!("#{tmp_dir}/c", "ccc")
+
+      plug = fn conn ->
+        conn = Plug.Parsers.call(conn, Plug.Parsers.init(parsers: [:multipart]))
+
+        assert %{"a" => "1", "b" => b, "c" => c} = conn.body_params
+
+        assert b.filename == "b.txt"
+        assert b.content_type == "text/plain"
+        assert File.read!(b.path) == "bbb"
+
+        assert c.filename == "ccc"
+        assert c.content_type == "application/octet-stream"
+        assert File.read!(c.path) == "ccc"
+
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end
+
+      assert Req.post!(
+               plug: plug,
+               form_multipart: [
+                 a: 1,
+                 b: File.stream!("#{tmp_dir}/b.txt"),
+                 c: {File.stream!("#{tmp_dir}/c"), filename: "ccc"}
+               ]
+             ).status == 200
+    end
   end
 
   test "put_params" do

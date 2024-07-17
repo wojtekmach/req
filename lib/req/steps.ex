@@ -29,6 +29,7 @@ defmodule Req.Steps do
       :path_params_style,
       :auth,
       :form,
+      :form_multipart,
       :json,
       :compress_body,
       :checksum,
@@ -365,19 +366,44 @@ defmodule Req.Steps do
 
   ## Request Options
 
-    * `:form` - if set, encodes the request body as form data (using `URI.encode_query/1`).
+    * `:form` - if set, encodes the request body as `application/x-www-form-urlencoded`
+      (using `URI.encode_query/1`).
+
+    * `:form_multipart` - if set, encodes the request body as `multipart/form-data`.
+
+      It accepts `name` / `value` pairs. `value` can be one of:
+
+        * integer (automatically encoded as string)
+
+        * iodata
+
+        * `File.Stream`
+
+        * `{value, options}` tuple. Supported options are `:filename` and `:content_type`
 
     * `:json` - if set, encodes the request body as JSON (using `Jason.encode_to_iodata!/1`), sets
       the `accept` header to `application/json`, and the `content-type` header to `application/json`.
 
   ## Examples
 
-      iex> Req.post!("https://httpbin.org/anything", form: [x: 1]).body["form"]
-      %{"x" => "1"}
+  Encoding form (`application/x-www-form-urlencoded`):
 
-      iex> Req.post!("https://httpbin.org/post", json: %{x: 2}).body["json"]
-      %{"x" => 2}
+      iex> Req.post!("https://httpbin.org/anything", form: [a: 1]).body["form"]
+      %{"a" => "1"}
 
+  Encoding form (`multipart/form-data`):
+
+      iex> fields = [a: 1, b: {"2", filename: "b.txt"}]
+      iex> resp = Req.post!("https://httpbin.org/anything", form_multipart: fields)
+      iex> resp.body["form"]
+      %{"a" => "1"}
+      iex> resp.body["files"]
+      %{"b" => "2"}
+
+  Encoding JSON:
+
+      iex> Req.post!("https://httpbin.org/post", json: %{a: 2}).body["json"]
+      %{"a" => 2}
   """
   @doc step: :request
   def encode_body(request) do
@@ -385,6 +411,12 @@ defmodule Req.Steps do
       data = request.options[:form] ->
         %{request | body: URI.encode_query(data)}
         |> Req.Request.put_new_header("content-type", "application/x-www-form-urlencoded")
+
+      data = request.options[:form_multipart] ->
+        multipart = Req.Utils.encode_form_multipart(data)
+
+        %{request | body: multipart.body}
+        |> Req.Request.put_new_header("content-type", multipart.content_type)
 
       data = request.options[:json] ->
         %{request | body: Jason.encode_to_iodata!(data)}

@@ -30,9 +30,13 @@ write new ones.
 
   * Extensibility via request, response, and error steps.
 
-  * Request body compression and automatic response body decompression (via [`compress_body`], [`compressed`], and [`decompress_body`] steps). Supports gzip, brotli, and zstd decompression.
+  * Request body compression (via [`compress_body`] step)
 
-  * Request body encoding and automatic response body decoding (via [`encode_body`] and [`decode_body`] steps.)
+  * Automatic response body decompression (via [`compressed`] and [`decompress_body`] steps). Supports gzip, brotli, and zstd.
+
+  * Request body encoding. Supports urlencoded and multipart forms, and JSON. See [`encode_body`].
+
+  * Aautomatic response body decoding (via [`decode_body`] step.)
 
   * Encode params as query string (via [`put_params`] step.)
 
