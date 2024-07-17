@@ -28,6 +28,8 @@ defmodule Req.TestTest do
       assert Req.Test.__fetch_plug__(:bar) == {SharedPlug, [1]}
     end)
     |> Task.await()
+  after
+    Req.Test.set_req_test_to_private()
   end
 
   describe "expect/3" do
