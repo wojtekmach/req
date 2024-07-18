@@ -183,6 +183,12 @@ defmodule Req.FinchTest do
       end
     end
 
+    test ":finch option" do
+      assert_raise ArgumentError, "unknown registry: MyFinch", fn ->
+        Req.get!("http://localhost", finch: MyFinch)
+      end
+    end
+
     test ":finch and :connect_options" do
       assert_raise ArgumentError, "cannot set both :finch and :connect_options", fn ->
         Req.request!(finch: MyFinch, connect_options: [timeout: 0])
