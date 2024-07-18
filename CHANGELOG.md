@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v0.5.3 (2024-07-18)
+
+  * [`Req.Test`]: Fix using shared mode
+
+  * [`encode_body`]: Add `:form_multipart` option
+
+  * [`put_aws_sigv4`]: Try detecting the service
+
+  * [`run_finch`]: Fix setting `:finch` option
+
 ## v0.5.2 (2024-07-08)
 
   * [`put_aws_sigv4`]: Fix bug when using custom headers

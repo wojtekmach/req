@@ -163,8 +163,8 @@ And here is how they can be used:
 Mix.install([
   {:req, "~> 0.5.0"},
   {:req_easyhtml, "~> 0.1.0"},
-  {:req_s3, "~> 0.1.0"},
-  {:req_hex, "~> 0.1.0"},
+  {:req_s3, "~> 0.2.0"},
+  {:req_hex, "~> 0.2.0"},
   {:req_github_oauth, "~> 0.1.0"}
 ])
 
@@ -181,15 +181,8 @@ Req.get!(req, url: "https://elixir-lang.org").body[".entry-summary h5"]
 #    Elixir is a dynamic, functional language for building scalable and maintainable applications.
 #  </h5>]
 
-Req.get!(req, url: "s3://ossci-datasets").body
-#=>
-# [
-#   "mnist/",
-#   "mnist/t10k-images-idx3-ubyte.gz",
-#   "mnist/t10k-labels-idx1-ubyte.gz",
-#   "mnist/train-images-idx3-ubyte.gz",
-#   "mnist/train-labels-idx1-ubyte.gz"
-# ]
+Req.get!(req, url: "s3://ossci-datasets/mnist/t10k-images-idx3-ubyte.gz").body
+#=> <<0, 0, 8, 3, ...>>
 
 Req.get!(req, url: "https://repo.hex.pm/tarballs/req-0.1.0.tar").body["metadata.config"]["links"]
 #=> %{"GitHub" => "https://github.com/wojtekmach/req"}
