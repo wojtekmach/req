@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v0.5.4 (2024-07-18)
+
+  * [`run_finch`], [`Req.parse_message/2`]: Gracefully handle process messages not meant
+    for the asynchronous response. In that case, `Req.parse_message/2` returns `:unknown`.
+
 ## v0.5.3 (2024-07-18)
 
   * [`Req.Test`]: Fix using shared mode
@@ -312,7 +317,7 @@ If you wish to maximize request rate or have more control over how messages are 
 
 ## v0.4.12 (2024-03-06)
 
-  * [`Req`]: Add response body streaming via `into: :self`, `Req.parse_message/2`,
+  * [`Req`]: Add response body streaming via `into: :self`, [`Req.parse_message/2`],
     and `Req.cancel_async_response/1`.
 
   * [`Req`]: Deprecate `Req.update/2` in favour of [`Req.merge/2`]
