@@ -391,6 +391,7 @@ defmodule Req.FinchTest do
       assert {:ok, [data: "foo"]} = Req.parse_message(resp, assert_receive(_))
       assert {:ok, [data: "bar"]} = Req.parse_message(resp, assert_receive(_))
       assert {:ok, [:done]} = Req.parse_message(resp, assert_receive(_))
+      assert :unknown = Req.parse_message(resp, :other)
       refute_receive _
     end
 
@@ -429,6 +430,18 @@ defmodule Req.FinchTest do
         )
 
       assert Req.get!(req).body |> Enum.to_list() == ["ok"]
+    end
+
+    test "into: :self enumerable with unrelated message" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      send(self(), :other)
+      resp = Req.get!(url: url, into: :self)
+      assert Enum.to_list(resp.body) == ["ok"]
+      assert_received :other
     end
   end
 

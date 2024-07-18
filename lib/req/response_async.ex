@@ -51,8 +51,10 @@ defmodule Req.Response.Async do
         raise "expected to read body chunk in the process #{inspect(async.pid)} which made the request, got: #{inspect(self())}"
       end
 
+      ref = async.ref
+
       receive do
-        message ->
+        {^ref, _} = message ->
           case async.stream_fun.(async.ref, message) do
             {:ok, [data: data]} ->
               result =

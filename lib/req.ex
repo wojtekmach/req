@@ -1217,9 +1217,20 @@ defmodule Req do
   end
 
   @doc """
-  Parses asynchronous response message.
+  Parses asynchronous response body message.
 
-  An asynchronous response is a result of request with `into: :self`.
+  A request with option `:into` set to `:self` returns response with asynchronous body.
+  In that case, Req sends chunks to the calling process as messages. You'd typically
+  get them using `receive/1` or [`handle_info/2`](`c:GenServer.handle_info/2`) in a GenServer.
+  These messages should be parsed using this function. The possible return values are:
+
+    * `{:ok, chunks}` - where a chunk can be `{:data, binary}`, `{:trailers, trailers}`, or
+      `:done`.
+
+    * `{:error, reason}` - an error occured
+
+    * `:unknown` - the message was not meant for this response.
+
   See also `Req.Response.Async`.
 
   ## Examples
@@ -1231,6 +1242,8 @@ defmodule Req do
       {:ok, [data: "{\"url\": \"http://httpbin.org/stream/2\", ..., \"id\": 1}\\n"]}
       iex> Req.parse_message(resp, receive do message -> message end)
       {:ok, [:done]}
+      iex> Req.parse_message(resp, :other)
+      :unknown
   """
   @doc type: :async
   def parse_message(response, message)

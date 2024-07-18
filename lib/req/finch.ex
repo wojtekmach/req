@@ -290,6 +290,10 @@ defmodule Req.Finch do
     {:error, reason}
   end
 
+  defp parse_message(_, _) do
+    :unknown
+  end
+
   defp cancel(ref) do
     Finch.cancel_async_request(ref)
     clean_responses(ref)
