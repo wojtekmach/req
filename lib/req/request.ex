@@ -90,7 +90,7 @@ defmodule Req.Request do
 
         * `collectable` - stream response body into a `t:Collectable.t/0`. For example:
 
-              into: File.stream!(“path”)
+              into: File.stream!("path")
 
     * `:options` - the options to be used by steps. The exact representation of options is private.
       Calling `request.options[key]`, `put_in(request.options[key], value)`, and
