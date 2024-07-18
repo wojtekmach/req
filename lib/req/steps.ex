@@ -1199,61 +1199,43 @@ defmodule Req.Steps do
         :service,
         :region,
         :datetime,
-        :into,
 
         # for req_s3
         :expires
       ])
 
-      {into, aws_options} = Keyword.pop(aws_options, :into, :headers)
+      {body, options} =
+        case request.body do
+          nil ->
+            {"", []}
 
-      case into do
-        :headers ->
-          {body, options} =
-            case request.body do
-              nil ->
-                {"", []}
+          iodata when is_binary(iodata) or is_list(iodata) ->
+            {iodata, []}
 
-              iodata when is_binary(iodata) or is_list(iodata) ->
-                {iodata, []}
-
-              _enumerable ->
-                if Req.Request.get_header(request, "content-length") == [] do
-                  raise "content-length header must be explicitly set when streaming request body"
-                end
-
-                {"", [body_digest: "UNSIGNED-PAYLOAD"]}
+          _enumerable ->
+            if Req.Request.get_header(request, "content-length") == [] do
+              raise "content-length header must be explicitly set when streaming request body"
             end
 
-          request = Req.Request.put_new_header(request, "host", request.url.host)
+            {"", [body_digest: "UNSIGNED-PAYLOAD"]}
+        end
 
-          headers = for {name, values} <- request.headers, value <- values, do: {name, value}
+      request = Req.Request.put_new_header(request, "host", request.url.host)
 
-          headers =
-            Req.Utils.aws_sigv4_headers(
-              aws_options ++
-                [
-                  method: request.method,
-                  url: to_string(request.url),
-                  headers: headers,
-                  body: body
-                ] ++ options
-            )
+      headers = for {name, values} <- request.headers, value <- values, do: {name, value}
 
-          Req.merge(request, headers: headers)
+      headers =
+        Req.Utils.aws_sigv4_headers(
+          aws_options ++
+            [
+              method: request.method,
+              url: to_string(request.url),
+              headers: headers,
+              body: body
+            ] ++ options
+        )
 
-        :url ->
-          url =
-            Req.Utils.aws_sigv4_url(
-              aws_options ++
-                [
-                  method: request.method,
-                  url: to_string(request.url)
-                ]
-            )
-
-          put_in(request.url, url)
-      end
+      Req.merge(request, headers: headers)
     else
       request
     end
