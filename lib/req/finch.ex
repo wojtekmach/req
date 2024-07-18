@@ -309,8 +309,12 @@ defmodule Req.Finch do
       Map.has_key?(request.options, :connect_options) or Map.has_key?(request.options, :inet6)
 
     cond do
-      request.options[:finch] && custom_options? ->
-        raise ArgumentError, "cannot set both :finch and :connect_options"
+      name = request.options[:finch] ->
+        if custom_options? do
+          raise ArgumentError, "cannot set both :finch and :connect_options"
+        else
+          name
+        end
 
       custom_options? ->
         pool_options = pool_options(request.options)
