@@ -1136,7 +1136,8 @@ defmodule Req.Steps do
 
         * `:token` - if set, the AWS security token, for example returned from AWS STS.
 
-        * `:service` - the AWS service.
+        * `:service` - the AWS service. We try to automatically detect the service (e.g.
+          `s3.amazonaws.com` host sets service to `:s3`)
 
         * `:region` - the AWS region. Defaults to `"us-east-1"`.
 
@@ -1149,8 +1150,7 @@ defmodule Req.Steps do
       ...>     base_url: "https://s3.amazonaws.com",
       ...>     aws_sigv4: [
       ...>       access_key_id: System.get_env("AWS_ACCESS_KEY_ID"),
-      ...>       secret_access_key: System.get_env("AWS_SECRET_ACCESS_KEY"),
-      ...>       service: :s3
+      ...>       secret_access_key: System.get_env("AWS_SECRET_ACCESS_KEY")
       ...>     ]
       ...>   )
       iex>
@@ -1191,6 +1191,7 @@ defmodule Req.Steps do
         |> Keyword.put_new(:datetime, DateTime.utc_now())
         # aws_credentials returns this key so let's ignore it
         |> Keyword.drop([:credential_provider])
+        |> maybe_put_aws_service(request.url)
 
       Req.Request.validate_options(aws_options, [
         :access_key_id,
@@ -1238,6 +1239,39 @@ defmodule Req.Steps do
       Req.merge(request, headers: headers)
     else
       request
+    end
+  end
+
+  defp maybe_put_aws_service(options, url) do
+    if options[:service] do
+      options
+    else
+      if service = detect_aws_service(url) do
+        Keyword.put(options, :service, service)
+      end
+    end
+  end
+
+  defp detect_aws_service(%URI{} = url) do
+    parts = url.host |> String.split(".") |> Enum.reverse()
+
+    with ["com", "amazonaws" | rest] <- parts do
+      case rest do
+        # s3
+        ["s3" | _] -> :s3
+        [_region, "s3" | _] -> :s3
+        # sqs
+        ["sqs" | _] -> :sqs
+        [_region, "sqs" | _] -> :sqs
+        # ses
+        ["email" | _] -> :ses
+        [_region, "email" | _] -> :ses
+        # iam
+        ["iam"] -> :iam
+        _ -> nil
+      end
+    else
+      _ -> nil
     end
   end
 

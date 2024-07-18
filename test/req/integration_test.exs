@@ -56,8 +56,7 @@ defmodule Req.IntegrationTest do
         base_url: "https://#{aws_bucket}.s3.amazonaws.com",
         aws_sigv4: [
           access_key_id: aws_access_key_id,
-          secret_access_key: aws_secret_access_key,
-          service: :s3
+          secret_access_key: aws_secret_access_key
         ]
       )
 

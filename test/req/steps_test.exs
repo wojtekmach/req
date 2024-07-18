@@ -522,7 +522,6 @@ defmodule Req.StepsTest do
           aws_sigv4: [
             access_key_id: "foo",
             secret_access_key: "bar",
-            service: :s3,
             datetime: ~U[2024-01-01 00:00:00Z]
           ],
           body: "hello",
@@ -558,7 +557,6 @@ defmodule Req.StepsTest do
           aws_sigv4: [
             access_key_id: "foo",
             secret_access_key: "bar",
-            service: :s3,
             datetime: ~U[2024-01-01 00:00:00Z]
           ],
           headers: [content_length: 5],
