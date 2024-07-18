@@ -271,7 +271,9 @@ defmodule Req do
                 {:cont, {req, resp}}
               end
 
-        * `collectable` - stream response body into a `t:Collectable.t/0`.
+        * `collectable` - stream response body into a `t:Collectable.t/0`. For example:
+
+               into: File.stream!("path")
 
         * `:self` - stream response body into the current process mailbox.
 
