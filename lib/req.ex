@@ -1233,6 +1233,8 @@ defmodule Req do
       {:ok, [:done]}
   """
   @doc type: :async
+  def parse_message(response, message)
+
   def parse_message(%Req.Response{body: %Req.Response.Async{stream_fun: fun, ref: ref}}, message) do
     fun.(ref, message)
   end
