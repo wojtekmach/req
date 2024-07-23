@@ -1248,6 +1248,8 @@ defmodule Req.Steps do
     else
       if service = detect_aws_service(url) do
         Keyword.put(options, :service, service)
+      else
+        options
       end
     end
   end
