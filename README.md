@@ -208,6 +208,12 @@ Req.get!(req, url: "https://api.github.com/user").body["login"]
 
 See [`Req.Request`] module documentation for more information on low-level API, request struct, and developing plugins.
 
+## Configuration
+
+Req aims to work without global configuration to promote explicitness.
+However, you might need to adapt the HTTP pools used.
+Refer to the [`run_finch`] documenation for more information on this.
+
 ## Presentations
 
   * [Req: A batteries-included HTTP client for Elixir - ElixirConf 2023, 2023-09-08](https://www.youtube.com/watch?v=owz2QacFuoQ "ElixirConf 2023 - Wojtek Mach - Req - a batteries-included HTTP client for Elixir")
