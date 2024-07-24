@@ -2,9 +2,9 @@
 
 [![License](https://img.shields.io/hexpm/l/req.svg)](https://github.com/wojtekmach/req/blob/main/LICENSE.md)
 [![Version](https://img.shields.io/hexpm/v/req.svg)](https://hex.pm/packages/req)
+[![Hex Docs](https://img.shields.io/badge/docs-hexpm-blue.svg)](https://hexdocs.pm/req)
 [![CI](https://github.com/wojtekmach/req/actions/workflows/ci.yml/badge.svg)](https://github.com/wojtekmach/req/actions/workflows/ci.yml)
 
-[Docs](https://hexdocs.pm/req)
 
 Req is a batteries-included HTTP client for Elixir.
 
