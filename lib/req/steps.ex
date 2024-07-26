@@ -83,11 +83,11 @@ defmodule Req.Steps do
     )
     |> Req.Request.prepend_response_steps(
       retry: &Req.Steps.retry/1,
+      handle_http_errors: &Req.Steps.handle_http_errors/1,
       redirect: &Req.Steps.redirect/1,
       decompress_body: &Req.Steps.decompress_body/1,
       verify_checksum: &Req.Steps.verify_checksum/1,
       decode_body: &Req.Steps.decode_body/1,
-      handle_http_errors: &Req.Steps.handle_http_errors/1,
       output: &Req.Steps.output/1
     )
     |> Req.Request.prepend_error_steps(retry: &Req.Steps.retry/1)
