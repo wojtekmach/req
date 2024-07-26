@@ -1264,7 +1264,7 @@ defmodule Req.Steps do
   end
 
   defp detect_aws_service(%URI{} = url) do
-    parts = url.host |> String.split(".") |> Enum.reverse()
+    parts = (url.host || "") |> String.split(".") |> Enum.reverse()
 
     with ["com", "amazonaws" | rest] <- parts do
       case rest do
