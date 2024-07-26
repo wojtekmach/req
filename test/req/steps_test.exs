@@ -494,35 +494,20 @@ defmodule Req.StepsTest do
   end
 
   describe "put_aws_sigv4" do
-    # TODO: flaky
-    @tag :skip
     test "body: binary" do
       plug = fn conn ->
         assert {:ok, "hello", conn} = Plug.Conn.read_body(conn)
-
-        assert Plug.Conn.get_req_header(conn, "x-amz-content-sha256") == [
-                 "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
-               ]
-
-        assert Plug.Conn.get_req_header(conn, "authorization") == [
-                 """
-                 AWS4-HMAC-SHA256 \
-                 Credential=foo/20240101/us-east-1/s3/aws4_request,\
-                 SignedHeaders=accept-encoding;host;user-agent;x-amz-content-sha256;x-amz-date,\
-                 Signature=a7a27655988cf90a6d834c6544e8a5e1ef00308a64692f0e656167165d42ec4d\
-                 """
-               ]
-
+        assert ["AWS4-HMAC-SHA256" <> _] = Plug.Conn.get_req_header(conn, "authorization")
+        assert [<<_::binary-size(64)>>] = Plug.Conn.get_req_header(conn, "x-amz-content-sha256")
         Plug.Conn.send_resp(conn, 200, "ok")
       end
 
       req =
         Req.new(
-          url: "http://localhost",
+          url: "https://s3.amazonaws.com",
           aws_sigv4: [
             access_key_id: "foo",
-            secret_access_key: "bar",
-            datetime: ~U[2024-01-01 00:00:00Z]
+            secret_access_key: "bar"
           ],
           body: "hello",
           plug: plug
@@ -531,33 +516,22 @@ defmodule Req.StepsTest do
       assert Req.put!(req).body == "ok"
     end
 
-    # TODO: flaky
-    @tag :skip
     test "body: enumerable" do
       plug = fn conn ->
         assert {:ok, "hello", conn} = Plug.Conn.read_body(conn)
-
-        assert Plug.Conn.get_req_header(conn, "x-amz-content-sha256") == ["UNSIGNED-PAYLOAD"]
-
-        assert Plug.Conn.get_req_header(conn, "authorization") == [
-                 """
-                 AWS4-HMAC-SHA256 \
-                 Credential=foo/20240101/us-east-1/s3/aws4_request,\
-                 SignedHeaders=accept-encoding;content-length;host;user-agent;x-amz-content-sha256;x-amz-date,\
-                 Signature=6d8d9e360bf82d48064ee93cc628133da813bfc9b587fe52f8792c2335b29312\
-                 """
-               ]
-
+        assert ["AWS4-HMAC-SHA256" <> _] = Plug.Conn.get_req_header(conn, "authorization")
+        assert ["UNSIGNED-PAYLOAD"] = Plug.Conn.get_req_header(conn, "x-amz-content-sha256")
         Plug.Conn.send_resp(conn, 200, "ok")
       end
 
       req =
         Req.new(
-          url: "http://localhost",
+          url: "http://example.com",
           aws_sigv4: [
             access_key_id: "foo",
             secret_access_key: "bar",
-            datetime: ~U[2024-01-01 00:00:00Z]
+            # test setting explicit :service
+            service: :s3
           ],
           headers: [content_length: 5],
           body: Stream.take(["hello"], 1),

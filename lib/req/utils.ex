@@ -71,10 +71,12 @@ defmodule Req.Utils do
 
     path = URI.encode(url.path || "/", &(&1 == ?/ or URI.char_unreserved?(&1)))
 
+    canonical_query = canonical_query(url.query)
+
     canonical_request = """
     #{method}
     #{path}
-    #{url.query || ""}
+    #{canonical_query}
     #{canonical_headers}
 
     #{signed_headers}
@@ -104,6 +106,21 @@ defmodule Req.Utils do
       "AWS4-HMAC-SHA256 Credential=#{credential},SignedHeaders=#{signed_headers},Signature=#{signature}"
 
     [{"authorization", authorization}] ++ aws_headers ++ headers
+  end
+
+  defp canonical_query(query) when query in [nil, ""] do
+    query
+  end
+
+  defp canonical_query(query) do
+    for item <- String.split(query, "&", trim: true) do
+      case String.split(item, "=") do
+        [name, value] -> [name, "=", value]
+        [name] -> [name, "="]
+      end
+    end
+    |> Enum.sort()
+    |> Enum.intersperse("&")
   end
 
   @doc """
