@@ -566,6 +566,36 @@ defmodule Req.StepsTest do
 
       assert Req.put!(req).body == "ok"
     end
+
+    test "missing :access_key_id" do
+      req = Req.new(aws_sigv4: [])
+
+      assert_raise ArgumentError, "missing :access_key_id in :aws_sigv4 option", fn ->
+        Req.get(req)
+      end
+    end
+
+    test "missing :secret_access_key" do
+      req = Req.new(aws_sigv4: [access_key_id: "foo"])
+
+      assert_raise ArgumentError, "missing :secret_access_key in :aws_sigv4 option", fn ->
+        Req.get(req)
+      end
+    end
+
+    test "missing :service" do
+      req =
+        Req.new(
+          aws_sigv4: [
+            access_key_id: "foo",
+            secret_access_key: "bar"
+          ]
+        )
+
+      assert_raise ArgumentError, "missing :service in :aws_sigv4 option", fn ->
+        Req.get(req)
+      end
+    end
   end
 
   ## Response steps

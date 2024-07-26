@@ -1191,7 +1191,6 @@ defmodule Req.Steps do
         |> Keyword.put_new(:datetime, DateTime.utc_now())
         # aws_credentials returns this key so let's ignore it
         |> Keyword.drop([:credential_provider])
-        |> maybe_put_aws_service(request.url)
 
       Req.Request.validate_options(aws_options, [
         :access_key_id,
@@ -1204,6 +1203,16 @@ defmodule Req.Steps do
         # for req_s3
         :expires
       ])
+
+      unless aws_options[:access_key_id] do
+        raise ArgumentError, "missing :access_key_id in :aws_sigv4 option"
+      end
+
+      unless aws_options[:secret_access_key] do
+        raise ArgumentError, "missing :secret_access_key in :aws_sigv4 option"
+      end
+
+      aws_options = ensure_aws_service(aws_options, request.url)
 
       {body, options} =
         case request.body do
@@ -1242,14 +1251,14 @@ defmodule Req.Steps do
     end
   end
 
-  defp maybe_put_aws_service(options, url) do
+  defp ensure_aws_service(options, url) do
     if options[:service] do
       options
     else
       if service = detect_aws_service(url) do
         Keyword.put(options, :service, service)
       else
-        options
+        raise ArgumentError, "missing :service in :aws_sigv4 option"
       end
     end
   end
