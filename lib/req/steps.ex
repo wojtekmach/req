@@ -417,6 +417,7 @@ defmodule Req.Steps do
 
         %{request | body: multipart.body}
         |> Req.Request.put_new_header("content-type", multipart.content_type)
+        |> Req.Request.put_new_header("content-length", Integer.to_string(multipart.size))
 
       data = request.options[:json] ->
         %{request | body: Jason.encode_to_iodata!(data)}

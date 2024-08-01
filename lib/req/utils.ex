@@ -326,6 +326,8 @@ defmodule Req.Utils do
     %CollectWithHash{collectable: collectable, type: type}
   end
 
+  @crlf "\r\n"
+
   @doc """
   Encodes fields into "multipart/form-data" format.
   """
@@ -336,40 +338,44 @@ defmodule Req.Utils do
       options[:boundary] ||
         Base.encode16(:crypto.strong_rand_bytes(16), padding: false, case: :lower)
 
-    crlf = "\r\n"
+    footer = [[@crlf, "--", boundary, "--", @crlf]]
 
-    body =
+    {body, size} =
       fields
-      |> Enum.reduce([], &add_form_parts(&2, encode_form_part(&1, boundary)))
-      |> add_form_parts([[crlf, "--", boundary, "--", crlf]])
+      |> Enum.reduce({[], 0}, &add_form_parts(&2, encode_form_part(&1, boundary)))
+      |> add_form_parts({footer, IO.iodata_length(footer)})
 
     %{
+      size: size,
       content_type: "multipart/form-data; boundary=#{boundary}",
       body: body
     }
   end
 
-  defp add_form_parts(parts1, parts2) when is_list(parts1) and is_list(parts2) do
-    [parts1, parts2]
+  defp add_form_parts({parts1, size1}, {parts2, size2})
+       when is_list(parts1) and is_list(parts2) do
+    {[parts1, parts2], size1 + size2}
   end
 
-  defp add_form_parts(parts1, parts2) do
-    Stream.concat(parts1, parts2)
+  defp add_form_parts({parts1, size1}, {parts2, size2}) do
+    {Stream.concat(parts1, parts2), size1 + size2}
   end
 
   defp encode_form_part({name, {value, options}}, boundary) do
     options = Keyword.validate!(options, [:filename, :content_type])
 
-    {parts, options} =
+    {parts, parts_size, options} =
       case value do
         integer when is_integer(integer) ->
-          {[Integer.to_string(integer)], options}
+          part = Integer.to_string(integer)
+          {[part], byte_size(part), options}
 
         value when is_binary(value) or is_list(value) ->
-          {[value], options}
+          {[value], IO.iodata_length(value), options}
 
         stream = %File.Stream{} ->
           filename = Path.basename(stream.path)
+          size = File.stat!(stream.path).size
 
           options =
             options
@@ -378,7 +384,7 @@ defmodule Req.Utils do
               MIME.from_path(filename)
             end)
 
-          {stream, options}
+          {stream, size, options}
       end
 
     params =
@@ -388,17 +394,16 @@ defmodule Req.Utils do
         []
       end
 
-    crlf = "\r\n"
-
     headers =
       if content_type = options[:content_type] do
-        ["content-type: ", content_type, crlf]
+        ["content-type: ", content_type, @crlf]
       else
         []
       end
 
-    headers = ["content-disposition: form-data; name=\"#{name}\"", params, crlf, headers]
-    add_form_parts([[crlf, "--", boundary, crlf, headers, crlf]], parts)
+    headers = ["content-disposition: form-data; name=\"#{name}\"", params, @crlf, headers]
+    header = [[@crlf, "--", boundary, @crlf, headers, @crlf]]
+    add_form_parts({header, IO.iodata_length(header)}, {parts, parts_size})
   end
 
   defp encode_form_part({name, value}, boundary) do

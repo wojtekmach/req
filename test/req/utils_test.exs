@@ -72,7 +72,7 @@ defmodule Req.UtilsTest do
 
   describe "encode_form_multipart" do
     test "it works" do
-      %{content_type: content_type, body: body} =
+      %{content_type: content_type, body: body, size: size} =
         Req.Utils.encode_form_multipart(
           [
             field1: 1,
@@ -82,9 +82,11 @@ defmodule Req.UtilsTest do
           boundary: "foo"
         )
 
+      body = IO.iodata_to_binary(body)
+      assert size == byte_size(body)
       assert content_type == "multipart/form-data; boundary=foo"
 
-      assert IO.iodata_to_binary(body) == """
+      assert body == """
              \r\n\
              --foo\r\n\
              content-disposition: form-data; name=\"field1\"\r\n\
@@ -107,7 +109,7 @@ defmodule Req.UtilsTest do
     test "can return stream", %{tmp_dir: tmp_dir} do
       File.write!("#{tmp_dir}/2.txt", "22")
 
-      %{body: body} =
+      %{body: body, size: size} =
         Req.Utils.encode_form_multipart(
           [
             field1: 1,
@@ -117,8 +119,10 @@ defmodule Req.UtilsTest do
         )
 
       assert is_function(body)
+      body = body |> Enum.to_list() |> IO.iodata_to_binary()
+      assert size == byte_size(body)
 
-      assert body |> Enum.to_list() |> IO.iodata_to_binary() == """
+      assert body == """
              \r\n\
              --foo\r\n\
              content-disposition: form-data; name=\"field1\"\r\n\
@@ -132,7 +136,7 @@ defmodule Req.UtilsTest do
              --foo--\r\n\
              """
 
-      %{body: body} =
+      %{body: body, size: size} =
         Req.Utils.encode_form_multipart(
           [
             field2: File.stream!("#{tmp_dir}/2.txt"),
@@ -142,8 +146,10 @@ defmodule Req.UtilsTest do
         )
 
       assert is_function(body)
+      body = body |> Enum.to_list() |> IO.iodata_to_binary()
+      assert size == byte_size(body)
 
-      assert body |> Enum.to_list() |> IO.iodata_to_binary() == """
+      assert body == """
              \r\n\
              --foo\r\n\
              content-disposition: form-data; name=\"field2\"; filename=\"2.txt\"\r\n\
