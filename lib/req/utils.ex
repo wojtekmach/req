@@ -375,7 +375,13 @@ defmodule Req.Utils do
 
         stream = %File.Stream{} ->
           filename = Path.basename(stream.path)
-          size = File.stat!(stream.path).size
+
+          size =
+            if stream.node == node() do
+              File.stat!(stream.path).size
+            else
+              :erpc.call(stream.node, File, :stat!, [stream.path]).size
+            end
 
           options =
             options
