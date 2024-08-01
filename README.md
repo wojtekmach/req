@@ -264,7 +264,7 @@ limitations under the License.
 [Finch]: https://github.com/sneako/finch
 [cURL]: https://curl.se
 [Requests]: https://docs.python-requests.org/en/master/
-[Tesla]: https://github.com/teamon/tesla
+[Tesla]: https://github.com/elixir-tesla/tesla
 [`req_easyhtml`]: https://github.com/wojtekmach/req_easyhtml
 [`req_s3`]: https://github.com/wojtekmach/req_s3
 [`req_hex`]: https://github.com/wojtekmach/req_hex
