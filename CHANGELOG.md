@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.5.6 (2024-08-01)
+
+  * Fix compatibility with Elixir v1.13
+
 ## v0.5.5 (2024-08-01)
 
   * [`put_aws_sigv4`]: Fix detecting service
