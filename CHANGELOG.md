@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## v0.5.5 (2024-08-01)
+
+  * [`put_aws_sigv4`]: Fix detecting service
+
+  * [`put_aws_sigv4`]: Raise on no `:access_key_id`/`:secret_access_key`/`:service`
+
+  * [`put_aws_sigv4`]: Fix handling `?name` (no value)
+
+  * [`handle_http_errors`]: should run before `verify_checksum`
+
+  * [`encode_body`]: Support `%File.Stream{}` in `:form_multipart`
+
+  * [`encode_body`]: Support `%File.Stream{}` from other nodes in `:form_multipart`
+
 ## v0.5.4 (2024-07-18)
 
   * [`run_finch`], [`Req.parse_message/2`]: Gracefully handle process messages not meant
