@@ -42,6 +42,8 @@ defmodule Req.Utils do
 
     method = method |> Atom.to_string() |> String.upcase()
 
+    headers = canonical_host_header(headers, url)
+
     aws_headers = [
       {"x-amz-content-sha256", body_digest},
       {"x-amz-date", datetime_string}
@@ -154,7 +156,7 @@ defmodule Req.Utils do
         {"X-Amz-SignedHeaders", "host"}
       ])
 
-    canonical_headers = [{"host", URI.parse(url).host}]
+    canonical_headers = canonical_host_header([], url)
 
     signed_headers =
       Enum.map_intersperse(
@@ -200,6 +202,19 @@ defmodule Req.Utils do
       )
 
     put_in(url.query, canonical_query_string <> "&X-Amz-Signature=#{signature}")
+  end
+
+  defp canonical_host_header(headers, %URI{} = url) do
+    {_host_headers, headers} = Enum.split_with(headers, &match?({"host", _value}, &1))
+
+    host_value =
+      if is_nil(url.port) or URI.default_port(url.scheme) === url.port do
+        url.host
+      else
+        "#{url.host}:#{url.port}"
+      end
+
+    [{"host", host_value} | headers]
   end
 
   def aws_sigv4(
