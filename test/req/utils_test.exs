@@ -40,7 +40,7 @@ defmodule Req.UtilsTest do
                Enum.map(signature2, fn {name, value} -> {String.downcase(name), value} end)
     end
 
-    test "GET for s3 compatible service" do
+    test "custom port" do
       options = [
         access_key_id: "dummy-access-key-id",
         secret_access_key: "dummy-secret-access-key",
@@ -112,7 +112,7 @@ defmodule Req.UtilsTest do
       assert url1 == url2
     end
 
-    test "GET for s3 compatible service" do
+    test "custom port" do
       options = [
         access_key_id: "dummy-access-key-id",
         secret_access_key: "dummy-secret-access-key",

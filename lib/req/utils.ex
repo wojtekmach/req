@@ -208,7 +208,7 @@ defmodule Req.Utils do
     {_host_headers, headers} = Enum.split_with(headers, &match?({"host", _value}, &1))
 
     host_value =
-      if is_nil(url.port) or URI.default_port(url.scheme) === url.port do
+      if is_nil(url.port) or URI.default_port(url.scheme) == url.port do
         url.host
       else
         "#{url.host}:#{url.port}"
