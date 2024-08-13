@@ -39,6 +39,49 @@ defmodule Req.UtilsTest do
       assert signature1 ==
                Enum.map(signature2, fn {name, value} -> {String.downcase(name), value} end)
     end
+
+    test "custom port" do
+      options = [
+        access_key_id: "dummy-access-key-id",
+        secret_access_key: "dummy-secret-access-key",
+        region: "dummy-region",
+        service: "s3",
+        datetime: ~U[2024-01-01 09:00:00Z],
+        method: :get,
+        url: "https://s3-compatible.com:4433/foo/:bar",
+        headers: [],
+        body: ""
+      ]
+
+      signature1 = Req.Utils.aws_sigv4_headers(options)
+
+      signature2 =
+        Req.Utils.aws_sigv4_headers(
+          Keyword.put(options, :headers, [{"host", "s3-compatible.com"}])
+        )
+
+      signature3 =
+        :aws_signature.sign_v4(
+          Keyword.fetch!(options, :access_key_id),
+          Keyword.fetch!(options, :secret_access_key),
+          Keyword.fetch!(options, :region),
+          Keyword.fetch!(options, :service),
+          Keyword.fetch!(options, :datetime) |> NaiveDateTime.to_erl(),
+          Keyword.fetch!(options, :method) |> Atom.to_string() |> String.upcase(),
+          Keyword.fetch!(options, :url),
+          [{"host", "s3-compatible.com:4433"}],
+          Keyword.fetch!(options, :body),
+          Keyword.take(options, [:body_digest])
+        )
+
+      assert signature1 === signature2
+
+      assert signature1 ==
+               Enum.map(signature3, fn {name, value} -> {String.downcase(name), value} end)
+
+      assert signature2 ==
+               Enum.map(signature3, fn {name, value} -> {String.downcase(name), value} end)
+    end
   end
 
   describe "aws_sigv4_url" do
@@ -64,6 +107,33 @@ defmodule Req.UtilsTest do
         &X-Amz-Expires=86400\
         &X-Amz-SignedHeaders=host\
         &X-Amz-Signature=7fd16f0749b0902acde5a3d8933315006f2993b279b995cad880165ff4be75ff\
+        """
+
+      assert url1 == url2
+    end
+
+    test "custom port" do
+      options = [
+        access_key_id: "dummy-access-key-id",
+        secret_access_key: "dummy-secret-access-key",
+        region: "dummy-region",
+        service: "s3",
+        datetime: ~U[2024-01-01 09:00:00Z],
+        method: :get,
+        url: "https://s3-compatible.com:4433/foo/:bar"
+      ]
+
+      url1 = to_string(Req.Utils.aws_sigv4_url(options))
+
+      url2 =
+        """
+        https://s3-compatible.com:4433/foo/:bar?\
+        X-Amz-Algorithm=AWS4-HMAC-SHA256\
+        &X-Amz-Credential=dummy-access-key-id%2F20240101%2Fdummy-region%2Fs3%2Faws4_request\
+        &X-Amz-Date=20240101T090000Z\
+        &X-Amz-Expires=86400\
+        &X-Amz-SignedHeaders=host\
+        &X-Amz-Signature=860c79d524ea488a96b56d9e687348f108262738a5205f907cc0794f73d23403\
         """
 
       assert url1 == url2
