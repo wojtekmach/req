@@ -162,7 +162,7 @@ And here is how they can be used:
 Mix.install([
   {:req, "~> 0.5.0"},
   {:req_easyhtml, "~> 0.1.0"},
-  {:req_s3, "~> 0.2.0"},
+  {:req_s3, "~> 0.2.3"},
   {:req_hex, "~> 0.2.0"},
   {:req_github_oauth, "~> 0.1.0"}
 ])
