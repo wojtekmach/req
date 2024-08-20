@@ -1,5 +1,9 @@
-# Vendored from nimble_ownership v0.3.1, replacing NimbleOwnership.Error with
+# Vendored from nimble_ownership v1.0.0, replacing NimbleOwnership.Error with
 # Req.Test.OwnershipError.
+#
+# Check changes with:
+#
+#     git diff --no-index lib/req/test/ownership.ex ../nimble_ownership/lib/nimble_ownership.ex
 defmodule Req.Test.Ownership do
   @moduledoc false
 
@@ -328,13 +332,7 @@ defmodule Req.Test.Ownership do
     state.allowances
     |> Enum.reduce({[], [], false}, fn
       {key, value}, {result, resolved, unresolved} when is_function(key, 0) ->
-        case key.() do
-          pid when is_pid(pid) ->
-            {[{pid, value} | result], [{key, pid} | resolved], unresolved}
-
-          _ ->
-            {[{key, value} | result], resolved, true}
-        end
+        resolve_once(key.(), {key, value}, {result, resolved, unresolved})
 
       kv, {result, resolved, unresolved} ->
         {[kv | result], resolved, unresolved}
@@ -342,9 +340,39 @@ defmodule Req.Test.Ownership do
     |> fix_resolved(state)
   end
 
+  defp resolve_once(pid, {key, value}, {result, resolved, unresolved}) when is_pid(pid) do
+    {[{pid, value} | result], [{key, pid} | resolved], unresolved}
+  end
+
+  defp resolve_once([pid | pids], {key, value}, {result, resolved, unresolved})
+       when is_pid(pid) do
+    resolve_once(
+      pids,
+      {key, value},
+      {[{pid, value} | result], [{key, pid} | resolved], unresolved}
+    )
+  end
+
+  defp resolve_once([_not_a_pid | pids], kv, {result, resolved, _unresolved}) do
+    resolve_once(pids, kv, {[kv | result], resolved, true})
+  end
+
+  defp resolve_once([], _kv, {result, resolved, unresolved}) do
+    {result, resolved, unresolved}
+  end
+
+  defp resolve_once(_, kv, {result, resolved, _unresolved}) do
+    {[kv | result], resolved, true}
+  end
+
   defp fix_resolved({_, [], _}, state), do: state
 
   defp fix_resolved({allowances, _fun_to_pids, lazy_calls}, state) do
-    %__MODULE__{state | allowances: Map.new(allowances), lazy_calls: lazy_calls}
+    allowances =
+      Enum.reduce(allowances, %{}, fn {k, v}, acc ->
+        Map.update(acc, k, v, &Map.merge(&1, v))
+      end)
+
+    %__MODULE__{state | allowances: allowances, lazy_calls: lazy_calls}
   end
 end
