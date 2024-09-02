@@ -325,7 +325,7 @@ defmodule Req do
         * `false` - don't retry.
 
     * `:retry_delay` - if not set, which is the default, the retry delay is determined by
-      the value of `retry-delay` header on HTTP 429/503 responses. If the header is not set,
+      the value of the `Retry-After` header on HTTP 429/503 responses. If the header is not set,
       the default delay follows a simple exponential backoff: 1s, 2s, 4s, 8s, ...
 
       `:retry_delay` can be set to a function that receives the retry count (starting at 0)
