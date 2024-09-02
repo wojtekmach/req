@@ -35,7 +35,7 @@ write new ones.
 
   * Request body encoding. Supports urlencoded and multipart forms, and JSON. See [`encode_body`].
 
-  * Aautomatic response body decoding (via [`decode_body`] step.)
+  * Automatic response body decoding (via [`decode_body`] step.)
 
   * Encode params as query string (via [`put_params`] step.)
 
