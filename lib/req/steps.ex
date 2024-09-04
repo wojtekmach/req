@@ -761,15 +761,26 @@ defmodule Req.Steps do
       iex> Req.get!("http:///v1.41/_ping", unix_socket: "/var/run/docker.sock").body
       "OK"
 
-  Connecting with custom connection options:
+  Custom connection options:
 
       iex> Req.get!(url, connect_options: [timeout: 5000])
 
       iex> Req.get!(url, connect_options: [protocols: [:http2]])
 
-  Connecting with built-in CA store (requires OTP 25+):
+  Connecting without certificate check (useful in development, not recommended in production):
 
-      iex> Req.get!(url, connect_options: [transport_opts: [cacerts: :public_key.cacerts_get()]])
+      iex> Req.get!(url, connect_options: [transport_opts: [verify: :verify_none]])
+
+  Connecting through a proxy with basic authentication:
+
+      iex> Req.new(
+      ...>  url: "https://elixir-lang.org",
+      ...>  connect_options: [
+      ...>    proxy: {:http, "your.proxy.com", 8888, []},
+      ...>    proxy_headers: [{"proxy-authorization", "Basic " <> Base.encode64("user:pass")}]
+      ...>  ]
+      ...> )
+      iex> |> Req.get!()
 
   Transport errors are represented as `Req.TransportError` exceptions:
 
