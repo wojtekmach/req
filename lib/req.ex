@@ -406,16 +406,16 @@ defmodule Req do
     Performing a request through a proxy with basic authentication:
 
       iex> Req.new(
-      iex>  url: "https://www.google.com/",
-      iex>  connect_options: [
-      iex>    proxy_headers: [{"proxy-authorization", "Basic " <> Base.encode64("user:pass")}]
-      iex>  ],
-      iex>  proxy: {:http, "your.proxy.com", 8888, []},
-      iex>  transport_opts: [
-      iex>    # verify: :verify_none,
-      iex>    cacertfile: "/your/cert/File.pem"
-      iex>  ]
-      iex> )
+      ...>  url: "https://www.google.com/",
+      ...>  connect_options: [
+      ...>    proxy_headers: [{"proxy-authorization", "Basic " <> Base.encode64("user:pass")}]
+      ...>  ],
+      ...>  proxy: {:http, "your.proxy.com", 8888, []},
+      ...>  transport_opts: [
+      ...>    # verify: :verify_none,
+      ...>    cacertfile: "/your/cert/File.pem"
+      ...>  ]
+      ...> )
       iex> |> Req.get!()
 
   Fake adapter:
