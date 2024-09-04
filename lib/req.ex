@@ -403,6 +403,21 @@ defmodule Req do
       iex> URI.to_string(req.url)
       "https://elixir-lang.org"
 
+    Performing a request through a proxy with basic authentication:
+
+      iex> Req.new(
+      iex>  url: "https://www.google.com/",
+      iex>  connect_options: [
+      iex>    proxy_headers: [{"proxy-authorization", "Basic " <> Base.encode64("user:pass")}]
+      iex>  ],
+      iex>  proxy: {:http, "your.proxy.com", 8888, []},
+      iex>  transport_opts: [
+      iex>    # verify: :verify_none,
+      iex>    cacertfile: "/your/cert/File.pem"
+      iex>  ]
+      iex> )
+      iex> |> Req.get!()
+
   Fake adapter:
 
       iex> fake = fn request ->
