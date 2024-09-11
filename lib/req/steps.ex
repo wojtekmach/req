@@ -771,6 +771,10 @@ defmodule Req.Steps do
 
       iex> Req.get!(url, connect_options: [transport_opts: [verify: :verify_none]])
 
+  Connecting with custom certificates:
+
+      iex> Req.get!(url, connect_options: [transport_opts: [cacertfile: "certs.pem"]])
+
   Connecting through a proxy with basic authentication:
 
       iex> Req.new(

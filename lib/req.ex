@@ -40,6 +40,14 @@ defmodule Req do
       iex> Req.post!("https://httpbin.org/post", form: [comments: "hello!"]).body["form"]
       %{"comments" => "hello!"}
 
+  Set connection timeout:
+
+      iex> resp = Req.get!("https://httpbin.org", connect_options: [timeout: 100])
+      iex> resp.status
+      200
+
+  See [`run_finch`](`Req.Steps.run_finch/1`) for more connection related options and usage examples.
+
   Stream request body:
 
       iex> stream = Stream.duplicate("foo", 3)
