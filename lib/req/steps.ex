@@ -2109,14 +2109,12 @@ defmodule Req.Steps do
       fun when is_function(fun, 1) ->
         case fun.(retry_count) do
           delay when is_integer(delay) and delay >= 0 ->
-            delay
+            {request, delay}
 
           other ->
             raise ArgumentError,
                   "expected :retry_delay function to return non-negative integer, got: #{inspect(other)}"
         end
-
-        {request, fun.(retry_count)}
     end
   end
 
