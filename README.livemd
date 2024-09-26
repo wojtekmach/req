@@ -126,6 +126,7 @@ finch = Req.get!(req, url: "/repos/sneako/finch").body["description"]
 
 mint = Req.get!(req, url: "/repos/elixir-mint/mint").body["description"]
 # => "Functional HTTP client for Elixir with support for HTTP/1 and HTTP/2."
+
 %{finch: finch, mint: mint}
 ```
 
