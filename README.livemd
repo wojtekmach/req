@@ -125,8 +125,8 @@ finch = Req.get!(req, url: "/repos/sneako/finch").body["description"]
 # => "Elixir HTTP client, focused on performance"
 
 mint = Req.get!(req, url: "/repos/elixir-mint/mint").body["description"]
-%{finch: finch, mint: mint}
 # => "Functional HTTP client for Elixir with support for HTTP/1 and HTTP/2."
+%{finch: finch, mint: mint}
 ```
 
 See [`Req.new/1`] for more information on available options.
