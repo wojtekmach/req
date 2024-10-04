@@ -179,6 +179,9 @@ defmodule Req.Steps do
 
         * `{:bearer, token}` - uses Bearer HTTP authentication;
 
+        * `{:bearer, fn -> "eyJ0eXAi..." end}` - uses Bearer HTTP authentication with a dynamically generated token;
+          Must supply a 0-arity function that returns a valid token;
+
         * `:netrc` - load credentials from `.netrc` at path specified in `NETRC` environment variable.
           If `NETRC` is not set, load `.netrc` in user's home directory;
 
@@ -194,6 +197,8 @@ defmodule Req.Steps do
       iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, ""}).status
       401
       iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, "foo"}).status
+      200
+      iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, fn -> "foo" end}).status
       200
 
       iex> System.put_env("NETRC", "./test/my_netrc")
@@ -222,6 +227,10 @@ defmodule Req.Steps do
 
   defp auth(request, {:bearer, token}) when is_binary(token) do
     Req.Request.put_header(request, "authorization", "Bearer " <> token)
+  end
+
+  defp auth(request, {:bearer, token_generator}) when is_function(token_generator, 0) do
+    Req.Request.put_header(request, "authorization", "Bearer " <> token_generator.())
   end
 
   defp auth(request, :netrc) do
