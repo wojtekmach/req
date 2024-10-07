@@ -184,16 +184,22 @@ defmodule Req.Steps do
 
         * `{:netrc, path}` - load credentials from `path`
 
+        * `fn -> {:bearer, "eyJ0eXAi..." } end` - a 0-arity function that returns one of the aforementioned types.
+
   ## Examples
 
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:basic, "foo:foo"}).status
       401
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:basic, "foo:bar"}).status
       200
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: fn -> {:basic, "foo:bar"} end).status
+      200
 
       iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, ""}).status
       401
       iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, "foo"}).status
+      200
+      iex> Req.get!("https://httpbin.org/bearer", auth: fn -> {:bearer, "foo"} end).status
       200
 
       iex> System.put_env("NETRC", "./test/my_netrc")
@@ -201,6 +207,8 @@ defmodule Req.Steps do
       200
 
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:netrc, "./test/my_netrc"}).status
+      200
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: fn -> {:netrc, "./test/my_netrc"} end).status
       200
   """
   @doc step: :request
@@ -222,6 +230,16 @@ defmodule Req.Steps do
 
   defp auth(request, {:bearer, token}) when is_binary(token) do
     Req.Request.put_header(request, "authorization", "Bearer " <> token)
+  end
+
+  defp auth(request, fun) when is_function(fun, 0) do
+    value = fun.()
+
+    if is_function(value, 0) do
+      raise ArgumentError, "setting `auth: fn -> ... end` should not return another function"
+    end
+
+    auth(request, value)
   end
 
   defp auth(request, :netrc) do
