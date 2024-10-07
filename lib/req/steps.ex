@@ -179,13 +179,12 @@ defmodule Req.Steps do
 
         * `{:bearer, token}` - uses Bearer HTTP authentication;
 
-        * `{:bearer, fn -> "eyJ0eXAi..." end}` - uses Bearer HTTP authentication with a dynamically generated token;
-          Must supply a 0-arity function that returns a valid token;
-
         * `:netrc` - load credentials from `.netrc` at path specified in `NETRC` environment variable.
           If `NETRC` is not set, load `.netrc` in user's home directory;
 
         * `{:netrc, path}` - load credentials from `path`
+
+        * `fn -> {:bearer, "eyJ0eXAi..." } end` - a 0-arity function that returns one of the aforementioned types.
 
   ## Examples
 
@@ -193,12 +192,14 @@ defmodule Req.Steps do
       401
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:basic, "foo:bar"}).status
       200
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: fn -> {:basic, "foo:bar"} end).status
+      200
 
       iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, ""}).status
       401
       iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, "foo"}).status
       200
-      iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, fn -> "foo" end}).status
+      iex> Req.get!("https://httpbin.org/bearer", auth: fn -> {:bearer, "foo"} end).status
       200
 
       iex> System.put_env("NETRC", "./test/my_netrc")
@@ -206,6 +207,8 @@ defmodule Req.Steps do
       200
 
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:netrc, "./test/my_netrc"}).status
+      200
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: fn -> {:netrc, "./test/my_netrc"} end).status
       200
   """
   @doc step: :request
@@ -229,8 +232,14 @@ defmodule Req.Steps do
     Req.Request.put_header(request, "authorization", "Bearer " <> token)
   end
 
-  defp auth(request, {:bearer, token_generator}) when is_function(token_generator, 0) do
-    Req.Request.put_header(request, "authorization", "Bearer " <> token_generator.())
+  defp auth(request, auth_generator) when is_function(auth_generator, 0) do
+    generated_auth_val = auth_generator.()
+
+    if is_function(generated_auth_val , 0) do
+      IO.warn("setting `auth: fn -> ... end` should not return another function; ")
+    end
+
+    auth(request, generated_auth_val)
   end
 
   defp auth(request, :netrc) do

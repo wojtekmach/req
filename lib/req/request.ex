@@ -1256,8 +1256,8 @@ defmodule Req.Request do
       {:bearer, redact(bearer)}
     end
 
-    defp redact_option(:auth, {:bearer, token_generator}) when is_function(token_generator, 0) do
-      {:bearer, token_generator}
+    defp redact_option(:auth, auth_generator) when is_function(auth_generator, 0) do
+      auth_generator
     end
 
     defp redact_option(:auth, {:basic, userinfo}) do
