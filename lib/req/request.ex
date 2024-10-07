@@ -1252,7 +1252,7 @@ defmodule Req.Request do
       container_doc(open, list, close, opts, fun, separator: sep, break: :strict)
     end
 
-    defp redact_option(:auth, {:bearer, bearer}) when is_binary(bearer) do
+    defp redact_option(:auth, {:bearer, bearer}) do
       {:bearer, redact(bearer)}
     end
 
