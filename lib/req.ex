@@ -223,7 +223,7 @@ defmodule Req do
 
         * `string` - sets to this value.
 
-        * `&auth_generator/1` - a function that returns one of the above (such as a `{:bearer, token}`).
+        * `&fun/0` - a function that returns one of the above (such as a `{:bearer, token}`).
 
   Request body encoding options ([`encode_body`](`Req.Steps.encode_body/1`)):
 

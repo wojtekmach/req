@@ -232,14 +232,14 @@ defmodule Req.Steps do
     Req.Request.put_header(request, "authorization", "Bearer " <> token)
   end
 
-  defp auth(request, auth_generator) when is_function(auth_generator, 0) do
-    generated_auth_val = auth_generator.()
+  defp auth(request, fun) when is_function(fun, 0) do
+    value = fun.()
 
-    if is_function(generated_auth_val , 0) do
-      IO.warn("setting `auth: fn -> ... end` should not return another function; ")
+    if is_function(value, 0) do
+      raise ArgumentError, "setting `auth: fn -> ... end` should not return another function"
     end
 
-    auth(request, generated_auth_val)
+    auth(request, value)
   end
 
   defp auth(request, :netrc) do

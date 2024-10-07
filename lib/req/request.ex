@@ -1256,8 +1256,8 @@ defmodule Req.Request do
       {:bearer, redact(bearer)}
     end
 
-    defp redact_option(:auth, auth_generator) when is_function(auth_generator, 0) do
-      auth_generator
+    defp redact_option(:auth, fun) when is_function(fun, 0) do
+      fun
     end
 
     defp redact_option(:auth, {:basic, userinfo}) do
