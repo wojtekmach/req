@@ -95,4 +95,12 @@ defmodule ReqTest do
     resp = Req.get!(origin_url, into: :self)
     assert Req.put!(echo_url, body: resp.body).body == "foobarbaz"
   end
+
+  test "empty params", c do
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "")
+    end)
+
+    assert %Req.Response{status: 200} = Req.get!(c.url, params: nil)
+  end
 end
