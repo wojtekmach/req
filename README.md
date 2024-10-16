@@ -148,15 +148,9 @@ Req.get!(req, url: "/repos/wojtekmach/req").body["description"]
 #=> "Req is a batteries-included HTTP client for Elixir."
 ```
 
-Custom steps can be packaged into plugins so that they are even easier to use by others.
-Here are some examples:
+Custom steps can be packaged into plugins so that they are even easier to use by others. See [Related Packages](#related-packages).
 
-  * [`req_easyhtml`]
-  * [`req_s3`]
-  * [`req_hex`]
-  * [`req_github_oauth`]
-
-And here is how they can be used:
+Here is how they can be used:
 
 ```elixir
 Mix.install([
@@ -207,6 +201,16 @@ Req.get!(req, url: "https://api.github.com/user").body["login"]
 ```
 
 See [`Req.Request`] module documentation for more information on low-level API, request struct, and developing plugins.
+
+## Related Packages
+
+There are many packages that extend the Req library. To get yours listed here, send a PR.
+
+  * [`req_easyhtml`]
+  * [`req_s3`]
+  * [`req_hex`]
+  * [`req_github_oauth`]
+  * [`curl_req`]
 
 ## Presentations
 
@@ -270,3 +274,4 @@ limitations under the License.
 [`req_hex`]: https://github.com/wojtekmach/req_hex
 [`req_github_oauth`]: https://github.com/wojtekmach/req_github_oauth
 [`Mix.install/2`]: https://hexdocs.pm/mix/Mix.html#install/2
+[`curl_req`]: https://github.com/derekkraan/curl_req
