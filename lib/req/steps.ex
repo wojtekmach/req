@@ -535,10 +535,9 @@ defmodule Req.Steps do
   end
 
   defp put_params(request, []), do: request
-  defp put_params(request, nil), do: request
 
   defp put_params(request, params) do
-    encoded = URI.encode_query(params)
+    encoded = URI.encode_query(params || [])
 
     update_in(request.url.query, fn
       nil -> encoded

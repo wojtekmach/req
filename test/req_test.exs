@@ -96,11 +96,27 @@ defmodule ReqTest do
     assert Req.put!(echo_url, body: resp.body).body == "foobarbaz"
   end
 
-  test "empty params", c do
+  test "merge params" do
+    req = Req.new(url: "/", params: [a: 1])
+    assert %{options: %{params: [a: 1, b: 2]}} = Req.merge(req, params: [b: 2])
+  end
+
+  test "merge with empty params" do
+    req = Req.new(url: "/", params: nil)
+    assert %{options: %{params: [a: 1]}} = Req.merge(req, params: [a: 1])
+
+    req = Req.new(url: "/", params: [a: 1])
+    assert %{options: %{params: nil}} = Req.merge(req, params: nil)
+  end
+
+  test "request with empty params", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       Plug.Conn.send_resp(conn, 200, "")
     end)
 
+
+    assert {:ok, %Req.Response{}} = Req.get(Req.new(url: c.url, params: [a: 1]), params: nil)
+    assert {:ok, %Req.Response{}} = Req.get(Req.new(url: c.url, params: nil), params: [a: 1])
     assert %Req.Response{status: 200} = Req.get!(c.url, params: nil)
   end
 end

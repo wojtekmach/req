@@ -544,6 +544,12 @@ defmodule Req do
     update_in(
       request.options,
       &Map.merge(&1, Map.new(options), fn
+        :params, nil, new ->
+          new
+
+        :params, _old, nil ->
+          nil
+
         :params, old, new ->
           Keyword.merge(old, new)
 
