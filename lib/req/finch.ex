@@ -93,8 +93,11 @@ defmodule Req.Finch do
         {:cont, {req, %{resp | status: status}}}
 
       {:headers, fields}, {req, resp} ->
-        fields = finch_fields_to_map(fields)
-        resp = update_in(resp.headers, &Map.merge(&1, fields))
+        resp =
+          Enum.reduce(fields, resp, fn {name, value}, resp ->
+            Req.Response.put_header(resp, name, value)
+          end)
+
         {:cont, {req, resp}}
 
       {:data, data}, acc ->
@@ -135,9 +138,12 @@ defmodule Req.Finch do
       {:status, status}, {acc, req, resp} ->
         {acc, req, %{resp | status: status}}
 
-      {:headers, fields}, {acc, req, resp} ->
-        fields = finch_fields_to_map(fields)
-        resp = update_in(resp.headers, &Map.merge(&1, fields))
+      {:headers, headers}, {acc, req, resp} ->
+        resp =
+          Enum.reduce(headers, resp, fn {name, value}, resp ->
+            Req.Response.put_header(resp, name, value)
+          end)
+
         {acc, req, resp}
 
       {:data, data}, {acc, req, resp} ->
@@ -186,9 +192,7 @@ defmodule Req.Finch do
         {^ref, message} ->
           {:headers, headers} = message
 
-          Enum.reduce(headers, %{}, fn {name, value}, acc ->
-            Map.update(acc, name, [value], &(&1 ++ [value]))
-          end)
+          handle_finch_headers(headers)
       end
 
     async = %Req.Response.Async{
@@ -218,9 +222,7 @@ defmodule Req.Finch do
           # TODO: handle trailers
           {:headers, headers} = message
 
-          Enum.reduce(headers, %{}, fn {name, value}, acc ->
-            Map.update(acc, name, [value], &(&1 ++ [value]))
-          end)
+          handle_finch_headers(headers)
       end
 
     async = %Req.Response.Async{
@@ -266,6 +268,12 @@ defmodule Req.Finch do
     Enum.reduce(private_options, finch_request, fn {k, v}, acc_finch_req ->
       Finch.Request.put_private(acc_finch_req, k, v)
     end)
+  end
+
+  if Req.MixProject.legacy_headers_as_lists?() do
+    defp handle_finch_headers(headers), do: headers
+  else
+    defp handle_finch_headers(headers), do: finch_fields_to_map(headers)
   end
 
   defp finch_fields_to_map(fields) do
