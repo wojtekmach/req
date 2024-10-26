@@ -138,9 +138,9 @@ defmodule Req.Finch do
       {:status, status}, {acc, req, resp} ->
         {acc, req, %{resp | status: status}}
 
-      {:headers, headers}, {acc, req, resp} ->
+      {:headers, fields}, {acc, req, resp} ->
         resp =
-          Enum.reduce(headers, resp, fn {name, value}, resp ->
+          Enum.reduce(fields, resp, fn {name, value}, resp ->
             Req.Response.put_header(resp, name, value)
           end)
 
