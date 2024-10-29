@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## v0.5.7 (2024-10-29)
+
+  * [`put_aws_sigv4`]: Fix signature when using custom port
+
+  * [`retry`]: Do not call `retry_delay` fun twice
+
+  * [`auth`]: Support passing a 0-arity function
+
 ## v0.5.6 (2024-08-01)
 
   * Fix compatibility with Elixir v1.13
