@@ -201,7 +201,7 @@ defmodule Req.Utils do
         secret_access_key
       )
 
-    put_in(url.query, canonical_query_string <> "&X-Amz-Signature=#{signature}")
+    %{url | path: path, query: canonical_query_string <> "&X-Amz-Signature=#{signature}"}
   end
 
   defp canonical_host_header(headers, %URI{} = url) do

@@ -100,7 +100,7 @@ defmodule Req.UtilsTest do
 
       url2 =
         """
-        https://s3/foo/:bar?\
+        https://s3/foo/%3Abar?\
         X-Amz-Algorithm=AWS4-HMAC-SHA256\
         &X-Amz-Credential=dummy-access-key-id%2F20240101%2Fdummy-region%2Fs3%2Faws4_request\
         &X-Amz-Date=20240101T090000Z\
@@ -127,7 +127,7 @@ defmodule Req.UtilsTest do
 
       url2 =
         """
-        https://s3-compatible.com:4433/foo/:bar?\
+        https://s3-compatible.com:4433/foo/%3Abar?\
         X-Amz-Algorithm=AWS4-HMAC-SHA256\
         &X-Amz-Credential=dummy-access-key-id%2F20240101%2Fdummy-region%2Fs3%2Faws4_request\
         &X-Amz-Date=20240101T090000Z\
