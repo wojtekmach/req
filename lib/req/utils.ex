@@ -36,7 +36,7 @@ defmodule Req.Utils do
     datetime = DateTime.truncate(datetime, :second)
     datetime_string = DateTime.to_iso8601(datetime, :basic)
     date_string = Date.to_iso8601(datetime, :basic)
-    url = URI.parse(url)
+    url = normalize_url(url)
     body_digest = options[:body_digest] || hex(sha256(body))
     service = to_string(service)
 
@@ -144,7 +144,7 @@ defmodule Req.Utils do
     datetime = DateTime.truncate(datetime, :second)
     datetime_string = DateTime.to_iso8601(datetime, :basic)
     date_string = Date.to_iso8601(datetime, :basic)
-    url = URI.parse(url)
+    url = normalize_url(url)
     service = to_string(service)
 
     canonical_query_string =
@@ -202,6 +202,17 @@ defmodule Req.Utils do
       )
 
     %{url | path: path, query: canonical_query_string <> "&X-Amz-Signature=#{signature}"}
+  end
+
+  # Try decoding the path in case it was encoded earlier to prevent double encoding,
+  # as the path is encoded later in the corresponding function.
+  defp normalize_url(url) do
+    url = URI.parse(url)
+
+    case url.path do
+      nil -> url
+      path -> %{url | path: URI.decode(path)}
+    end
   end
 
   defp canonical_host_header(headers, %URI{} = url) do
