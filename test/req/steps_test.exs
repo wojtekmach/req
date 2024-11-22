@@ -1942,7 +1942,7 @@ defmodule Req.StepsTest do
             {:ok, conn} = Plug.Conn.chunk(conn, "bar")
             conn
           end,
-          into: []
+          into: File.stream!(file)
         )
 
       resp = Req.request!(req)
