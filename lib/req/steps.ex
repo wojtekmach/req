@@ -628,7 +628,7 @@ defmodule Req.Steps do
           stat.mtime
           |> NaiveDateTime.from_erl!()
           |> DateTime.from_naive!("Etc/UTC")
-          |> Req.Utils.format_http_datetime()
+          |> Req.Utils.format_http_date()
 
         Req.Request.put_new_header(request, "if-modified-since", http_datetime_string)
 

@@ -1549,7 +1549,7 @@ defmodule Req.StepsTest do
 
     defp retry_after(r, value), do: Req.Response.put_header(r, "retry-after", retry_after(value))
     defp retry_after(integer) when is_integer(integer), do: to_string(integer)
-    defp retry_after(%DateTime{} = dt), do: Req.Utils.format_http_datetime(dt)
+    defp retry_after(%DateTime{} = dt), do: Req.Utils.format_http_date(dt)
 
     @tag :capture_log
     test "always failing", c do

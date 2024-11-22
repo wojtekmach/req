@@ -1357,12 +1357,12 @@ defmodule Req do
   end
 
   defp encode_header_value(%DateTime{} = datetime) do
-    datetime |> DateTime.shift_zone!("Etc/UTC") |> Req.Utils.format_http_datetime()
+    datetime |> DateTime.shift_zone!("Etc/UTC") |> Req.Utils.format_http_date()
   end
 
   defp encode_header_value(%NaiveDateTime{} = datetime) do
     IO.warn("setting header to %NaiveDateTime{} is deprecated, use %DateTime{} instead")
-    Req.Utils.format_http_datetime(datetime)
+    Req.Utils.format_http_date(datetime)
   end
 
   defp encode_header_value(value) when is_binary(value) do

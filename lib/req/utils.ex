@@ -253,11 +253,97 @@ defmodule Req.Utils do
 
   ## Examples
 
-      iex> Req.Utils.format_http_datetime(~U[2024-01-01 09:00:00Z])
+      iex> Req.Utils.format_http_date(~U[2024-01-01 09:00:00Z])
       "Mon, 01 Jan 2024 09:00:00 GMT"
   """
-  def format_http_datetime(datetime) do
+  def format_http_date(datetime) do
     Calendar.strftime(datetime, "%a, %d %b %Y %H:%M:%S GMT")
+  end
+
+  @doc """
+  Parses "HTTP Date" as datetime.
+
+  ## Examples
+
+      iex> Req.Utils.parse_http_date("Mon, 01 Jan 2024 09:00:00 GMT")
+      {:ok, ~U[2024-01-01 09:00:00Z]}
+  """
+  def parse_http_date(<<
+        day_name::binary-size(3),
+        ", ",
+        day::binary-size(2),
+        " ",
+        month_name::binary-size(3),
+        " ",
+        year::binary-size(4),
+        " ",
+        time::binary-size(8),
+        " GMT"
+      >>) do
+    with {:ok, day_of_week} <- parse_day_name(day_name),
+         {day, ""} <- Integer.parse(day),
+         {:ok, month} <- parse_month_name(month_name),
+         {year, ""} <- Integer.parse(year),
+         {:ok, time} <- Time.from_iso8601(time),
+         {:ok, date} <- Date.new(year, month, day),
+         true <- day_of_week == Date.day_of_week(date) do
+      DateTime.new(date, time)
+    else
+      {:error, _} = e ->
+        e
+
+      _ ->
+        {:error, :invalid_format}
+    end
+  end
+
+  def parse_http_date(binary) when is_binary(binary) do
+    {:error, :invalid_format}
+  end
+
+  defp parse_month_name("Jan"), do: {:ok, 1}
+  defp parse_month_name("Feb"), do: {:ok, 2}
+  defp parse_month_name("Mar"), do: {:ok, 3}
+  defp parse_month_name("Apr"), do: {:ok, 4}
+  defp parse_month_name("May"), do: {:ok, 5}
+  defp parse_month_name("Jun"), do: {:ok, 6}
+  defp parse_month_name("Jul"), do: {:ok, 7}
+  defp parse_month_name("Aug"), do: {:ok, 8}
+  defp parse_month_name("Sep"), do: {:ok, 9}
+  defp parse_month_name("Oct"), do: {:ok, 10}
+  defp parse_month_name("Nov"), do: {:ok, 11}
+  defp parse_month_name("Dec"), do: {:ok, 12}
+  defp parse_month_name(_), do: :error
+
+  defp parse_day_name("Mon"), do: {:ok, 1}
+  defp parse_day_name("Tue"), do: {:ok, 2}
+  defp parse_day_name("Wed"), do: {:ok, 3}
+  defp parse_day_name("Thu"), do: {:ok, 4}
+  defp parse_day_name("Fri"), do: {:ok, 5}
+  defp parse_day_name("Sat"), do: {:ok, 6}
+  defp parse_day_name("Sun"), do: {:ok, 7}
+  defp parse_day_name(_), do: :error
+
+  @doc """
+  Parses "HTTP Date" as datetime or raises an error.
+
+  ## Examples
+
+      iex> Req.Utils.parse_http_date!("Mon, 01 Jan 2024 09:00:00 GMT")
+      ~U[2024-01-01 09:00:00Z]
+
+      iex> Req.Utils.parse_http_date!("Mon")
+      ** (ArgumentError) cannot parse "Mon" as HTTP date, reason: :invalid_format
+  """
+  def parse_http_date!(binary) do
+    case parse_http_date(binary) do
+      {:ok, datetime} ->
+        datetime
+
+      {:error, reason} ->
+        raise ArgumentError,
+              "cannot parse #{inspect(binary)} as HTTP date, reason: #{inspect(reason)}"
+    end
   end
 
   @doc """
