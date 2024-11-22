@@ -92,6 +92,9 @@ defmodule Req.Request do
 
               into: File.stream!("path")
 
+          Note that the collectable is only used, if the response status is 200. In other cases,
+          the body is accumulated and processed as usual.
+
     * `:options` - the options to be used by steps. The exact representation of options is private.
       Calling `request.options[key]`, `put_in(request.options[key], value)`, and
       `update_in(request.options[key], fun)` is allowed. `get_option/3` and `delete_option/2`

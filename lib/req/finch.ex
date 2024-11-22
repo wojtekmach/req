@@ -131,12 +131,16 @@ defmodule Req.Finch do
   end
 
   defp finch_stream_into_collectable(req, finch_req, finch_name, finch_options, collectable) do
-    {acc, collector} = Collectable.into(collectable)
     resp = Req.Response.new()
 
     fun = fn
-      {:status, status}, {acc, req, resp} ->
-        {acc, req, %{resp | status: status}}
+      {:status, 200}, {nil, req, resp} ->
+        {acc, collector} = Collectable.into(collectable)
+        {{acc, collector}, req, %{resp | status: 200}}
+
+      {:status, status}, {nil, req, resp} ->
+        {acc, collector} = Collectable.into("")
+        {{acc, collector}, req, %{resp | status: status}}
 
       {:headers, fields}, {acc, req, resp} ->
         resp =
@@ -146,9 +150,9 @@ defmodule Req.Finch do
 
         {acc, req, resp}
 
-      {:data, data}, {acc, req, resp} ->
+      {:data, data}, {{acc, collector}, req, resp} ->
         acc = collector.(acc, {:cont, data})
-        {acc, req, resp}
+        {{acc, collector}, req, resp}
 
       {:trailers, fields}, {acc, req, resp} ->
         fields = finch_fields_to_map(fields)
@@ -156,8 +160,8 @@ defmodule Req.Finch do
         {acc, req, resp}
     end
 
-    case Finch.stream(finch_req, finch_name, {acc, req, resp}, fun, finch_options) do
-      {:ok, {acc, req, resp}} ->
+    case Finch.stream(finch_req, finch_name, {nil, req, resp}, fun, finch_options) do
+      {:ok, {{acc, collector}, req, resp}} ->
         acc = collector.(acc, :done)
         {req, %{resp | body: acc}}
 

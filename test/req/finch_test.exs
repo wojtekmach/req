@@ -346,6 +346,42 @@ defmodule Req.FinchTest do
       assert resp.body == ["chunk1", "chunk2"]
     end
 
+    @tag :tmp_dir
+    test "into: collectable non-200", %{tmp_dir: tmp_dir} do
+      # Ignores the collectable and returns body as usual
+
+      File.mkdir_p!(tmp_dir)
+      file = Path.join(tmp_dir, "result.bin")
+
+      %{url: url} =
+        start_tcp_server(fn socket ->
+          {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
+
+          body = ~s|{"error": "not found"}|
+
+          data = """
+          HTTP/1.1 404 OK
+          content-length: #{byte_size(body)}
+          content-type: application/json
+
+          #{body}
+          """
+
+          :ok = :gen_tcp.send(socket, data)
+        end)
+
+      resp =
+        Req.get!(
+          url: url,
+          into: File.stream!(file)
+        )
+
+      assert resp.status == 404
+      assert resp.body == %{"error" => "not found"}
+
+      refute File.exists?(file)
+    end
+
     test "into: collectable handle error" do
       assert {:error, %Req.TransportError{reason: :econnrefused}} =
                Req.get(
