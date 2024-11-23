@@ -1927,12 +1927,8 @@ defmodule Req.StepsTest do
       refute_receive _
     end
 
-    @tag :tmp_dir
-    test "into: collectable non-200", %{tmp_dir: tmp_dir} do
+    test "into: collectable non-200" do
       # Ignores the collectable and returns body as usual
-
-      File.mkdir_p!(tmp_dir)
-      file = Path.join(tmp_dir, "result.bin")
 
       req =
         Req.new(
@@ -1942,15 +1938,13 @@ defmodule Req.StepsTest do
             {:ok, conn} = Plug.Conn.chunk(conn, "bar")
             conn
           end,
-          into: File.stream!(file)
+          into: :not_a_collectable
         )
 
       resp = Req.request!(req)
       assert resp.status == 404
       assert resp.body == "foobar"
       refute_receive _
-
-      refute File.exists?(file)
     end
 
     test "errors" do

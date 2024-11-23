@@ -346,28 +346,22 @@ defmodule Req.FinchTest do
       assert resp.body == ["chunk1", "chunk2"]
     end
 
-    @tag :tmp_dir
-    test "into: collectable non-200", %{tmp_dir: tmp_dir} do
+    test "into: collectable non-200" do
       # Ignores the collectable and returns body as usual
-
-      File.mkdir_p!(tmp_dir)
-      file = Path.join(tmp_dir, "result.bin")
 
       %{url: url} =
         start_http_server(fn conn ->
-          Req.Test.json(%{conn | status: 404}, %{error: :not_found})
+          Req.Test.json(%{conn | status: 404}, %{error: "not found"})
         end)
 
       resp =
         Req.get!(
           url: url,
-          into: File.stream!(file)
+          into: :not_a_collectable
         )
 
       assert resp.status == 404
       assert resp.body == %{"error" => "not found"}
-
-      refute File.exists?(file)
     end
 
     test "into: collectable handle error" do
