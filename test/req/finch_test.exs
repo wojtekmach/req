@@ -354,20 +354,8 @@ defmodule Req.FinchTest do
       file = Path.join(tmp_dir, "result.bin")
 
       %{url: url} =
-        start_tcp_server(fn socket ->
-          {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
-
-          body = ~s|{"error": "not found"}|
-
-          data = """
-          HTTP/1.1 404 OK
-          content-length: #{byte_size(body)}
-          content-type: application/json
-
-          #{body}
-          """
-
-          :ok = :gen_tcp.send(socket, data)
+        start_http_server(fn conn ->
+          Req.Test.json(%{conn | status: 404}, %{error: :not_found})
         end)
 
       resp =
