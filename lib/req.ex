@@ -285,6 +285,9 @@ defmodule Req do
 
                into: File.stream!("path")
 
+          Note that the collectable is only used, if the response status is 200. In other cases,
+          the body is accumulated and processed as usual.
+
         * `:self` - stream response body into the current process mailbox.
 
           Received messages should be parsed with `Req.parse_message/2`.

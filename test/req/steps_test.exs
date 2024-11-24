@@ -1927,6 +1927,26 @@ defmodule Req.StepsTest do
       refute_receive _
     end
 
+    test "into: collectable non-200" do
+      # Ignores the collectable and returns body as usual
+
+      req =
+        Req.new(
+          plug: fn conn ->
+            conn = Plug.Conn.send_chunked(conn, 404)
+            {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+            {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+            conn
+          end,
+          into: :not_a_collectable
+        )
+
+      resp = Req.request!(req)
+      assert resp.status == 404
+      assert resp.body == "foobar"
+      refute_receive _
+    end
+
     test "errors" do
       req =
         Req.new(

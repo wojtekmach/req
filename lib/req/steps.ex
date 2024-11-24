@@ -1032,17 +1032,20 @@ defmodule Req.Steps do
           end
 
         collectable ->
-          {acc, collector} = Collectable.into(collectable)
-
           response =
             Req.Response.new(
               status: conn.status,
               headers: conn.resp_headers
             )
 
-          acc = collector.(acc, {:cont, conn.resp_body})
-          acc = collector.(acc, :done)
-          {request, %{response | body: acc}}
+          if conn.status == 200 do
+            {acc, collector} = Collectable.into(collectable)
+            acc = collector.(acc, {:cont, conn.resp_body})
+            acc = collector.(acc, :done)
+            {request, %{response | body: acc}}
+          else
+            {request, %{response | body: conn.resp_body}}
+          end
       end
     end
 
