@@ -113,20 +113,12 @@ defmodule Req.Finch do
       {:ok, acc} ->
         acc
 
-      {:error, %Mint.TransportError{reason: reason}} ->
-        {req, %Req.TransportError{reason: reason}}
-
-      {:error, %Mint.HTTPError{module: Mint.HTTP1, reason: reason}} ->
-        {req, %Req.HTTPError{protocol: :http1, reason: reason}}
-
-      {:error, %Mint.HTTPError{module: Mint.HTTP2, reason: reason}} ->
-        {req, %Req.HTTPError{protocol: :http2, reason: reason}}
-
-      {:error, %Finch.Error{reason: reason}} ->
-        {req, %Req.HTTPError{protocol: :http2, reason: reason}}
-
+      # TODO: remove when we require Finch 0.20
       {:error, exception} ->
-        {req, exception}
+        {req, normalize_error(exception)}
+
+      {:error, exception, _acc} ->
+        {req, normalize_error(exception)}
     end
   end
 
@@ -167,6 +159,9 @@ defmodule Req.Finch do
 
       # TODO: remove when we require Finch 0.20
       {:error, exception} ->
+        {req, normalize_error(exception)}
+
+      {:error, exception, {nil, _req, _resp}} ->
         {req, normalize_error(exception)}
 
       {:error, exception, {{acc, collector}, _req, _resp}} ->
