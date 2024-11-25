@@ -365,6 +365,7 @@ defmodule Req.Finch do
   def pool_options(options) when is_map(options) do
     connect_options = options[:connect_options] || []
     inet6_options = options |> Map.take([:inet6]) |> Enum.to_list()
+    pool_options = options |> Map.take([:pool_max_idle_time]) |> Enum.to_list()
 
     Req.Request.validate_options(
       connect_options,
@@ -413,7 +414,8 @@ defmodule Req.Finch do
           [:http1]
       end
 
-    [protocols: protocols] ++
+    pool_options ++
+      [protocols: protocols] ++
       if conn_opts != [] do
         [conn_opts: conn_opts]
       else
