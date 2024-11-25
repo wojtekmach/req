@@ -165,24 +165,34 @@ defmodule Req.Finch do
         acc = collector.(acc, :done)
         {req, %{resp | body: acc}}
 
-      # TODO: call collector.(:halt) once {:error, error, acc} is
-      # returned on Finch v0.20
-
-      {:error, %Mint.TransportError{reason: reason}} ->
-        {req, %Req.TransportError{reason: reason}}
-
-      {:error, %Mint.HTTPError{module: Mint.HTTP1, reason: reason}} ->
-        {req, %Req.HTTPError{protocol: :http1, reason: reason}}
-
-      {:error, %Mint.HTTPError{module: Mint.HTTP2, reason: reason}} ->
-        {req, %Req.HTTPError{protocol: :http2, reason: reason}}
-
-      {:error, %Finch.Error{reason: reason}} ->
-        {req, %Req.HTTPError{protocol: :http2, reason: reason}}
-
+      # TODO: remove when we require Finch 0.20
       {:error, exception} ->
-        {req, exception}
+        {req, normalize_error(exception)}
+
+      {:error, exception, {{acc, collector}, _req, _resp}} ->
+        collector.(acc, :halt)
+        {req, normalize_error(exception)}
     end
+  end
+
+  defp normalize_error(%Mint.TransportError{reason: reason}) do
+    %Req.TransportError{reason: reason}
+  end
+
+  defp normalize_error(%Mint.HTTPError{module: Mint.HTTP1, reason: reason}) do
+    %Req.HTTPError{protocol: :http1, reason: reason}
+  end
+
+  defp normalize_error(%Mint.HTTPError{module: Mint.HTTP2, reason: reason}) do
+    %Req.HTTPError{protocol: :http2, reason: reason}
+  end
+
+  defp normalize_error(%Finch.Error{reason: reason}) do
+    %Req.HTTPError{protocol: :http2, reason: reason}
+  end
+
+  defp normalize_error(error) do
+    error
   end
 
   defp finch_stream_into_legacy_self(req, finch_req, finch_name, finch_options) do
