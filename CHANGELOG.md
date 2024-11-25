@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## HEAD
+
+  * [`Req`]: Check legacy headers when streaming headers
+
+  * [`Req`]: Ignore :into collectable for non-200 responses
+
+  * [`put_aws_sigv4`]: Fix encoding path
+
+  * [`run_finch`]: Add option to configure Finch `:pool_max_idle_time`
+
+  * [`run_finch`]: Prepare for upcoming Finch v0.20
+
 ## v0.5.7 (2024-10-29)
 
   * [`put_aws_sigv4`]: Fix signature when using custom port
