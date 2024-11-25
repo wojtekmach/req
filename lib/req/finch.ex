@@ -165,6 +165,9 @@ defmodule Req.Finch do
         acc = collector.(acc, :done)
         {req, %{resp | body: acc}}
 
+      # TODO: call collector.(:halt) once {:error, error, acc} is
+      # returned on Finch v0.20
+
       {:error, %Mint.TransportError{reason: reason}} ->
         {req, %Req.TransportError{reason: reason}}
 
