@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## HEAD
+## v0.5.8 (2024-11-29)
 
   * [`Req`]: Check legacy headers when streaming headers
 
