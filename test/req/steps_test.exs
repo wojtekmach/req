@@ -1947,6 +1947,30 @@ defmodule Req.StepsTest do
       refute_receive _
     end
 
+    test "into: self" do
+      req =
+        Req.new(
+          plug: fn conn ->
+            conn = Plug.Conn.send_chunked(conn, 200)
+            {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+            {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+            conn
+          end,
+          into: :self
+        )
+
+      resp = Req.request!(req)
+      assert resp.status == 200
+      assert {:ok, [data: "foobar"]} = Req.parse_message(resp, assert_receive(_))
+      assert {:ok, [:done]} = Req.parse_message(resp, assert_receive(_))
+      refute_receive _
+
+      resp = Req.request!(req)
+      assert resp.status == 200
+      assert Enum.to_list(resp.body) == ["foobar"]
+      refute_receive _
+    end
+
     test "errors" do
       req =
         Req.new(

@@ -1035,6 +1035,19 @@ defmodule Req.Steps do
               raise ArgumentError, "expected {:cont, acc}, got: #{inspect(other)}"
           end
 
+        :self ->
+          async = %Req.Response.Async{
+            pid: self(),
+            ref: make_ref(),
+            stream_fun: &plug_parse_message/2,
+            cancel_fun: &plug_cancel/1
+          }
+
+          resp = Req.Response.new(status: conn.status, headers: conn.resp_headers, body: async)
+          send(self(), {async.ref, {:data, conn.resp_body}})
+          send(self(), {async.ref, :done})
+          {request, resp}
+
         collectable ->
           response =
             Req.Response.new(
@@ -1050,6 +1063,31 @@ defmodule Req.Steps do
           else
             {request, %{response | body: conn.resp_body}}
           end
+      end
+    end
+
+    defp plug_parse_message(ref, {ref, {:data, data}}) do
+      {:ok, [data: data]}
+    end
+
+    defp plug_parse_message(ref, {ref, :done}) do
+      {:ok, [:done]}
+    end
+
+    defp plug_parse_message(_, _) do
+      :unknown
+    end
+
+    defp plug_cancel(ref) do
+      plug_clean_responses(ref)
+      :ok
+    end
+
+    defp plug_clean_responses(ref) do
+      receive do
+        {^ref, _} -> plug_clean_responses(ref)
+      after
+        0 -> :ok
       end
     end
 

@@ -244,8 +244,7 @@ defmodule Req.Finch do
       cancel_fun: &cancel/1
     }
 
-    resp = Req.Response.new(status: status, headers: headers)
-    resp = put_in(resp.body, async)
+    resp = Req.Response.new(status: status, headers: headers, body: async)
     {req, resp}
   end
 
