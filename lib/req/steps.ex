@@ -1390,7 +1390,7 @@ defmodule Req.Steps do
 
   ## Options
 
-    * `:raw` - if set to `true`, disables response body decompression. Defaults to `false`.
+    * `:raw` - if set to `true`, disables response body decompression & decoding. Defaults to `false`.
 
   ## Examples
 
@@ -1582,7 +1582,7 @@ defmodule Req.Steps do
 
     * `:decode_json` - options to pass to `Jason.decode/2`, defaults to `[]`.
 
-    * `:raw` - if set to `true`, disables response body decoding. Defaults to `false`.
+    * `:raw` - if set to `true`, disables response body decoding & decompression. Defaults to `false`.
 
   ## Examples
 
