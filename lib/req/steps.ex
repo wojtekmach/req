@@ -1390,7 +1390,9 @@ defmodule Req.Steps do
 
   ## Options
 
-    * `:raw` - if set to `true`, disables response body decompression & decoding. Defaults to `false`.
+    * `:raw` - if set to `true`, disables response body decompression. Defaults to `false`.
+    
+      Note: `:raw` option also disables response body decoding in the `decode_body/1` step.
 
   ## Examples
 
