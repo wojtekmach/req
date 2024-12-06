@@ -1,17 +1,5 @@
 # Vendored from nimble_ownership. See Req.Test.Ownership.
 defmodule Req.Test.OwnershipError do
-  @moduledoc false
-
-  @type t() :: %__MODULE__{
-          reason:
-            {:already_allowed, pid()}
-            | :not_allowed
-            | :already_an_owner
-            | :cant_allow_in_shared_mode
-            | {:not_shared_owner, pid()},
-          key: Req.Test.Ownership.key()
-        }
-
   defexception [:reason, :key]
 
   @impl true

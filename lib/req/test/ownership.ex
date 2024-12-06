@@ -1,4 +1,4 @@
-# Vendored from nimble_ownership v1.0.0, replacing NimbleOwnership.Error with
+# Vendored from nimble_ownership v1.0.1, replacing NimbleOwnership.Error with
 # Req.Test.OwnershipError.
 #
 # Check changes with:
@@ -41,8 +41,9 @@ defmodule Req.Test.Ownership do
     GenServer.start_link(__MODULE__, [], genserver_opts)
   end
 
-  @spec allow(server(), pid(), pid() | (-> pid()), key()) ::
+  @spec allow(server(), pid(), pid() | (-> resolved_pid), key()) ::
           :ok | {:error, Error.t()}
+        when resolved_pid: pid() | [pid()]
   def allow(ownership_server, pid_with_access, pid_to_allow, key, timeout \\ 5000)
       when is_pid(pid_with_access) and (is_pid(pid_to_allow) or is_function(pid_to_allow, 0)) and
              is_timeout(timeout) do
@@ -117,10 +118,7 @@ defmodule Req.Test.Ownership do
     allowances: %{},
 
     # This is used to track which PIDs we're monitoring, to avoid double-monitoring.
-    monitored_pids: MapSet.new(),
-
-    # This boolean field tracks whether there are any lazy calls in the allowances.
-    lazy_calls: false
+    monitored_pids: MapSet.new()
   ]
 
   ## Callbacks
@@ -180,15 +178,12 @@ defmodule Req.Test.Ownership do
           state
           |> maybe_monitor_pid(pid_with_access)
           |> put_in([Access.key!(:allowances), Access.key(pid_to_allow, %{}), key], owner_pid)
-          |> update_in([Access.key!(:lazy_calls)], &(&1 or is_function(pid_to_allow, 0)))
 
         {:reply, :ok, state}
     end
   end
 
   def handle_call({:get_and_update, owner_pid, key, fun}, _from, %__MODULE__{} = state) do
-    state = revalidate_lazy_calls(state)
-
     case state.mode do
       {:shared, shared_owner_pid} when shared_owner_pid != owner_pid ->
         error = %Error{key: key, reason: {:not_shared_owner, shared_owner_pid}}
@@ -197,6 +192,8 @@ defmodule Req.Test.Ownership do
       _ ->
         :ok
     end
+
+    state = resolve_lazy_calls_for_key(state, key)
 
     if other_owner = state.allowances[owner_pid][key] do
       throw({:reply, {:error, %Error{key: key, reason: {:already_allowed, other_owner}}}, state})
@@ -238,15 +235,21 @@ defmodule Req.Test.Ownership do
   end
 
   def handle_call({:fetch_owner, callers, key}, _from, %__MODULE__{mode: :private} = state) do
-    state = revalidate_lazy_calls(state)
+    {owner, state} =
+      case fetch_owner_once(state, callers, key) do
+        nil ->
+          state = resolve_lazy_calls_for_key(state, key)
+          {fetch_owner_once(state, callers, key), state}
 
-    Enum.find_value(callers, {:reply, :error, state}, fn caller ->
-      cond do
-        owner_pid = state.allowances[caller][key] -> {:reply, {:ok, owner_pid}, state}
-        _meta = state.owners[caller][key] -> {:reply, {:ok, caller}, state}
-        true -> nil
+        owner ->
+          {owner, state}
       end
-    end)
+
+    if is_nil(owner) do
+      {:reply, :error, state}
+    else
+      {:reply, {:ok, owner}, state}
+    end
   end
 
   def handle_call({:get_owned, owner_pid, default}, _from, %__MODULE__{} = state) do
@@ -328,51 +331,38 @@ defmodule Req.Test.Ownership do
     end
   end
 
-  defp revalidate_lazy_calls(state) do
-    state.allowances
-    |> Enum.reduce({[], [], false}, fn
-      {key, value}, {result, resolved, unresolved} when is_function(key, 0) ->
-        resolve_once(key.(), {key, value}, {result, resolved, unresolved})
-
-      kv, {result, resolved, unresolved} ->
-        {[kv | result], resolved, unresolved}
+  defp fetch_owner_once(state, callers, key) do
+    Enum.find_value(callers, fn caller ->
+      case state do
+        %{owners: %{^caller => %{^key => _meta}}} -> caller
+        %{allowances: %{^caller => %{^key => owner_pid}}} -> owner_pid
+        _ -> nil
+      end
     end)
-    |> fix_resolved(state)
   end
 
-  defp resolve_once(pid, {key, value}, {result, resolved, unresolved}) when is_pid(pid) do
-    {[{pid, value} | result], [{key, pid} | resolved], unresolved}
-  end
+  defp resolve_lazy_calls_for_key(state, key) do
+    updated_allowances =
+      Enum.reduce(state.allowances, state.allowances, fn
+        {fun, value}, allowances when is_function(fun, 0) and is_map_key(value, key) ->
+          result =
+            fun.()
+            |> List.wrap()
+            |> Enum.group_by(&is_pid/1)
 
-  defp resolve_once([pid | pids], {key, value}, {result, resolved, unresolved})
-       when is_pid(pid) do
-    resolve_once(
-      pids,
-      {key, value},
-      {[{pid, value} | result], [{key, pid} | resolved], unresolved}
-    )
-  end
+          allowances =
+            result
+            |> Map.get(true, [])
+            |> Enum.reduce(allowances, fn pid, allowances ->
+              Map.update(allowances, pid, value, &Map.merge(&1, value))
+            end)
 
-  defp resolve_once([_not_a_pid | pids], kv, {result, resolved, _unresolved}) do
-    resolve_once(pids, kv, {[kv | result], resolved, true})
-  end
+          if Map.has_key?(allowances, false), do: Map.delete(allowances, fun), else: allowances
 
-  defp resolve_once([], _kv, {result, resolved, unresolved}) do
-    {result, resolved, unresolved}
-  end
-
-  defp resolve_once(_, kv, {result, resolved, _unresolved}) do
-    {[kv | result], resolved, true}
-  end
-
-  defp fix_resolved({_, [], _}, state), do: state
-
-  defp fix_resolved({allowances, _fun_to_pids, lazy_calls}, state) do
-    allowances =
-      Enum.reduce(allowances, %{}, fn {k, v}, acc ->
-        Map.update(acc, k, v, &Map.merge(&1, v))
+        _, allowances ->
+          allowances
       end)
 
-    %__MODULE__{state | allowances: allowances, lazy_calls: lazy_calls}
+    %{state | allowances: updated_allowances}
   end
 end
