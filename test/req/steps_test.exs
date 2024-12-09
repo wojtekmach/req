@@ -1006,7 +1006,7 @@ defmodule Req.StepsTest do
 
     {resp, log} =
       ExUnit.CaptureLog.with_log(fn ->
-        Req.get!("", plug: plug)
+        Req.get!(plug: plug)
       end)
 
     assert resp.body |> :zlib.uncompress() |> Jason.decode!() == %{"a" => 1}
@@ -1014,26 +1014,28 @@ defmodule Req.StepsTest do
   end
 
   describe "redirect" do
-    test "ignore when :redirect is false", c do
-      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
-        redirect(conn, 302, c.url <> "/ok")
-      end)
+    test "ignore when :redirect is false" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          redirect(conn, 302, "/ok")
+        end)
 
-      assert Req.get!(c.url <> "/redirect", redirect: false).status == 302
+      assert Req.get!("#{url}/redirect", redirect: false).status == 302
     end
 
-    test "absolute", c do
-      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
-        redirect(conn, 302, c.url <> "/ok")
-      end)
+    test "absolute" do
+      %{url: url} =
+        start_http_server(fn
+          conn when conn.request_path == "/redirect" ->
+            redirect(conn, 302, "http://localhost:#{conn.port}/ok")
 
-      Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-        Plug.Conn.send_resp(conn, 200, "ok")
-      end)
+          conn when conn.request_path == "/ok" ->
+            redirect(conn, 200, "/ok")
+        end)
 
       assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.get!(c.url <> "/redirect").status == 200
-             end) =~ "[debug] redirecting to #{c.url}/ok"
+               assert Req.get!("#{url}/redirect", retry: false).status == 200
+             end) =~ "[debug] redirecting to #{url}/ok"
     end
 
     test "relative", c do
