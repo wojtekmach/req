@@ -204,9 +204,9 @@ See [`Req.Request`] module documentation for more information on low-level API, 
 
 ## Configuration
 
-Req aims to work without global configuration to promote explicitness.
-However, you might need to adapt the HTTP pools used.
-Refer to the [`run_finch`] documentation for more information on this.
+Req supports many configuration options, see [`Req.new/1`] for a full list and see each step for
+more details. In particular, if you are looking for slightly lower level HTTP options like for
+example timeouts, pool sizes, and certificates, see [`run_finch`] documentation.
 
 ## Related Packages
 
