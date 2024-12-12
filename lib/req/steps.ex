@@ -714,6 +714,24 @@ defmodule Req.Steps do
 
       Req.get!("https://httpbin.org/json", finch: MyFinch)
 
+  More commonly you'd add the the custom Finch pool as part of your supervision tree in your
+  `application.ex`:
+
+      children = [
+        {Finch,
+         name: MyFinch,
+         pools: %{
+           default: [size: 70]
+         }}
+      ]
+
+  That way you can also configure a bigger pool size for the HTTP pool. You just mustn't forget to
+  pass along `finch: MyFinch` as discussed above. You could use `Req.default_options/1` to make it
+  a global default but it's generally discouraged.
+
+  For documentation about the possible pool options and their meaning, please check out the
+  [Finch docs on pool configuration options](https://hexdocs.pm/finch/Finch.html#start_link/1-pool-configuration-options).
+
   ## Request Options
 
     * `:finch` - the name of the Finch pool. Defaults to a pool automatically started by Req.
