@@ -719,10 +719,10 @@ defmodule Req.Steps do
 
       children = [
         {Finch,
-        name: MyFinch,
-        pools: %{
-          :default => [size: 70]
-        }}
+         name: MyFinch,
+         pools: %{
+           default: [size: 70]
+         }}
       ]
 
   That way you can also configure a bigger pool size for the HTTP pool. You just mustn't forget to
