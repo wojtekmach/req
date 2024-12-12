@@ -212,7 +212,7 @@ See [`Req.Request`] module documentation for more information on low-level API, 
 
 Req aims to work without global configuration to promote explicitness.
 However, you might need to adapt the HTTP pools used.
-Refer to the [`run_finch`] documenation for more information on this.
+Refer to the [`run_finch`] documentation for more information on this.
 
 ## Presentations
 
