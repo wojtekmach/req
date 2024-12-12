@@ -92,6 +92,9 @@ defmodule Req.Request do
 
               into: File.stream!("path")
 
+          Note that the collectable is only used, if the response status is 200. In other cases,
+          the body is accumulated and processed as usual.
+
     * `:options` - the options to be used by steps. The exact representation of options is private.
       Calling `request.options[key]`, `put_in(request.options[key], value)`, and
       `update_in(request.options[key], fun)` is allowed. `get_option/3` and `delete_option/2`
@@ -1254,6 +1257,10 @@ defmodule Req.Request do
 
     defp redact_option(:auth, {:bearer, bearer}) do
       {:bearer, redact(bearer)}
+    end
+
+    defp redact_option(:auth, fun) when is_function(fun, 0) do
+      fun
     end
 
     defp redact_option(:auth, {:basic, userinfo}) do

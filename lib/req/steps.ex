@@ -59,6 +59,7 @@ defmodule Req.Steps do
       :receive_timeout,
       :pool_timeout,
       :unix_socket,
+      :pool_max_idle_time,
 
       # TODO: Remove on Req 1.0
       :output,
@@ -83,11 +84,11 @@ defmodule Req.Steps do
     )
     |> Req.Request.prepend_response_steps(
       retry: &Req.Steps.retry/1,
+      handle_http_errors: &Req.Steps.handle_http_errors/1,
       redirect: &Req.Steps.redirect/1,
       decompress_body: &Req.Steps.decompress_body/1,
       verify_checksum: &Req.Steps.verify_checksum/1,
       decode_body: &Req.Steps.decode_body/1,
-      handle_http_errors: &Req.Steps.handle_http_errors/1,
       output: &Req.Steps.output/1
     )
     |> Req.Request.prepend_error_steps(retry: &Req.Steps.retry/1)
@@ -184,16 +185,22 @@ defmodule Req.Steps do
 
         * `{:netrc, path}` - load credentials from `path`
 
+        * `fn -> {:bearer, "eyJ0eXAi..." } end` - a 0-arity function that returns one of the aforementioned types.
+
   ## Examples
 
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:basic, "foo:foo"}).status
       401
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:basic, "foo:bar"}).status
       200
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: fn -> {:basic, "foo:bar"} end).status
+      200
 
       iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, ""}).status
       401
       iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, "foo"}).status
+      200
+      iex> Req.get!("https://httpbin.org/bearer", auth: fn -> {:bearer, "foo"} end).status
       200
 
       iex> System.put_env("NETRC", "./test/my_netrc")
@@ -201,6 +208,8 @@ defmodule Req.Steps do
       200
 
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:netrc, "./test/my_netrc"}).status
+      200
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: fn -> {:netrc, "./test/my_netrc"} end).status
       200
   """
   @doc step: :request
@@ -222,6 +231,16 @@ defmodule Req.Steps do
 
   defp auth(request, {:bearer, token}) when is_binary(token) do
     Req.Request.put_header(request, "authorization", "Bearer " <> token)
+  end
+
+  defp auth(request, fun) when is_function(fun, 0) do
+    value = fun.()
+
+    if is_function(value, 0) do
+      raise ArgumentError, "setting `auth: fn -> ... end` should not return another function"
+    end
+
+    auth(request, value)
   end
 
   defp auth(request, :netrc) do
@@ -417,6 +436,7 @@ defmodule Req.Steps do
 
         %{request | body: multipart.body}
         |> Req.Request.put_new_header("content-type", multipart.content_type)
+        |> Req.Request.put_new_header("content-length", Integer.to_string(multipart.size))
 
       data = request.options[:json] ->
         %{request | body: Jason.encode_to_iodata!(data)}
@@ -609,7 +629,7 @@ defmodule Req.Steps do
           stat.mtime
           |> NaiveDateTime.from_erl!()
           |> DateTime.from_naive!("Etc/UTC")
-          |> Req.Utils.format_http_datetime()
+          |> Req.Utils.format_http_date()
 
         Req.Request.put_new_header(request, "if-modified-since", http_datetime_string)
 
@@ -749,6 +769,9 @@ defmodule Req.Steps do
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket.
 
+    * `:pool_max_idle_time` - the maximum number of milliseconds that a pool can be
+      idle before being terminated, used only by HTTP1 pools. Default to `:infinity`.
+
     * `:finch_private` - a map or keyword list of private metadata to add to the Finch request.
       May be useful for adding custom data when handling telemetry with `Finch.Telemetry`.
 
@@ -778,15 +801,30 @@ defmodule Req.Steps do
       iex> Req.get!("http:///v1.41/_ping", unix_socket: "/var/run/docker.sock").body
       "OK"
 
-  Connecting with custom connection options:
+  Custom connection options:
 
       iex> Req.get!(url, connect_options: [timeout: 5000])
 
       iex> Req.get!(url, connect_options: [protocols: [:http2]])
 
-  Connecting with built-in CA store (requires OTP 25+):
+  Connecting without certificate check (useful in development, not recommended in production):
 
-      iex> Req.get!(url, connect_options: [transport_opts: [cacerts: :public_key.cacerts_get()]])
+      iex> Req.get!(url, connect_options: [transport_opts: [verify: :verify_none]])
+
+  Connecting with custom certificates:
+
+      iex> Req.get!(url, connect_options: [transport_opts: [cacertfile: "certs.pem"]])
+
+  Connecting through a proxy with basic authentication:
+
+      iex> Req.new(
+      ...>  url: "https://elixir-lang.org",
+      ...>  connect_options: [
+      ...>    proxy: {:http, "your.proxy.com", 8888, []},
+      ...>    proxy_headers: [{"proxy-authorization", "Basic " <> Base.encode64("user:pass")}]
+      ...>  ]
+      ...> )
+      iex> |> Req.get!()
 
   Transport errors are represented as `Req.TransportError` exceptions:
 
@@ -1015,18 +1053,59 @@ defmodule Req.Steps do
               raise ArgumentError, "expected {:cont, acc}, got: #{inspect(other)}"
           end
 
-        collectable ->
-          {acc, collector} = Collectable.into(collectable)
+        :self ->
+          async = %Req.Response.Async{
+            pid: self(),
+            ref: make_ref(),
+            stream_fun: &plug_parse_message/2,
+            cancel_fun: &plug_cancel/1
+          }
 
+          resp = Req.Response.new(status: conn.status, headers: conn.resp_headers, body: async)
+          send(self(), {async.ref, {:data, conn.resp_body}})
+          send(self(), {async.ref, :done})
+          {request, resp}
+
+        collectable ->
           response =
             Req.Response.new(
               status: conn.status,
               headers: conn.resp_headers
             )
 
-          acc = collector.(acc, {:cont, conn.resp_body})
-          acc = collector.(acc, :done)
-          {request, %{response | body: acc}}
+          if conn.status == 200 do
+            {acc, collector} = Collectable.into(collectable)
+            acc = collector.(acc, {:cont, conn.resp_body})
+            acc = collector.(acc, :done)
+            {request, %{response | body: acc}}
+          else
+            {request, %{response | body: conn.resp_body}}
+          end
+      end
+    end
+
+    defp plug_parse_message(ref, {ref, {:data, data}}) do
+      {:ok, [data: data]}
+    end
+
+    defp plug_parse_message(ref, {ref, :done}) do
+      {:ok, [:done]}
+    end
+
+    defp plug_parse_message(_, _) do
+      :unknown
+    end
+
+    defp plug_cancel(ref) do
+      plug_clean_responses(ref)
+      :ok
+    end
+
+    defp plug_clean_responses(ref) do
+      receive do
+        {^ref, _} -> plug_clean_responses(ref)
+      after
+        0 -> :ok
       end
     end
 
@@ -1209,7 +1288,6 @@ defmodule Req.Steps do
         |> Keyword.put_new(:datetime, DateTime.utc_now())
         # aws_credentials returns this key so let's ignore it
         |> Keyword.drop([:credential_provider])
-        |> maybe_put_aws_service(request.url)
 
       Req.Request.validate_options(aws_options, [
         :access_key_id,
@@ -1222,6 +1300,16 @@ defmodule Req.Steps do
         # for req_s3
         :expires
       ])
+
+      unless aws_options[:access_key_id] do
+        raise ArgumentError, "missing :access_key_id in :aws_sigv4 option"
+      end
+
+      unless aws_options[:secret_access_key] do
+        raise ArgumentError, "missing :secret_access_key in :aws_sigv4 option"
+      end
+
+      aws_options = ensure_aws_service(aws_options, request.url)
 
       {body, options} =
         case request.body do
@@ -1260,20 +1348,20 @@ defmodule Req.Steps do
     end
   end
 
-  defp maybe_put_aws_service(options, url) do
+  defp ensure_aws_service(options, url) do
     if options[:service] do
       options
     else
       if service = detect_aws_service(url) do
         Keyword.put(options, :service, service)
       else
-        options
+        raise ArgumentError, "missing :service in :aws_sigv4 option"
       end
     end
   end
 
   defp detect_aws_service(%URI{} = url) do
-    parts = url.host |> String.split(".") |> Enum.reverse()
+    parts = (url.host || "") |> String.split(".") |> Enum.reverse()
 
     with ["com", "amazonaws" | rest] <- parts do
       case rest do
@@ -1359,6 +1447,8 @@ defmodule Req.Steps do
   ## Options
 
     * `:raw` - if set to `true`, disables response body decompression. Defaults to `false`.
+    
+      Note: setting `raw: true` also disables response body decoding in the `decode_body/1` step.
 
   ## Examples
 
@@ -1551,6 +1641,9 @@ defmodule Req.Steps do
     * `:decode_json` - options to pass to `Jason.decode/2`, defaults to `[]`.
 
     * `:raw` - if set to `true`, disables response body decoding. Defaults to `false`.
+
+      Note: setting `raw: true` also disables response body decompression in the
+      `decompress_body/1` step.
 
   ## Examples
 
@@ -1943,7 +2036,7 @@ defmodule Req.Steps do
         * `false` - don't retry.
 
     * `:retry_delay` - if not set, which is the default, the retry delay is determined by
-      the value of `retry-delay` header on HTTP 429/503 responses. If the header is not set,
+      the value of the `Retry-After` header on HTTP 429/503 responses. If the header is not set,
       the default delay follows a simple exponential backoff: 1s, 2s, 4s, 8s, ...
 
       `:retry_delay` can be set to a function that receives the retry count (starting at 0)
@@ -2102,14 +2195,12 @@ defmodule Req.Steps do
       fun when is_function(fun, 1) ->
         case fun.(retry_count) do
           delay when is_integer(delay) and delay >= 0 ->
-            delay
+            {request, delay}
 
           other ->
             raise ArgumentError,
                   "expected :retry_delay function to return non-negative integer, got: #{inspect(other)}"
         end
-
-        {request, fun.(retry_count)}
     end
   end
 

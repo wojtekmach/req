@@ -1,7 +1,7 @@
 defmodule Req.MixProject do
   use Mix.Project
 
-  @version "0.5.4"
+  @version "0.5.8"
   @source_url "https://github.com/wojtekmach/req"
 
   def project do
@@ -63,7 +63,8 @@ defmodule Req.MixProject do
       {:aws_signature, "~> 0.3.2", only: :test},
       {:bypass, "~> 2.1", only: :test},
       {:ex_doc, ">= 0.0.0", only: :docs},
-      {:bandit, "~> 1.0", only: :test}
+      {:bandit, "~> 1.0", only: :test},
+      {:castore, "~> 1.0", only: :test}
     ]
   end
 

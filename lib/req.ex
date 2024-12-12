@@ -40,6 +40,14 @@ defmodule Req do
       iex> Req.post!("https://httpbin.org/post", form: [comments: "hello!"]).body["form"]
       %{"comments" => "hello!"}
 
+  Set connection timeout:
+
+      iex> resp = Req.get!("https://httpbin.org", connect_options: [timeout: 100])
+      iex> resp.status
+      200
+
+  See [`run_finch`](`Req.Steps.run_finch/1`) for more connection related options and usage examples.
+
   Stream request body:
 
       iex> stream = Stream.duplicate("foo", 3)
@@ -215,6 +223,8 @@ defmodule Req do
 
         * `string` - sets to this value.
 
+        * `&fun/0` - a function that returns one of the above (such as a `{:bearer, token}`).
+
   Request body encoding options ([`encode_body`](`Req.Steps.encode_body/1`)):
 
     * `:form` - if set, encodes the request body as `application/x-www-form-urlencoded`
@@ -275,6 +285,9 @@ defmodule Req do
 
                into: File.stream!("path")
 
+          Note that the collectable is only used, if the response status is 200. In other cases,
+          the body is accumulated and processed as usual.
+
         * `:self` - stream response body into the current process mailbox.
 
           Received messages should be parsed with `Req.parse_message/2`.
@@ -325,7 +338,7 @@ defmodule Req do
         * `false` - don't retry.
 
     * `:retry_delay` - if not set, which is the default, the retry delay is determined by
-      the value of `retry-delay` header on HTTP 429/503 responses. If the header is not set,
+      the value of the `Retry-After` header on HTTP 429/503 responses. If the header is not set,
       the default delay follows a simple exponential backoff: 1s, 2s, 4s, 8s, ...
 
       `:retry_delay` can be set to a function that receives the retry count (starting at 0)
@@ -389,6 +402,9 @@ defmodule Req do
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket.
+
+    * `:pool_max_idle_time` - the maximum number of milliseconds that a pool can be
+      idle before being terminated, used only by HTTP1 pools. Default to `:infinity`.
 
     * `:finch_private` - a map or keyword list of private metadata to add to the Finch request. May be useful
       for adding custom data when handling telemetry with `Finch.Telemetry`.
@@ -1347,12 +1363,12 @@ defmodule Req do
   end
 
   defp encode_header_value(%DateTime{} = datetime) do
-    datetime |> DateTime.shift_zone!("Etc/UTC") |> Req.Utils.format_http_datetime()
+    datetime |> DateTime.shift_zone!("Etc/UTC") |> Req.Utils.format_http_date()
   end
 
   defp encode_header_value(%NaiveDateTime{} = datetime) do
     IO.warn("setting header to %NaiveDateTime{} is deprecated, use %DateTime{} instead")
-    Req.Utils.format_http_datetime(datetime)
+    Req.Utils.format_http_date(datetime)
   end
 
   defp encode_header_value(value) when is_binary(value) do

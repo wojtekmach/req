@@ -93,8 +93,11 @@ defmodule Req.Finch do
         {:cont, {req, %{resp | status: status}}}
 
       {:headers, fields}, {req, resp} ->
-        fields = finch_fields_to_map(fields)
-        resp = update_in(resp.headers, &Map.merge(&1, fields))
+        resp =
+          Enum.reduce(fields, resp, fn {name, value}, resp ->
+            Req.Response.put_header(resp, name, value)
+          end)
+
         {:cont, {req, resp}}
 
       {:data, data}, acc ->
@@ -110,39 +113,38 @@ defmodule Req.Finch do
       {:ok, acc} ->
         acc
 
-      {:error, %Mint.TransportError{reason: reason}} ->
-        {req, %Req.TransportError{reason: reason}}
-
-      {:error, %Mint.HTTPError{module: Mint.HTTP1, reason: reason}} ->
-        {req, %Req.HTTPError{protocol: :http1, reason: reason}}
-
-      {:error, %Mint.HTTPError{module: Mint.HTTP2, reason: reason}} ->
-        {req, %Req.HTTPError{protocol: :http2, reason: reason}}
-
-      {:error, %Finch.Error{reason: reason}} ->
-        {req, %Req.HTTPError{protocol: :http2, reason: reason}}
-
+      # TODO: remove when we require Finch 0.20
       {:error, exception} ->
-        {req, exception}
+        {req, normalize_error(exception)}
+
+      {:error, exception, _acc} ->
+        {req, normalize_error(exception)}
     end
   end
 
   defp finch_stream_into_collectable(req, finch_req, finch_name, finch_options, collectable) do
-    {acc, collector} = Collectable.into(collectable)
     resp = Req.Response.new()
 
     fun = fn
-      {:status, status}, {acc, req, resp} ->
-        {acc, req, %{resp | status: status}}
+      {:status, 200}, {nil, req, resp} ->
+        {acc, collector} = Collectable.into(collectable)
+        {{acc, collector}, req, %{resp | status: 200}}
+
+      {:status, status}, {nil, req, resp} ->
+        {acc, collector} = Collectable.into("")
+        {{acc, collector}, req, %{resp | status: status}}
 
       {:headers, fields}, {acc, req, resp} ->
-        fields = finch_fields_to_map(fields)
-        resp = update_in(resp.headers, &Map.merge(&1, fields))
+        resp =
+          Enum.reduce(fields, resp, fn {name, value}, resp ->
+            Req.Response.put_header(resp, name, value)
+          end)
+
         {acc, req, resp}
 
-      {:data, data}, {acc, req, resp} ->
+      {:data, data}, {{acc, collector}, req, resp} ->
         acc = collector.(acc, {:cont, data})
-        {acc, req, resp}
+        {{acc, collector}, req, resp}
 
       {:trailers, fields}, {acc, req, resp} ->
         fields = finch_fields_to_map(fields)
@@ -150,26 +152,42 @@ defmodule Req.Finch do
         {acc, req, resp}
     end
 
-    case Finch.stream(finch_req, finch_name, {acc, req, resp}, fun, finch_options) do
-      {:ok, {acc, req, resp}} ->
+    case Finch.stream(finch_req, finch_name, {nil, req, resp}, fun, finch_options) do
+      {:ok, {{acc, collector}, req, resp}} ->
         acc = collector.(acc, :done)
         {req, %{resp | body: acc}}
 
-      {:error, %Mint.TransportError{reason: reason}} ->
-        {req, %Req.TransportError{reason: reason}}
-
-      {:error, %Mint.HTTPError{module: Mint.HTTP1, reason: reason}} ->
-        {req, %Req.HTTPError{protocol: :http1, reason: reason}}
-
-      {:error, %Mint.HTTPError{module: Mint.HTTP2, reason: reason}} ->
-        {req, %Req.HTTPError{protocol: :http2, reason: reason}}
-
-      {:error, %Finch.Error{reason: reason}} ->
-        {req, %Req.HTTPError{protocol: :http2, reason: reason}}
-
+      # TODO: remove when we require Finch 0.20
       {:error, exception} ->
-        {req, exception}
+        {req, normalize_error(exception)}
+
+      {:error, exception, {nil, _req, _resp}} ->
+        {req, normalize_error(exception)}
+
+      {:error, exception, {{acc, collector}, _req, _resp}} ->
+        collector.(acc, :halt)
+        {req, normalize_error(exception)}
     end
+  end
+
+  defp normalize_error(%Mint.TransportError{reason: reason}) do
+    %Req.TransportError{reason: reason}
+  end
+
+  defp normalize_error(%Mint.HTTPError{module: Mint.HTTP1, reason: reason}) do
+    %Req.HTTPError{protocol: :http1, reason: reason}
+  end
+
+  defp normalize_error(%Mint.HTTPError{module: Mint.HTTP2, reason: reason}) do
+    %Req.HTTPError{protocol: :http2, reason: reason}
+  end
+
+  defp normalize_error(%Finch.Error{reason: reason}) do
+    %Req.HTTPError{protocol: :http2, reason: reason}
+  end
+
+  defp normalize_error(error) do
+    error
   end
 
   defp finch_stream_into_legacy_self(req, finch_req, finch_name, finch_options) do
@@ -186,9 +204,7 @@ defmodule Req.Finch do
         {^ref, message} ->
           {:headers, headers} = message
 
-          Enum.reduce(headers, %{}, fn {name, value}, acc ->
-            Map.update(acc, name, [value], &(&1 ++ [value]))
-          end)
+          handle_finch_headers(headers)
       end
 
     async = %Req.Response.Async{
@@ -218,9 +234,7 @@ defmodule Req.Finch do
           # TODO: handle trailers
           {:headers, headers} = message
 
-          Enum.reduce(headers, %{}, fn {name, value}, acc ->
-            Map.update(acc, name, [value], &(&1 ++ [value]))
-          end)
+          handle_finch_headers(headers)
       end
 
     async = %Req.Response.Async{
@@ -230,8 +244,7 @@ defmodule Req.Finch do
       cancel_fun: &cancel/1
     }
 
-    resp = Req.Response.new(status: status, headers: headers)
-    resp = put_in(resp.body, async)
+    resp = Req.Response.new(status: status, headers: headers, body: async)
     {req, resp}
   end
 
@@ -266,6 +279,12 @@ defmodule Req.Finch do
     Enum.reduce(private_options, finch_request, fn {k, v}, acc_finch_req ->
       Finch.Request.put_private(acc_finch_req, k, v)
     end)
+  end
+
+  if Req.MixProject.legacy_headers_as_lists?() do
+    defp handle_finch_headers(headers), do: headers
+  else
+    defp handle_finch_headers(headers), do: finch_fields_to_map(headers)
   end
 
   defp finch_fields_to_map(fields) do
@@ -353,6 +372,7 @@ defmodule Req.Finch do
   def pool_options(options) when is_map(options) do
     connect_options = options[:connect_options] || []
     inet6_options = options |> Map.take([:inet6]) |> Enum.to_list()
+    pool_options = options |> Map.take([:pool_max_idle_time]) |> Enum.to_list()
 
     Req.Request.validate_options(
       connect_options,
@@ -401,7 +421,8 @@ defmodule Req.Finch do
           [:http1]
       end
 
-    [protocols: protocols] ++
+    pool_options ++
+      [protocols: protocols] ++
       if conn_opts != [] do
         [conn_opts: conn_opts]
       else

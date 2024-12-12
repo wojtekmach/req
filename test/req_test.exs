@@ -56,6 +56,8 @@ defmodule ReqTest do
 
     assert inspect(Req.new(auth: {:basic, "foo:bar"})) =~ ~s|auth: {:basic, "foo****"}|
 
+    assert inspect(Req.new(auth: fn -> {:basic, "foo:bar"} end)) =~ ~s|auth: #Function|
+
     if Req.MixProject.legacy_headers_as_lists?() do
       assert inspect(Req.new(headers: [authorization: "bearer foobar"])) =~
                ~s|{"authorization", "bearer ***"}|

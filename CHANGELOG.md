@@ -1,5 +1,43 @@
 # CHANGELOG
 
+## v0.5.8 (2024-11-29)
+
+  * [`Req`]: Check legacy headers when streaming headers
+
+  * [`Req`]: Ignore :into collectable for non-200 responses
+
+  * [`put_aws_sigv4`]: Fix encoding path
+
+  * [`run_finch`]: Add option to configure Finch `:pool_max_idle_time`
+
+  * [`run_finch`]: Prepare for upcoming Finch v0.20
+
+## v0.5.7 (2024-10-29)
+
+  * [`put_aws_sigv4`]: Fix signature when using custom port
+
+  * [`retry`]: Do not call `retry_delay` fun twice
+
+  * [`auth`]: Support passing a 0-arity function
+
+## v0.5.6 (2024-08-01)
+
+  * Fix compatibility with Elixir v1.13
+
+## v0.5.5 (2024-08-01)
+
+  * [`put_aws_sigv4`]: Fix detecting service
+
+  * [`put_aws_sigv4`]: Raise on no `:access_key_id`/`:secret_access_key`/`:service`
+
+  * [`put_aws_sigv4`]: Fix handling `?name` (no value)
+
+  * [`handle_http_errors`]: should run before `verify_checksum`
+
+  * [`encode_body`]: Support `%File.Stream{}` in `:form_multipart`
+
+  * [`encode_body`]: Support `%File.Stream{}` from other nodes in `:form_multipart`
+
 ## v0.5.4 (2024-07-18)
 
   * [`run_finch`], [`Req.parse_message/2`]: Gracefully handle process messages not meant

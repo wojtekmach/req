@@ -257,6 +257,7 @@ defmodule Req.StepsTest do
       plug = fn conn ->
         conn = Plug.Parsers.call(conn, Plug.Parsers.init(parsers: [:multipart]))
 
+        assert Plug.Conn.get_req_header(conn, "content-length") == ["393"]
         assert %{"a" => "1", "b" => b, "c" => c} = conn.body_params
 
         assert b.filename == "b.txt"
@@ -494,35 +495,20 @@ defmodule Req.StepsTest do
   end
 
   describe "put_aws_sigv4" do
-    # TODO: flaky
-    @tag :skip
     test "body: binary" do
       plug = fn conn ->
         assert {:ok, "hello", conn} = Plug.Conn.read_body(conn)
-
-        assert Plug.Conn.get_req_header(conn, "x-amz-content-sha256") == [
-                 "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
-               ]
-
-        assert Plug.Conn.get_req_header(conn, "authorization") == [
-                 """
-                 AWS4-HMAC-SHA256 \
-                 Credential=foo/20240101/us-east-1/s3/aws4_request,\
-                 SignedHeaders=accept-encoding;host;user-agent;x-amz-content-sha256;x-amz-date,\
-                 Signature=a7a27655988cf90a6d834c6544e8a5e1ef00308a64692f0e656167165d42ec4d\
-                 """
-               ]
-
+        assert ["AWS4-HMAC-SHA256" <> _] = Plug.Conn.get_req_header(conn, "authorization")
+        assert [<<_::binary-size(64)>>] = Plug.Conn.get_req_header(conn, "x-amz-content-sha256")
         Plug.Conn.send_resp(conn, 200, "ok")
       end
 
       req =
         Req.new(
-          url: "http://localhost",
+          url: "https://s3.amazonaws.com",
           aws_sigv4: [
             access_key_id: "foo",
-            secret_access_key: "bar",
-            datetime: ~U[2024-01-01 00:00:00Z]
+            secret_access_key: "bar"
           ],
           body: "hello",
           plug: plug
@@ -531,33 +517,22 @@ defmodule Req.StepsTest do
       assert Req.put!(req).body == "ok"
     end
 
-    # TODO: flaky
-    @tag :skip
     test "body: enumerable" do
       plug = fn conn ->
         assert {:ok, "hello", conn} = Plug.Conn.read_body(conn)
-
-        assert Plug.Conn.get_req_header(conn, "x-amz-content-sha256") == ["UNSIGNED-PAYLOAD"]
-
-        assert Plug.Conn.get_req_header(conn, "authorization") == [
-                 """
-                 AWS4-HMAC-SHA256 \
-                 Credential=foo/20240101/us-east-1/s3/aws4_request,\
-                 SignedHeaders=accept-encoding;content-length;host;user-agent;x-amz-content-sha256;x-amz-date,\
-                 Signature=6d8d9e360bf82d48064ee93cc628133da813bfc9b587fe52f8792c2335b29312\
-                 """
-               ]
-
+        assert ["AWS4-HMAC-SHA256" <> _] = Plug.Conn.get_req_header(conn, "authorization")
+        assert ["UNSIGNED-PAYLOAD"] = Plug.Conn.get_req_header(conn, "x-amz-content-sha256")
         Plug.Conn.send_resp(conn, 200, "ok")
       end
 
       req =
         Req.new(
-          url: "http://localhost",
+          url: "http://example.com",
           aws_sigv4: [
             access_key_id: "foo",
             secret_access_key: "bar",
-            datetime: ~U[2024-01-01 00:00:00Z]
+            # test setting explicit :service
+            service: :s3
           ],
           headers: [content_length: 5],
           body: Stream.take(["hello"], 1),
@@ -565,6 +540,36 @@ defmodule Req.StepsTest do
         )
 
       assert Req.put!(req).body == "ok"
+    end
+
+    test "missing :access_key_id" do
+      req = Req.new(aws_sigv4: [])
+
+      assert_raise ArgumentError, "missing :access_key_id in :aws_sigv4 option", fn ->
+        Req.get(req)
+      end
+    end
+
+    test "missing :secret_access_key" do
+      req = Req.new(aws_sigv4: [access_key_id: "foo"])
+
+      assert_raise ArgumentError, "missing :secret_access_key in :aws_sigv4 option", fn ->
+        Req.get(req)
+      end
+    end
+
+    test "missing :service" do
+      req =
+        Req.new(
+          aws_sigv4: [
+            access_key_id: "foo",
+            secret_access_key: "bar"
+          ]
+        )
+
+      assert_raise ArgumentError, "missing :service in :aws_sigv4 option", fn ->
+        Req.get(req)
+      end
     end
   end
 
@@ -1001,7 +1006,7 @@ defmodule Req.StepsTest do
 
     {resp, log} =
       ExUnit.CaptureLog.with_log(fn ->
-        Req.get!("", plug: plug)
+        Req.get!(plug: plug)
       end)
 
     assert resp.body |> :zlib.uncompress() |> Jason.decode!() == %{"a" => 1}
@@ -1009,26 +1014,28 @@ defmodule Req.StepsTest do
   end
 
   describe "redirect" do
-    test "ignore when :redirect is false", c do
-      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
-        redirect(conn, 302, c.url <> "/ok")
-      end)
+    test "ignore when :redirect is false" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          redirect(conn, 302, "/ok")
+        end)
 
-      assert Req.get!(c.url <> "/redirect", redirect: false).status == 302
+      assert Req.get!("#{url}/redirect", redirect: false).status == 302
     end
 
-    test "absolute", c do
-      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
-        redirect(conn, 302, c.url <> "/ok")
-      end)
+    test "absolute" do
+      %{url: url} =
+        start_http_server(fn
+          conn when conn.request_path == "/redirect" ->
+            redirect(conn, 302, "http://localhost:#{conn.port}/ok")
 
-      Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-        Plug.Conn.send_resp(conn, 200, "ok")
-      end)
+          conn when conn.request_path == "/ok" ->
+            redirect(conn, 200, "/ok")
+        end)
 
       assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.get!(c.url <> "/redirect").status == 200
-             end) =~ "[debug] redirecting to #{c.url}/ok"
+               assert Req.get!("#{url}/redirect", retry: false).status == 200
+             end) =~ "[debug] redirecting to #{url}/ok"
     end
 
     test "relative", c do
@@ -1544,7 +1551,7 @@ defmodule Req.StepsTest do
 
     defp retry_after(r, value), do: Req.Response.put_header(r, "retry-after", retry_after(value))
     defp retry_after(integer) when is_integer(integer), do: to_string(integer)
-    defp retry_after(%DateTime{} = dt), do: Req.Utils.format_http_datetime(dt)
+    defp retry_after(%DateTime{} = dt), do: Req.Utils.format_http_date(dt)
 
     @tag :capture_log
     test "always failing", c do
@@ -1919,6 +1926,50 @@ defmodule Req.StepsTest do
       resp = Req.request!(req)
       assert resp.status == 200
       assert ["defmodule Req.MixProject do" <> _] = resp.body
+      refute_receive _
+    end
+
+    test "into: collectable non-200" do
+      # Ignores the collectable and returns body as usual
+
+      req =
+        Req.new(
+          plug: fn conn ->
+            conn = Plug.Conn.send_chunked(conn, 404)
+            {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+            {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+            conn
+          end,
+          into: :not_a_collectable
+        )
+
+      resp = Req.request!(req)
+      assert resp.status == 404
+      assert resp.body == "foobar"
+      refute_receive _
+    end
+
+    test "into: self" do
+      req =
+        Req.new(
+          plug: fn conn ->
+            conn = Plug.Conn.send_chunked(conn, 200)
+            {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+            {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+            conn
+          end,
+          into: :self
+        )
+
+      resp = Req.request!(req)
+      assert resp.status == 200
+      assert {:ok, [data: "foobar"]} = Req.parse_message(resp, assert_receive(_))
+      assert {:ok, [:done]} = Req.parse_message(resp, assert_receive(_))
+      refute_receive _
+
+      resp = Req.request!(req)
+      assert resp.status == 200
+      assert Enum.to_list(resp.body) == ["foobar"]
       refute_receive _
     end
 

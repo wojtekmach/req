@@ -35,7 +35,7 @@ write new ones.
 
   * Request body encoding. Supports urlencoded and multipart forms, and JSON. See [`encode_body`].
 
-  * Aautomatic response body decoding (via [`decode_body`] step.)
+  * Automatic response body decoding (via [`decode_body`] step.)
 
   * Encode params as query string (via [`put_params`] step.)
 
@@ -148,21 +148,15 @@ Req.get!(req, url: "/repos/wojtekmach/req").body["description"]
 #=> "Req is a batteries-included HTTP client for Elixir."
 ```
 
-Custom steps can be packaged into plugins so that they are even easier to use by others.
-Here are some examples:
+Custom steps can be packaged into plugins so that they are even easier to use by others. See [Related Packages](#related-packages).
 
-  * [`req_easyhtml`]
-  * [`req_s3`]
-  * [`req_hex`]
-  * [`req_github_oauth`]
-
-And here is how they can be used:
+Here is how they can be used:
 
 ```elixir
 Mix.install([
   {:req, "~> 0.5.0"},
   {:req_easyhtml, "~> 0.1.0"},
-  {:req_s3, "~> 0.2.0"},
+  {:req_s3, "~> 0.2.3"},
   {:req_hex, "~> 0.2.0"},
   {:req_github_oauth, "~> 0.1.0"}
 ])
@@ -213,6 +207,16 @@ See [`Req.Request`] module documentation for more information on low-level API, 
 Req aims to work without global configuration to promote explicitness.
 However, you might need to adapt the HTTP pools used.
 Refer to the [`run_finch`] documentation for more information on this.
+
+## Related Packages
+
+There are many packages that extend the Req library. To get yours listed here, send a PR.
+
+  * [`req_easyhtml`]
+  * [`req_s3`]
+  * [`req_hex`]
+  * [`req_github_oauth`]
+  * [`curl_req`]
 
 ## Presentations
 
@@ -270,9 +274,10 @@ limitations under the License.
 [Finch]: https://github.com/sneako/finch
 [cURL]: https://curl.se
 [Requests]: https://docs.python-requests.org/en/master/
-[Tesla]: https://github.com/teamon/tesla
+[Tesla]: https://github.com/elixir-tesla/tesla
 [`req_easyhtml`]: https://github.com/wojtekmach/req_easyhtml
 [`req_s3`]: https://github.com/wojtekmach/req_s3
 [`req_hex`]: https://github.com/wojtekmach/req_hex
 [`req_github_oauth`]: https://github.com/wojtekmach/req_github_oauth
 [`Mix.install/2`]: https://hexdocs.pm/mix/Mix.html#install/2
+[`curl_req`]: https://github.com/derekkraan/curl_req

@@ -346,6 +346,24 @@ defmodule Req.FinchTest do
       assert resp.body == ["chunk1", "chunk2"]
     end
 
+    test "into: collectable non-200" do
+      # Ignores the collectable and returns body as usual
+
+      %{url: url} =
+        start_http_server(fn conn ->
+          Req.Test.json(%{conn | status: 404}, %{error: "not found"})
+        end)
+
+      resp =
+        Req.get!(
+          url: url,
+          into: :not_a_collectable
+        )
+
+      assert resp.status == 404
+      assert resp.body == %{"error" => "not found"}
+    end
+
     test "into: collectable handle error" do
       assert {:error, %Req.TransportError{reason: :econnrefused}} =
                Req.get(

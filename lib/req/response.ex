@@ -269,37 +269,9 @@ defmodule Req.Response do
 
       :error ->
         delay_value
-        |> parse_http_datetime()
+        |> Req.Utils.parse_http_date!()
         |> DateTime.diff(DateTime.utc_now(), :millisecond)
         |> max(0)
-    end
-  end
-
-  @month_numbers %{
-    "Jan" => "01",
-    "Feb" => "02",
-    "Mar" => "03",
-    "Apr" => "04",
-    "May" => "05",
-    "Jun" => "06",
-    "Jul" => "07",
-    "Aug" => "08",
-    "Sep" => "09",
-    "Oct" => "10",
-    "Nov" => "11",
-    "Dec" => "12"
-  }
-
-  defp parse_http_datetime(datetime) do
-    [_day_of_week, day, month, year, time, "GMT"] = String.split(datetime, " ")
-    date = year <> "-" <> @month_numbers[month] <> "-" <> day
-
-    case DateTime.from_iso8601(date <> " " <> time <> "Z") do
-      {:ok, valid_datetime, 0} ->
-        valid_datetime
-
-      {:error, reason} ->
-        raise "cannot parse \"retry-after\" header value #{inspect(datetime)} as datetime, reason: #{reason}"
     end
   end
 end

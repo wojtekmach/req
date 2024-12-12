@@ -36,11 +36,13 @@ defmodule Req.Utils do
     datetime = DateTime.truncate(datetime, :second)
     datetime_string = DateTime.to_iso8601(datetime, :basic)
     date_string = Date.to_iso8601(datetime, :basic)
-    url = URI.parse(url)
+    url = normalize_url(url)
     body_digest = options[:body_digest] || hex(sha256(body))
     service = to_string(service)
 
     method = method |> Atom.to_string() |> String.upcase()
+
+    headers = canonical_host_header(headers, url)
 
     aws_headers = [
       {"x-amz-content-sha256", body_digest},
@@ -71,10 +73,12 @@ defmodule Req.Utils do
 
     path = URI.encode(url.path || "/", &(&1 == ?/ or URI.char_unreserved?(&1)))
 
+    canonical_query = canonical_query(url.query)
+
     canonical_request = """
     #{method}
     #{path}
-    #{url.query || ""}
+    #{canonical_query}
     #{canonical_headers}
 
     #{signed_headers}
@@ -106,6 +110,21 @@ defmodule Req.Utils do
     [{"authorization", authorization}] ++ aws_headers ++ headers
   end
 
+  defp canonical_query(query) when query in [nil, ""] do
+    query
+  end
+
+  defp canonical_query(query) do
+    for item <- String.split(query, "&", trim: true) do
+      case String.split(item, "=") do
+        [name, value] -> [name, "=", value]
+        [name] -> [name, "="]
+      end
+    end
+    |> Enum.sort()
+    |> Enum.intersperse("&")
+  end
+
   @doc """
   Create AWS Signature v4 URL.
 
@@ -125,7 +144,7 @@ defmodule Req.Utils do
     datetime = DateTime.truncate(datetime, :second)
     datetime_string = DateTime.to_iso8601(datetime, :basic)
     date_string = Date.to_iso8601(datetime, :basic)
-    url = URI.parse(url)
+    url = normalize_url(url)
     service = to_string(service)
 
     canonical_query_string =
@@ -137,7 +156,7 @@ defmodule Req.Utils do
         {"X-Amz-SignedHeaders", "host"}
       ])
 
-    canonical_headers = [{"host", URI.parse(url).host}]
+    canonical_headers = canonical_host_header([], url)
 
     signed_headers =
       Enum.map_intersperse(
@@ -182,7 +201,31 @@ defmodule Req.Utils do
         secret_access_key
       )
 
-    put_in(url.query, canonical_query_string <> "&X-Amz-Signature=#{signature}")
+    %{url | path: path, query: canonical_query_string <> "&X-Amz-Signature=#{signature}"}
+  end
+
+  # Try decoding the path in case it was encoded earlier to prevent double encoding,
+  # as the path is encoded later in the corresponding function.
+  defp normalize_url(url) do
+    url = URI.parse(url)
+
+    case url.path do
+      nil -> url
+      path -> %{url | path: URI.decode(path)}
+    end
+  end
+
+  defp canonical_host_header(headers, %URI{} = url) do
+    {_host_headers, headers} = Enum.split_with(headers, &match?({"host", _value}, &1))
+
+    host_value =
+      if is_nil(url.port) or URI.default_port(url.scheme) == url.port do
+        url.host
+      else
+        "#{url.host}:#{url.port}"
+      end
+
+    [{"host", host_value} | headers]
   end
 
   def aws_sigv4(
@@ -221,11 +264,97 @@ defmodule Req.Utils do
 
   ## Examples
 
-      iex> Req.Utils.format_http_datetime(~U[2024-01-01 09:00:00Z])
+      iex> Req.Utils.format_http_date(~U[2024-01-01 09:00:00Z])
       "Mon, 01 Jan 2024 09:00:00 GMT"
   """
-  def format_http_datetime(datetime) do
+  def format_http_date(datetime) do
     Calendar.strftime(datetime, "%a, %d %b %Y %H:%M:%S GMT")
+  end
+
+  @doc """
+  Parses "HTTP Date" as datetime.
+
+  ## Examples
+
+      iex> Req.Utils.parse_http_date("Mon, 01 Jan 2024 09:00:00 GMT")
+      {:ok, ~U[2024-01-01 09:00:00Z]}
+  """
+  def parse_http_date(<<
+        day_name::binary-size(3),
+        ", ",
+        day::binary-size(2),
+        " ",
+        month_name::binary-size(3),
+        " ",
+        year::binary-size(4),
+        " ",
+        time::binary-size(8),
+        " GMT"
+      >>) do
+    with {:ok, day_of_week} <- parse_day_name(day_name),
+         {day, ""} <- Integer.parse(day),
+         {:ok, month} <- parse_month_name(month_name),
+         {year, ""} <- Integer.parse(year),
+         {:ok, time} <- Time.from_iso8601(time),
+         {:ok, date} <- Date.new(year, month, day),
+         true <- day_of_week == Date.day_of_week(date) do
+      DateTime.new(date, time)
+    else
+      {:error, _} = e ->
+        e
+
+      _ ->
+        {:error, :invalid_format}
+    end
+  end
+
+  def parse_http_date(binary) when is_binary(binary) do
+    {:error, :invalid_format}
+  end
+
+  defp parse_month_name("Jan"), do: {:ok, 1}
+  defp parse_month_name("Feb"), do: {:ok, 2}
+  defp parse_month_name("Mar"), do: {:ok, 3}
+  defp parse_month_name("Apr"), do: {:ok, 4}
+  defp parse_month_name("May"), do: {:ok, 5}
+  defp parse_month_name("Jun"), do: {:ok, 6}
+  defp parse_month_name("Jul"), do: {:ok, 7}
+  defp parse_month_name("Aug"), do: {:ok, 8}
+  defp parse_month_name("Sep"), do: {:ok, 9}
+  defp parse_month_name("Oct"), do: {:ok, 10}
+  defp parse_month_name("Nov"), do: {:ok, 11}
+  defp parse_month_name("Dec"), do: {:ok, 12}
+  defp parse_month_name(_), do: :error
+
+  defp parse_day_name("Mon"), do: {:ok, 1}
+  defp parse_day_name("Tue"), do: {:ok, 2}
+  defp parse_day_name("Wed"), do: {:ok, 3}
+  defp parse_day_name("Thu"), do: {:ok, 4}
+  defp parse_day_name("Fri"), do: {:ok, 5}
+  defp parse_day_name("Sat"), do: {:ok, 6}
+  defp parse_day_name("Sun"), do: {:ok, 7}
+  defp parse_day_name(_), do: :error
+
+  @doc """
+  Parses "HTTP Date" as datetime or raises an error.
+
+  ## Examples
+
+      iex> Req.Utils.parse_http_date!("Mon, 01 Jan 2024 09:00:00 GMT")
+      ~U[2024-01-01 09:00:00Z]
+
+      iex> Req.Utils.parse_http_date!("Mon")
+      ** (ArgumentError) cannot parse "Mon" as HTTP date, reason: :invalid_format
+  """
+  def parse_http_date!(binary) do
+    case parse_http_date(binary) do
+      {:ok, datetime} ->
+        datetime
+
+      {:error, reason} ->
+        raise ArgumentError,
+              "cannot parse #{inspect(binary)} as HTTP date, reason: #{inspect(reason)}"
+    end
   end
 
   @doc """
@@ -309,6 +438,8 @@ defmodule Req.Utils do
     %CollectWithHash{collectable: collectable, type: type}
   end
 
+  @crlf "\r\n"
+
   @doc """
   Encodes fields into "multipart/form-data" format.
   """
@@ -319,40 +450,51 @@ defmodule Req.Utils do
       options[:boundary] ||
         Base.encode16(:crypto.strong_rand_bytes(16), padding: false, case: :lower)
 
-    crlf = "\r\n"
+    footer = [[@crlf, "--", boundary, "--", @crlf]]
 
-    body =
+    {body, size} =
       fields
-      |> Enum.reduce([], &add_form_parts(&2, encode_form_part(&1, boundary)))
-      |> add_form_parts([[crlf, "--", boundary, "--", crlf]])
+      |> Enum.reduce({[], 0}, &add_form_parts(&2, encode_form_part(&1, boundary)))
+      |> add_form_parts({footer, IO.iodata_length(footer)})
 
     %{
+      size: size,
       content_type: "multipart/form-data; boundary=#{boundary}",
       body: body
     }
   end
 
-  defp add_form_parts(parts1, parts2) when is_list(parts1) and is_list(parts2) do
-    [parts1, parts2]
+  defp add_form_parts({parts1, size1}, {parts2, size2})
+       when is_list(parts1) and is_list(parts2) do
+    {[parts1, parts2], size1 + size2}
   end
 
-  defp add_form_parts(parts1, parts2) do
-    Stream.concat(parts1, parts2)
+  defp add_form_parts({parts1, size1}, {parts2, size2}) do
+    {Stream.concat(parts1, parts2), size1 + size2}
   end
 
   defp encode_form_part({name, {value, options}}, boundary) do
     options = Keyword.validate!(options, [:filename, :content_type])
 
-    {parts, options} =
+    {parts, parts_size, options} =
       case value do
         integer when is_integer(integer) ->
-          {[Integer.to_string(integer)], options}
+          part = Integer.to_string(integer)
+          {[part], byte_size(part), options}
 
         value when is_binary(value) or is_list(value) ->
-          {[value], options}
+          {[value], IO.iodata_length(value), options}
 
         stream = %File.Stream{} ->
           filename = Path.basename(stream.path)
+
+          # TODO: Simplify when we require Elixir v1.15
+          size =
+            if not Map.has_key?(stream, :node) or stream.node == node() do
+              File.stat!(stream.path).size
+            else
+              :erpc.call(stream.node, fn -> File.stat!(stream.path).size end)
+            end
 
           options =
             options
@@ -361,7 +503,7 @@ defmodule Req.Utils do
               MIME.from_path(filename)
             end)
 
-          {stream, options}
+          {stream, size, options}
       end
 
     params =
@@ -371,17 +513,16 @@ defmodule Req.Utils do
         []
       end
 
-    crlf = "\r\n"
-
     headers =
       if content_type = options[:content_type] do
-        ["content-type: ", content_type, crlf]
+        ["content-type: ", content_type, @crlf]
       else
         []
       end
 
-    headers = ["content-disposition: form-data; name=\"#{name}\"", params, crlf, headers]
-    add_form_parts([[crlf, "--", boundary, crlf, headers, crlf]], parts)
+    headers = ["content-disposition: form-data; name=\"#{name}\"", params, @crlf, headers]
+    header = [[@crlf, "--", boundary, @crlf, headers, @crlf]]
+    add_form_parts({header, IO.iodata_length(header)}, {parts, parts_size})
   end
 
   defp encode_form_part({name, value}, boundary) do
