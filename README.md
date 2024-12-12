@@ -205,8 +205,8 @@ See [`Req.Request`] module documentation for more information on low-level API, 
 ## Configuration
 
 Req supports many configuration options, see [`Req.new/1`] for a full list and see each step for
-more details. In particular, if you are looking for slightly lower level HTTP options like for
-example timeouts, pool sizes, and certificates, see [`run_finch`] documentation.
+more details. In particular, if you are looking for slightly lower level HTTP options such as
+timeouts, pool sizes, and certificates, see the [`run_finch`] documentation.
 
 ## Related Packages
 
