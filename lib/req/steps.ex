@@ -1624,7 +1624,7 @@ defmodule Req.Steps do
 
   | Format       | Decoder                                                           |
   | ------------ | ----------------------------------------------------------------- |
-  | `json`       | `JSON.decode/2`                                                  |
+  | `json`       | `JSON.decode/3`                                                  |
   | `tar`, `tgz` | `:erl_tar.extract/2`                                              |
   | `zip`        | `:zip.unzip/2`                                                    |
   | `gzip`       | `:zlib.gunzip/1`                                                  |
