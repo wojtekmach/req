@@ -3,6 +3,13 @@ defmodule Req.StepsTest do
   import TestHelper, only: [start_http_server: 1, start_tcp_server: 1]
   require Logger
 
+  # TODO: Remove when we require Elixir 1.18
+  @json (if Version.match?(System.version(), "~> 1.18") do
+           JSON
+         else
+           Jason
+         end)
+
   setup do
     bypass = Bypass.open()
     [bypass: bypass, url: "http://localhost:#{bypass.port}"]
@@ -319,10 +326,10 @@ defmodule Req.StepsTest do
   describe "compress_body" do
     test "request" do
       req = Req.new(method: :post, json: %{a: 1}) |> Req.Request.prepare()
-      assert Jason.decode!(req.body) == %{"a" => 1}
+      assert @json.decode!(req.body) == %{"a" => 1}
 
       req = Req.new(method: :post, json: %{a: 1}, compress_body: true) |> Req.Request.prepare()
-      assert :zlib.gunzip(req.body) |> Jason.decode!() == %{"a" => 1}
+      assert :zlib.gunzip(req.body) |> @json.decode!() == %{"a" => 1}
       assert Req.Request.get_header(req, "content-encoding") == ["gzip"]
     end
 
@@ -756,12 +763,31 @@ defmodule Req.StepsTest do
       assert Req.get!(plug: plug).body == %{"a" => 1}
     end
 
-    test "json with custom options" do
-      plug = fn conn ->
-        Req.Test.json(conn, %{a: 1})
-      end
+    # TODO: Remove when we require Elixir 1.18
+    if(Version.match?(System.version(), "~> 1.18")) do
+      test "json with custom options" do
+        plug = fn conn ->
+          Req.Test.json(conn, %{a: 1})
+        end
 
-      assert Req.get!(plug: plug, decode_json: [keys: :atoms]).body == %{a: 1}
+        assert Req.get!(
+                 plug: plug,
+                 decode_json: [
+                   object_finish: fn acc, old_acc ->
+                     acc = Enum.map(acc, &{String.to_atom(elem(&1, 0)), elem(&1, 1)}) |> Map.new()
+                     {acc, old_acc}
+                   end
+                 ]
+               ).body == %{a: 1}
+      end
+    else
+      test "json with custom options" do
+        plug = fn conn ->
+          Req.Test.json(conn, %{a: 1})
+        end
+
+        assert Req.get!(plug: plug, decode_json: [keys: :atoms]).body == %{a: 1}
+      end
     end
 
     test "json invalid" do
@@ -771,7 +797,11 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, "bad")
       end
 
-      assert {:error, %Jason.DecodeError{}} = Req.get(plug: plug)
+      if(Version.match?(System.version(), "~> 1.18")) do
+        assert {:error, {:invalid_byte, 0, 98}} = Req.get(plug: plug)
+      else
+        assert {:error, %Jason.DecodeError{}} = Req.get(plug: plug)
+      end
     end
 
     test "tar (content-type)" do
@@ -961,7 +991,7 @@ defmodule Req.StepsTest do
     plug = fn conn ->
       body =
         %{a: 1}
-        |> Jason.encode_to_iodata!()
+        |> @json.encode_to_iodata!()
         |> :zlib.gzip()
 
       conn
@@ -977,7 +1007,7 @@ defmodule Req.StepsTest do
     plug = fn conn ->
       body =
         %{a: 1}
-        |> Jason.encode_to_iodata!()
+        |> @json.encode_to_iodata!()
         |> :zlib.gzip()
 
       conn
@@ -986,7 +1016,7 @@ defmodule Req.StepsTest do
       |> Plug.Conn.send_resp(200, body)
     end
 
-    assert Req.get!("", plug: plug, raw: true).body |> :zlib.gunzip() |> Jason.decode!() == %{
+    assert Req.get!("", plug: plug, raw: true).body |> :zlib.gunzip() |> @json.decode!() == %{
              "a" => 1
            }
   end
@@ -995,7 +1025,7 @@ defmodule Req.StepsTest do
     plug = fn conn ->
       body =
         %{a: 1}
-        |> Jason.encode_to_iodata!()
+        |> @json.encode_to_iodata!()
         |> :zlib.compress()
 
       conn
@@ -1009,7 +1039,7 @@ defmodule Req.StepsTest do
         Req.get!(plug: plug)
       end)
 
-    assert resp.body |> :zlib.uncompress() |> Jason.decode!() == %{"a" => 1}
+    assert resp.body |> :zlib.uncompress() |> @json.decode!() == %{"a" => 1}
     assert log =~ ~s|algorithm \"deflate\" is not supported|
   end
 

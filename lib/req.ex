@@ -264,7 +264,7 @@ defmodule Req do
     * `:decode_body` - if set to `false`, disables automatic response body decoding.
       Defaults to `true`.
 
-    * `:decode_json` - options to pass to `Jason.decode!/2`, defaults to `[]`.
+    * `:decode_json` - options to pass to `JSON.decode!/2`, defaults to `[]`.
 
     * `:into` - where to send the response body. It can be one of:
 

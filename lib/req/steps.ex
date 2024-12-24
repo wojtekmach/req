@@ -15,6 +15,13 @@ defmodule Req.Steps do
 
   require Logger
 
+  # TODO: Remove when we require Elixir 1.18
+  @json (if Version.match?(System.version(), "~> 1.18") do
+           JSON
+         else
+           Jason
+         end)
+
   @doc false
   def attach(req) do
     req
@@ -400,7 +407,7 @@ defmodule Req.Steps do
 
         * `{value, options}` tuple. Supported options are `:filename` and `:content_type`
 
-    * `:json` - if set, encodes the request body as JSON (using `Jason.encode_to_iodata!/1`), sets
+    * `:json` - if set, encodes the request body as JSON (using `JSON.encode_to_iodata!/1`), sets
       the `accept` header to `application/json`, and the `content-type` header to `application/json`.
 
   ## Examples
@@ -439,7 +446,7 @@ defmodule Req.Steps do
         |> Req.Request.put_new_header("content-length", Integer.to_string(multipart.size))
 
       data = request.options[:json] ->
-        %{request | body: Jason.encode_to_iodata!(data)}
+        %{request | body: @json.encode_to_iodata!(data)}
         |> Req.Request.put_new_header("content-type", "application/json")
         |> Req.Request.put_new_header("accept", "application/json")
 
@@ -1447,7 +1454,7 @@ defmodule Req.Steps do
   ## Options
 
     * `:raw` - if set to `true`, disables response body decompression. Defaults to `false`.
-    
+
       Note: setting `raw: true` also disables response body decoding in the `decode_body/1` step.
 
   ## Examples
@@ -1617,7 +1624,7 @@ defmodule Req.Steps do
 
   | Format       | Decoder                                                           |
   | ------------ | ----------------------------------------------------------------- |
-  | `json`       | `Jason.decode/2`                                                  |
+  | `json`       | `JSON.decode/2`                                                  |
   | `tar`, `tgz` | `:erl_tar.extract/2`                                              |
   | `zip`        | `:zip.unzip/2`                                                    |
   | `gzip`       | `:zlib.gunzip/1`                                                  |
@@ -1638,7 +1645,7 @@ defmodule Req.Steps do
     * `:decode_body` - if set to `false`, disables automatic response body decoding.
       Defaults to `true`.
 
-    * `:decode_json` - options to pass to `Jason.decode/2`, defaults to `[]`.
+    * `:decode_json` - options to pass to `JSON.decode/2`, defaults to `[]`.
 
     * `:raw` - if set to `true`, disables response body decoding. Defaults to `false`.
 
@@ -1686,15 +1693,30 @@ defmodule Req.Steps do
     end
   end
 
-  defp decode_body({request, response}, format) when format in ~w(json json-api) do
-    options = Req.Request.get_option(request, :decode_json, [])
+  # TODO: Remove when we require Elixir 1.18
+  if(Version.match?(System.version(), "~> 1.18")) do
+    defp decode_body({request, response}, format) when format in ~w(json json-api) do
+      options = Req.Request.get_option(request, :decode_json, [])
 
-    case Jason.decode(response.body, options) do
-      {:ok, decoded} ->
-        {request, put_in(response.body, decoded)}
+      case JSON.decode(response.body, :ok, options) do
+        {decoded, :ok, _rest} ->
+          {request, put_in(response.body, decoded)}
 
-      {:error, e} ->
-        {request, e}
+        {:error, e} ->
+          {request, e}
+      end
+    end
+  else
+    defp decode_body({request, response}, format) when format in ~w(json json-api) do
+      options = Req.Request.get_option(request, :decode_json, [])
+
+      case Jason.decode(response.body, options) do
+        {:ok, decoded} ->
+          {request, put_in(response.body, decoded)}
+
+        {:error, e} ->
+          {request, e}
+      end
     end
   end
 
@@ -2143,6 +2165,19 @@ defmodule Req.Steps do
     true
   end
 
+  defp transient?({:unexpected_end, _offset}) do
+    false
+  end
+
+  defp transient?({:invalid_byte, _offset, _byte}) do
+    false
+  end
+
+  defp transient?({:unexpected_sequence, _offset, _bytes}) do
+    false
+  end
+
+  # TODO: Remove when we require Elixir 1.18
   defp transient?(%{__exception__: true}) do
     false
   end
@@ -2220,6 +2255,40 @@ defmodule Req.Steps do
     message = ["will retry in #{delay}ms, ", retries_left, " left"]
 
     case response_or_exception do
+      {:unexpected_end, offset} ->
+        Logger.log(level, [
+          "retry: got exception, ",
+          message
+        ])
+
+        Logger.log(level, [
+          "** (JSON) ",
+          "unexpected_sequence offset: #{offset}"
+        ])
+
+      {:invalid_byte, offset, byte} ->
+        Logger.log(level, [
+          "retry: got exception, ",
+          message
+        ])
+
+        Logger.log(level, [
+          "** (JSON) ",
+          "unexpected_sequence offset: #{offset} byte: #{byte}"
+        ])
+
+      {:unexpected_sequence, offset, bytes} ->
+        Logger.log(level, [
+          "retry: got exception, ",
+          message
+        ])
+
+        Logger.log(level, [
+          "** (JSON) ",
+          "unexpected_sequence offset: #{offset} bytes: #{bytes}"
+        ])
+
+      # TODO: Remove when we require Elixir 1.18
       %{__exception__: true} = exception ->
         Logger.log(level, [
           "retry: got exception, ",

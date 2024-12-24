@@ -183,6 +183,13 @@ defmodule Req.Test do
 
   @ownership Req.Test.Ownership
 
+  # TODO: Remove when we require Elixir 1.18
+  @json (if Version.match?(System.version(), "~> 1.18") do
+    JSON
+  else
+    Jason
+  end)
+
   @doc """
   Sends JSON response.
 
@@ -202,7 +209,7 @@ defmodule Req.Test do
   if Code.ensure_loaded?(Plug.Test) do
     @spec json(Plug.Conn.t(), term()) :: Plug.Conn.t()
     def json(%Plug.Conn{} = conn, data) do
-      send_resp(conn, conn.status || 200, "application/json", Jason.encode_to_iodata!(data))
+      send_resp(conn, conn.status || 200, "application/json", @json.encode_to_iodata!(data))
     end
 
     defp send_resp(conn, default_status, default_content_type, body) do

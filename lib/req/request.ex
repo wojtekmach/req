@@ -179,7 +179,7 @@ defmodule Req.Request do
       def decode({request, response}) do
         case Req.Response.get_header(response, "content-type") do
           ["application/json" <> _] ->
-            {request, update_in(response.body, &Jason.decode!/1)}
+            {request, update_in(response.body, &JSON.decode!/1)}
 
           [] ->
             {request, response}
@@ -682,6 +682,19 @@ defmodule Req.Request do
     {put_in(request.halted, true), response}
   end
 
+  def halt(%Req.Request{} = request, {:unexpected_end, _offset} = exception) do
+    {put_in(request.halted, true), exception}
+  end
+
+  def halt(%Req.Request{} = request, {:invalid_byte, _offset, _byte} = exception) do
+    {put_in(request.halted, true), exception}
+  end
+
+  def halt(%Req.Request{} = request, {:unexpected_sequence, _offset, _bytes} = exception) do
+    {put_in(request.halted, true), exception}
+  end
+
+  # TODO: Remove when we require Elixir 1.18
   def halt(%Req.Request{} = request, %_{__exception__: true} = exception) do
     {put_in(request.halted, true), exception}
   end
@@ -821,6 +834,16 @@ defmodule Req.Request do
         request = %{request | request_steps: steps}
         prepare(request)
 
+      {_request, {:unexpected_end, _offset} = exception} ->
+        raise exception
+
+      {_request, {:invalid_byte, _offset, _byte} = exception} ->
+        raise exception
+
+      {_request, {:unexpected_sequence, _offset, _bytes} = exception} ->
+        raise exception
+
+      # TODO: Remove when we require Elixir 1.18
       {_request, %{__exception__: true} = exception} ->
         raise exception
     end
@@ -1097,6 +1120,16 @@ defmodule Req.Request do
       {request, %Req.Response{} = response} ->
         run_response(request, response)
 
+      {request, {:unexpected_end, _offset} = exception} ->
+        run_error(request, exception)
+
+      {request, {:invalid_byte, _offset, _byte} = exception} ->
+        run_error(request, exception)
+
+      {request, {:unexpected_sequence, _offset, _bytes} = exception} ->
+        run_error(request, exception)
+
+      # TODO: Remove when we require Elixir 1.18
       {request, %{__exception__: true} = exception} ->
         run_error(request, exception)
     end
@@ -1107,6 +1140,16 @@ defmodule Req.Request do
       {request, %Req.Response{} = response} ->
         run_response(request, response)
 
+      {request, {:unexpected_end, _offset} = exception} ->
+        run_error(request, exception)
+
+      {request, {:invalid_byte, _offset, _byte} = exception} ->
+        run_error(request, exception)
+
+      {request, {:unexpected_sequence, _offset, _bytes} = exception} ->
+        run_error(request, exception)
+
+      # TODO: Remove when we require Elixir 1.18
       {request, %{__exception__: true} = exception} ->
         run_error(request, exception)
 
@@ -1127,6 +1170,16 @@ defmodule Req.Request do
         {request, %Req.Response{} = response} ->
           {:cont, {request, response}}
 
+        {request, {:unexpected_end, _offset} = exception} ->
+          {:halt, run_error(request, exception)}
+
+        {request, {:invalid_byte, _offset, _byte} = exception} ->
+          {:halt, run_error(request, exception)}
+
+        {request, {:unexpected_sequence, _offset, _bytes} = exception} ->
+          {:halt, run_error(request, exception)}
+
+        # TODO: Remove when we require Elixir 1.18
         {request, %{__exception__: true} = exception} ->
           {:halt, run_error(request, exception)}
       end
@@ -1141,6 +1194,16 @@ defmodule Req.Request do
         {%Req.Request{halted: true} = request, response_or_exception} ->
           {:halt, {request, response_or_exception}}
 
+        {request, {:unexpected_end, _offset} = exception} ->
+          {:cont, {request, exception}}
+
+        {request, {:invalid_byte, _offset, _byte} = exception} ->
+          {:cont, {request, exception}}
+
+        {request, {:unexpected_sequence, _offset, _bytes} = exception} ->
+          {:cont, {request, exception}}
+
+        # TODO: Remove when we require Elixir 1.18
         {request, %{__exception__: true} = exception} ->
           {:cont, {request, exception}}
 

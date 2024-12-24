@@ -32,6 +32,13 @@ defmodule Req.Response do
             trailers: %{},
             private: %{}
 
+  # TODO: Remove when we require Elixir 1.18
+  @json (if Version.match?(System.version(), "~> 1.18") do
+    JSON
+  else
+    Jason
+  end)
+
   @doc """
   Returns a new response.
 
@@ -118,7 +125,7 @@ defmodule Req.Response do
           response
       end
 
-    Map.replace!(response, :body, Jason.encode!(body))
+    Map.replace!(response, :body, @json.encode!(body))
   end
 
   @doc """
