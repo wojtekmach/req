@@ -436,7 +436,7 @@ defmodule Req.Steps do
 
         %{request | body: multipart.body}
         |> Req.Request.put_new_header("content-type", multipart.content_type)
-        |> Req.Request.put_new_header("content-length", Integer.to_string(multipart.size))
+        |> then(&maybe_put_content_length(&1, multipart.size))
 
       data = request.options[:json] ->
         %{request | body: Jason.encode_to_iodata!(data)}
@@ -446,6 +446,12 @@ defmodule Req.Steps do
       true ->
         request
     end
+  end
+
+  defp maybe_put_content_length(req, nil), do: req
+
+  defp maybe_put_content_length(req, size) do
+    Req.Request.put_new_header(req, "content-length", Integer.to_string(size))
   end
 
   @doc """
