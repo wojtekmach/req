@@ -156,13 +156,18 @@ defmodule Req.Utils do
     signed_headers = Enum.map_join(canonical_headers, ";", &elem(&1, 0))
 
     canonical_query_string =
-      URI.encode_query([
-        {"X-Amz-Algorithm", "AWS4-HMAC-SHA256"},
-        {"X-Amz-Credential", "#{access_key_id}/#{date_string}/#{region}/#{service}/aws4_request"},
-        {"X-Amz-Date", datetime_string},
-        {"X-Amz-Expires", expires},
-        {"X-Amz-SignedHeaders", signed_headers}
-      ])
+      URI.encode_query(
+        [
+          {"X-Amz-Algorithm", "AWS4-HMAC-SHA256"},
+          {"X-Amz-Credential",
+           "#{access_key_id}/#{date_string}/#{region}/#{service}/aws4_request"},
+          {"X-Amz-Date", datetime_string},
+          {"X-Amz-Expires", expires},
+          {"X-Amz-SignedHeaders", signed_headers}
+        ],
+        # Ensure spaces are encoded as %20 not +
+        :rfc3986
+      )
 
     path = URI.encode(url.path || "/", &(&1 == ?/ or URI.char_unreserved?(&1)))
 
