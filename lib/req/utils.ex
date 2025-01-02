@@ -139,6 +139,7 @@ defmodule Req.Utils do
     {method, options} = Keyword.pop!(options, :method)
     {url, options} = Keyword.pop!(options, :url)
     {expires, options} = Keyword.pop(options, :expires, 86400)
+    {headers, options} = Keyword.pop(options, :headers, [])
     [] = options
 
     datetime = DateTime.truncate(datetime, :second)
@@ -147,23 +148,21 @@ defmodule Req.Utils do
     url = normalize_url(url)
     service = to_string(service)
 
+    canonical_headers =
+      headers
+      |> canonical_host_header(url)
+      |> format_canonical_headers()
+
+    signed_headers = Enum.map_join(canonical_headers, ";", &elem(&1, 0))
+
     canonical_query_string =
       URI.encode_query([
         {"X-Amz-Algorithm", "AWS4-HMAC-SHA256"},
         {"X-Amz-Credential", "#{access_key_id}/#{date_string}/#{region}/#{service}/aws4_request"},
         {"X-Amz-Date", datetime_string},
         {"X-Amz-Expires", expires},
-        {"X-Amz-SignedHeaders", "host"}
+        {"X-Amz-SignedHeaders", signed_headers}
       ])
-
-    canonical_headers = canonical_host_header([], url)
-
-    signed_headers =
-      Enum.map_intersperse(
-        Enum.sort(canonical_headers),
-        ";",
-        &String.downcase(elem(&1, 0), :ascii)
-      )
 
     path = URI.encode(url.path || "/", &(&1 == ?/ or URI.char_unreserved?(&1)))
 
@@ -226,6 +225,31 @@ defmodule Req.Utils do
       end
 
     [{"host", host_value} | headers]
+  end
+
+  # Headers must be sorted alphabetically by name
+  # See https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
+  defp format_canonical_headers(headers) do
+    headers
+    |> Enum.map(&format_canonical_header/1)
+    |> Enum.sort(fn {name_1, _}, {name_2, _} -> name_1 < name_2 end)
+  end
+
+  # Header names must be lower case
+  # Header values must be trimmed
+  # See https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
+  defp format_canonical_header({name, value}) do
+    name =
+      name
+      |> to_string()
+      |> String.downcase(:ascii)
+
+    value =
+      value
+      |> to_string()
+      |> String.trim()
+
+    {name, value}
   end
 
   def aws_sigv4(

@@ -138,6 +138,34 @@ defmodule Req.UtilsTest do
 
       assert url1 == url2
     end
+
+    test "custom headers" do
+      options = [
+        access_key_id: "dummy-access-key-id",
+        secret_access_key: "dummy-secret-access-key",
+        region: "dummy-region",
+        service: "s3",
+        datetime: ~U[2024-01-01 09:00:00Z],
+        method: :put,
+        url: "https://s3/foo/hello_world.txt",
+        headers: [{"content-length", 11}]
+      ]
+
+      url1 = to_string(Req.Utils.aws_sigv4_url(options))
+
+      url2 =
+        """
+        https://s3/foo/hello_world.txt?\
+        X-Amz-Algorithm=AWS4-HMAC-SHA256\
+        &X-Amz-Credential=dummy-access-key-id%2F20240101%2Fdummy-region%2Fs3%2Faws4_request\
+        &X-Amz-Date=20240101T090000Z\
+        &X-Amz-Expires=86400\
+        &X-Amz-SignedHeaders=content-length%3Bhost\
+        &X-Amz-Signature=dbb4ae08836db5089a924f2eb52eb52dbc1c372a384a6a99ceb469b14b83e995\
+        """
+
+      assert url1 == url2
+    end
   end
 
   describe "encode_form_multipart" do
