@@ -266,6 +266,7 @@ defmodule Req.Utils do
     |> Enum.map_join("&", fn {name, value} -> "#{name}=#{value}" end)
   end
 
+  # Spaces must be encoded as %20, not as "+".
   defp format_canonical_query_param({name, value}) do
     name =
       name
