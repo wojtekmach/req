@@ -398,7 +398,9 @@ defmodule Req.Steps do
 
         * `File.Stream`
 
-        * `{value, options}` tuple. Supported options are `:filename` and `:content_type`
+        * `Enumerable` (optionally takes `:size`, which is used for content-length header calculation)
+
+        * `{value, options}` tuple. Supported options are: `:filename`, `:content_type`, `:size`
 
     * `:json` - if set, encodes the request body as JSON (using `Jason.encode_to_iodata!/1`), sets
       the `accept` header to `application/json`, and the `content-type` header to `application/json`.
@@ -418,6 +420,14 @@ defmodule Req.Steps do
       %{"a" => "1"}
       iex> resp.body["files"]
       %{"b" => "2"}
+
+  Encoding streaming form (`multipart/form-data`):
+
+      iex> stream = Stream.cycle(["abc"]) |> Stream.take(3)
+      iex> fields = [file: {stream, filename: "b.txt", size: 9}]
+      iex> resp = Req.post!("https://httpbin.org/anything", form_multipart: fields)
+      iex> resp.body["files"]
+      %{"file" => "abcabcabc"}
 
   Encoding JSON:
 
