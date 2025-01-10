@@ -16,11 +16,6 @@ defmodule Req.MixProject do
       aliases: [
         "test.all": ["test --include integration"]
       ],
-      preferred_cli_env: [
-        "test.all": :test,
-        docs: :docs,
-        "hex.publish": :docs
-      ],
       xref: [
         exclude: [
           NimbleCSV.RFC4180,
@@ -37,6 +32,16 @@ defmodule Req.MixProject do
     [
       mod: {Req.Application, []},
       extra_applications: [:logger]
+    ]
+  end
+
+  def cli do
+    [
+      preferred_envs: [
+        "test.all": :test,
+        docs: :docs,
+        "hex.publish": :docs
+      ]
     ]
   end
 
