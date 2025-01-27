@@ -1,135 +1,7 @@
 # Experimental httpc adapter to test the adapter contract.
 
-defmodule Req.HttpcTest do
-  use ExUnit.Case, async: true
-
-  require Logger
-
-  # TODO
-  @moduletag :skip
-
-  setup do
-    bypass = Bypass.open()
-
-    req =
-      Req.new(
-        adapter: &run_httpc/1,
-        url: "http://localhost:#{bypass.port}"
-      )
-
-    [bypass: bypass, req: req]
-  end
-
-  if function_exported?(Mix, :ensure_application!, 1) do
-    Mix.ensure_application!(:inets)
-  end
-
-  describe "run_httpc/1" do
-    test "request", %{bypass: bypass, req: req} do
-      Bypass.expect(bypass, "GET", "/", fn conn ->
-        Plug.Conn.send_resp(conn, 200, "ok")
-      end)
-
-      resp = Req.get!(req)
-      assert resp.status == 200
-      assert Req.Response.get_header(resp, "server") == ["Cowboy"]
-      assert resp.body == "ok"
-    end
-
-    test "post request body", %{bypass: bypass, req: req} do
-      Bypass.expect(bypass, "POST", "/", fn conn ->
-        assert {:ok, body, conn} = Plug.Conn.read_body(conn)
-        Plug.Conn.send_resp(conn, 200, body)
-      end)
-
-      resp = Req.post!(req, body: "foofoofoo")
-      assert resp.status == 200
-      assert resp.body == "foofoofoo"
-    end
-
-    test "stream request body", %{bypass: bypass, req: req} do
-      Bypass.expect(bypass, "POST", "/", fn conn ->
-        assert {:ok, body, conn} = Plug.Conn.read_body(conn)
-        Plug.Conn.send_resp(conn, 200, body)
-      end)
-
-      resp = Req.post!(req, body: {:stream, Stream.take(["foo", "foo", "foo"], 2)})
-      assert resp.status == 200
-      assert resp.body == "foofoo"
-    end
-
-    test "into: fun", %{req: req, bypass: bypass} do
-      Bypass.expect(bypass, "GET", "/", fn conn ->
-        conn = Plug.Conn.send_chunked(conn, 200)
-        {:ok, conn} = Plug.Conn.chunk(conn, "foo")
-        {:ok, conn} = Plug.Conn.chunk(conn, "bar")
-        conn
-      end)
-
-      pid = self()
-
-      resp =
-        Req.get!(
-          req,
-          into: fn {:data, data}, acc ->
-            send(pid, {:data, data})
-            {:cont, acc}
-          end
-        )
-
-      assert resp.status == 200
-      assert resp.headers["transfer-encoding"] == ["chunked"]
-      assert_receive {:data, "foobar"}
-
-      # httpc seems to randomly chunk things
-      receive do
-        {:data, ""} -> :ok
-      after
-        0 -> :ok
-      end
-
-      refute_receive _
-    end
-
-    test "into: :self", %{req: req, bypass: bypass} do
-      Bypass.expect(bypass, "GET", "/", fn conn ->
-        conn = Plug.Conn.send_chunked(conn, 200)
-        {:ok, conn} = Plug.Conn.chunk(conn, "foo")
-        {:ok, conn} = Plug.Conn.chunk(conn, "bar")
-        conn
-      end)
-
-      resp = Req.get!(req, into: :self)
-      assert resp.status == 200
-
-      # httpc seems to randomly chunk things
-      assert Req.parse_message(resp, assert_receive(_)) in [
-               {:ok, [data: "foo"]},
-               {:ok, [data: "foobar"]}
-             ]
-
-      assert Req.parse_message(resp, assert_receive(_)) in [
-               {:ok, [data: "bar"]},
-               {:ok, [data: ""]},
-               {:ok, [:done]}
-             ]
-    end
-
-    test "into: pid cancel", %{req: req, bypass: bypass} do
-      Bypass.expect(bypass, "GET", "/", fn conn ->
-        conn = Plug.Conn.send_chunked(conn, 200)
-        {:ok, conn} = Plug.Conn.chunk(conn, "foo")
-        {:ok, conn} = Plug.Conn.chunk(conn, "bar")
-        conn
-      end)
-
-      resp = Req.get!(req, into: :self)
-      assert resp.status == 200
-      assert :ok = Req.cancel_async_response(resp)
-    end
-  end
-
-  def run_httpc(request) do
+defmodule Req.Httpc do
+  def run(request) do
     httpc_url = request.url |> URI.to_string() |> String.to_charlist()
 
     httpc_headers =
@@ -328,6 +200,136 @@ defmodule Req.HttpcTest do
       # TODO: handle trailers
       {:http, {^ref, :stream_end, _headers}} ->
         {request, response}
+    end
+  end
+end
+
+defmodule Req.HttpcTest do
+  use ExUnit.Case, async: true
+
+  require Logger
+
+  # TODO
+  @moduletag :skip
+
+  setup do
+    bypass = Bypass.open()
+
+    req =
+      Req.new(
+        adapter: &Req.Httpc.run/1,
+        url: "http://localhost:#{bypass.port}"
+      )
+
+    [bypass: bypass, req: req]
+  end
+
+  if function_exported?(Mix, :ensure_application!, 1) do
+    Mix.ensure_application!(:inets)
+  end
+
+  describe "httpc" do
+    test "request", %{bypass: bypass, req: req} do
+      Bypass.expect(bypass, "GET", "/", fn conn ->
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+      resp = Req.get!(req)
+      assert resp.status == 200
+      assert Req.Response.get_header(resp, "server") == ["Cowboy"]
+      assert resp.body == "ok"
+    end
+
+    test "post request body", %{bypass: bypass, req: req} do
+      Bypass.expect(bypass, "POST", "/", fn conn ->
+        assert {:ok, body, conn} = Plug.Conn.read_body(conn)
+        Plug.Conn.send_resp(conn, 200, body)
+      end)
+
+      resp = Req.post!(req, body: "foofoofoo")
+      assert resp.status == 200
+      assert resp.body == "foofoofoo"
+    end
+
+    test "stream request body", %{bypass: bypass, req: req} do
+      Bypass.expect(bypass, "POST", "/", fn conn ->
+        assert {:ok, body, conn} = Plug.Conn.read_body(conn)
+        Plug.Conn.send_resp(conn, 200, body)
+      end)
+
+      resp = Req.post!(req, body: {:stream, Stream.take(["foo", "foo", "foo"], 2)})
+      assert resp.status == 200
+      assert resp.body == "foofoo"
+    end
+
+    test "into: fun", %{req: req, bypass: bypass} do
+      Bypass.expect(bypass, "GET", "/", fn conn ->
+        conn = Plug.Conn.send_chunked(conn, 200)
+        {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+        {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+        conn
+      end)
+
+      pid = self()
+
+      resp =
+        Req.get!(
+          req,
+          into: fn {:data, data}, acc ->
+            send(pid, {:data, data})
+            {:cont, acc}
+          end
+        )
+
+      assert resp.status == 200
+      assert resp.headers["transfer-encoding"] == ["chunked"]
+      assert_receive {:data, "foobar"}
+
+      # httpc seems to randomly chunk things
+      receive do
+        {:data, ""} -> :ok
+      after
+        0 -> :ok
+      end
+
+      refute_receive _
+    end
+
+    test "into: :self", %{req: req, bypass: bypass} do
+      Bypass.expect(bypass, "GET", "/", fn conn ->
+        conn = Plug.Conn.send_chunked(conn, 200)
+        {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+        {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+        conn
+      end)
+
+      resp = Req.get!(req, into: :self)
+      assert resp.status == 200
+
+      # httpc seems to randomly chunk things
+      assert Req.parse_message(resp, assert_receive(_)) in [
+               {:ok, [data: "foo"]},
+               {:ok, [data: "foobar"]}
+             ]
+
+      assert Req.parse_message(resp, assert_receive(_)) in [
+               {:ok, [data: "bar"]},
+               {:ok, [data: ""]},
+               {:ok, [:done]}
+             ]
+    end
+
+    test "into: pid cancel", %{req: req, bypass: bypass} do
+      Bypass.expect(bypass, "GET", "/", fn conn ->
+        conn = Plug.Conn.send_chunked(conn, 200)
+        {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+        {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+        conn
+      end)
+
+      resp = Req.get!(req, into: :self)
+      assert resp.status == 200
+      assert :ok = Req.cancel_async_response(resp)
     end
   end
 end
