@@ -1935,8 +1935,8 @@ defmodule Req.Steps do
     Logger.log(level, ["redirecting to ", location])
   end
 
-  defp normalize_redirect_uri(%URI{scheme: "http", port: nil} = uri), do: %URI{uri | port: 80}
-  defp normalize_redirect_uri(%URI{scheme: "https", port: nil} = uri), do: %URI{uri | port: 443}
+  defp normalize_redirect_uri(%URI{scheme: "http", port: nil} = uri), do: %{uri | port: 80}
+  defp normalize_redirect_uri(%URI{scheme: "https", port: nil} = uri), do: %{uri | port: 443}
   defp normalize_redirect_uri(%URI{} = uri), do: uri
 
   # https://www.rfc-editor.org/rfc/rfc9110#name-301-moved-permanently and 302:
