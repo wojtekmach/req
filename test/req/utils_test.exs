@@ -203,6 +203,45 @@ defmodule Req.UtilsTest do
              """
     end
 
+    test "raise when size is not integer" do
+      assert_raise ArgumentError, fn ->
+        enum = Stream.cycle([1]) |> Stream.take(1)
+        Req.Utils.encode_form_multipart([field1: {enum, content_length: "10"}], boundary: "foo")
+      end
+    end
+
+    test "content-length" do
+      %{content_type: content_type, body: body, size: size} =
+        Req.Utils.encode_form_multipart([field1: {"a", content_length: 11}], boundary: "foo")
+
+      body = IO.iodata_to_binary(body)
+
+      assert size == byte_size(body)
+      assert content_type == "multipart/form-data; boundary=foo"
+
+      assert body == """
+             \r\n\
+             --foo\r\n\
+             content-disposition: form-data; name=\"field1\"\r\n\
+             content-length: 11\r\n\
+             \r\n\
+             a\r\n\
+             --foo--\r\n\
+             """
+    end
+
+    test "can accept any enumerable" do
+      enum = Stream.cycle(["a"]) |> Stream.take(1)
+
+      %{body: body, size: size} =
+        Req.Utils.encode_form_multipart([field1: {enum, content_length: 11}], boundary: "foo")
+
+      body = body |> Enum.to_list() |> IO.iodata_to_binary()
+
+      # content_length is +10 of actual size
+      assert size == byte_size(body) + 10
+    end
+
     @tag :tmp_dir
     test "can return stream", %{tmp_dir: tmp_dir} do
       File.write!("#{tmp_dir}/2.txt", "22")
