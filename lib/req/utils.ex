@@ -493,11 +493,6 @@ defmodule Req.Utils do
     }
   end
 
-  defp add_form_parts({_parts1, size1}, {_parts2, size2})
-       when not is_integer(size1) or not is_integer(size2) do
-    raise ArgumentError, "multipart part sizes must be integers"
-  end
-
   defp add_form_parts({parts1, size1}, {parts2, size2})
        when is_list(parts1) and is_list(parts2) do
     {[parts1, parts2], size1 + size2}
@@ -508,7 +503,7 @@ defmodule Req.Utils do
   end
 
   defp encode_form_part({name, {value, options}}, boundary) do
-    options = Keyword.validate!(options, [:filename, :content_type, :content_length])
+    options = Keyword.validate!(options, [:filename, :content_type])
 
     {parts, parts_size, options} =
       case value do
@@ -538,12 +533,6 @@ defmodule Req.Utils do
             end)
 
           {stream, size, options}
-
-        enum ->
-          Enumerable.impl_for!(enum)
-          size = Keyword.get(options, :content_length, 0)
-
-          {enum, size, options}
       end
 
     params =
@@ -554,11 +543,11 @@ defmodule Req.Utils do
       end
 
     headers =
-      [
-        maybe_content_type(options),
-        maybe_content_length(options)
-      ]
-      |> Enum.reject(&is_nil/1)
+      if content_type = options[:content_type] do
+        ["content-type: ", content_type, @crlf]
+      else
+        []
+      end
 
     headers = ["content-disposition: form-data; name=\"#{name}\"", params, @crlf, headers]
     header = [[@crlf, "--", boundary, @crlf, headers, @crlf]]
@@ -567,18 +556,6 @@ defmodule Req.Utils do
 
   defp encode_form_part({name, value}, boundary) do
     encode_form_part({name, {value, []}}, boundary)
-  end
-
-  defp maybe_content_type(options) do
-    if content_type = options[:content_type] do
-      ["content-type: ", content_type, @crlf]
-    end
-  end
-
-  defp maybe_content_length(options) do
-    if content_length = options[:content_length] do
-      ["content-length: ", Integer.to_string(content_length), @crlf]
-    end
   end
 
   @doc """
