@@ -166,6 +166,35 @@ defmodule Req.UtilsTest do
 
       assert url1 == url2
     end
+
+    test "custom query" do
+      options = [
+        access_key_id: "dummy-access-key-id",
+        secret_access_key: "dummy-secret-access-key",
+        region: "dummy-region",
+        service: "s3",
+        datetime: ~U[2024-01-01 09:00:00Z],
+        method: :get,
+        url: "https://s3/foo/hello_world.txt",
+        query: [{"response-content-disposition", ~s(attachment; filename="hello_world.txt")}]
+      ]
+
+      url1 = to_string(Req.Utils.aws_sigv4_url(options))
+
+      url2 =
+        """
+        https://s3/foo/hello_world.txt?\
+        X-Amz-Algorithm=AWS4-HMAC-SHA256\
+        &X-Amz-Credential=dummy-access-key-id%2F20240101%2Fdummy-region%2Fs3%2Faws4_request\
+        &X-Amz-Date=20240101T090000Z\
+        &X-Amz-Expires=86400\
+        &X-Amz-SignedHeaders=host\
+        &response-content-disposition=attachment%3B%20filename%3D%22hello_world.txt%22\
+        &X-Amz-Signature=574a638441ff0e623c800b7379408748d58f3e6679e3ca2619c5900fa030beed\
+        """
+
+      assert url1 == url2
+    end
   end
 
   describe "encode_form_multipart" do
