@@ -850,7 +850,7 @@ defmodule Req.Request do
     deprecated = [:method, :url, :headers, :body, :adapter]
 
     options =
-      case deprecated -- deprecated -- Keyword.keys(options) do
+      case deprecated -- (deprecated -- Keyword.keys(options)) do
         [] ->
           options
 
@@ -1244,7 +1244,11 @@ defmodule Req.Request do
           key = color("url:", :atom, opts)
 
           doc =
-            concat(["URI.parse(", color("\"" <> URI.to_string(value) <> "\"", :string, opts), ")"])
+            concat([
+              "URI.parse(",
+              color("\"" <> URI.to_string(value) <> "\"", :string, opts),
+              ")"
+            ])
 
           concat(key, concat(" ", doc))
 
