@@ -13,9 +13,7 @@ defmodule Req.MixProject do
       deps: deps(),
       package: package(),
       docs: docs(),
-      aliases: [
-        "test.all": ["test --include integration"]
-      ],
+      aliases: aliases(),
       xref: [
         exclude: [
           NimbleCSV.RFC4180,
@@ -38,11 +36,62 @@ defmodule Req.MixProject do
   def cli do
     [
       preferred_envs: [
+        ci: :test,
         "test.all": :test,
         docs: :docs,
         "hex.publish": :docs
       ]
     ]
+  end
+
+  defp aliases do
+    [
+      "test.all": ["test --include integration"],
+      ci: &ci/1
+    ]
+  end
+
+  defp ci(args) do
+    strict? =
+      case args do
+        [] -> true
+        ["--relaxed"] -> false
+      end
+
+    tasks =
+      if strict? do
+        [
+          "deps.get --no-archives-check --check-locked",
+          "deps.unlock --check-unused",
+          "format --check-formatted",
+          "compile --no-optional-deps --warnings-as-errors",
+          "compile --warnings-as-errors",
+          "test --warnings-as-errors"
+        ]
+      else
+        [
+          "deps.get",
+          "test"
+        ]
+      end
+
+    runner = System.get_env("GITHUB_ACTIONS") && :github
+
+    for task <- tasks do
+      [name | args] = OptionParser.split(task)
+      with_task_title(task, runner, fn -> Mix.Task.rerun(name, args) end)
+    end
+  end
+
+  defp with_task_title(task, :github, fun) do
+    IO.puts("::group::Run mix #{task}")
+    fun.()
+    IO.puts("::endgroup::")
+  end
+
+  defp with_task_title(task, nil, fun) do
+    IO.puts(">> Run mix #{task}")
+    fun.()
   end
 
   defp package do
