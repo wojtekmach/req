@@ -216,7 +216,7 @@ defmodule Req.Test do
         conn
       else
         content_type = content_type <> "; charset=utf-8"
-        %Plug.Conn{conn | resp_headers: [{"content-type", content_type} | resp_headers]}
+        %{conn | resp_headers: [{"content-type", content_type} | resp_headers]}
       end
     end
   else

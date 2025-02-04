@@ -258,12 +258,12 @@ defmodule Req.Test.Ownership do
 
   def handle_call({:set_mode, {:shared, shared_owner_pid}}, _from, %__MODULE__{} = state) do
     state = maybe_monitor_pid(state, shared_owner_pid)
-    state = %__MODULE__{state | mode: {:shared, shared_owner_pid}}
+    state = %{state | mode: {:shared, shared_owner_pid}}
     {:reply, :ok, state}
   end
 
   def handle_call({:set_mode, :private}, _from, %__MODULE__{} = state) do
-    {:reply, :ok, %__MODULE__{state | mode: :private}}
+    {:reply, :ok, %{state | mode: :private}}
   end
 
   def handle_call({:set_owner_to_manual_cleanup, owner_pid}, _from, %__MODULE__{} = state) do
@@ -279,7 +279,7 @@ defmodule Req.Test.Ownership do
 
   # The global owner went down, so we go back to private mode.
   def handle_info({:DOWN, _, _, down_pid, _}, %__MODULE__{mode: {:shared, down_pid}} = state) do
-    {:noreply, %__MODULE__{state | mode: :private}}
+    {:noreply, %{state | mode: :private}}
   end
 
   # An owner went down, so we need to clean up all of its allowances as well as all its keys.
@@ -319,7 +319,7 @@ defmodule Req.Test.Ownership do
         Map.put(acc, pid, new_allowances)
       end)
 
-    %__MODULE__{state | allowances: allowances}
+    %{state | allowances: allowances}
   end
 
   defp maybe_monitor_pid(state, pid) do
