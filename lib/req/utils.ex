@@ -140,6 +140,7 @@ defmodule Req.Utils do
     {url, options} = Keyword.pop!(options, :url)
     {expires, options} = Keyword.pop(options, :expires, 86400)
     {headers, options} = Keyword.pop(options, :headers, [])
+    {query, options} = Keyword.pop(options, :query, [])
     [] = options
 
     datetime = DateTime.truncate(datetime, :second)
@@ -156,7 +157,7 @@ defmodule Req.Utils do
     signed_headers = Enum.map_join(canonical_headers, ";", &elem(&1, 0))
 
     canonical_query_string =
-      URI.encode_query(
+      format_canonical_query_params(
         [
           {"X-Amz-Algorithm", "AWS4-HMAC-SHA256"},
           {"X-Amz-Credential",
@@ -164,9 +165,7 @@ defmodule Req.Utils do
           {"X-Amz-Date", datetime_string},
           {"X-Amz-Expires", expires},
           {"X-Amz-SignedHeaders", signed_headers}
-        ],
-        # Ensure spaces are encoded as %20 not +
-        :rfc3986
+        ] ++ query
       )
 
     path = URI.encode(url.path || "/", &(&1 == ?/ or URI.char_unreserved?(&1)))
@@ -233,6 +232,8 @@ defmodule Req.Utils do
   end
 
   # Headers must be sorted alphabetically by name
+  # Header names must be lower case
+  # Header values must be trimmed
   # See https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
   defp format_canonical_headers(headers) do
     headers
@@ -240,9 +241,6 @@ defmodule Req.Utils do
     |> Enum.sort(fn {name_1, _}, {name_2, _} -> name_1 < name_2 end)
   end
 
-  # Header names must be lower case
-  # Header values must be trimmed
-  # See https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
   defp format_canonical_header({name, value}) do
     name =
       name
@@ -256,6 +254,35 @@ defmodule Req.Utils do
 
     {name, value}
   end
+
+  # Query params must be sorted alphabetically by name
+  # Query param name and values must be URI-encoded individually
+  # Query params must be sorted after encoding
+  # See https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
+  defp format_canonical_query_params(query_params) do
+    query_params
+    |> Enum.map(&format_canonical_query_param/1)
+    |> Enum.sort(&canonical_query_param_sorter/2)
+    |> Enum.map_join("&", fn {name, value} -> "#{name}=#{value}" end)
+  end
+
+  # Spaces must be encoded as %20, not as "+".
+  defp format_canonical_query_param({name, value}) do
+    name =
+      name
+      |> to_string()
+      |> URI.encode(&URI.char_unreserved?/1)
+
+    value =
+      value
+      |> to_string()
+      |> URI.encode(&URI.char_unreserved?/1)
+
+    {name, value}
+  end
+
+  defp canonical_query_param_sorter({name, value_1}, {name, value_2}), do: value_1 < value_2
+  defp canonical_query_param_sorter({name_1, _}, {name_2, _}), do: name_1 < name_2
 
   def aws_sigv4(
         string_to_sign,
