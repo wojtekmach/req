@@ -166,6 +166,35 @@ defmodule Req.UtilsTest do
 
       assert url1 == url2
     end
+
+    test "query params" do
+      options = [
+        access_key_id: "dummy-access-key-id",
+        secret_access_key: "dummy-secret-access-key",
+        region: "dummy-region",
+        service: "s3",
+        datetime: ~U[2024-01-01 09:00:00Z],
+        method: :get,
+        query_params: %{"response-content-disposition" => "attachment; filename=\"cat.webp\""},
+        url: "https://s3/foo/:bar"
+      ]
+
+      url1 = to_string(Req.Utils.aws_sigv4_url(options))
+
+      url2 =
+        """
+        https://s3/foo/%3Abar?\
+        X-Amz-Algorithm=AWS4-HMAC-SHA256\
+        &X-Amz-Credential=dummy-access-key-id%2F20240101%2Fdummy-region%2Fs3%2Faws4_request\
+        &X-Amz-Date=20240101T090000Z\
+        &X-Amz-Expires=86400\
+        &X-Amz-SignedHeaders=host\
+        &response-content-disposition=attachment%3B%20filename%3D%22cat.webp%22\
+        &X-Amz-Signature=43c08800205ad36d7afec01c08b223b67f710bb41d58ccba0eb1380caa6ee99c\
+        """
+
+      assert url1 == url2
+    end
   end
 
   describe "encode_form_multipart" do

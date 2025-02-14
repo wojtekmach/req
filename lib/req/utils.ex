@@ -140,6 +140,7 @@ defmodule Req.Utils do
     {url, options} = Keyword.pop!(options, :url)
     {expires, options} = Keyword.pop(options, :expires, 86400)
     {headers, options} = Keyword.pop(options, :headers, [])
+    {query_params, options} = Keyword.pop(options, :query_params, %{})
     [] = options
 
     datetime = DateTime.truncate(datetime, :second)
@@ -164,7 +165,7 @@ defmodule Req.Utils do
           {"X-Amz-Date", datetime_string},
           {"X-Amz-Expires", expires},
           {"X-Amz-SignedHeaders", signed_headers}
-        ],
+        ] ++ Map.to_list(query_params),
         # Ensure spaces are encoded as %20 not +
         :rfc3986
       )
