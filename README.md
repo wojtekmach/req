@@ -217,6 +217,7 @@ There are many packages that extend the Req library. To get yours listed here, s
   * [`req_hex`]
   * [`req_github_oauth`]
   * [`curl_req`]
+  * [`http_cookie`]
 
 ## Presentations
 
@@ -281,3 +282,4 @@ limitations under the License.
 [`req_github_oauth`]: https://github.com/wojtekmach/req_github_oauth
 [`Mix.install/2`]: https://hexdocs.pm/mix/Mix.html#install/2
 [`curl_req`]: https://github.com/derekkraan/curl_req
+[`http_cookie`]: https://github.com/reisub/http_cookie
