@@ -6,7 +6,7 @@ on:
       - main
 jobs:
   test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     env:
       MIX_ENV: test
       # TODO: Remove on Req 1.0
@@ -15,20 +15,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - pair:
-              elixir: "1.13"
-              otp: "24.3.4.10"
-          - pair:
-              elixir: "1.17"
-              otp: "27.0.1"
-            lint: lint
+          - elixir: "1.13"
+            otp: "24.3.4.10"
+            ci_args: "--relaxed"
+          - elixir: "1.18"
+            otp: "27.2"
     steps:
       - uses: actions/checkout@v4
 
       - uses: erlef/setup-beam@main
         with:
-          otp-version: ${{ matrix.pair.otp }}
-          elixir-version: ${{ matrix.pair.elixir }}
+          otp-version: ${{ matrix.otp }}
+          elixir-version: ${{ matrix.elixir }}
           version-type: strict
 
       - uses: actions/cache@v4
@@ -36,23 +34,6 @@ jobs:
           path: deps
           # ezstd and brotli are compiling native objects to deps/x/_build, not _build,
           # so we need to cache per OTP
-          key: mix-otp-${{ matrix.pair.otp }}-deps-${{ hashFiles('**/mix.lock') }}
+          key: mix-otp-${{ matrix.otp }}-deps-${{ hashFiles('**/mix.lock') }}
 
-      - run: mix deps.get --check-locked
-
-      - run: mix format --check-formatted
-        if: ${{ matrix.lint }}
-
-      - run: mix deps.unlock --check-unused
-        if: ${{ matrix.lint }}
-
-      - run: mix deps.compile
-
-      - run: mix compile --no-optional-deps --warnings-as-errors
-        if: ${{ matrix.lint }}
-
-      - run: mix test --slowest 5
-        if: ${{ ! matrix.lint }}
-
-      - run: mix test --slowest 5 --warnings-as-errors
-        if: ${{ matrix.lint }}
+      - run: mix ci ${{ matrix.ci_args }}
