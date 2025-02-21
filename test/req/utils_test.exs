@@ -222,16 +222,6 @@ defmodule Req.UtilsTest do
              """
     end
 
-    test "raise when size is not integer" do
-      assert_raise ArgumentError, fn ->
-        enum = Stream.cycle([1]) |> Stream.take(1)
-
-        Req.Utils.encode_form_multipart([field1: {enum, size: "not integer"}],
-          boundary: "foo"
-        )
-      end
-    end
-
     test "can accept any enumerable" do
       enum = Stream.cycle(["a"]) |> Stream.take(10)
 

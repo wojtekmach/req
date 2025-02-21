@@ -493,7 +493,8 @@ defmodule Req.Utils do
     }
   end
 
-  defp add_sizes(nil, nil), do: nil
+  defp add_sizes(_, nil), do: nil
+  defp add_sizes(nil, _), do: nil
   defp add_sizes(size1, size2), do: size1 + size2
 
   defp add_form_parts({parts1, size1}, {parts2, size2})

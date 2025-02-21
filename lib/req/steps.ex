@@ -401,11 +401,11 @@ defmodule Req.Steps do
         * `Enumerable`
 
         * `{value, options}` tuple.
-        
+
            `value` can be any of the values mentioned above.
-           
+
            Supported options are: `:filename`, `:content_type`, and `:size`.
-           
+
            When `value` is an `Enumerable`, option `:size` can be set with
            the binary size of the `value`. The size will be used to calculate
            and send the `content-length` header which might be required for
