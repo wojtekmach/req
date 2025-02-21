@@ -398,9 +398,19 @@ defmodule Req.Steps do
 
         * `File.Stream`
 
-        * `Enumerable` (optionally takes `:size`, which is used for content-length header calculation)
+        * `Enumerable`
 
-        * `{value, options}` tuple. Supported options are: `:filename`, `:content_type`, `:size`
+        * `{value, options}` tuple.
+        
+           `value` can be any of the values mentioned above.
+           
+           Supported options are: `:filename`, `:content_type`, and `:size`.
+           
+           When `value` is an `Enumerable`, option `:size` can be set with
+           the binary size of the `value`. The size will be used to calculate
+           and send the `content-length` header which might be required for
+           some servers. There is no need to pass `:size` for `integer`,
+           `iodata`, and `File.Stream` values as it's automatically calculated.
 
     * `:json` - if set, encodes the request body as JSON (using `Jason.encode_to_iodata!/1`), sets
       the `accept` header to `application/json`, and the `content-type` header to `application/json`.
@@ -423,6 +433,13 @@ defmodule Req.Steps do
 
   Encoding streaming form (`multipart/form-data`):
 
+      iex> stream = Stream.cycle(["abc"]) |> Stream.take(3)
+      iex> fields = [file: {stream, filename: "b.txt"}]
+      iex> resp = Req.post!("https://httpbin.org/anything", form_multipart: fields)
+      iex> resp.body["files"]
+      %{"file" => "abcabcabc"}
+
+      # with explicit :size
       iex> stream = Stream.cycle(["abc"]) |> Stream.take(3)
       iex> fields = [file: {stream, filename: "b.txt", size: 9}]
       iex> resp = Req.post!("https://httpbin.org/anything", form_multipart: fields)

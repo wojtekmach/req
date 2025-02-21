@@ -493,11 +493,8 @@ defmodule Req.Utils do
     }
   end
 
-  defp add_sizes(size1, size2) when is_nil(size1) or is_nil(size2), do: nil
-  defp add_sizes(size1, size2) when is_number(size1) and is_number(size2), do: size1 + size2
-
-  defp add_sizes(_size1, _size2),
-    do: raise(ArgumentError, "multipart part sizes must be integers or nil")
+  defp add_sizes(nil, nil), do: nil
+  defp add_sizes(size1, size2), do: size1 + size2
 
   defp add_form_parts({parts1, size1}, {parts2, size2})
        when is_list(parts1) and is_list(parts2) do
@@ -541,7 +538,6 @@ defmodule Req.Utils do
           {stream, size, options}
 
         enum ->
-          Enumerable.impl_for!(enum)
           size = Keyword.get(options, :size)
 
           {enum, size, options}
