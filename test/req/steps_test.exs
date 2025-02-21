@@ -280,6 +280,31 @@ defmodule Req.StepsTest do
                ]
              ).status == 200
     end
+
+    test "form_multipart enum without size" do
+      plug = fn conn ->
+        conn = Plug.Parsers.call(conn, Plug.Parsers.init(parsers: [:multipart]))
+
+        assert Plug.Conn.get_req_header(conn, "content-length") == []
+        assert %{"a" => "1", "b" => b} = conn.body_params
+
+        assert b.filename == "cycle"
+        assert b.content_type == "application/text"
+        assert File.read!(b.path) == "abcabc"
+
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end
+
+      assert Req.post!(
+               plug: plug,
+               form_multipart: [
+                 a: 1,
+                 b:
+                   {Stream.cycle(["a", "b", "c"]) |> Stream.take(6),
+                    filename: "cycle", content_type: "application/text"}
+               ]
+             ).status == 200
+    end
   end
 
   test "put_params" do

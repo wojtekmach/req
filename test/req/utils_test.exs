@@ -203,6 +203,62 @@ defmodule Req.UtilsTest do
              """
     end
 
+    test "it works with size" do
+      %{content_type: content_type, body: body, size: size} =
+        Req.Utils.encode_form_multipart([field1: {"value", size: 5}], boundary: "foo")
+
+      body = IO.iodata_to_binary(body)
+
+      assert size == byte_size(body)
+      assert content_type == "multipart/form-data; boundary=foo"
+
+      assert body == """
+             \r\n\
+             --foo\r\n\
+             content-disposition: form-data; name=\"field1\"\r\n\
+             \r\n\
+             value\r\n\
+             --foo--\r\n\
+             """
+    end
+
+    test "can accept any enumerable" do
+      enum = Stream.cycle(["a"]) |> Stream.take(10)
+
+      %{body: body, size: size} =
+        Req.Utils.encode_form_multipart([field1: {enum, size: 10}], boundary: "foo")
+
+      body = body |> Enum.to_list() |> IO.iodata_to_binary()
+
+      assert size == byte_size(body)
+    end
+
+    test "blindly trust :content_length option" do
+      enum = Stream.cycle(["a"]) |> Stream.take(10)
+      advertised_length = 50
+
+      %{body: body, size: size} =
+        Req.Utils.encode_form_multipart([field1: {enum, size: advertised_length}],
+          boundary: "foo"
+        )
+
+      body = body |> Enum.to_list() |> IO.iodata_to_binary()
+
+      assert size ==
+               byte_size(body) + advertised_length - IO.iodata_length(enum |> Enum.to_list())
+    end
+
+    test "can return nil size" do
+      enum = Stream.cycle(["a"]) |> Stream.take(10)
+
+      %{size: size} =
+        Req.Utils.encode_form_multipart([field1: {enum, []}],
+          boundary: "foo"
+        )
+
+      assert size == nil
+    end
+
     @tag :tmp_dir
     test "can return stream", %{tmp_dir: tmp_dir} do
       File.write!("#{tmp_dir}/2.txt", "22")

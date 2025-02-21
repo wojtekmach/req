@@ -493,17 +493,21 @@ defmodule Req.Utils do
     }
   end
 
+  defp add_sizes(_, nil), do: nil
+  defp add_sizes(nil, _), do: nil
+  defp add_sizes(size1, size2), do: size1 + size2
+
   defp add_form_parts({parts1, size1}, {parts2, size2})
        when is_list(parts1) and is_list(parts2) do
-    {[parts1, parts2], size1 + size2}
+    {[parts1, parts2], add_sizes(size1, size2)}
   end
 
   defp add_form_parts({parts1, size1}, {parts2, size2}) do
-    {Stream.concat(parts1, parts2), size1 + size2}
+    {Stream.concat(parts1, parts2), add_sizes(size1, size2)}
   end
 
   defp encode_form_part({name, {value, options}}, boundary) do
-    options = Keyword.validate!(options, [:filename, :content_type])
+    options = Keyword.validate!(options, [:filename, :content_type, :size])
 
     {parts, parts_size, options} =
       case value do
@@ -533,6 +537,11 @@ defmodule Req.Utils do
             end)
 
           {stream, size, options}
+
+        enum ->
+          size = Keyword.get(options, :size)
+
+          {enum, size, options}
       end
 
     params =

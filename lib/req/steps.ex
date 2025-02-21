@@ -398,7 +398,19 @@ defmodule Req.Steps do
 
         * `File.Stream`
 
-        * `{value, options}` tuple. Supported options are `:filename` and `:content_type`
+        * `Enumerable`
+
+        * `{value, options}` tuple.
+
+           `value` can be any of the values mentioned above.
+
+           Supported options are: `:filename`, `:content_type`, and `:size`.
+
+           When `value` is an `Enumerable`, option `:size` can be set with
+           the binary size of the `value`. The size will be used to calculate
+           and send the `content-length` header which might be required for
+           some servers. There is no need to pass `:size` for `integer`,
+           `iodata`, and `File.Stream` values as it's automatically calculated.
 
     * `:json` - if set, encodes the request body as JSON (using `Jason.encode_to_iodata!/1`), sets
       the `accept` header to `application/json`, and the `content-type` header to `application/json`.
@@ -419,6 +431,21 @@ defmodule Req.Steps do
       iex> resp.body["files"]
       %{"b" => "2"}
 
+  Encoding streaming form (`multipart/form-data`):
+
+      iex> stream = Stream.cycle(["abc"]) |> Stream.take(3)
+      iex> fields = [file: {stream, filename: "b.txt"}]
+      iex> resp = Req.post!("https://httpbin.org/anything", form_multipart: fields)
+      iex> resp.body["files"]
+      %{"file" => "abcabcabc"}
+
+      # with explicit :size
+      iex> stream = Stream.cycle(["abc"]) |> Stream.take(3)
+      iex> fields = [file: {stream, filename: "b.txt", size: 9}]
+      iex> resp = Req.post!("https://httpbin.org/anything", form_multipart: fields)
+      iex> resp.body["files"]
+      %{"file" => "abcabcabc"}
+
   Encoding JSON:
 
       iex> Req.post!("https://httpbin.org/post", json: %{a: 2}).body["json"]
@@ -436,7 +463,7 @@ defmodule Req.Steps do
 
         %{request | body: multipart.body}
         |> Req.Request.put_new_header("content-type", multipart.content_type)
-        |> Req.Request.put_new_header("content-length", Integer.to_string(multipart.size))
+        |> then(&maybe_put_content_length(&1, multipart.size))
 
       data = request.options[:json] ->
         %{request | body: Jason.encode_to_iodata!(data)}
@@ -446,6 +473,12 @@ defmodule Req.Steps do
       true ->
         request
     end
+  end
+
+  defp maybe_put_content_length(req, nil), do: req
+
+  defp maybe_put_content_length(req, size) do
+    Req.Request.put_new_header(req, "content-length", Integer.to_string(size))
   end
 
   @doc """
