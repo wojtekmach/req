@@ -263,11 +263,13 @@ defmodule Req.Response do
   end
 
   defp retry_delay_in_ms(delay_value) do
-    case Float.parse(delay_value) do
+    case Integer.parse(delay_value) do
       {seconds, ""} ->
-        seconds
-        |> :timer.seconds()
-        |> floor()
+        :timer.seconds(seconds)
+
+      # when value is non-RFC9110 compliant (i.e. float) round up
+      {seconds, _} ->
+        (seconds + 1) |> :timer.seconds()
 
       :error ->
         delay_value
