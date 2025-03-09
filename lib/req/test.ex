@@ -363,7 +363,7 @@ defmodule Req.Test do
 
   def __fetch_plug__(name) do
     case Req.Test.Ownership.fetch_owner(@ownership, callers(), name) do
-      {:ok, owner} when is_pid(owner) ->
+      {tag, owner} when is_pid(owner) and tag in [:ok, :shared_owner] ->
         result =
           Req.Test.Ownership.get_and_update(@ownership, owner, name, fn
             %{expectations: [value | rest]} = map ->
@@ -378,17 +378,6 @@ defmodule Req.Test do
 
         case result do
           {:ok, {:ok, value}} ->
-            value
-
-          {:ok, {:error, :no_expectations_and_no_stub}} ->
-            raise "no mock or stub for #{inspect(name)}"
-        end
-
-      {:shared_owner, owner} when is_pid(owner) ->
-        result = Req.Test.Ownership.get_owned(@ownership, owner)[name]
-
-        case result do
-          %{stub: value} ->
             value
 
           {:ok, {:error, :no_expectations_and_no_stub}} ->
