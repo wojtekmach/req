@@ -1738,6 +1738,37 @@ defmodule Req.StepsTest do
       assert_received :ping
       refute_received _
     end
+
+    @tag :capture_log
+    test "does not carry `halted` status over", c do
+      adapter = fn request ->
+        request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
+
+        attempt = request.private.attempt
+
+        if attempt < 2 do
+          Req.Request.halt(request, Req.Response.new(status: 500, body: "oops"))
+        else
+          {request, Req.Response.new(status: 200, body: "ok")}
+        end
+      end
+
+      response_step = fn
+        {request, %Req.Response{} = response} ->
+          response = Req.Response.put_private(response, :ran_response_step, true)
+          {request, response}
+
+        {request, response} ->
+          {request, response}
+      end
+
+      response =
+        Req.new(url: c.url, adapter: adapter, retry_delay: &Integer.pow(2, &1))
+        |> Req.Request.append_response_steps(response_step: response_step)
+        |> Req.request!()
+
+      assert %{ran_response_step: true} = response.private
+    end
   end
 
   @tag :tmp_dir
