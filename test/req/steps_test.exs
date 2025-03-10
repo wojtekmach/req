@@ -1740,6 +1740,45 @@ defmodule Req.StepsTest do
     end
   end
 
+  describe "get_retry_after" do
+    test "returns nil when no retry-after header exists" do
+      response = Req.Response.new()
+      assert Req.Response.get_retry_after(response) == nil
+    end
+
+    test "converts integer seconds to milliseconds" do
+      response = Req.Response.new() |> Req.Response.put_header("retry-after", "30")
+      assert Req.Response.get_retry_after(response) == :timer.seconds(30)
+    end
+
+    test "rounds up non-RFC-compliant float values" do
+      response = Req.Response.new() |> Req.Response.put_header("retry-after", "0.123")
+      assert Req.Response.get_retry_after(response) == :timer.seconds(1)
+    end
+
+    test "parses HTTP date and calculates delay" do
+      # Set a future date for consistent testing
+      future_date = DateTime.utc_now() |> DateTime.add(60, :second)
+      formatted_date = Req.Utils.format_http_date(future_date)
+
+      response = Req.Response.new() |> Req.Response.put_header("retry-after", formatted_date)
+
+      # The result should be approximately 6000 milliseconds, but need to add some padding for the time it takes to process
+      delay = Req.Response.get_retry_after(response)
+      assert delay >= :timer.seconds(58)
+      assert delay <= :timer.seconds(60)
+    end
+
+    test "returns zero for past HTTP date" do
+      past_date = DateTime.utc_now() |> DateTime.add(-60, :second)
+      formatted_date = Req.Utils.format_http_date(past_date)
+
+      response = Req.Response.new() |> Req.Response.put_header("retry-after", formatted_date)
+
+      assert Req.Response.get_retry_after(response) == 0
+    end
+  end
+
   @tag :tmp_dir
   test "cache", c do
     pid = self()

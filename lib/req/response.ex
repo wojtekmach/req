@@ -267,6 +267,10 @@ defmodule Req.Response do
       {seconds, ""} ->
         :timer.seconds(seconds)
 
+      # when value is non-RFC9110 compliant (i.e. float) round up
+      {seconds, _} ->
+        (seconds + 1) |> :timer.seconds()
+
       :error ->
         delay_value
         |> Req.Utils.parse_http_date!()
