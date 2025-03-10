@@ -21,11 +21,18 @@ defmodule Req.TestTest do
 
     assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [2]}
 
-    Req.Test.stub(:bar, {SharedPlug, [1]})
     Req.Test.set_req_test_to_shared()
+    Req.Test.stub(:bar, {SharedPlug, [1]})
 
     Task.async(fn ->
       assert Req.Test.__fetch_plug__(:bar) == {SharedPlug, [1]}
+    end)
+    |> Task.await()
+
+    Req.Test.expect(:baz, {SharedPlug, [1]})
+
+    Task.async(fn ->
+      assert Req.Test.__fetch_plug__(:baz) == {SharedPlug, [1]}
     end)
     |> Task.await()
   after
