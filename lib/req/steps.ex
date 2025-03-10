@@ -2053,7 +2053,7 @@ defmodule Req.Steps do
 
             * `Req.TransportError` with `reason: :timeout | :econnrefused | :closed`
 
-            * `Req.HTTPError` with `protocol: :http2, reason: :unprocessed`
+            * `Req.HTTPError` with `protocol: :http2, reason: :unprocessed | :disconnected | :read_only`
 
         * `:transient` - same as `:safe_transient` except retries all HTTP methods (POST, DELETE, etc.)
 
@@ -2173,6 +2173,16 @@ defmodule Req.Steps do
   end
 
   defp transient?(%Req.HTTPError{protocol: :http2, reason: :unprocessed}) do
+    true
+  end
+
+  # See https://github.com/sneako/finch/issues/144
+  defp transient?(%Req.HTTPError{protocol: :http2, reason: :disconnected}) do
+    true
+  end
+
+  # See https://github.com/sneako/finch/issues/216
+  defp transient?(%Req.HTTPError{protocol: :http2, reason: :read_only}) do
     true
   end
 
