@@ -55,7 +55,8 @@ defmodule Req.Test do
 
         def get_temperature(location) do
           [
-            base_url: "https://weather-service"
+            base_url: "https://weather-service",
+            params: [location: location]
           ]
           |> Keyword.merge(Application.get_env(:myapp, :weather_req_options, []))
           |> Req.request()
