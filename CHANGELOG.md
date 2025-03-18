@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## v0.5.9 (2025-03-17)
+
+  * [`encode_body`]: Support any enumerable in `:form_multipart`
+
+  * [`Req.Test.expect/3`]: Fix usage in shared mode
+
+  * [`retry`]: Do not carry halt between retries
+
+  * (Internal) Support custom headers in `Req.Utils.aws_sigv4_url/1`
+
+  * (Internal) Support custom query params in `Req.Utils.aws_sigv4_url/1`
+
 ## v0.5.8 (2024-11-29)
 
   * [`Req`]: Check legacy headers when streaming headers
