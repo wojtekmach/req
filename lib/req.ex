@@ -383,12 +383,12 @@ defmodule Req do
 
         * A _module_ plug: a `module` name or a `{module, options}` tuple.
 
-  Finch options ([`run_finch`](`Req.Steps.run_finch/1`) step)
+  Finch options ([`run_finch`](`Req.Steps.run_finch/1`) step), [see Finch options](https://hexdocs.pm/finch/Finch.html#start_link/1):
 
     * `:finch` - the Finch pool to use. Defaults to pool automatically started by `Req`.
 
     * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
-      the given connection options:
+      the given connection options [see Mint connect options](https://hexdocs.pm/mint/1.6.2/Mint.HTTP.html#connect/4):
 
         * `:timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
 
