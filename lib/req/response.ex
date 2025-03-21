@@ -27,9 +27,9 @@ defmodule Req.Response do
         }
 
   defstruct status: 200,
-            headers: if(Req.MixProject.legacy_headers_as_lists?(), do: [], else: %{}),
+            headers: Req.Fields.new([]),
             body: "",
-            trailers: %{},
+            trailers: Req.Fields.new([]),
             private: %{}
 
   @doc """
@@ -50,30 +50,25 @@ defmodule Req.Response do
   @spec new(options :: keyword() | map() | struct()) :: t()
   def new(options \\ [])
 
-  def new(options) when is_list(options), do: new(Map.new(options))
+  def new(%{} = options) do
+    options =
+      Map.take(options, [:status, :headers, :body, :trailers])
+      |> Map.update(
+        :headers,
+        Req.Fields.new([]),
+        &Req.Fields.new_without_normalize_with_duplicates/1
+      )
+      |> Map.update(
+        :trailers,
+        Req.Fields.new([]),
+        &Req.Fields.new_without_normalize_with_duplicates/1
+      )
 
-  if Req.MixProject.legacy_headers_as_lists?() do
-    def new(options) do
-      options = Map.take(options, [:status, :headers, :body])
-      struct!(__MODULE__, options)
-    end
-  else
-    def new(options) do
-      options =
-        Map.take(options, [:status, :headers, :body, :trailers])
-        |> Map.update(:headers, %{}, fn headers ->
-          Enum.reduce(headers, %{}, fn {name, value}, acc ->
-            Map.update(acc, name, List.wrap(value), &(&1 ++ List.wrap(value)))
-          end)
-        end)
-        |> Map.update(:trailers, %{}, fn trailers ->
-          Enum.reduce(trailers, %{}, fn {name, value}, acc ->
-            Map.update(acc, name, List.wrap(value), &(&1 ++ List.wrap(value)))
-          end)
-        end)
+    struct!(__MODULE__, options)
+  end
 
-      struct!(__MODULE__, options)
-    end
+  def new(options) when is_list(options) do
+    new(Map.new(options))
   end
 
   @doc """
@@ -110,13 +105,7 @@ defmodule Req.Response do
   @spec json(t(), body :: term()) :: t()
   def json(response \\ new(), body) do
     response =
-      case get_header(response, "content-type") do
-        [] ->
-          put_header(response, "content-type", "application/json")
-
-        _ ->
-          response
-      end
+      update_in(response.headers, &Req.Fields.put_new(&1, "content-type", "application/json"))
 
     Map.replace!(response, :body, Jason.encode!(body))
   end
@@ -169,19 +158,8 @@ defmodule Req.Response do
       ["application/json"]
   """
   @spec get_header(t(), binary()) :: [binary()]
-  if Req.MixProject.legacy_headers_as_lists?() do
-    def get_header(%Req.Response{} = response, name) when is_binary(name) do
-      name = Req.__ensure_header_downcase__(name)
-
-      for {^name, value} <- response.headers do
-        value
-      end
-    end
-  else
-    def get_header(%Req.Response{} = response, name) when is_binary(name) do
-      name = Req.__ensure_header_downcase__(name)
-      Map.get(response.headers, name, [])
-    end
+  def get_header(%Req.Response{} = resp, name) when is_binary(name) do
+    Req.Fields.get_values(resp.headers, name)
   end
 
   @doc """
@@ -197,18 +175,8 @@ defmodule Req.Response do
       %{"content-type" => ["application/json"]}
   """
   @spec put_header(t(), binary(), binary()) :: t()
-  if Req.MixProject.legacy_headers_as_lists?() do
-    def put_header(%Req.Response{} = response, name, value)
-        when is_binary(name) and is_binary(value) do
-      name = Req.__ensure_header_downcase__(name)
-      %{response | headers: List.keystore(response.headers, name, 0, {name, value})}
-    end
-  else
-    def put_header(%Req.Response{} = response, name, value)
-        when is_binary(name) and is_binary(value) do
-      name = Req.__ensure_header_downcase__(name)
-      put_in(response.headers[name], List.wrap(value))
-    end
+  def put_header(%Req.Response{} = resp, name, value) when is_binary(name) and is_binary(value) do
+    update_in(resp.headers, &Req.Fields.put(&1, name, value))
   end
 
   @doc """
@@ -227,25 +195,8 @@ defmodule Req.Response do
       []
 
   """
-  if Req.MixProject.legacy_headers_as_lists?() do
-    def delete_header(%Req.Response{} = response, name) when is_binary(name) do
-      name_to_delete = Req.__ensure_header_downcase__(name)
-
-      %Req.Response{
-        response
-        | headers:
-            for(
-              {name, value} <- response.headers,
-              name != name_to_delete,
-              do: {name, value}
-            )
-      }
-    end
-  else
-    def delete_header(%Req.Response{} = response, name) when is_binary(name) do
-      name = Req.__ensure_header_downcase__(name)
-      update_in(response.headers, &Map.delete(&1, name))
-    end
+  def delete_header(%Req.Response{} = resp, name) when is_binary(name) do
+    update_in(resp.headers, &Req.Fields.delete(&1, name))
   end
 
   @doc """

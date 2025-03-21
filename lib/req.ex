@@ -543,15 +543,7 @@ defmodule Req do
           put_in(acc.url, URI.parse(url))
 
         {:headers, new_headers}, acc ->
-          update_in(acc.headers, fn old_headers ->
-            if unquote(Req.MixProject.legacy_headers_as_lists?()) do
-              new_headers = encode_headers(new_headers)
-              new_header_names = Enum.map(new_headers, &elem(&1, 0))
-              Enum.reject(old_headers, &(elem(&1, 0) in new_header_names)) ++ new_headers
-            else
-              Map.merge(old_headers, encode_headers(new_headers))
-            end
-          end)
+          update_in(acc.headers, &Req.Fields.merge(&1, new_headers))
 
         {name, value}, acc ->
           %{acc | name => value}
@@ -1219,8 +1211,11 @@ defmodule Req do
           {Req.Request.t(), Req.Response.t()}
   def run!(request, options \\ []) do
     case run(request, options) do
-      {req, %Req.Response{} = resp} -> {req, resp}
-      {_req, exception} -> raise exception
+      {req, %Req.Response{} = resp} ->
+        {req, resp}
+
+      {_req, exception} ->
+        raise exception
     end
   end
 
@@ -1359,70 +1354,5 @@ defmodule Req do
       headers: Keyword.get(options, :headers, []),
       body: Keyword.get(options, :body, "")
     }
-  end
-
-  if Req.MixProject.legacy_headers_as_lists?() do
-    defp encode_headers(headers) do
-      for {name, value} <- headers do
-        {encode_header_name(name), encode_header_value(value)}
-      end
-    end
-  else
-    defp encode_headers(headers) do
-      Enum.reduce(headers, %{}, fn {name, value}, acc ->
-        Map.update(
-          acc,
-          encode_header_name(name),
-          encode_header_values(List.wrap(value)),
-          &(&1 ++ encode_header_values(List.wrap(value)))
-        )
-      end)
-    end
-
-    defp encode_header_values([value | rest]) do
-      [encode_header_value(value) | encode_header_values(rest)]
-    end
-
-    defp encode_header_values([]) do
-      []
-    end
-  end
-
-  defp encode_header_name(name) when is_atom(name) do
-    name |> Atom.to_string() |> String.replace("_", "-") |> __ensure_header_downcase__()
-  end
-
-  defp encode_header_name(name) when is_binary(name) do
-    __ensure_header_downcase__(name)
-  end
-
-  defp encode_header_value(%DateTime{} = datetime) do
-    datetime |> DateTime.shift_zone!("Etc/UTC") |> Req.Utils.format_http_date()
-  end
-
-  defp encode_header_value(%NaiveDateTime{} = datetime) do
-    IO.warn("setting header to %NaiveDateTime{} is deprecated, use %DateTime{} instead")
-    Req.Utils.format_http_date(datetime)
-  end
-
-  defp encode_header_value(value) when is_binary(value) do
-    value
-  end
-
-  defp encode_header_value(value) when is_integer(value) do
-    Integer.to_string(value)
-  end
-
-  defp encode_header_value(value) do
-    IO.warn(
-      "setting header to value other than string, integer, or %DateTime{} is deprecated," <>
-        " got: #{inspect(value)}"
-    )
-
-    String.Chars.to_string(value)
-  end
-
-  def __ensure_header_downcase__(name) do
-    String.downcase(name, :ascii)
   end
 end

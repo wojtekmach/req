@@ -421,7 +421,7 @@ defmodule Req.Request do
 
   defstruct method: :get,
             url: URI.parse(""),
-            headers: if(Req.MixProject.legacy_headers_as_lists?(), do: [], else: %{}),
+            headers: Req.Fields.new([]),
             body: nil,
             options: %{},
             halted: false,
@@ -460,33 +460,15 @@ defmodule Req.Request do
       200
   """
   @spec new(keyword()) :: t()
-  def new(options \\ [])
+  def new(options \\ []) do
+    options =
+      options
+      |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
+      |> Keyword.update(:url, URI.new!(""), &URI.parse/1)
+      |> Keyword.update(:headers, Req.Fields.new([]), &Req.Fields.new_without_normalize/1)
+      |> Keyword.update(:options, %{}, &Map.new/1)
 
-  if Req.MixProject.legacy_headers_as_lists?() do
-    def new(options) do
-      options =
-        options
-        |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
-        |> Keyword.update(:url, URI.new!(""), &URI.parse/1)
-        |> Keyword.update(:options, %{}, &Map.new/1)
-
-      struct!(__MODULE__, options)
-    end
-  else
-    def new(options) do
-      options =
-        options
-        |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
-        |> Keyword.update(:url, URI.new!(""), &URI.parse/1)
-        |> Keyword.update(:headers, %{}, fn headers ->
-          Map.new(headers, fn {key, value} ->
-            {key, List.wrap(value)}
-          end)
-        end)
-        |> Keyword.update(:options, %{}, &Map.new/1)
-
-      struct!(__MODULE__, options)
-    end
+    struct!(__MODULE__, options)
   end
 
   @doc """
@@ -884,19 +866,8 @@ defmodule Req.Request do
 
   """
   @spec get_header(t(), binary()) :: [binary()]
-  if Req.MixProject.legacy_headers_as_lists?() do
-    def get_header(%Req.Request{} = request, name) when is_binary(name) do
-      name = Req.__ensure_header_downcase__(name)
-
-      for {^name, value} <- request.headers do
-        value
-      end
-    end
-  else
-    def get_header(%Req.Request{} = request, name) when is_binary(name) do
-      name = Req.__ensure_header_downcase__(name)
-      Map.get(request.headers, name, [])
-    end
+  def get_header(%Req.Request{} = req, name) when is_binary(name) do
+    Req.Fields.get_values(req.headers, name)
   end
 
   @doc """
@@ -918,20 +889,10 @@ defmodule Req.Request do
       ["application/json"]
 
   """
-  if Req.MixProject.legacy_headers_as_lists?() do
-    @spec put_header(t(), binary(), binary()) :: t()
-    def put_header(%Req.Request{} = request, name, value)
-        when is_binary(name) and is_binary(value) do
-      name = Req.__ensure_header_downcase__(name)
-      %{request | headers: List.keystore(request.headers, name, 0, {name, value})}
-    end
-  else
-    @spec put_header(t(), binary(), binary() | [binary()]) :: t()
-    def put_header(%Req.Request{} = request, name, value)
-        when is_binary(name) and (is_binary(value) or is_list(value)) do
-      name = Req.__ensure_header_downcase__(name)
-      put_in(request.headers[name], List.wrap(value))
-    end
+  @spec put_header(t(), binary(), binary()) :: t()
+  def put_header(%Req.Request{} = request, name, value)
+      when is_binary(name) and is_binary(value) do
+    update_in(request.headers, &Req.Fields.put(&1, name, value))
   end
 
   @doc """
@@ -970,22 +931,9 @@ defmodule Req.Request do
       ["application/json"]
   """
   @spec put_new_header(t(), binary(), binary()) :: t()
-  if Req.MixProject.legacy_headers_as_lists?() do
-    def put_new_header(%Req.Request{} = request, name, value) do
-      case get_header(request, name) do
-        [] ->
-          put_header(request, name, value)
-
-        _ ->
-          request
-      end
-    end
-  else
-    def put_new_header(%Req.Request{} = request, name, value)
-        when is_binary(name) and (is_binary(value) or is_list(value)) do
-      name = Req.__ensure_header_downcase__(name)
-      update_in(request.headers, &Map.put_new(&1, name, List.wrap(value)))
-    end
+  def put_new_header(%Req.Request{} = request, name, value)
+      when is_binary(name) and is_binary(value) do
+    update_in(request.headers, &Req.Fields.put_new(&1, name, value))
   end
 
   @doc """
@@ -1005,18 +953,8 @@ defmodule Req.Request do
 
   """
   @spec delete_header(t(), binary()) :: t()
-  def delete_header(request, name)
-
-  if Req.MixProject.legacy_headers_as_lists?() do
-    def delete_header(%Req.Request{} = request, name) when is_binary(name) do
-      name = Req.__ensure_header_downcase__(name)
-      %{request | headers: List.keydelete(request.headers, name, 0)}
-    end
-  else
-    def delete_header(%Req.Request{} = request, name) when is_binary(name) do
-      name = Req.__ensure_header_downcase__(name)
-      update_in(request.headers, &Map.delete(&1, name))
-    end
+  def delete_header(%Req.Request{} = request, name) when is_binary(name) do
+    update_in(request.headers, &Req.Fields.delete(&1, name))
   end
 
   @doc """
@@ -1204,7 +1142,7 @@ defmodule Req.Request do
       headers =
         if unquote(Req.MixProject.legacy_headers_as_lists?()) do
           for {name, value} <- request.headers do
-            if Req.__ensure_header_downcase__(name) == "authorization" do
+            if Req.Fields.ensure_name_downcase(name) == "authorization" do
               [scheme, value] = String.split(value, " ", parts: 2)
               {name, scheme <> " " <> redact(value)}
             else
@@ -1213,7 +1151,7 @@ defmodule Req.Request do
           end
         else
           for {name, values} <- request.headers, into: %{} do
-            if Req.__ensure_header_downcase__(name) == "authorization" do
+            if Req.Fields.ensure_name_downcase(name) == "authorization" do
               [value] = values
               [scheme, value] = String.split(value, " ", parts: 2)
               {name, [scheme <> " " <> redact(value)]}
