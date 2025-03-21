@@ -383,7 +383,7 @@ defmodule Req.Request do
 
   See also the ["Request Steps"](#module-request-steps) section in the module documentation.
   """
-  @typedoc since: "0.6.0"
+  @typedoc since: "0.5.1"
   @type request_step() ::
           (t() -> t() | {t(), Req.Response.t() | Exception.t()}) | {module(), atom(), [term()]}
 
@@ -397,7 +397,7 @@ defmodule Req.Request do
   See also the ["Response and Error Steps"](#module-response-and-error-steps) section in the
   module documentation.
   """
-  @typedoc since: "0.6.0"
+  @typedoc since: "0.5.1"
   @type response_step() ::
           ({t(), Req.Response.t()} -> {t(), Req.Response.t() | Exception.t()})
           | {module(), atom(), [term()]}
@@ -412,7 +412,7 @@ defmodule Req.Request do
   See also the ["Response and Error Steps"](#module-response-and-error-steps) section in the
   module documentation.
   """
-  @typedoc since: "0.6.0"
+  @typedoc since: "0.5.1"
   @type error_step() ::
           ({t(), Exception.t()} -> {t(), Req.Response.t() | Exception.t()})
           | {module(), atom(), [term()]}
