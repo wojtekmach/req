@@ -1337,6 +1337,30 @@ defmodule Req do
     Application.put_env(:req, :default_options, options)
   end
 
+  # Plugins support is experimental and undocumented.
+  defp run_plugins(request, [plugin | rest]) when is_atom(plugin) do
+    run_plugins(plugin.attach(request), rest)
+  end
+
+  defp run_plugins(request, [plugin | rest]) when is_function(plugin, 1) do
+    run_plugins(plugin.(request), rest)
+  end
+
+  defp run_plugins(request, []) do
+    request
+  end
+
+  @doc false
+  @deprecated "Manually build Req.Request struct instead"
+  def build(method, url, options \\ []) do
+    %Req.Request{
+      method: method,
+      url: URI.parse(url),
+      headers: Keyword.get(options, :headers, []),
+      body: Keyword.get(options, :body, "")
+    }
+  end
+
   if Req.MixProject.legacy_headers_as_lists?() do
     defp encode_headers(headers) do
       for {name, value} <- headers do
@@ -1396,30 +1420,6 @@ defmodule Req do
     )
 
     String.Chars.to_string(value)
-  end
-
-  # Plugins support is experimental and undocumented.
-  defp run_plugins(request, [plugin | rest]) when is_atom(plugin) do
-    run_plugins(plugin.attach(request), rest)
-  end
-
-  defp run_plugins(request, [plugin | rest]) when is_function(plugin, 1) do
-    run_plugins(plugin.(request), rest)
-  end
-
-  defp run_plugins(request, []) do
-    request
-  end
-
-  @doc false
-  @deprecated "Manually build Req.Request struct instead"
-  def build(method, url, options \\ []) do
-    %Req.Request{
-      method: method,
-      url: URI.parse(url),
-      headers: Keyword.get(options, :headers, []),
-      body: Keyword.get(options, :body, "")
-    }
   end
 
   def __ensure_header_downcase__(name) do
