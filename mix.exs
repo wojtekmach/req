@@ -121,6 +121,7 @@ defmodule Req.MixProject do
       ],
       skip_code_autolink_to: [
         "Req.Test.stub/1",
+        "Req.Utils.aws_sigv4_url/1",
         "Req.update/2"
       ]
     ]
