@@ -1332,6 +1332,25 @@ defmodule Req do
     Application.put_env(:req, :default_options, options)
   end
 
+  @doc """
+  Returns request/response headers as list.
+
+  ## Examples
+
+      iex> req = Req.Request.new(headers: %{"accept" => ["application/json"]})
+      iex> Req.get_headers_list(req)
+      [{"accept", "application/json"}]
+
+      iex> resp = Req.Response.new(headers: %{"content-type" => ["application/json"]})
+      iex> Req.get_headers_list(resp)
+      [{"content-type", "application/json"}]
+  """
+  @doc since: "0.5.10"
+  @spec get_headers_list(Req.Request.t() | Req.Response.t()) :: [{binary(), binary()}]
+  def get_headers_list(%struct{headers: headers}) when struct in [Req.Request, Req.Response] do
+    Req.Fields.get_list(headers)
+  end
+
   # Plugins support is experimental and undocumented.
   defp run_plugins(request, [plugin | rest]) when is_atom(plugin) do
     run_plugins(plugin.attach(request), rest)

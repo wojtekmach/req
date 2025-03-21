@@ -212,4 +212,22 @@ defmodule Req.Fields do
       Map.delete(fields, name)
     end
   end
+
+  @doc """
+  Returns fields as list.
+  """
+  def get_list(fields)
+
+  if @legacy? do
+    def get_list(fields) do
+      fields
+    end
+  else
+    def get_list(fields) do
+      for {name, values} <- fields,
+          value <- values do
+        {name, value}
+      end
+    end
+  end
 end

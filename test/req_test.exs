@@ -5,7 +5,8 @@ defmodule ReqTest do
   doctest Req,
     only: [
       new: 1,
-      merge: 2
+      merge: 2,
+      get_headers_list: 1
     ]
 
   setup do
