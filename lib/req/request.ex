@@ -63,7 +63,7 @@ defmodule Req.Request do
     * `:url` - the HTTP request URL.
 
     * `:headers` - the HTTP request headers. The header names should be downcased.
-      See also "Header Names" section in `Req` module documentation.
+      See also "Headers" section in `Req` module documentation.
 
     * `:body` - the HTTP request body.
 
@@ -854,7 +854,7 @@ defmodule Req.Request do
   @doc """
   Returns the values of the header specified by `name`.
 
-  See also "Header Names" section in `Req` module documentation.
+  See also "Headers" section in `Req` module documentation.
 
   ## Examples
 
@@ -877,7 +877,7 @@ defmodule Req.Request do
 
   If the header was previously set, its value is overwritten.
 
-  See also "Header Names" section in `Req` module documentation.
+  See also "Headers" section in `Req` module documentation.
 
   ## Examples
 
@@ -941,7 +941,7 @@ defmodule Req.Request do
 
   All occurrences of the header are deleted, in case the header is repeated multiple times.
 
-  See also "Header Names" section in `Req` module documentation.
+  See also "Headers" section in `Req` module documentation.
 
   ## Examples
 

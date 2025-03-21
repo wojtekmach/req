@@ -101,7 +101,7 @@ defmodule Req do
 
   See `:into` option in `Req.new/1` documentation for more information on response body streaming.
 
-  ## Header Names
+  ## Headers
 
   The HTTP specification requires that header names should be case-insensitive.
   Req allows two ways to access the headers; using functions and by accessing
@@ -121,6 +121,17 @@ defmodule Req do
     * functions like `Req.Request.get_header/2`, `Req.Request.put_header/3`,
       `Req.Response.get_header/2`, `Req.Response.put_header/3`, etc
       automatically downcase the given header name.
+
+  > #### Note {: .tip}
+  >
+  > Most Elixir/Erlang HTTP clients represent headers as lists of tuples like:
+  >
+  > ```elixir
+  > [{"content-type", "text/plain"}]`
+  > ```
+  >
+  > For interopability with those, use
+  > `Req.get_headers_list/1`.
   """
 
   # Response streaming to caller:
@@ -177,7 +188,7 @@ defmodule Req do
 
       If you set `:headers` options both in `Req.new/1` and `request/2`, the header lists are merged.
 
-      See also "Header Names" section in the module documentation.
+      See also "Headers" section in the module documentation.
 
     * `:body` - the request body.
 

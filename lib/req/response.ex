@@ -7,7 +7,7 @@ defmodule Req.Response do
     * `:status` - the HTTP status code.
 
     * `:headers` - the HTTP response headers. The header names should be downcased.
-      See also "Header Names" section in `Req` module documentation.
+      See also "Headers" section in `Req` module documentation.
 
     * `:body` - the HTTP response body.
 
@@ -150,7 +150,7 @@ defmodule Req.Response do
   @doc """
   Returns the values of the header specified by `name`.
 
-  See also "Header Names" section in `Req` module documentation.
+  See also "Headers" section in `Req` module documentation.
 
   ## Examples
 
@@ -166,7 +166,7 @@ defmodule Req.Response do
   Adds a new response header `name` if not present, otherwise replaces the
   previous value of that header with `value`.
 
-  See also "Header Names" section in `Req` module documentation.
+  See also "Headers" section in `Req` module documentation.
 
   ## Examples
 
@@ -184,7 +184,7 @@ defmodule Req.Response do
 
   All occurrences of the header are deleted, in case the header is repeated multiple times.
 
-  See also "Header Names" section in `Req` module documentation.
+  See also "Headers" section in `Req` module documentation.
 
   ## Examples
 

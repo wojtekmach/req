@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.5.10 (2025-03-21)
+
+  * [`Req`]: Add `Req.get_headers_list/1`.
+
 ## v0.5.9 (2025-03-17)
 
   * [`encode_body`]: Support any enumerable in `:form_multipart`
@@ -1204,6 +1208,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.merge/2`]:                https://hexdocs.pm/req/Req.html#merge/2
 [`Req.parse_message/2`]:        https://hexdocs.pm/req/Req.html#merge/2
 [`Req.cancel_async_request/1`]: https://hexdocs.pm/req/Req.html#merge/2
+[`Req.get_headers_list/1`]:     https://hexdocs.pm/req/Req.html#get_headers_list/1
 
 [`Req.Request`]:                   https://hexdocs.pm/req/Req.Request.html
 [`Req.Request.new/1`]:             https://hexdocs.pm/req/Req.Request.html#new/1
