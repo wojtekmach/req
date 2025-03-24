@@ -2,7 +2,7 @@
 
 ## v0.5.10 (2025-03-21)
 
-  * [`Req`]: Add `Req.get_headers_list/1`.
+  * [`Req`]: Add [`Req.get_headers_list/1`].
 
 ## v0.5.9 (2025-03-17)
 
