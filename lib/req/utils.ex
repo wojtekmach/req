@@ -423,30 +423,31 @@ defmodule Req.Utils do
       "foobarbaz"
   """
   def stream_gzip(enumerable) do
-    eof = make_ref()
-
-    enumerable
-    |> Stream.concat([eof])
-    |> Stream.transform(
+    Stream.transform(
+      enumerable,
+      # start_fun
       fn ->
         z = :zlib.open()
-        # https://github.com/erlang/otp/blob/OTP-26.0/erts/preloaded/src/zlib.erl#L551
+        # copied from :zlib.gzip/1
         :ok = :zlib.deflateInit(z, :default, :deflated, 16 + 15, 8, :default)
         z
       end,
-      fn
-        ^eof, z ->
-          buf = :zlib.deflate(z, [], :finish)
-          {buf, z}
-
-        data, z ->
-          buf = :zlib.deflate(z, data)
-          {buf, z}
+      # reducer
+      fn chunk, z ->
+        case :zlib.deflate(z, chunk) do
+          # optimization: avoid emitting empty chunks
+          [] -> {[], z}
+          compressed -> {[compressed], z}
+        end
       end,
+      # last_fun
       fn z ->
+        last = :zlib.deflate(z, [], :finish)
         :ok = :zlib.deflateEnd(z)
-        :ok = :zlib.close(z)
-      end
+        {[last], z}
+      end,
+      # after_fun
+      fn z -> :ok = :zlib.close(z) end
     )
   end
 
