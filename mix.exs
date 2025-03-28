@@ -8,7 +8,7 @@ defmodule Req.MixProject do
     [
       app: :req,
       version: @version,
-      elixir: "~> 1.13",
+      elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       package: package(),
