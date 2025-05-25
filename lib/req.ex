@@ -394,12 +394,12 @@ defmodule Req do
 
         * A _module_ plug: a `module` name or a `{module, options}` tuple.
 
-  Finch options ([`run_finch`](`Req.Steps.run_finch/1`) step)
+  Finch options ([`run_finch`](`Req.Steps.run_finch/1`) step), see `Finch.start_link/1` for options:
 
     * `:finch` - the Finch pool to use. Defaults to pool automatically started by `Req`.
 
     * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
-      the given connection options:
+      the given connection options (see `Mint.HTTP.connect/4` for options):
 
         * `:timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
 
