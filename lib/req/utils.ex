@@ -590,7 +590,7 @@ defmodule Req.Utils do
 
     {header, IO.iodata_length(header)}
     |> add_form_parts({parts, parts_size})
-    |> add_form_parts({@crlf, 2})
+    |> add_form_parts({[@crlf], 2})
   end
 
   defp encode_form_part({name, value}, boundary) do
