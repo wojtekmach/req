@@ -507,7 +507,7 @@ defmodule Req.Utils do
       options[:boundary] ||
         Base.encode16(:crypto.strong_rand_bytes(16), padding: false, case: :lower)
 
-    footer = [[@crlf, "--", boundary, "--", @crlf]]
+    footer = [["--", boundary, "--", @crlf]]
 
     {body, size} =
       fields
@@ -587,8 +587,11 @@ defmodule Req.Utils do
       end
 
     headers = ["content-disposition: form-data; name=\"#{name}\"", params, @crlf, headers]
-    header = [[@crlf, "--", boundary, @crlf, headers, @crlf]]
-    add_form_parts({header, IO.iodata_length(header)}, {parts, parts_size})
+    header = [["--", boundary, @crlf, headers, @crlf]]
+
+    {header, IO.iodata_length(header)}
+    |> add_form_parts({parts, parts_size})
+    |> add_form_parts({[@crlf], 2})
   end
 
   defp encode_form_part({name, value}, boundary) do

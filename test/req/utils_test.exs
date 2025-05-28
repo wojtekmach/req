@@ -214,7 +214,6 @@ defmodule Req.UtilsTest do
       assert content_type == "multipart/form-data; boundary=foo"
 
       assert body == """
-             \r\n\
              --foo\r\n\
              content-disposition: form-data; name=\"field1\"\r\n\
              \r\n\
@@ -242,7 +241,6 @@ defmodule Req.UtilsTest do
       assert content_type == "multipart/form-data; boundary=foo"
 
       assert body == """
-             \r\n\
              --foo\r\n\
              content-disposition: form-data; name=\"field1\"\r\n\
              \r\n\
@@ -306,7 +304,6 @@ defmodule Req.UtilsTest do
       assert size == byte_size(body)
 
       assert body == """
-             \r\n\
              --foo\r\n\
              content-disposition: form-data; name=\"field1\"\r\n\
              \r\n\
@@ -333,7 +330,6 @@ defmodule Req.UtilsTest do
       assert size == byte_size(body)
 
       assert body == """
-             \r\n\
              --foo\r\n\
              content-disposition: form-data; name=\"field2\"; filename=\"2.txt\"\r\n\
              content-type: text/plain\r\n\

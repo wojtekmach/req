@@ -257,7 +257,7 @@ defmodule Req.StepsTest do
       plug = fn conn ->
         conn = Plug.Parsers.call(conn, Plug.Parsers.init(parsers: [:multipart]))
 
-        assert Plug.Conn.get_req_header(conn, "content-length") == ["393"]
+        assert Plug.Conn.get_req_header(conn, "content-length") == ["391"]
         assert %{"a" => "1", "b" => b, "c" => c} = conn.body_params
 
         assert b.filename == "b.txt"
