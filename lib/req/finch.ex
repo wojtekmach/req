@@ -222,30 +222,41 @@ defmodule Req.Finch do
   defp finch_stream_into_self(req, finch_req, finch_name, finch_options) do
     ref = Finch.async_request(finch_req, finch_name, finch_options)
 
-    {:status, status} =
-      receive do
-        {^ref, message} ->
-          message
-      end
+    with {:status, status} <- recv_status(req, ref),
+         {:headers, headers} <- recv_headers(req, ref) do
+      # TODO: handle trailers
+      headers = handle_finch_headers(headers)
 
-    headers =
-      receive do
-        {^ref, message} ->
-          # TODO: handle trailers
-          {:headers, headers} = message
+      async = %Req.Response.Async{
+        pid: self(),
+        ref: ref,
+        stream_fun: &parse_message/2,
+        cancel_fun: &cancel/1
+      }
 
-          handle_finch_headers(headers)
-      end
+      resp = Req.Response.new(status: status, headers: headers, body: async)
+      {req, resp}
+    end
+  end
 
-    async = %Req.Response.Async{
-      pid: self(),
-      ref: ref,
-      stream_fun: &parse_message/2,
-      cancel_fun: &cancel/1
-    }
+  defp recv_status(req, ref) do
+    receive do
+      {^ref, {:status, status}} ->
+        {:status, status}
 
-    resp = Req.Response.new(status: status, headers: headers, body: async)
-    {req, resp}
+      {^ref, {:error, exception}} ->
+        {req, normalize_error(exception)}
+    end
+  end
+
+  defp recv_headers(req, ref) do
+    receive do
+      {^ref, {:headers, headers}} ->
+        {:headers, headers}
+
+      {^ref, {:error, exception}} ->
+        {req, normalize_error(exception)}
+    end
   end
 
   defp run_finch_request(finch_request, finch_name, finch_options) do
@@ -253,20 +264,8 @@ defmodule Req.Finch do
       {:ok, response} ->
         Req.Response.new(response)
 
-      {:error, %Mint.TransportError{reason: reason}} ->
-        %Req.TransportError{reason: reason}
-
-      {:error, %Mint.HTTPError{module: Mint.HTTP1, reason: reason}} ->
-        %Req.HTTPError{protocol: :http1, reason: reason}
-
-      {:error, %Mint.HTTPError{module: Mint.HTTP2, reason: reason}} ->
-        %Req.HTTPError{protocol: :http2, reason: reason}
-
-      {:error, %Finch.Error{reason: reason}} ->
-        %Req.HTTPError{protocol: :http2, reason: reason}
-
       {:error, exception} ->
-        exception
+        normalize_error(exception)
     end
   end
 

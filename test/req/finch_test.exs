@@ -461,6 +461,17 @@ defmodule Req.FinchTest do
       assert Enum.to_list(resp.body) == ["ok"]
       assert_received :other
     end
+
+    test "into: :self with :receive_timeout" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          Process.sleep(100)
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      assert Req.get(url: url, into: :self, receive_timeout: 0, retry: false) ==
+               {:error, %Req.TransportError{reason: :timeout}}
+    end
   end
 
   describe "pool_options" do
