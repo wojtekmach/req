@@ -1015,7 +1015,7 @@ defmodule Req.Steps do
         Plug.Parsers.init(
           parsers: [:urlencoded, :multipart, :json],
           json_decoder: Jason,
-          body_reader: {Req.Test, :read_request_body, []}
+          body_reader: {Req.Test, :__read_request_body__, []}
         )
 
       conn =

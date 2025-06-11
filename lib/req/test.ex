@@ -649,7 +649,7 @@ defmodule Req.Test do
   ## Plug Parser
 
   @doc false
-  def read_request_body(conn, opts) do
+  def __read_request_body__(conn, opts) do
     with {:ok, body, conn} <- Plug.Conn.read_body(conn, opts) do
       conn = update_in(conn.private[:req_test_raw_body], &((&1 || "") <> body))
       {:ok, body, conn}
