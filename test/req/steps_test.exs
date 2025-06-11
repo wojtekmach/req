@@ -255,8 +255,6 @@ defmodule Req.StepsTest do
       File.write!("#{tmp_dir}/c", "ccc")
 
       plug = fn conn ->
-        conn = Plug.Parsers.call(conn, Plug.Parsers.init(parsers: [:multipart]))
-
         assert Plug.Conn.get_req_header(conn, "content-length") == ["391"]
         assert %{"a" => "1", "b" => b, "c" => c} = conn.body_params
 
@@ -283,8 +281,6 @@ defmodule Req.StepsTest do
 
     test "form_multipart enum without size" do
       plug = fn conn ->
-        conn = Plug.Parsers.call(conn, Plug.Parsers.init(parsers: [:multipart]))
-
         assert Plug.Conn.get_req_header(conn, "content-length") == []
         assert %{"a" => "1", "b" => b} = conn.body_params
 
@@ -1892,6 +1888,16 @@ defmodule Req.StepsTest do
       end
 
       assert Req.request!(plug: plug, params: [a: 1]).body == "ok"
+    end
+
+    test "fetches request body" do
+      plug = fn conn ->
+        assert conn.body_params == %{"a" => 1}
+        assert Req.Test.raw_body(conn) == "{\"a\":1}"
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end
+
+      assert Req.post!(plug: plug, json: %{a: 1}).body == "ok"
     end
 
     test "into: fun" do

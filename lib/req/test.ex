@@ -645,4 +645,48 @@ defmodule Req.Test do
         """
     end
   end
+
+  ## Plug Parser
+
+  @doc false
+  def read_request_body(conn, opts) do
+    with {:ok, body, conn} <- Plug.Conn.read_body(conn, opts) do
+      conn = update_in(conn.private[:req_test_raw_body], &((&1 || "") <> body))
+      {:ok, body, conn}
+    end
+  end
+
+  @doc """
+  Read the raw request body from a plug request.
+
+  ## Examples
+
+      iex> plug = fn conn ->
+      ...>   send(self(), {:raw_body, Req.Test.raw_body(conn)})
+      ...>   Plug.Conn.send_resp(conn, 200, "Hello, World!")
+      ...> end
+      iex>
+      iex> Req.post(plug: plug, json: %{hello: "world"})
+      iex> receive do {:raw_body, body} -> body end
+      "{\\"hello\\":\\"world\\"}"
+
+  """
+  if Code.ensure_loaded?(Plug.Test) do
+    @spec raw_body(Plug.Conn.t()) :: iodata()
+    def raw_body(%Plug.Conn{} = conn) do
+      conn.private.req_test_raw_body
+    end
+  else
+    def raw_body(_conn) do
+      Logger.error("""
+      Could not find plug dependency.
+
+      Please add :plug to your dependencies:
+
+          {:plug, "~> 1.0"}
+      """)
+
+      raise "missing plug dependency"
+    end
+  end
 end

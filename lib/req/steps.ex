@@ -909,7 +909,10 @@ defmodule Req.Steps do
         * A _module_ plug: a `module` name or a `{module, options}` tuple.
 
       Req automatically calls `Plug.Conn.fetch_query_params/2` before your plug, so you can
-      get query params using `conn.query_params`.
+      get query params using `conn.query_params`. Req also automatically fetches the request
+      body using `Plug.Parsers` for JSON and multipart forms, you can get these using
+      `conn.body_params`. The raw request body of the request is avaialble by calling
+      `Req.Test.raw_body/1` with the conn.
 
   ## Examples
 
@@ -1008,10 +1011,18 @@ defmodule Req.Steps do
           end
         end
 
+      parser_opts =
+        Plug.Parsers.init(
+          parsers: [:urlencoded, :multipart, :json],
+          json_decoder: Jason,
+          body_reader: {Req.Test, :read_request_body, []}
+        )
+
       conn =
         Plug.Test.conn(request.method, request.url, req_body)
         |> Map.replace!(:req_headers, req_headers)
         |> Plug.Conn.fetch_query_params()
+        |> Plug.Parsers.call(parser_opts)
         |> call_plug(plug)
 
       unless match?(%Plug.Conn{}, conn) do
