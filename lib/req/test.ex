@@ -657,7 +657,7 @@ defmodule Req.Test do
   end
 
   @doc """
-  Read the raw request body from a plug request.
+  Reads the raw request body from a plug request.
 
   ## Examples
 
