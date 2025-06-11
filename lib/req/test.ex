@@ -661,13 +661,13 @@ defmodule Req.Test do
 
   ## Examples
 
-      iex> plug = fn conn ->
-      ...>   send(self(), {:raw_body, Req.Test.raw_body(conn)})
-      ...>   Plug.Conn.send_resp(conn, 200, "Hello, World!")
+      iex> echo = fn conn ->
+      ...>   body = Req.Test.raw_body(conn)
+      ...>   Plug.Conn.send_resp(conn, 200, body)
       ...> end
       iex>
-      iex> Req.post(plug: plug, json: %{hello: "world"})
-      iex> receive do {:raw_body, body} -> body end
+      iex> resp = Req.post!(plug: echo, json: %{hello: "world"})
+      iex> resp.body
       "{\\"hello\\":\\"world\\"}"
 
   """
