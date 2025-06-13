@@ -568,12 +568,10 @@ defmodule Req.Steps do
     put_params(request, Req.Request.get_option(request, :params, []))
   end
 
-  defp put_params(request, []) do
-    request
-  end
+  defp put_params(request, []), do: request
 
   defp put_params(request, params) do
-    encoded = URI.encode_query(params)
+    encoded = URI.encode_query(params || [])
 
     update_in(request.url.query, fn
       nil -> encoded
