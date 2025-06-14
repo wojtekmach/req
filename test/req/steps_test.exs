@@ -1696,6 +1696,37 @@ defmodule Req.StepsTest do
     end
 
     @tag :capture_log
+    test "custom function returning {:delay, milliseconds, request_modifier_fun}", c do
+      pid = self()
+
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        case  Plug.Conn.get_req_header(conn, "x-is-retry") do
+          [] -> send(pid, :ping)
+          ["true"] -> send(pid, :pong)
+        end
+        Plug.Conn.send_resp(conn, 500, "oops")
+      end)
+
+      fun = fn _request, response ->
+        assert response.status == 500
+        request_retry_modifier = fn request ->
+          request |> Req.Request.put_header("x-is-retry", "true")
+        end
+        {:delay, 1, request_retry_modifier}
+      end
+
+      request = Req.new(url: c.url, retry: fun)
+
+      assert Req.get!(request).status == 500
+      assert_received :ping
+      assert_received :pong
+      assert_received :pong
+      assert_received :pong
+      refute_received _
+    end
+
+
+    @tag :capture_log
     test "raise on custom function returning {:delay, milliseconds} when `:retry_delay` is provided",
          c do
       pid = self()
