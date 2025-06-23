@@ -138,7 +138,7 @@ defmodule Req.TestTest do
 
   describe "transport_error/2" do
     test "validate reason" do
-      assert_raise ArgumentError, "unexpected Req.TransportError reason: :bad", fn ->
+      assert_raise ArgumentError, ~r"unexpected Req.TransportError reason: :bad", fn ->
         Req.Test.transport_error(%Plug.Conn{}, :bad)
       end
     end
