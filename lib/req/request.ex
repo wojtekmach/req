@@ -472,6 +472,57 @@ defmodule Req.Request do
   end
 
   @doc """
+  Sets the value `value` for the option `name`.
+
+  See also `put_new_option/3`, `merge_options/2`, and `merge_new_options/2`.
+
+  ## Examples
+
+      iex> req = Req.Request.new() |> Req.Request.register_options([:a])
+      iex> req.options
+      %{}
+      iex> req = Req.Request.put_option(req, :a, 1)
+      iex> req.options
+      %{a: 1}
+
+      iex> req = Req.Request.new()
+      iex> Req.Request.put_option(req, :b, 2)
+      ** (ArgumentError) unknown option :b
+  """
+  @spec put_option(t(), atom(), term()) :: t()
+  def put_option(%Req.Request{} = request, key, value) when is_atom(key) do
+    validate_options(request, [{key, value}])
+    put_in(request.options[key], value)
+  end
+
+  @doc """
+  Sets the value `value` for the option `name` unless option is already set.
+
+  See also `put_option/3`, `merge_options/2`, and `merge_new_options/2`.
+
+  ## Examples
+
+      iex> req = Req.Request.new() |> Req.Request.register_options([:a])
+      iex> req.options
+      %{}
+      iex> req = Req.Request.put_new_option(req, :a, 1)
+      iex> req.options
+      %{a: 1}
+      iex> req = Req.Request.put_new_option(req, :a, 2)
+      iex> req.options
+      %{a: 1}
+
+      iex> req = Req.Request.new()
+      iex> Req.Request.put_new_option(req, :b, 2)
+      ** (ArgumentError) unknown option :b
+  """
+  @spec put_new_option(t(), atom(), term()) :: t()
+  def put_new_option(%Req.Request{} = request, key, value) when is_atom(key) do
+    validate_options(request, [{key, value}])
+    update_in(request.options, &Map.put_new(&1, key, value))
+  end
+
+  @doc """
   Gets the value for the option `key`.
 
   See also `fetch_option!/2`.
@@ -849,6 +900,28 @@ defmodule Req.Request do
 
     validate_options(request, options)
     update_in(request.options, &Map.merge(&1, Map.new(options)))
+  end
+
+  @doc """
+  Merges given options into the request unless they are already set.
+
+  ## Examples
+
+      iex> req = Req.new(auth: {:basic, "alice:secret"})
+      iex> req.options
+      %{auth: {:basic, "alice:secret"}}
+      iex> req = Req.Request.merge_new_options(req, auth: {:bearer, "abcd"}, base_url: "https://example.com")
+      iex> req.options
+      %{auth: {:basic, "alice:secret"}, base_url: "https://example.com"}
+
+      iex> req = Req.new()
+      iex> Req.Request.merge_new_options(req, foo: :bar)
+      ** (ArgumentError) unknown option :foo
+  """
+  @spec merge_new_options(t(), keyword()) :: t()
+  def merge_new_options(%Req.Request{} = request, options) when is_list(options) do
+    validate_options(request, options)
+    update_in(request.options, &Map.merge(&1, Map.new(options), fn _k, v1, _v2 -> v1 end))
   end
 
   @doc """
