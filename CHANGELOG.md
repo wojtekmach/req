@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## v0.5.11 (2025-06-23)
+
+  * [`encode_body`]: Fix leading newline before multipart body
+
+  * [`run_finch`]: Handle initial transport errors on `into: :self`
+
+  * [`run_plug`]: Automatically parse request body
+
+  * [`retry`]: Use jitter by default
+
+  * [`Req.Request`]: Add [`Req.Request.put_option/3`].
+
+  * [`Req.Request`]: Add [`Req.Request.put_new_option/3`].
+
+  * [`Req.Request`]: Add [`Req.Request.merge_new_options/2`].
+
+  * [`Req.Test`]: Add [`Req.Test.redirect/2`].
+
 ## v0.5.10 (2025-03-21)
 
   * [`Req`]: Add [`Req.get_headers_list/1`].
@@ -1210,16 +1228,20 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.cancel_async_request/1`]: https://hexdocs.pm/req/Req.html#merge/2
 [`Req.get_headers_list/1`]:     https://hexdocs.pm/req/Req.html#get_headers_list/1
 
-[`Req.Request`]:                   https://hexdocs.pm/req/Req.Request.html
-[`Req.Request.new/1`]:             https://hexdocs.pm/req/Req.Request.html#new/1
-[`Req.Request.run_request/1`]:     https://hexdocs.pm/req/Req.Request.html#run_request/1
-[`Req.Request.get_option/3`]:      https://hexdocs.pm/req/Req.Request.html#get_option/3
-[`Req.Request.get_option_lazy/2`]: https://hexdocs.pm/req/Req.Request.html#get_option_lazy/2
-[`Req.Request.fetch_option/2`]:    https://hexdocs.pm/req/Req.Request.html#fetch_option/2
-[`Req.Request.fetch_option!/2`]:   https://hexdocs.pm/req/Req.Request.html#fetch_option!/2
-[`Req.Request.delete_option/2`]:   https://hexdocs.pm/req/Req.Request.html#delete_option/2
-[`Req.Request.drop_options/2`]:    https://hexdocs.pm/req/Req.Request.html#drop_options/2
-[`Req.Request.update_private/4`]:  https://hexdocs.pm/req/Req.Request.html#update_private/4
+[`Req.Request`]:                     https://hexdocs.pm/req/Req.Request.html
+[`Req.Request.new/1`]:               https://hexdocs.pm/req/Req.Request.html#new/1
+[`Req.Request.run_request/1`]:       https://hexdocs.pm/req/Req.Request.html#run_request/1
+[`Req.Request.put_option/3`]:        https://hexdocs.pm/req/Req.Request.html#put_option/3
+[`Req.Request.put_new_option/3`]:    https://hexdocs.pm/req/Req.Request.html#put_new_option/3
+[`Req.Request.merge_options/2`]:     https://hexdocs.pm/req/Req.Request.html#merge_options/2
+[`Req.Request.merge_new_options/2`]: https://hexdocs.pm/req/Req.Request.html#merge_new_options/2
+[`Req.Request.get_option/3`]:        https://hexdocs.pm/req/Req.Request.html#get_option/3
+[`Req.Request.get_option_lazy/2`]:   https://hexdocs.pm/req/Req.Request.html#get_option_lazy/2
+[`Req.Request.fetch_option/2`]:      https://hexdocs.pm/req/Req.Request.html#fetch_option/2
+[`Req.Request.fetch_option!/2`]:     https://hexdocs.pm/req/Req.Request.html#fetch_option!/2
+[`Req.Request.delete_option/2`]:     https://hexdocs.pm/req/Req.Request.html#delete_option/2
+[`Req.Request.drop_options/2`]:      https://hexdocs.pm/req/Req.Request.html#drop_options/2
+[`Req.Request.update_private/4`]:    https://hexdocs.pm/req/Req.Request.html#update_private/4
 
 [`Req.Response`]:                  https://hexdocs.pm/req/Req.Response.html
 [`Req.Response.get_header/2`]:     https://hexdocs.pm/req/Req.Response.html#get_response/2
