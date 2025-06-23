@@ -6,7 +6,24 @@
 
   * [`run_finch`]: Handle initial transport errors on `into: :self`
 
-  * [`run_plug`]: Automatically parse request body
+  * [`run_plug`]: Automatically parse request body.
+
+    Prior to this change:
+
+        plug = fn conn ->
+          Plug.Conn.send_resp(conn, 200, inspect(conn.body_params))
+        end
+
+        iex> Req.post!(json: %{a: 1}, plug: plug).body
+        "%Plug.Conn.Unfetched{aspect: :body_params}"
+
+    Now it is:
+
+        iex> Req.post!(json: %{a: 1}, plug: plug).body
+        "%{\"a\": 1}"
+
+    Note, if in your `:plug` usage you look at `conn.params`, it will
+    now include `conn.body_params` as Plug always merges them.
 
   * [`retry`]: Use jitter by default
 
