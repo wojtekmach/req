@@ -409,7 +409,13 @@ defmodule Req.Test do
     defp validate_transport_error!(reason) do
       case :ssl.format_error(reason) do
         ~c"Unexpected error:" ++ _ ->
-          raise ArgumentError, "unexpected Req.TransportError reason: #{inspect(reason)}"
+          raise ArgumentError, """
+          unexpected Req.TransportError reason: #{inspect(reason)}
+
+          This function only accepts error reasons that can happen
+          in production, for example: `:closed`, `:timeout`,
+          `:econnrefused`, etc.
+          """
 
         _ ->
           :ok
