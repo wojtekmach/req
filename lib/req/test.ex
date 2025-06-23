@@ -305,6 +305,79 @@ defmodule Req.Test do
   end
 
   @doc """
+  Sends redirect response to the given url.
+
+  This function is adapted from [`Phoenix.Controller.redirect/2`](https://hexdocs.pm/phoenix/Phoenix.Controller.html#redirect/2).
+
+  For security, `:to` only accepts paths. Use the `:external`
+  option to redirect to any URL.
+
+  The response will be sent with the status code defined within
+  the connection, via `Plug.Conn.put_status/2`. If no status
+  code is set, a 302 response is sent.
+
+  ## Examples
+
+
+      iex> plug = fn
+      ...>   conn when conn.request_path == nil ->
+      ...>     Req.Test.redirect(conn, to: "/hello")
+      ...>
+      ...>   conn when conn.request_path == "/hello" ->
+      ...>     Req.Test.text(conn, "Hello, World!")
+      ...>   conn -> dbg(conn)
+      ...> end
+      iex>
+      iex> resp = Req.get!(plug: plug, url: "http://example.com")
+      # 14:53:06.101 [debug] redirecting to /hello
+      iex> resp.body
+      "Hello, World!"
+
+  """
+  def redirect(conn, opts) when is_list(opts) do
+    url = url(opts)
+    html = Plug.HTML.html_escape(url)
+    body = "<html><body>You are being <a href=\"#{html}\">redirected</a>.</body></html>"
+
+    conn =
+      if List.keyfind(conn.resp_headers, "content-type", 0) do
+        conn
+      else
+        content_type = "text/html; charset=utf-8"
+        update_in(conn.resp_headers, &[{"content-type", content_type} | &1])
+      end
+
+    conn
+    |> Plug.Conn.put_resp_header("location", url)
+    |> Plug.Conn.send_resp(conn.status || 302, body)
+  end
+
+  defp url(opts) do
+    cond do
+      to = opts[:to] -> validate_local_url(to)
+      external = opts[:external] -> external
+      true -> raise ArgumentError, "expected :to or :external option in redirect/2"
+    end
+  end
+
+  @invalid_local_url_chars ["\\", "/%09", "/\t"]
+  defp validate_local_url("//" <> _ = to), do: raise_invalid_url(to)
+
+  defp validate_local_url("/" <> _ = to) do
+    if String.contains?(to, @invalid_local_url_chars) do
+      raise ArgumentError, "unsafe characters detected for local redirect in URL #{inspect(to)}"
+    else
+      to
+    end
+  end
+
+  defp validate_local_url(to), do: raise_invalid_url(to)
+
+  defp raise_invalid_url(url) do
+    raise ArgumentError, "the :to option in redirect expects a path but was #{inspect(url)}"
+  end
+
+  @doc """
   Simulates a network transport error.
 
   ## Examples

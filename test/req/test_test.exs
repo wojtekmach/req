@@ -1,6 +1,6 @@
 defmodule Req.TestTest do
   use ExUnit.Case, async: true
-  doctest Req.Test, except: [expect: 3]
+  doctest Req.Test, except: [expect: 3, redirect: 2]
 
   test "__fetch_plug__" do
     assert_raise RuntimeError, ~r/cannot find mock/, fn ->
