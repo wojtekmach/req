@@ -354,6 +354,8 @@ defmodule Req do
 
             * `{:delay, milliseconds}` - retry with the given delay.
 
+            * `{:delay, milliseconds, request_retry_modifier}` - retry with the given delay. The request object is passed to the request_retry_modifier function immediately before each retry. This can be helpful, for example, if you need to update an auth header that is based on the current time.
+
             * `false/nil` - don't retry.
 
         * `false` - don't retry.
