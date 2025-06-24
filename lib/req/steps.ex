@@ -1014,6 +1014,7 @@ defmodule Req.Steps do
       parser_opts =
         Plug.Parsers.init(
           parsers: [:urlencoded, :multipart, :json],
+          pass: ["*/*"],
           json_decoder: Jason,
           body_reader: {Req.Test, :__read_request_body__, []}
         )
