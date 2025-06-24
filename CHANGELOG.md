@@ -1,14 +1,49 @@
 # CHANGELOG
 
+## v0.5.12 (2025-06-24)
+
+  * [`run_plug`]: Do not raise on unknown content types.
+
+  * [`Req.Test`]: Improve `Req.Test.transport_error/2` error message.
+
 ## v0.5.11 (2025-06-23)
 
-  * [`encode_body`]: Fix leading newline before multipart body
+  * [`encode_body`]: Fix leading newline before multipart body.
 
-  * [`run_finch`]: Handle initial transport errors on `into: :self`
+  * [`run_finch`]: Handle initial transport errors on `into: :self`.
 
   * [`run_plug`]: Automatically parse request body.
 
-    Prior to this change:
+    Prior to this change, users would typically write:
+
+        plug = fn conn ->
+          {:ok, body, conn} = Plug.Conn.read_body(conn)
+          assert JSON.decode!(body) == %{"x" => 1}
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end
+
+        Req.put!(plug: plug, json: %{x: 1})
+
+    Now, it can be:
+
+        plug = fn conn ->
+          assert conn.params == %{"x" => 1}
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end
+
+        Req.put!(plug: plug, json: %{x: 1})
+
+    This is a **breaking change** as `Plug.Conn.read_body` will now return `""`.
+
+    It can be easily fixed by using [`Req.Test.raw_body/1`] which returns copy of
+    the request raw body:
+
+    ```diff
+    - {:ok, body, conn} = Plug.Conn.read_body(conn)
+    + body = Req.Test.raw_body(conn)
+    ```
+
+    Furthermore, prior to this change `conn.body_params` was unfetched:
 
         plug = fn conn ->
           Plug.Conn.send_resp(conn, 200, inspect(conn.body_params))
@@ -22,7 +57,7 @@
         iex> Req.post!(json: %{a: 1}, plug: plug).body
         "%{\"a\": 1}"
 
-    Note, if in your `:plug` usage you look at `conn.params`, it will
+    If in your `:plug` usage you look at `conn.params`, it will
     now include `conn.body_params` as Plug always merges them.
 
   * [`retry`]: Use jitter by default
@@ -1272,6 +1307,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Test.html/2`]: https://hexdocs.pm/req/Req.Test.html#html/2
 [`Req.Test.text/2`]: https://hexdocs.pm/req/Req.Test.html#text/2
 [`Req.Test.allow/3`]: https://hexdocs.pm/req/Req.Test.html#allow/3
+[`Req.Test.raw_body/1`]: https://hexdocs.pm/req/Req.Test.html#raw_body/1
 [`Req.Test.transport_error/2`]: https://hexdocs.pm/req/Req.Test.html#transport_error/2
 [`Req.Test.expect/3`]: https://hexdocs.pm/req/Req.Test.html#expect/3
 [`Req.Test.verify!/0`]: https://hexdocs.pm/req/Req.Test.html#verify!/0
