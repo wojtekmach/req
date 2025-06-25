@@ -725,16 +725,6 @@ defmodule Req.Test do
     end
   end
 
-  ## Plug Parser
-
-  @doc false
-  def __read_request_body__(conn, opts) do
-    with {:ok, body, conn} <- Plug.Conn.read_body(conn, opts) do
-      conn = update_in(conn.private[:req_test_raw_body], &((&1 || "") <> body))
-      {:ok, body, conn}
-    end
-  end
-
   @doc """
   Reads the raw request body from a plug request.
 
@@ -753,7 +743,8 @@ defmodule Req.Test do
   if Code.ensure_loaded?(Plug.Test) do
     @spec raw_body(Plug.Conn.t()) :: iodata()
     def raw_body(%Plug.Conn{} = conn) do
-      conn.private.req_test_raw_body
+      {Req.Test.Adapter, %{raw_body: raw_body}} = conn.adapter
+      raw_body
     end
   else
     def raw_body(_conn) do

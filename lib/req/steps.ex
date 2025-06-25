@@ -909,10 +909,11 @@ defmodule Req.Steps do
         * A _module_ plug: a `module` name or a `{module, options}` tuple.
 
       Req automatically calls `Plug.Conn.fetch_query_params/2` before your plug, so you can
-      get query params using `conn.query_params`. Req also automatically fetches the request
-      body using `Plug.Parsers` for JSON and multipart forms, you can get these using
-      `conn.body_params`. The raw request body of the request is available by calling
-      `Req.Test.raw_body/1` with the conn.
+      get query params using `conn.query_params`.
+
+      Req also automatically parses request body using `Plug.Parsers` for JSON, urlencoded and
+      multipart requests and you can access it with `conn.body_params`. The raw request body of
+      the request is available by calling `Req.Test.raw_body/1` with the `conn` in your tests.
 
   ## Examples
 
@@ -1015,16 +1016,20 @@ defmodule Req.Steps do
         Plug.Parsers.init(
           parsers: [:urlencoded, :multipart, :json],
           pass: ["*/*"],
-          json_decoder: Jason,
-          body_reader: {Req.Test, :__read_request_body__, []}
+          json_decoder: Jason
         )
 
       conn =
-        Plug.Test.conn(request.method, request.url, req_body)
+        Req.Test.Adapter.conn(%Plug.Conn{}, request.method, request.url, req_body)
         |> Map.replace!(:req_headers, req_headers)
         |> Plug.Conn.fetch_query_params()
         |> Plug.Parsers.call(parser_opts)
-        |> call_plug(plug)
+
+      # Handle cases where the body isn't read with Plug.Parsers
+      {mod, state} = conn.adapter
+      state = %{state | body_read: true}
+      conn = %{conn | adapter: {mod, state}}
+      conn = call_plug(conn, plug)
 
       unless match?(%Plug.Conn{}, conn) do
         raise ArgumentError, "expected to return %Plug.Conn{}, got: #{inspect(conn)}"
