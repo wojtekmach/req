@@ -909,10 +909,11 @@ defmodule Req.Steps do
         * A _module_ plug: a `module` name or a `{module, options}` tuple.
 
       Req automatically calls `Plug.Conn.fetch_query_params/2` before your plug, so you can
-      get query params using `conn.query_params`. Req also automatically fetches the request
-      body using `Plug.Parsers` for JSON and multipart forms, you can get these using
-      `conn.body_params`. The raw request body of the request is available by calling
-      `Req.Test.raw_body/1` with the conn.
+      get query params using `conn.query_params`.
+
+      Req also automatically parses request body using `Plug.Parsers` for JSON, urlencoded and
+      multipart requests and you can access it with `conn.body_params`. The raw request body of
+      the request is available by calling `Req.Test.raw_body/1` with the `conn` in your tests.
 
   ## Examples
 
