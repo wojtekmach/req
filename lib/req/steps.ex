@@ -1023,7 +1023,6 @@ defmodule Req.Steps do
         |> Map.replace!(:req_headers, req_headers)
         |> Plug.Conn.fetch_query_params()
         |> Plug.Parsers.call(parser_opts)
-        |> Plug.Conn.put_private(:req_test_raw_body, req_body)
 
       # Handle cases where the body isn't read with Plug.Parsers
       {mod, state} = conn.adapter

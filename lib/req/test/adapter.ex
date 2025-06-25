@@ -4,10 +4,10 @@ defmodule Req.Test.PlugAdapter do
 
   ## Test helpers
 
-  def conn(conn, method, uri, body_or_params) do
-    conn = Plug.Adapters.Test.Conn.conn(conn, method, uri, body_or_params)
+  def conn(conn, method, uri, body) when is_binary(body) do
+    conn = Plug.Adapters.Test.Conn.conn(conn, method, uri, body)
     {_, state} = conn.adapter
-    state = Map.merge(state, %{body_read: false, has_more_body: false})
+    state = Map.merge(state, %{body_read: false, has_more_body: false, raw_body: body})
     %{conn | adapter: {__MODULE__, state}}
   end
 
