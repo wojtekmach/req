@@ -1024,7 +1024,20 @@ defmodule Req.Steps do
         |> Map.replace!(:req_headers, req_headers)
         |> Plug.Conn.fetch_query_params()
         |> Plug.Parsers.call(parser_opts)
-        |> call_plug(plug)
+
+      # Handle cases where the body isn't read with Plug.Parsers
+      {mod, state} = conn.adapter
+      state = %{state | body_read: true}
+      conn = %{conn | adapter: {mod, state}}
+
+      conn =
+        if !conn.private[:req_test_raw_body] do
+          Plug.Conn.put_private(conn, :req_test_raw_body, req_body)
+        else
+          conn
+        end
+
+      conn = call_plug(conn, plug)
 
       unless match?(%Plug.Conn{}, conn) do
         raise ArgumentError, "expected to return %Plug.Conn{}, got: #{inspect(conn)}"

@@ -50,4 +50,16 @@ defmodule Req.AdapterTest do
 
     assert Req.post!(plug: plug, json: %{a: 1}).body == "ok"
   end
+
+  test "reading binary body" do
+    plug = fn conn ->
+      {:ok, "foo", conn} = Plug.Conn.read_body(conn)
+      {:ok, "", conn} = Plug.Conn.read_body(conn)
+      assert Req.Test.raw_body(conn) == "foo"
+      assert Req.Test.raw_body(conn) == "foo"
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end
+
+    assert Req.post!(plug: plug, body: "foo").body == "ok"
+  end
 end

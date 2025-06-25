@@ -7,7 +7,7 @@ defmodule Req.Test.PlugAdapter do
   def conn(conn, method, uri, body_or_params) do
     conn = Plug.Adapters.Test.Conn.conn(conn, method, uri, body_or_params)
     {_, state} = conn.adapter
-    state = Map.merge(state, %{has_more_body: false})
+    state = Map.merge(state, %{body_read: false, has_more_body: false})
     %{conn | adapter: {__MODULE__, state}}
   end
 
@@ -16,11 +16,15 @@ defmodule Req.Test.PlugAdapter do
     # We restore the body for the first automatic read for backwards
     # compatability with Req 0.5.10 and below.
     # TODO: remove in 0.6 if we allow opting out
+
     case Plug.Adapters.Test.Conn.read_req_body(state, opts) do
       {:more, body, state} ->
         {:more, body, %{state | has_more_body: true}}
 
       {:ok, body, %{has_more_body: true} = state} ->
+        {:ok, body, state}
+
+      {:ok, body, %{body_read: true} = state} ->
         {:ok, body, state}
 
       {:ok, body, state} ->
