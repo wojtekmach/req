@@ -1019,7 +1019,7 @@ defmodule Req.Steps do
         )
 
       conn =
-        Req.Test.PlugAdapter.conn(%Plug.Conn{}, request.method, request.url, req_body)
+        Req.Test.Adapter.conn(%Plug.Conn{}, request.method, request.url, req_body)
         |> Map.replace!(:req_headers, req_headers)
         |> Plug.Conn.fetch_query_params()
         |> Plug.Parsers.call(parser_opts)

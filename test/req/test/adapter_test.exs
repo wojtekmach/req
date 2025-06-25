@@ -1,4 +1,4 @@
-defmodule Req.AdapterTest do
+defmodule Req.Test.AdapterTest do
   use ExUnit.Case, async: true
 
   test "reading request body" do

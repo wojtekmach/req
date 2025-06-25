@@ -1,4 +1,4 @@
-defmodule Req.Test.PlugAdapter do
+defmodule Req.Test.Adapter do
   @behaviour Plug.Conn.Adapter
   @moduledoc false
 
