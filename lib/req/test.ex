@@ -334,47 +334,63 @@ defmodule Req.Test do
       "Hello, World!"
 
   """
-  def redirect(conn, opts) when is_list(opts) do
-    url = url(opts)
-    html = Plug.HTML.html_escape(url)
-    body = "<html><body>You are being <a href=\"#{html}\">redirected</a>.</body></html>"
+  def redirect(conn, opts)
 
-    conn =
-      if List.keyfind(conn.resp_headers, "content-type", 0) do
-        conn
-      else
-        content_type = "text/html; charset=utf-8"
-        update_in(conn.resp_headers, &[{"content-type", content_type} | &1])
+  if Code.ensure_loaded?(Plug.Conn) do
+    def redirect(conn, opts) when is_list(opts) do
+      url = url(opts)
+      html = Plug.HTML.html_escape(url)
+      body = "<html><body>You are being <a href=\"#{html}\">redirected</a>.</body></html>"
+
+      conn =
+        if List.keyfind(conn.resp_headers, "content-type", 0) do
+          conn
+        else
+          content_type = "text/html; charset=utf-8"
+          update_in(conn.resp_headers, &[{"content-type", content_type} | &1])
+        end
+
+      conn
+      |> Plug.Conn.put_resp_header("location", url)
+      |> Plug.Conn.send_resp(conn.status || 302, body)
+    end
+
+    defp url(opts) do
+      cond do
+        to = opts[:to] -> validate_local_url(to)
+        external = opts[:external] -> external
+        true -> raise ArgumentError, "expected :to or :external option in redirect/2"
       end
-
-    conn
-    |> Plug.Conn.put_resp_header("location", url)
-    |> Plug.Conn.send_resp(conn.status || 302, body)
-  end
-
-  defp url(opts) do
-    cond do
-      to = opts[:to] -> validate_local_url(to)
-      external = opts[:external] -> external
-      true -> raise ArgumentError, "expected :to or :external option in redirect/2"
     end
-  end
 
-  @invalid_local_url_chars ["\\", "/%09", "/\t"]
-  defp validate_local_url("//" <> _ = to), do: raise_invalid_url(to)
+    @invalid_local_url_chars ["\\", "/%09", "/\t"]
+    defp validate_local_url("//" <> _ = to), do: raise_invalid_url(to)
 
-  defp validate_local_url("/" <> _ = to) do
-    if String.contains?(to, @invalid_local_url_chars) do
-      raise ArgumentError, "unsafe characters detected for local redirect in URL #{inspect(to)}"
-    else
-      to
+    defp validate_local_url("/" <> _ = to) do
+      if String.contains?(to, @invalid_local_url_chars) do
+        raise ArgumentError, "unsafe characters detected for local redirect in URL #{inspect(to)}"
+      else
+        to
+      end
     end
-  end
 
-  defp validate_local_url(to), do: raise_invalid_url(to)
+    defp validate_local_url(to), do: raise_invalid_url(to)
 
-  defp raise_invalid_url(url) do
-    raise ArgumentError, "the :to option in redirect expects a path but was #{inspect(url)}"
+    defp raise_invalid_url(url) do
+      raise ArgumentError, "the :to option in redirect expects a path but was #{inspect(url)}"
+    end
+  else
+    def redirect(_conn, _opts) do
+      Logger.error("""
+      Could not find plug dependency.
+
+      Please add :plug to your dependencies:
+
+          {:plug, "~> 1.0"}
+      """)
+
+      raise "missing plug dependency"
+    end
   end
 
   @doc """

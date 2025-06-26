@@ -19,8 +19,9 @@ defmodule Req.MixProject do
       xref: [
         exclude: [
           NimbleCSV.RFC4180,
-          Plug.Test,
           Plug.Conn,
+          Plug.HTML,
+          Plug.Test,
           :brotli,
           :ezstd
         ]
