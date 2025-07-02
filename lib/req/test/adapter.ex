@@ -35,8 +35,7 @@ if Code.ensure_loaded?(Plug.Conn) do
 
     defdelegate send_resp(state, status, headers, body), to: Plug.Adapters.Test.Conn
 
-    defdelegate send_file(state, status, headers, path, offset, length),
-      to: Plug.Adapters.Test.Conn
+    defdelegate send_file(state, status, headers, path, offset, len), to: Plug.Adapters.Test.Conn
 
     def send_chunked(state, _status, _headers) do
       {:ok, "", %{state | chunks: []}}
