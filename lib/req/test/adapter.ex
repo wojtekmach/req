@@ -38,12 +38,24 @@ if Code.ensure_loaded?(Plug.Conn) do
     defdelegate send_file(state, status, headers, path, offset, length),
       to: Plug.Adapters.Test.Conn
 
-    defdelegate send_chunked(state, status, headers), to: Plug.Adapters.Test.Conn
-    defdelegate chunk(state, body), to: Plug.Adapters.Test.Conn
+    def send_chunked(state, _status, _headers) do
+      {:ok, "", %{state | chunks: []}}
+    end
+
+    def chunk(state, chunk) do
+      chunk = IO.iodata_to_binary(chunk)
+      body = IO.iodata_to_binary([state.chunks, chunk])
+      {:ok, body, %{state | chunks: state.chunks ++ [chunk]}}
+    end
+
     defdelegate inform(state, status, headers), to: Plug.Adapters.Test.Conn
+
     defdelegate upgrade(state, protocol, opts), to: Plug.Adapters.Test.Conn
+
     defdelegate push(state, path, headers), to: Plug.Adapters.Test.Conn
+
     defdelegate get_peer_data(payload), to: Plug.Adapters.Test.Conn
+
     defdelegate get_http_protocol(payload), to: Plug.Adapters.Test.Conn
   end
 end
