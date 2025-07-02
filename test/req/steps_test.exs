@@ -1936,8 +1936,7 @@ defmodule Req.StepsTest do
           end
         )
 
-      {resp, output} = ExUnit.CaptureIO.with_io(:standard_error, fn -> Req.request!(req) end)
-      assert output =~ ~r/returning {:halt, acc} is not yet supported by Plug adapter/
+      resp = Req.request!(req)
       assert resp.status == 200
       assert resp.body == "foobar"
       refute_receive _
