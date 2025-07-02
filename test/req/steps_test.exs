@@ -1907,17 +1907,24 @@ defmodule Req.StepsTest do
             conn = Plug.Conn.send_chunked(conn, 200)
             {:ok, conn} = Plug.Conn.chunk(conn, "foo")
             {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+            {:ok, conn} = Plug.Conn.chunk(conn, "baz")
             conn
           end,
           into: fn {:data, data}, {req, resp} ->
-            resp = update_in(resp.body, &(&1 <> data))
-            {:cont, {req, resp}}
+            body =
+              if resp.body == "" do
+                [data]
+              else
+                resp.body ++ [data]
+              end
+
+            {:cont, {req, put_in(resp.body, body)}}
           end
         )
 
       resp = Req.request!(req)
       assert resp.status == 200
-      assert resp.body == "foobar"
+      assert resp.body == ["foo", "bar", "baz"]
       refute_receive _
     end
 
@@ -1931,14 +1938,47 @@ defmodule Req.StepsTest do
             conn
           end,
           into: fn {:data, data}, {req, resp} ->
-            resp = update_in(resp.body, &(&1 <> data))
-            {:halt, {req, resp}}
+            {:halt, {req, put_in(resp.body, [data])}}
           end
         )
 
       resp = Req.request!(req)
       assert resp.status == 200
-      assert resp.body == "foobar"
+      assert resp.body == ["foo"]
+      refute_receive _
+    end
+
+    test "into: fun with send_resp" do
+      req =
+        Req.new(
+          plug: fn conn ->
+            Plug.Conn.send_resp(conn, 200, "foo")
+          end,
+          into: fn {:data, data}, {req, resp} ->
+            {:cont, {req, put_in(resp.body, [data])}}
+          end
+        )
+
+      resp = Req.request!(req)
+      assert resp.status == 200
+      assert resp.body == ["foo"]
+      refute_receive _
+    end
+
+    test "into: fun with send_file" do
+      req =
+        Req.new(
+          plug: fn conn ->
+            Plug.Conn.send_file(conn, 200, "mix.exs")
+          end,
+          into: fn {:data, data}, {req, resp} ->
+            {:cont, {req, put_in(resp.body, [data])}}
+          end
+        )
+
+      resp = Req.request!(req)
+      assert resp.status == 200
+      assert ["defmodule Req.MixProject do" <> _] = resp.body
       refute_receive _
     end
 
@@ -1956,7 +1996,7 @@ defmodule Req.StepsTest do
 
       resp = Req.request!(req)
       assert resp.status == 200
-      assert resp.body == ["foobar"]
+      assert resp.body == ["foo", "bar"]
       refute_receive _
     end
 
@@ -2024,13 +2064,14 @@ defmodule Req.StepsTest do
 
       resp = Req.request!(req)
       assert resp.status == 200
-      assert {:ok, [data: "foobar"]} = Req.parse_message(resp, assert_receive(_))
+      assert {:ok, [data: "foo"]} = Req.parse_message(resp, assert_receive(_))
+      assert {:ok, [data: "bar"]} = Req.parse_message(resp, assert_receive(_))
       assert {:ok, [:done]} = Req.parse_message(resp, assert_receive(_))
       refute_receive _
 
       resp = Req.request!(req)
       assert resp.status == 200
-      assert Enum.to_list(resp.body) == ["foobar"]
+      assert Enum.to_list(resp.body) == ["foo", "bar"]
       refute_receive _
     end
 
