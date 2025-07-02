@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## v0.5.13 (2025-07-02)
+
+  * [`run_plug`]: Ease transition to automatically parsing request body.
+
+    Since v0.5.11, this code:
+
+        plug = fn conn ->
+          {:ok, body, conn} = Plug.Conn.read_body(conn)
+          assert JSON.decode!(body) == %{"x" => 1}
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end
+
+        Req.put!(plug: plug, json: %{x: 1})
+
+     Needed to be updated to:
+
+        plug = fn conn ->
+          assert conn.body_params == %{"x" => 1}
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end
+
+        Req.put!(plug: plug, json: %{x: 1})
+
+    This change makes it so both work. The latter will be required, however.
+
 ## v0.5.12 (2025-06-24)
 
   * [`run_plug`]: Do not raise on unknown content types.
