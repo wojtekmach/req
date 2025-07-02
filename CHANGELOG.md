@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## v0.5.14 (2025-07-02)
+
+  * [`run_plug`]: Remove warning about `into: fun` with `{:halt, acc}` result.
+
+    The warning never been particularly useful because it's not like users
+    can do anything about it.
+
 ## v0.5.13 (2025-07-02)
 
   * [`run_plug`]: Ease transition to automatically parsing request body.
