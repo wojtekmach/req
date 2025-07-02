@@ -1180,7 +1180,8 @@ defmodule Req.Steps do
                   {:halt, acc}
 
                 other ->
-                  raise ArgumentError, "expected {:cont, acc}, got: #{inspect(other)}"
+                  raise ArgumentError,
+                        "expected {:cont, acc} or {:halt, acc}, got: #{inspect(other)}"
               end
             end
           )
