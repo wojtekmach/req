@@ -1093,10 +1093,6 @@ defmodule Req.Steps do
               acc
 
             {:halt, acc} ->
-              message =
-                "returning {:halt, acc} is not yet supported by Plug adapter and it behaves as {:cont, acc}"
-
-              IO.warn(message, [])
               acc
 
             other ->
