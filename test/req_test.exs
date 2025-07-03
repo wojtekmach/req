@@ -1,6 +1,6 @@
 defmodule ReqTest do
   use ExUnit.Case, async: true
-  import TestHelper, only: [start_http_server: 1]
+  import TestHelper, only: [start_http_server: 1, start_https_server: 1]
 
   doctest Req,
     only: [
@@ -95,5 +95,22 @@ defmodule ReqTest do
 
     resp = Req.get!(origin_url, into: :self)
     assert Req.put!(echo_url, body: resp.body).body == "foobarbaz"
+  end
+
+  test "http1 + http2" do
+    %{url: url} =
+      start_https_server(fn conn ->
+        assert Plug.Conn.get_http_protocol(conn) == :"HTTP/2"
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+    assert Req.get!(
+             url,
+             connect_options: [
+               transport_opts: [cacertfile: "#{__DIR__}/support/ca.pem"],
+               protocols: [:http1, :http2]
+             ],
+             retry: false
+           ).body == "ok"
   end
 end

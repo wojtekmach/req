@@ -1,5 +1,5 @@
 defmodule TestHelper do
-  def start_http_server(plug) do
+  def start_http_server(plug) when is_function(plug, 1) do
     options = [
       scheme: :http,
       port: 0,
@@ -11,6 +11,22 @@ defmodule TestHelper do
     pid = ExUnit.Callbacks.start_supervised!({Bandit, options})
     {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)
     %{pid: pid, url: URI.new!("http://localhost:#{port}")}
+  end
+
+  def start_https_server(plug) when is_function(plug, 1) do
+    options = [
+      scheme: :https,
+      port: 0,
+      plug: fn conn, _ -> plug.(conn) end,
+      startup_log: false,
+      http_options: [compress: false],
+      certfile: "#{__DIR__}/support/cert.pem",
+      keyfile: "#{__DIR__}/support/key.pem"
+    ]
+
+    pid = ExUnit.Callbacks.start_supervised!({Bandit, options})
+    {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)
+    %{pid: pid, url: URI.new!("https://localhost:#{port}")}
   end
 
   def start_tcp_server(fun) do
