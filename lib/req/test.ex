@@ -556,6 +556,8 @@ defmodule Req.Test do
 
   See `stub/2` and module documentation for more information.
 
+  `verify_on_exit!/1` can be used to ensure that all defined expectations have been called.
+
   ## Examples
 
   Let's simulate a server that is having issues: on the first request it is not responding
@@ -642,6 +644,11 @@ defmodule Req.Test do
   Sets a ExUnit callback to verify the expectations on exit.
 
   Similar to calling `verify!/0` at the end of your test.
+
+  This works as a ExUnit callback:
+
+      setup {Req.Test, :verify_on_exit!}
+
   """
   @doc since: "0.5.0"
   @doc type: :mock
