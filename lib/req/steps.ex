@@ -544,7 +544,7 @@ defmodule Req.Steps do
         Regex.replace(regex, path, fn match, key ->
           case params[String.to_existing_atom(key)] do
             nil -> match
-            value -> value |> to_string() |> URI.encode()
+            value -> value |> to_string() |> URI.encode(&URI.char_unreserved?/1)
           end
         end)
     end)
@@ -1493,7 +1493,7 @@ defmodule Req.Steps do
   ## Options
 
     * `:raw` - if set to `true`, disables response body decompression. Defaults to `false`.
-    
+
       Note: setting `raw: true` also disables response body decoding in the `decode_body/1` step.
 
   ## Examples

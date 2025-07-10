@@ -329,6 +329,21 @@ defmodule Req.StepsTest do
     assert URI.to_string(req.url) == "http://foo/abc%7Cdef:bar"
   end
 
+  test "put_path_params properly escapes reserved characters" do
+    req =
+      Req.new(url: "http://foo/:id{ola}", path_params: [id: "abc#def"]) |> Req.Request.prepare()
+
+    assert URI.to_string(req.url) == "http://foo/abc%23def{ola}"
+
+    # With :curly style.
+
+    req =
+      Req.new(url: "http://foo/{id}:bar", path_params: [id: "abc#def"], path_params_style: :curly)
+      |> Req.Request.prepare()
+
+    assert URI.to_string(req.url) == "http://foo/abc%23def:bar"
+  end
+
   test "put_range" do
     req = Req.new(range: "bytes=0-10") |> Req.Request.prepare()
     assert Req.Request.get_header(req, "range") == ["bytes=0-10"]
