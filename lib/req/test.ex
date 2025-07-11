@@ -657,7 +657,7 @@ defmodule Req.Test do
     pid = self()
     Req.Test.Ownership.set_owner_to_manual_cleanup(@ownership, pid)
 
-    ExUnit.Callbacks.on_exit(Mox, fn ->
+    ExUnit.Callbacks.on_exit(Req.Test, fn ->
       verify(pid, :all)
       Req.Test.Ownership.cleanup_owner(@ownership, pid)
     end)
