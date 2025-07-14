@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.5.15 (2025-07-14)
+
+  * [`Req.Response`]: Add [`Req.Response.to_map/1`].
+
 ## v0.5.14 (2025-07-02)
 
   * [`run_plug`]: Remove warning about `into: fun` with `{:halt, acc}` result.
@@ -1331,6 +1335,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Response.get_header/2`]:     https://hexdocs.pm/req/Req.Response.html#get_response/2
 [`Req.Response.delete_header/2`]:  https://hexdocs.pm/req/Req.Response.html#delete_header/2
 [`Req.Response.update_private/4`]: https://hexdocs.pm/req/Req.Response.html#update_private/4
+[`Req.Response.to_map/1`]:         https://hexdocs.pm/req/Req.Response.html#to_map/1
 [`Req.Response.Async`]:            https://hexdocs.pm/req/Req.Response.Async.html
 
 [`Req.Test`]: https://hexdocs.pm/req/Req.Test.html
