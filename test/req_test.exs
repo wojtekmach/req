@@ -6,7 +6,12 @@ defmodule ReqTest do
     only: [
       new: 1,
       merge: 2,
-      get_headers_list: 1
+      get_headers_list: 1,
+      assign: 2,
+      assign: 3,
+      assign_new: 3,
+      update_assign: 3,
+      update_assign: 4
     ]
 
   setup do

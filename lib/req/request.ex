@@ -366,6 +366,7 @@ defmodule Req.Request do
                  {:cont | :halt, {t, Req.Response.t()}})
             | Collectable.t(),
           options: options(),
+          assigns: map(),
           halted: boolean(),
           adapter: request_step(),
           request_steps: [{name :: atom(), request_step()}],
@@ -424,6 +425,7 @@ defmodule Req.Request do
             headers: Req.Fields.new([]),
             body: nil,
             options: %{},
+            assigns: %{},
             halted: false,
             adapter: &Req.Steps.run_finch/1,
             request_steps: [],
@@ -450,6 +452,10 @@ defmodule Req.Request do
 
     * `:adapter` - the request adapter, defaults to calling [`run_finch`](`Req.Steps.run_finch/1`).
 
+    * `:options` - TODO
+
+    * `:assigns` - TODO
+
   ## Examples
 
       iex> req = Req.Request.new(url: "https://api.github.com/repos/wojtekmach/req")
@@ -463,7 +469,7 @@ defmodule Req.Request do
   def new(options \\ []) do
     options =
       options
-      |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
+      |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options, :assigns])
       |> Keyword.update(:url, URI.new!(""), &URI.parse/1)
       |> Keyword.update(:headers, Req.Fields.new([]), &Req.Fields.new_without_normalize/1)
       |> Keyword.update(:options, %{}, &Map.new/1)
