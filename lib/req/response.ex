@@ -72,6 +72,39 @@ defmodule Req.Response do
   end
 
   @doc """
+  Converts response to a map for interoperability with other libraries.
+
+  The resulting map has the folowing fields:
+
+    * `:status`
+    * `:headers`
+    * `:trailers`
+    * `:body`
+
+  Note, `body` can be any term since Req built-in and custom steps usually transform it.
+
+  ## Examples
+
+      iex> resp = Req.Response.new(status: 200, headers: %{"server" => ["test"]}, body: "hello")
+      iex> Req.Response.to_map(resp)
+      %{status: 200, body: "hello", headers: [{"server", "test"}], trailers: []}
+  """
+  @spec to_map(t()) :: %{
+          status: non_neg_integer(),
+          headers: [{binary(), binary()}],
+          trailers: [{binary(), binary()}],
+          body: term()
+        }
+  def to_map(%Req.Response{} = resp) do
+    %{
+      status: resp.status,
+      headers: Req.Fields.get_list(resp.headers),
+      trailers: Req.Fields.get_list(resp.trailers),
+      body: resp.body
+    }
+  end
+
+  @doc """
   Builds or updates a response with JSON body.
 
   ## Example
