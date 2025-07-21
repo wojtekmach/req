@@ -40,6 +40,7 @@ defmodule Req.Steps do
       :http_errors,
       :decode_body,
       :decode_json,
+      :expect,
       :redirect,
       :redirect_trusted,
       :redirect_log_level,
@@ -90,6 +91,7 @@ defmodule Req.Steps do
       decompress_body: &Req.Steps.decompress_body/1,
       verify_checksum: &Req.Steps.verify_checksum/1,
       decode_body: &Req.Steps.decode_body/1,
+      expect: &Req.Steps.expect/1,
       output: &Req.Steps.output/1
     )
     |> Req.Request.prepend_error_steps(retry: &Req.Steps.retry/1)
@@ -2331,6 +2333,80 @@ defmodule Req.Steps do
 
   defp quote_value(str) when is_binary(str) do
     inspect(str, printable_limit: :infinity)
+  end
+
+  @doc """
+  Expect that response matches the given status.
+
+  The expected status can be one of:
+
+    * integer
+    * range
+    * list of integers/ranges
+
+  > #### Order Matters! {: .info}
+  >
+  > By default, `expect/1` runs AFTER `retry/1`, `redirect/1`, `decompress_body/1`,
+  > and `decode_body/1` steps.
+  >
+  > This means that, for example, HTTP 503 error would be first retried,
+  > HTTP 307 redirect would be first followed, and the response body
+  > would be first decompressed and decoded before checking for expected HTTP status.
+  > If this is undesirable, re-arrange or disable and manually run given steps.
+
+  > #### Sensitive Response Data {: .warning}
+  >
+  > This steps returns `Req.UnexpectedResponseError` which contains full `Req.Response`.
+  > Since response headers/body can contain sensitive data, be careful about raising
+  > this error and automatically logging it, sending to exception trackers, etc.
+
+  ## Examples
+
+      iex> resp = Req.get!("https://httpbin.org/status/200", expect: 200)
+      iex> resp.status
+      200
+
+      iex> Req.get!("https://httpbin.org/status/404", expect: 200..299)
+      ** (Req.UnexpectedResponseError) expected status 200..299, got: 404
+  """
+  @doc step: :response
+  def expect(request_response)
+
+  def expect({request, response}) do
+    if expect = request.options[:expect] do
+      if expect_success?(response.status, expect) do
+        {request, response}
+      else
+        {request, Req.UnexpectedResponseError.exception(expected: expect, response: response)}
+      end
+    else
+      {request, response}
+    end
+  end
+
+  defp expect_success?(status, status) do
+    true
+  end
+
+  defp expect_success?(_, other_status) when is_integer(other_status) do
+    false
+  end
+
+  defp expect_success?(status, %Range{} = statuses) do
+    status in statuses
+  end
+
+  defp expect_success?(status, [expect | tail])
+       when is_integer(expect) or is_struct(expect, Range) do
+    if expect_success?(status, expect) do
+      true
+    else
+      expect_success?(status, tail)
+    end
+  end
+
+  defp expect_success?(_status, []) do
+    false
   end
 
   ## Error steps
