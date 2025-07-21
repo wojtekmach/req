@@ -2338,11 +2338,13 @@ defmodule Req.Steps do
   @doc """
   Expect that response matches the given status.
 
-  The expected status can be one of:
+  ## Request Options
 
-    * integer
-    * range
-    * list of integers/ranges
+    * `:expect` - the expected HTTP response status. Can be one of the following:
+
+        * integer
+        * range
+        * list of integers/ranges
 
   > #### Order Matters! {: .info}
   >
