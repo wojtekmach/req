@@ -1071,7 +1071,7 @@ defmodule Req.Steps do
       conn =
         Req.Test.Adapter.conn(%Plug.Conn{}, request.method, request.url, req_body)
         |> Map.replace!(:req_headers, req_headers)
-        |> Plug.Conn.fetch_query_params()
+        |> Plug.Conn.fetch_query_params(validate_utf8: false)
         |> Plug.Conn.put_private(:req_private, request.private)
         |> Plug.Parsers.call(parser_opts)
 
