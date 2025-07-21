@@ -301,6 +301,16 @@ defmodule Req.StepsTest do
                ]
              ).status == 200
     end
+
+    test "GET to POST" do
+      plug = &Plug.Conn.send_resp(&1, 200, &1.method)
+
+      assert Req.request!(plug: plug).body == "GET"
+      assert Req.request!(plug: plug, body: "").body == "POST"
+      assert Req.request!(plug: plug, body: "foo").body == "POST"
+      assert Req.request!(plug: plug, json: %{a: 1}).body == "POST"
+      assert Req.request!(plug: plug, json: %{a: 1}, method: :put).body == "PUT"
+    end
   end
 
   test "put_params" do
