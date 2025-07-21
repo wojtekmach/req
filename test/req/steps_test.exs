@@ -1388,6 +1388,42 @@ defmodule Req.StepsTest do
     end
   end
 
+  describe "expect" do
+    test "status integer" do
+      plug = fn conn ->
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end
+
+      assert Req.get!(plug: plug, expect: 200).body == "ok"
+      assert {:error, e} = Req.get(plug: plug, expect: 201)
+      assert Exception.message(e) =~ "expected status 201, got: 200"
+    end
+
+    test "status range" do
+      plug = fn conn ->
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end
+
+      assert Req.get!(plug: plug, expect: 200..201).body == "ok"
+      assert {:error, e} = Req.get(plug: plug, expect: 201..202)
+      assert Exception.message(e) =~ "expected status 201..202, got: 200"
+    end
+
+    test "status list" do
+      plug = fn conn ->
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end
+
+      assert Req.get!(plug: plug, expect: [200, 201]).body == "ok"
+      assert {:error, e} = Req.get(plug: plug, expect: [201, 202])
+      assert Exception.message(e) =~ "expected status [201, 202], got: 200"
+
+      assert Req.get!(plug: plug, expect: [200..201]).body == "ok"
+      assert {:error, e} = Req.get(plug: plug, expect: [201..202])
+      assert Exception.message(e) =~ "expected status [201..202], got: 200"
+    end
+  end
+
   ## Error steps
 
   describe "retry" do
