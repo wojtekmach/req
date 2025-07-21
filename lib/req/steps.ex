@@ -2338,6 +2338,9 @@ defmodule Req.Steps do
   @doc """
   Expect that response matches the given status.
 
+  This step ensures the HTTP response has the given expected status, otherwise it
+  returns `Req.UnexpectedResponseError`.
+
   ## Request Options
 
     * `:expect` - the expected HTTP response status. Can be one of the following:
@@ -2370,6 +2373,12 @@ defmodule Req.Steps do
 
       iex> Req.get!("https://httpbin.org/status/404", expect: 200..299)
       ** (Req.UnexpectedResponseError) expected status 200..299, got: 404
+
+      iex> {:error, e} = Req.get("https://httpbin.org/status/404", expect: 200..299)
+      iex> e.expected_status
+      200..299
+      iex> e.response.status
+      404
   """
   @doc step: :response
   def expect(request_response)
@@ -2379,7 +2388,8 @@ defmodule Req.Steps do
       if expect_success?(response.status, expect) do
         {request, response}
       else
-        {request, Req.UnexpectedResponseError.exception(expected: expect, response: response)}
+        {request,
+         Req.UnexpectedResponseError.exception(expected_status: expect, response: response)}
       end
     else
       {request, response}
