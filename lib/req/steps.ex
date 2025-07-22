@@ -1002,6 +1002,21 @@ defmodule Req.Steps do
             enumerable |> Enum.to_list() |> IO.iodata_to_binary()
         end
 
+      {req_body, request} =
+        case Req.Request.get_header(request, "content-encoding") do
+          [] ->
+            {req_body, request}
+
+          encoding_headers ->
+            case decompress_with_encoding(encoding_headers, req_body) do
+              %Req.DecompressError{} = error ->
+                raise error
+
+              {decompressed_body, _unknown_codecs} ->
+                {decompressed_body, Req.Request.delete_header(request, "content-encoding")}
+            end
+        end
+
       req_headers =
         if unquote(Req.MixProject.legacy_headers_as_lists?()) do
           request.headers
@@ -1532,9 +1547,9 @@ defmodule Req.Steps do
     if request.options[:raw] do
       {request, response}
     else
-      codecs = compression_algorithms(Req.Response.get_header(response, "content-encoding"))
+      encoding_headers = Req.Response.get_header(response, "content-encoding")
 
-      case decompress_body(codecs, response.body, []) do
+      case decompress_with_encoding(encoding_headers, response.body) do
         %Req.DecompressError{} = exception ->
           {request, exception}
 
@@ -1557,6 +1572,13 @@ defmodule Req.Steps do
           {request, response}
       end
     end
+  end
+
+  defp decompress_with_encoding([], body), do: {body, []}
+
+  defp decompress_with_encoding(encoding_headers, body) do
+    codecs = compression_algorithms(encoding_headers)
+    decompress_body(codecs, body, [])
   end
 
   defp decompress_body([gzip | rest], body, acc) when gzip in ["gzip", "x-gzip"] do
