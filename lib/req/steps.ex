@@ -1023,6 +1023,7 @@ defmodule Req.Steps do
         Req.Test.Adapter.conn(%Plug.Conn{}, request.method, request.url, req_body)
         |> Map.replace!(:req_headers, req_headers)
         |> Plug.Conn.fetch_query_params()
+        |> Plug.Conn.put_private(:req_private, request.private)
         |> Plug.Parsers.call(parser_opts)
 
       # Handle cases where the body isn't read with Plug.Parsers
