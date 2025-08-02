@@ -56,17 +56,10 @@ defmodule Req.Utils do
         aws_headers
       end
 
-    canonical_headers = headers ++ aws_headers
-
-    ## canonical_headers needs to be sorted for canonical_request construction
-    canonical_headers = Enum.sort(canonical_headers)
+    canonical_headers = format_canonical_headers(headers ++ aws_headers)
 
     signed_headers =
-      Enum.map_intersperse(
-        Enum.sort(canonical_headers),
-        ";",
-        &String.downcase(elem(&1, 0), :ascii)
-      )
+      Enum.map_intersperse(canonical_headers, ";", &elem(&1, 0))
 
     canonical_headers =
       Enum.map_intersperse(canonical_headers, "\n", fn {name, value} -> [name, ":", value] end)
@@ -235,10 +228,17 @@ defmodule Req.Utils do
   # Header names must be lower case
   # Header values must be trimmed
   # See https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
+  # "host", "range", "x-amz-*", and "content-*" headers must be included
+  # All other headers are excluded for compatibility with Supabase Storage
   defp format_canonical_headers(headers) do
     headers
     |> Enum.map(&format_canonical_header/1)
     |> Enum.sort(fn {name_1, _}, {name_2, _} -> name_1 < name_2 end)
+    |> Enum.filter(fn
+      {"content-" <> _, _value} -> true
+      {"x-amz-" <> _, _value} -> true
+      {name, _value} -> name in ["host", "range"]
+    end)
   end
 
   defp format_canonical_header({name, value}) do
