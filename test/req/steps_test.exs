@@ -329,6 +329,18 @@ defmodule Req.StepsTest do
     assert URI.to_string(req.url) == "http://foo/abc%7Cdef:bar"
   end
 
+  test "puth_path_params when path_params are empty still sets the template" do
+    req =
+      Req.new(url: "http://foo/bar", path_params: []) |> Req.Request.prepare()
+
+    assert Req.Request.get_private(req, :path_params_template)
+
+    req =
+      Req.new(url: "http://foo/bar") |> Req.Request.prepare()
+
+    refute Req.Request.get_private(req, :path_params_template)
+  end
+
   test "put_path_params properly escapes reserved characters" do
     req =
       Req.new(url: "http://foo/:id{ola}", path_params: [id: "abc#def"]) |> Req.Request.prepare()
