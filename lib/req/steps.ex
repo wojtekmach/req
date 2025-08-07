@@ -495,7 +495,7 @@ defmodule Req.Steps do
 
   ## Request Options
 
-    * `:path_params` - params to add to the templated path. Defaults to `[]`.
+    * `:path_params` - if set, params to add to the templated path. Defaults to `nil`.
 
     * `:path_params_style` (*available since v0.5.1*) - how path params are expressed. Can be one of:
 
@@ -516,10 +516,10 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def put_path_params(request) do
-    put_path_params(request, Req.Request.get_option(request, :path_params, []))
+    put_path_params(request, Req.Request.get_option(request, :path_params, nil))
   end
 
-  defp put_path_params(request, []) do
+  defp put_path_params(request, nil) do
     request
   end
 
