@@ -227,16 +227,10 @@ There are many packages that extend the Req library. To get yours listed here, s
 
 ## Development (MacOS)
 
-When developing on MacOS, you may need need the following linker flags in order to successfully compile [Brotli](https://hexdocs.pm/brotli/readme.html)
+When developing on MacOS, you may need need the following linker flags in order to successfully compile [Brotli](https://hexdocs.pm/brotli/readme.html).
 
-If it fails to compile, you can run the following
-
-``` elixir
-mix deps.clean brotli
-mix deps.get
-
+```bash
 export LDFLAGS="-undefined dynamic_lookup -dynamiclib"
-mix deps.compile brotli --force
 ```
 
 ## Acknowledgments
