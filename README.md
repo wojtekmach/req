@@ -225,9 +225,9 @@ There are many packages that extend the Req library. To get yours listed here, s
   * [Req: A batteries-included HTTP client for Elixir - ElixirConf 2023, 2023-09-08](https://www.youtube.com/watch?v=owz2QacFuoQ "ElixirConf 2023 - Wojtek Mach - Req - a batteries-included HTTP client for Elixir")
   * [Req: A batteries included HTTP client for Elixir - Elixir Kenya, 2022-08-26](https://www.youtube.com/watch?v=NxWgvHRN6mI "Req: A batteries included HTTP client for Elixir")
 
-## Development (MacOS)
+## Development
 
-When developing on MacOS, you may need need the following linker flags in order to successfully compile [Brotli](https://hexdocs.pm/brotli/readme.html).
+When developing on macOS, you may need the following linker flags in order to successfully compile [Brotli](https://hexdocs.pm/brotli/readme.html).
 
 ```bash
 export LDFLAGS="-undefined dynamic_lookup -dynamiclib"
