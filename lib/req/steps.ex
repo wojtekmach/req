@@ -516,10 +516,10 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def put_path_params(request) do
-    put_path_params(request, Req.Request.get_option(request, :path_params, []))
+    put_path_params(request, Req.Request.get_option(request, :path_params, nil))
   end
 
-  defp put_path_params(request, []) do
+  defp put_path_params(request, nil) do
     request
   end
 
