@@ -61,10 +61,10 @@ defmodule ReqTest do
 
     if Req.MixProject.legacy_headers_as_lists?() do
       assert inspect(Req.new(headers: [authorization: "bearer foobar"])) =~
-               ~s|{"authorization", "bearer ***"}|
+               ~s|{"authorization", "bearer foo***"}|
     else
-      assert inspect(Req.new(headers: [authorization: "bearer foo"])) =~
-               ~s|"authorization" => ["bearer ***"]|
+      assert inspect(Req.new(headers: [authorization: "bearer foobar"])) =~
+               ~s|"authorization" => ["bearer foo***"]|
     end
   end
 
