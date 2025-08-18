@@ -703,11 +703,19 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, "bad")
       end
 
-      assert_raise Req.DecompressError,
-                   ~S[zstd decompression failed, reason: "failed to decompress: ZSTD_CONTENTSIZE_ERROR"],
-                   fn ->
-                     Req.get!(plug: plug)
-                   end
+      if Code.ensure_loaded?(:zstd) do
+        assert_raise Req.DecompressError,
+                     ~S[zstd decompression failed, reason: "Unknown frame descriptor"],
+                     fn ->
+                       Req.get!(plug: plug)
+                     end
+      else
+        assert_raise Req.DecompressError,
+                     ~S[zstd decompression failed, reason: "failed to decompress: ZSTD_CONTENTSIZE_ERROR"],
+                     fn ->
+                       Req.get!(plug: plug)
+                     end
+      end
     end
 
     test "multiple codecs" do
@@ -982,8 +990,11 @@ defmodule Req.StepsTest do
       assert {:error, e} = Req.get(plug: plug)
       assert %RuntimeError{} = e
 
-      assert Exception.message(e) ==
+      assert Exception.message(e) in [
+               "Could not decompress Zstandard data: \"Unknown frame descriptor\"",
+               # TODO remove once Erlang v28 is required
                "Could not decompress Zstandard data: \"failed to decompress: ZSTD_CONTENTSIZE_ERROR\""
+             ]
     end
 
     test "csv" do
