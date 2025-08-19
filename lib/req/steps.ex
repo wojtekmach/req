@@ -306,7 +306,7 @@ defmodule Req.Steps do
 
     * `br` (if [brotli] is installed)
 
-    * `zstd` (if [ezstd] is installed)
+    * `zstd` (if your Erlang version is >= 28 or [ezstd] is installed)
 
   ## Request Options
 
@@ -370,14 +370,42 @@ defmodule Req.Steps do
     Code.ensure_loaded?(:brotli)
   end
 
-  defmacrop ezstd_loaded? do
-    Code.ensure_loaded?(:ezstd)
+  # TODO: Remove once Erlang v28 is required
+  defmacrop zstd_loaded? do
+    Code.ensure_loaded?(:zstd) or Code.ensure_loaded?(:ezstd)
   end
 
-  defp supported_accept_encoding do
-    value = "gzip"
-    value = if brotli_loaded?(), do: "br, " <> value, else: value
-    if ezstd_loaded?(), do: "zstd, " <> value, else: value
+  if Code.ensure_loaded?(:zstd) do
+    def zstd_decompress(arg) do
+      try do
+        arg
+        |> :zstd.decompress()
+        |> :erlang.iolist_to_binary()
+      rescue
+        err in ErlangError ->
+          case err do
+            %ErlangError{original: {:zstd_error, reason}} ->
+              {:error, reason}
+
+            err ->
+              reraise err, __STACKTRACE__
+          end
+      end
+    end
+
+    defp supported_accept_encoding do
+      "zstd, #{if brotli_loaded?(), do: "br, ", else: ""}gzip"
+    end
+  else
+    defp zstd_decompress(arg) do
+      :ezstd.decompress(arg)
+    end
+
+    defp supported_accept_encoding do
+      value = "gzip"
+      value = if brotli_loaded?(), do: "br, " <> value, else: value
+      if zstd_loaded?(), do: "zstd, " <> value, else: value
+    end
   end
 
   @doc """
@@ -1588,8 +1616,8 @@ defmodule Req.Steps do
   end
 
   defp decompress_body(["zstd" | rest], body, acc) do
-    if ezstd_loaded?() do
-      case :ezstd.decompress(body) do
+    if zstd_loaded?() do
+      case zstd_decompress(body) do
         decompressed when is_binary(decompressed) ->
           decompress_body(rest, decompressed, acc)
 
@@ -1779,8 +1807,8 @@ defmodule Req.Steps do
   end
 
   defp decode_body({request, response}, "zst") do
-    if ezstd_loaded?() do
-      case :ezstd.decompress(response.body) do
+    if zstd_loaded?() do
+      case zstd_decompress(response.body) do
         decompressed when is_binary(decompressed) ->
           {request, put_in(response.body, decompressed)}
 
