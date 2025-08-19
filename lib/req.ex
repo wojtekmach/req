@@ -198,6 +198,8 @@ defmodule Req do
 
         * `enumerable` - stream `enumerable` as request body
 
+    * `:assigns` - TODO
+
   Additional URL options:
 
     * `:base_url` - if set, the request URL is prepended with this base URL (via
@@ -532,7 +534,7 @@ defmodule Req do
       IO.warn("Setting :redact_auth is deprecated and has no effect")
     end
 
-    request_option_names = [:method, :url, :headers, :body, :adapter, :into]
+    request_option_names = [:method, :url, :headers, :body, :adapter, :into, :assigns]
 
     {request_options, options} = Keyword.split(options, request_option_names)
 
@@ -555,6 +557,9 @@ defmodule Req do
 
         {:headers, new_headers}, acc ->
           update_in(acc.headers, &Req.Fields.merge(&1, new_headers))
+
+        {:assigns, assigns}, acc ->
+          update_in(acc.assigns, &Enum.into(assigns, &1))
 
         {name, value}, acc ->
           %{acc | name => value}
@@ -1360,6 +1365,125 @@ defmodule Req do
   @spec get_headers_list(Req.Request.t() | Req.Response.t()) :: [{binary(), binary()}]
   def get_headers_list(%struct{headers: headers}) when struct in [Req.Request, Req.Response] do
     Req.Fields.get_list(headers)
+  end
+
+  @doc """
+  Assigns multiple values to request/response.
+
+  ## Examples
+
+      iex> req = Req.new()
+      iex> req.assigns
+      %{}
+      iex> req = Req.assign(req, a: 1, b: 2)
+      iex> req.assigns
+      %{a: 1, b: 2}
+  """
+  @doc since: "0.6.0"
+  @spec assign(req_or_resp, Enumerable.t()) :: req_or_resp
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def assign(%struct{} = req_or_resp, assigns) when struct in [Req.Request, Req.Response] do
+    update_in(req_or_resp.assigns, &Enum.into(assigns, &1))
+  end
+
+  @doc """
+  Assigns key/value to request/response.
+
+  ## Examples
+
+      iex> req = Req.new()
+      iex> req.assigns
+      %{}
+      iex> req = Req.assign(req, :a, 1)
+      iex> req.assigns
+      %{a: 1}
+  """
+  @doc since: "0.6.0"
+  @spec assign(req_or_resp, key :: atom(), value :: term()) :: req_or_resp
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def assign(%struct{} = req_or_resp, key, value)
+      when is_atom(key) and struct in [Req.Request, Req.Response] do
+    update_in(req_or_resp.assigns, &Map.put(&1, key, value))
+  end
+
+  @doc """
+  Assigns key/value to request/response unless key is already set.
+
+  ## Examples
+
+      iex> req = Req.new()
+      iex> req.assigns
+      %{}
+      iex> req = Req.assign_new(req, :a, 1)
+      iex> req.assigns
+      %{a: 1}
+      iex> req = Req.assign_new(req, :a, 2)
+      iex> req.assigns
+      %{a: 1}
+  """
+  @doc since: "0.6.0"
+  @spec assign_new(req_or_resp, key :: atom(), value :: term()) :: req_or_resp
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def assign_new(%struct{} = req_or_resp, key, value)
+      when is_atom(key) and struct in [Req.Request, Req.Response] do
+    update_in(req_or_resp.assigns, &Map.put_new(&1, key, value))
+  end
+
+  @doc """
+  Updates assign `key` in request/response with the given function.
+
+  Raises if the `key` is not set.
+
+  See also `update_assign/4`.
+
+  ## Examples
+
+      iex> req = Req.new(assigns: [a: 1])
+      iex> req = Req.update_assign(req, :a, & &1 * 2)
+      iex> req.assigns
+      %{a: 2}
+
+      iex> req = Req.new(assigns: [a: 1])
+      iex> Req.update_assign(req, :b, & &1 * 2)
+      ** (KeyError) key :b not found in: %{a: 1}
+  """
+  @doc since: "0.6.0"
+  @spec update_assign(req_or_resp, key :: atom(), (term() -> term())) :: req_or_resp
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def update_assign(%struct{} = req_or_resp, key, fun)
+      when struct in [Req.Request, Req.Response] and is_atom(key) and is_function(fun, 1) do
+    update_in(req_or_resp.assigns, &Map.update!(&1, key, fun))
+  end
+
+  @doc """
+  Updates assign `key` in request/response with the given function or `default`.
+
+  If `key` is present in assigns then the existing value is passed to fun and its
+  result is used as the updated value of `key`. If `key` is not present in assigns,
+  `default` is inserted as the value of `key`. The `default` value will not be passed
+  through the update function.
+
+  See also `update_assign/3`.
+
+  ## Examples
+
+      iex> req = Req.new(assigns: [a: 1])
+      iex> req = Req.update_assign(req, :a, & &1 * 2)
+      iex> req.assigns
+      %{a: 2}
+
+      iex> req = Req.new(assigns: [a: 1])
+      iex> req = Req.update_assign(req, :b, 1, & &1 * 2)
+      iex> req.assigns
+      %{a: 1, b: 1}
+  """
+  @doc since: "0.6.0"
+  @spec update_assign(req_or_resp, key :: atom(), default :: term(), (term() -> term())) ::
+          req_or_resp
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def update_assign(%struct{} = req_or_resp, key, default, fun)
+      when struct in [Req.Request, Req.Response] and is_atom(key) and is_function(fun, 1) do
+    update_in(req_or_resp.assigns, &Map.update(&1, key, default, fun))
   end
 
   # Plugins support is experimental and undocumented.
