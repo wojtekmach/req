@@ -2108,7 +2108,7 @@ defmodule Req.Steps do
       iex> delay = fn n -> trunc(Integer.pow(2, n) * 1000 * (1 - 0.1 * :rand.uniform())) end
       iex> Req.get!("https://httpbin.org/status/500,200", retry_delay: delay).status
       # 08:43:19.101 [warning] retry: got response with status 500, will retry in 941ms, 2 attempts left
-      # 08:43:22.958 [warning] retry: got response with status 500, will retry in 1877s, 1 attempt left
+      # 08:43:22.958 [warning] retry: got response with status 500, will retry in 1877ms, 1 attempt left
       200
 
   """
