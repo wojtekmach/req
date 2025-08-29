@@ -56,6 +56,7 @@ defmodule Req.Steps do
       :finch_private,
       :connect_options,
       :inet6,
+      :request_timeout,
       :receive_timeout,
       :pool_timeout,
       :unix_socket,
