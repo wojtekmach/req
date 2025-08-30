@@ -422,10 +422,13 @@ defmodule Req do
 
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
+    * `:request_timeout` - response timeout in milliseconds, defaults to `:infinity`.
+      See `Finch.request/3`.
+
     * `:unix_socket` - if set, connect through the given UNIX domain socket.
 
     * `:pool_max_idle_time` - the maximum number of milliseconds that a pool can be
-      idle before being terminated, used only by HTTP1 pools. Default to `:infinity`.
+      idle before being terminated, used only by HTTP1 pools. Defaults to `:infinity`.
 
     * `:finch_private` - a map or keyword list of private metadata to add to the Finch request. May be useful
       for adding custom data when handling telemetry with `Finch.Telemetry`.
