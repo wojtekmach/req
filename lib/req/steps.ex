@@ -801,6 +801,9 @@ defmodule Req.Steps do
 
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
+    * `:request_timeout` - response timeout in milliseconds, defaults to `:infinity`.
+      See `Finch.request/3`.
+
     * `:unix_socket` - if set, connect through the given UNIX domain socket.
 
     * `:pool_max_idle_time` - the maximum number of milliseconds that a pool can be
