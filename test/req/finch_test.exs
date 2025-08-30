@@ -78,6 +78,25 @@ defmodule Req.FinchTest do
       assert_received :ping
     end
 
+    test ":request_timeout" do
+      pid = self()
+
+      %{url: url} =
+        start_tcp_server(fn socket ->
+          assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
+          send(pid, :ping)
+          body = "ok"
+          resp_header = "HTTP/1.1 200 OK\r\ncontent-length: #{byte_size(body)}\r\n\r\n"
+          :ok = :gen_tcp.send(socket, resp_header)
+          Process.sleep(100)
+          :ok = :gen_tcp.send(socket, body)
+        end)
+
+      req = Req.new(url: url, request_timeout: 0, retry: false)
+      assert {:error, %Req.TransportError{reason: :timeout}} = Req.request(req)
+      assert_received :ping
+    end
+
     test "Req.HTTPError" do
       %{url: url} =
         start_tcp_server(fn socket ->
