@@ -247,9 +247,9 @@ defmodule Req.Response do
   end
 
   defp retry_delay_in_ms(delay_value) do
-    case Integer.parse(delay_value) do
+    case Float.parse(delay_value) do
       {seconds, ""} ->
-        :timer.seconds(seconds)
+        round(:timer.seconds(seconds))
 
       :error ->
         delay_value
