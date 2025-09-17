@@ -1286,6 +1286,9 @@ defmodule Req.Steps do
 
         * `:datetime` - the request datetime, defaults to `DateTime.utc_now(:second)`.
 
+      Additionally, it can be an `{mod, fun, args}` tuple that returns the above
+      options.
+
   ## Examples
 
       iex> req =
@@ -1316,20 +1319,8 @@ defmodule Req.Steps do
   def put_aws_sigv4(request) do
     if aws_options = request.options[:aws_sigv4] do
       aws_options =
-        case aws_options do
-          list when is_list(list) ->
-            list
-
-          map when is_map(map) ->
-            Enum.to_list(map)
-
-          other ->
-            raise ArgumentError,
-                  ":aws_sigv4 must be a keywords list or a map, got: #{inspect(other)}"
-        end
-
-      aws_options =
         aws_options
+        |> parse_aws_sigv4_options()
         |> Keyword.put_new(:region, "us-east-1")
         |> Keyword.put_new(:datetime, DateTime.utc_now())
         # aws_credentials returns this key so let's ignore it
@@ -1391,6 +1382,25 @@ defmodule Req.Steps do
       Req.merge(request, headers: headers)
     else
       request
+    end
+  end
+
+  defp parse_aws_sigv4_options(aws_options) do
+    case aws_options do
+      list when is_list(list) ->
+        list
+
+      map when is_map(map) ->
+        Enum.to_list(map)
+
+      {mod, fun, args} when is_atom(mod) and is_atom(fun) and is_list(args) ->
+        mod
+        |> apply(fun, args)
+        |> parse_aws_sigv4_options()
+
+      other ->
+        raise ArgumentError,
+              ":aws_sigv4 must be a keywords list or a map, got: #{inspect(other)}"
     end
   end
 

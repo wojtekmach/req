@@ -543,6 +543,8 @@ defmodule Req.StepsTest do
   end
 
   describe "put_aws_sigv4" do
+    def reflect_sigv4_options(opts), do: opts
+
     test "body: binary" do
       plug = fn conn ->
         assert {:ok, "hello", conn} = Plug.Conn.read_body(conn)
@@ -554,10 +556,10 @@ defmodule Req.StepsTest do
       req =
         Req.new(
           url: "https://s3.amazonaws.com",
-          aws_sigv4: [
-            access_key_id: "foo",
-            secret_access_key: "bar"
-          ],
+          # Test mfa tuple
+          aws_sigv4:
+            {__MODULE__, :reflect_sigv4_options,
+             [[access_key_id: "foo", secret_access_key: "bar"]]},
           body: "hello",
           plug: plug
         )
