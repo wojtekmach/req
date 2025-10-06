@@ -207,8 +207,6 @@ end
 defmodule Req.HttpcTest do
   use ExUnit.Case, async: true
 
-  require Logger
-
   # TODO
   @moduletag :skip
 

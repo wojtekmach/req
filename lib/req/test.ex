@@ -164,8 +164,6 @@ defmodule Req.Test do
 
   """
 
-  require Logger
-
   @typep name() :: term()
 
   if Code.ensure_loaded?(Plug.Conn) do
@@ -222,6 +220,8 @@ defmodule Req.Test do
     end
   else
     def json(_conn, _data) do
+      require Logger
+
       Logger.error("""
       Could not find plug dependency.
 
@@ -257,6 +257,8 @@ defmodule Req.Test do
     end
   else
     def html(_conn, _data) do
+      require Logger
+
       Logger.error("""
       Could not find plug dependency.
 
@@ -292,6 +294,8 @@ defmodule Req.Test do
     end
   else
     def text(_conn, _data) do
+      require Logger
+
       Logger.error("""
       Could not find plug dependency.
 
@@ -381,6 +385,8 @@ defmodule Req.Test do
     end
   else
     def redirect(_conn, _opts) do
+      require Logger
+
       Logger.error("""
       Could not find plug dependency.
 
@@ -439,6 +445,8 @@ defmodule Req.Test do
     end
   else
     def transport_error(_conn, _reason) do
+      require Logger
+
       Logger.error("""
       Could not find plug dependency.
 
@@ -771,6 +779,8 @@ defmodule Req.Test do
     end
   else
     def raw_body(_conn) do
+      require Logger
+
       Logger.error("""
       Could not find plug dependency.
 

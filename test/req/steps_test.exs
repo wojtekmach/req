@@ -1,7 +1,6 @@
 defmodule Req.StepsTest do
   use ExUnit.Case, async: true
   import TestHelper, only: [start_http_server: 1, start_tcp_server: 1]
-  require Logger
 
   setup do
     bypass = Bypass.open()
