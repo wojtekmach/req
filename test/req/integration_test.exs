@@ -42,7 +42,8 @@ defmodule Req.IntegrationTest do
       put_range: 1,
       cache: 1,
       decompress_body: 1,
-      handle_http_errors: 1
+      handle_http_errors: 1,
+      expect: 1
     ]
 
   @tag :s3
