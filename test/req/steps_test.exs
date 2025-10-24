@@ -90,6 +90,28 @@ defmodule Req.StepsTest do
       assert Req.Request.get_header(req, "authorization") == ["Bearer abcd"]
     end
 
+    test "digest" do
+      req = Req.new(auth: {:digest, "foo:bar"}) |> Req.Request.prepare()
+
+      assert Req.Request.get_option(req, :http_digest) == [
+               username: "foo",
+               password: "bar",
+               count: 1
+             ]
+    end
+
+    test "digest with client provided count" do
+      count = :rand.uniform(1000)
+
+      req = Req.new(auth: {:digest, "foo:bar", count}) |> Req.Request.prepare()
+
+      assert Req.Request.get_option(req, :http_digest) == [
+               username: "foo",
+               password: "bar",
+               count: count
+             ]
+    end
+
     @tag :tmp_dir
     test ":netrc", c do
       %{url: url} =
@@ -538,6 +560,230 @@ defmodule Req.StepsTest do
       assert_raise ArgumentError, ":checksum cannot be used with `into: :self`", fn ->
         Req.get!(req, checksum: @foo_sha1)
       end
+    end
+  end
+
+  describe "http_digest" do
+    test "md5 challenge" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          case Plug.Conn.get_req_header(conn, "authorization") do
+            [] ->
+              conn
+              |> Plug.Conn.put_resp_header(
+                "www-authenticate",
+                ~s|Digest realm="test", nonce="1234567890"|
+              )
+              |> Plug.Conn.send_resp(401, "Unauthorized")
+
+            [authorization | _] ->
+              has_expected_header? =
+                String.starts_with?(authorization, "Digest ") and
+                  authorization =~ ~r/username="foo"/ and
+                  authorization =~ ~r/realm="test"/ and
+                  authorization =~ ~r/nonce="1234567890"/ and
+                  authorization =~ ~r/uri="\/"/ and
+                  authorization =~ ~r/response="402359218de50d24c1c39d8c3c41a0c4"/
+
+              if has_expected_header? do
+                Plug.Conn.send_resp(conn, 200, "OK")
+              else
+                Plug.Conn.send_resp(conn, 401, "Unauthorized")
+              end
+          end
+        end)
+
+      req = Req.new(url: url)
+
+      resp = Req.get!(req, http_digest: [username: "foo", password: "bar"])
+      assert resp.status == 200
+    end
+
+    test "sha-256 challenge" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          case Plug.Conn.get_req_header(conn, "authorization") do
+            [] ->
+              conn
+              |> Plug.Conn.put_resp_header(
+                "www-authenticate",
+                ~s|Digest realm="test", nonce="1234567890", algorithm=SHA-256|
+              )
+              |> Plug.Conn.send_resp(401, "Unauthorized")
+
+            [authorization | _] ->
+              has_expected_header? =
+                String.starts_with?(authorization, "Digest ") and
+                  authorization =~ ~r/username="foo"/ and
+                  authorization =~ ~r/realm="test"/ and
+                  authorization =~ ~r/nonce="1234567890"/ and
+                  authorization =~ ~r/uri="\/"/ and
+                  authorization =~
+                    ~r/response="79fbcaf8e746ff152ab381f928ee1f5875ef3dab475937cd7a6f2a34c0941021\"/
+
+              if has_expected_header? do
+                Plug.Conn.send_resp(conn, 200, "OK")
+              else
+                Plug.Conn.send_resp(conn, 401, "Unauthorized")
+              end
+          end
+        end)
+
+      req = Req.new(url: url)
+
+      resp = Req.get!(req, http_digest: [username: "foo", password: "bar"])
+      assert resp.status == 200
+    end
+
+    test "no challenge" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 401, "Unauthorized")
+        end)
+
+      req = Req.new(url: url)
+
+      resp = Req.get!(req, http_digest: [username: "foo", password: "bar"])
+      assert resp.status == 401
+    end
+
+    test "quoted values and paths" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          case Plug.Conn.get_req_header(conn, "authorization") do
+            [] ->
+              conn
+              |> Plug.Conn.put_resp_header(
+                "www-authenticate",
+                ~s|Digest realm="test \\"realm\\"", nonce="1234567890"|
+              )
+              |> Plug.Conn.send_resp(401, "Unauthorized")
+
+            [authorization | _] ->
+              has_expected_header? =
+                String.starts_with?(authorization, "Digest ") and
+                  authorization =~ ~r/username="foo \\"bar\\""/ and
+                  authorization =~ ~r/realm="test \\"realm\\""/ and
+                  authorization =~ ~r/nonce="1234567890"/ and
+                  authorization =~ ~r/uri="\/some\/path"/ and
+                  authorization =~ ~r/response="872e1593ea4d45f4d0a099614a6b9632\"/
+
+              if has_expected_header? do
+                Plug.Conn.send_resp(conn, 200, "OK")
+              else
+                Plug.Conn.send_resp(conn, 401, "Unauthorized")
+              end
+          end
+        end)
+
+      req = Req.new(url: %URI{url | path: "/some/path"})
+
+      resp = Req.get!(req, http_digest: [username: "foo \"bar\"", password: "bar"])
+      assert resp.status == 200
+    end
+
+    test "with qop" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          case Plug.Conn.get_req_header(conn, "authorization") do
+            [] ->
+              conn
+              |> Plug.Conn.put_resp_header(
+                "www-authenticate",
+                ~s|Digest realm="test", nonce="1234567890", qop="auth"|
+              )
+              |> Plug.Conn.send_resp(401, "Unauthorized")
+
+            [authorization | _] ->
+              # Calculate expected response using cnonce
+              cnonce = ~r/cnonce="([a-f0-9]+)"/ |> Regex.run(authorization) |> Enum.at(1)
+
+              ha1 = :crypto.hash(:md5, "foo:test:bar") |> Base.encode16(case: :lower)
+              ha2 = :crypto.hash(:md5, "GET:/") |> Base.encode16(case: :lower)
+
+              expected_response =
+                :crypto.hash(
+                  :md5,
+                  # Response is calculated by hash_func(ha1:nonce:nc:cnonce:qop:ha2)
+                  "#{ha1}:1234567890:00000001:#{cnonce}:auth:#{ha2}"
+                )
+                |> Base.encode16(case: :lower)
+
+              has_expected_header? =
+                String.starts_with?(authorization, "Digest ") and
+                  authorization =~ ~r/username="foo"/ and
+                  authorization =~ ~r/realm="test"/ and
+                  authorization =~ ~r/nonce="1234567890"/ and
+                  authorization =~ ~r/uri="\/"/ and
+                  authorization =~ ~r/response="#{expected_response}"/ and
+                  authorization =~ ~r/qop=auth/ and
+                  authorization =~ ~r/nc=00000001/ and
+                  authorization =~ ~r/cnonce="#{cnonce}"/
+
+              if has_expected_header? do
+                Plug.Conn.send_resp(conn, 200, "OK")
+              else
+                Plug.Conn.send_resp(conn, 401, "Unauthorized")
+              end
+          end
+        end)
+
+      req = Req.new(url: url)
+
+      resp = Req.get!(req, http_digest: [username: "foo", password: "bar"])
+      assert resp.status == 200
+    end
+
+    test "with session" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          case Plug.Conn.get_req_header(conn, "authorization") do
+            [] ->
+              conn
+              |> Plug.Conn.put_resp_header(
+                "www-authenticate",
+                ~s|Digest realm="test", nonce="1234567890", algorithm=MD5-SESS|
+              )
+              |> Plug.Conn.send_resp(401, "Unauthorized")
+
+            [authorization | _] ->
+              # Calculate expected response using cnonce
+              cnonce = ~r/cnonce="([a-f0-9]+)"/ |> Regex.run(authorization) |> Enum.at(1)
+              ha1 = :crypto.hash(:md5, "foo:test:bar") |> Base.encode16(case: :lower)
+
+              ha1 =
+                :crypto.hash(:md5, "#{ha1}:1234567890:#{cnonce}") |> Base.encode16(case: :lower)
+
+              ha2 = :crypto.hash(:md5, "GET:/") |> Base.encode16(case: :lower)
+
+              expected_response =
+                :crypto.hash(
+                  :md5,
+                  "#{ha1}:1234567890:#{ha2}"
+                )
+                |> Base.encode16(case: :lower)
+
+              has_expected_header? =
+                String.starts_with?(authorization, "Digest ") and
+                  authorization =~ ~r/username="foo"/ and
+                  authorization =~ ~r/realm="test"/ and
+                  authorization =~ ~r/nonce="1234567890"/ and
+                  authorization =~ ~r/uri="\/"/ and
+                  authorization =~ ~r/response="#{expected_response}"/ and
+                  authorization =~ ~r/cnonce="#{cnonce}"/
+
+              if has_expected_header? do
+                Plug.Conn.send_resp(conn, 200, "OK")
+              else
+                Plug.Conn.send_resp(conn, 401, "Unauthorized")
+              end
+          end
+        end)
+
+      req = Req.new(url: url)
+
+      resp = Req.get!(req, http_digest: [username: "foo", password: "bar"])
+      assert resp.status == 200
     end
   end
 

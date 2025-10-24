@@ -38,6 +38,7 @@ defmodule Req.Steps do
       # response steps
       :raw,
       :http_errors,
+      :http_digest,
       :decode_body,
       :decode_json,
       :redirect,
@@ -2245,7 +2246,7 @@ defmodule Req.Steps do
   defp build_auth_header(opts) do
     header_parts =
       opts
-      |> Keyword.take([:username, :realm, :nonce, :uri, :response, :algorithm, :opaque])
+      |> Keyword.take([:username, :realm, :nonce, :uri, :response, :opaque])
       |> Enum.filter(&is_binary(elem(&1, 1)))
 
     qop_parts =
@@ -2253,9 +2254,17 @@ defmodule Req.Steps do
         Keyword.take(opts, [:qop, :nc, :cnonce])
       end
 
+    algorithm_parts =
+      if opts[:algorithm] |> String.upcase() |> String.ends_with?("-SESS") do
+        Keyword.take(opts, [:algorithm, :cnonce])
+      else
+        Keyword.take(opts, [:algorithm])
+      end
+
     header =
       header_parts
       |> Keyword.merge(qop_parts || [])
+      |> Keyword.merge(algorithm_parts || [])
       |> Enum.map_join(", ", &encode_header_part/1)
 
     {:ok, "Digest #{header}"}
