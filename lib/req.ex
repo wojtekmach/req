@@ -228,6 +228,10 @@ defmodule Req do
 
         * `{:bearer, token}` - uses Bearer HTTP authentication.
 
+        * `{:digest, userinfo}` - uses Digest HTTP authentication, uses nonce counter of 1.
+
+        * `{:digest, userinfo, count}` - uses Digest HTTP authentication with a custom nonce counter.
+
         * `:netrc` - load credentials from the default .netrc file.
 
         * `{:netrc, path}` - load credentials from `path`.

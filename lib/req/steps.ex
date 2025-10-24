@@ -2113,10 +2113,9 @@ defmodule Req.Steps do
   def handle_http_digest(other), do: other
 
   defp handle_challenge_reply(request, response, opts) do
-    opts = Keyword.validate!(opts, [:username, :password, count: 1])
-    username = Keyword.fetch!(opts, :username)
-    password = Keyword.fetch!(opts, :password)
-    count = Keyword.fetch!(opts, :count)
+    username = Keyword.get(opts, :username, "")
+    password = Keyword.get(opts, :password, "")
+    count = Keyword.get(opts, :count, 1)
 
     case get_challenge_header(response) do
       {:ok, auth_header} ->
