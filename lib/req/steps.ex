@@ -2093,7 +2093,7 @@ defmodule Req.Steps do
   ## Examples
 
       iex> Req.get!("https://httpbin.org/digest-auth/auth/user/pass", http_digest: [username: "user", password: "pass"])
-      {:ok, %Req.Response{status: 200, body: "OK"}}
+      {:ok, %Req.Response{status: 200, body: %{"authenticated" => true, "user" => "user"}}}
   """
   @doc step: :response
   def handle_http_digest({request, %Req.Response{status: 401} = response}) do
