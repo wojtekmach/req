@@ -2263,7 +2263,7 @@ defmodule Req.Steps do
     header =
       header_parts
       |> Keyword.merge(qop_parts || [])
-      |> Keyword.merge(algorithm_parts || [])
+      |> Keyword.merge(algorithm_parts)
       |> Enum.map_join(", ", &encode_header_part/1)
 
     {:ok, "Digest #{header}"}
