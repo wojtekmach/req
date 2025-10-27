@@ -93,10 +93,8 @@ defmodule Req.StepsTest do
     test "digest" do
       req = Req.new(auth: {:digest, "foo:bar"}) |> Req.Request.prepare()
 
-      assert Req.Request.get_private(req, :http_digest_credentials) == %{
-               username: "foo",
-               password: "bar"
-             }
+      # Does not apply authorization header until after the pre-authorized request is made
+      assert Req.Request.get_header(req, "authorization") == []
     end
 
     @tag :tmp_dir
@@ -632,6 +630,28 @@ defmodule Req.StepsTest do
 
       resp = Req.get!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 401
+    end
+
+    @tag :capture_log
+    test "unsupported digest algorithm" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          conn
+          |> Plug.Conn.put_resp_header(
+            "www-authenticate",
+            ~s|Digest realm="test", nonce="1234567890", algorithm=UNSUPPORTED|
+          )
+          |> Plug.Conn.send_resp(401, "Unauthorized")
+        end)
+
+      req = Req.new(url: url)
+
+      resp = Req.get!(req, auth: {:digest, "foo:bar"})
+      assert resp.status == 401
+
+      assert Req.Response.get_header(resp, "www-authenticate") == [
+               ~s|Digest realm="test", nonce="1234567890", algorithm=UNSUPPORTED|
+             ]
     end
 
     test "quoted values and paths" do

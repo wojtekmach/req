@@ -38,7 +38,6 @@ defmodule Req.Steps do
       # response steps
       :raw,
       :http_errors,
-      :http_digest,
       :decode_body,
       :decode_json,
       :redirect,
@@ -238,7 +237,7 @@ defmodule Req.Steps do
   end
 
   defp auth(request, {:digest, userinfo}) when is_binary(userinfo) do
-    authenticate_with_digest(request, userinfo)
+    request
   end
 
   defp auth(request, fun) when is_function(fun, 0) do
@@ -270,15 +269,6 @@ defmodule Req.Steps do
       "authorization",
       "Basic " <> Base.encode64("#{username}:#{password}")
     )
-  end
-
-  defp authenticate_with_digest(request, userinfo) do
-    [username, password] = String.split(userinfo, ":", parts: 2)
-
-    Req.Request.put_private(request, :http_digest_credentials, %{
-      username: username,
-      password: password
-    })
   end
 
   defp authenticate_with_netrc(request, path_or_device) do
@@ -2081,24 +2071,22 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> Req.get!("https://httpbin.org/digest-auth/auth/user/pass", auth: {:digest, "user:pass"}])
+      iex> Req.get!("https://httpbin.org/digest-auth/auth/user/pass", auth: {:digest, "user:pass"})
       {:ok, %Req.Response{status: 200, body: %{"authenticated" => true, "user" => "user"}}}
   """
   @doc step: :response
   def handle_http_digest({request, %Req.Response{status: 401} = response}) do
-    case Req.Request.get_private(request, :http_digest_credentials) do
-      nil ->
-        {request, response}
+    case request.options[:auth] do
+      {:digest, userinfo} when is_binary(userinfo) ->
+        [username, password] = String.split(userinfo, ":", parts: 2)
 
-      credentials when is_map(credentials) ->
-        if Req.Request.get_private(request, :http_digest_attempted, false) do
-          {request, response}
-        else
-          handle_challenge_reply(request, response,
-            username: credentials.username,
-            password: credentials.password
-          )
-        end
+        handle_challenge_reply(request, response,
+          username: username,
+          password: password
+        )
+
+      _ ->
+        {request, response}
     end
   end
 
@@ -2119,10 +2107,10 @@ defmodule Req.Steps do
           {:ok, auth_header_value} ->
             request
             |> Req.Request.put_header("authorization", auth_header_value)
-            |> Req.Request.put_private(:http_digest_attempted, true)
             |> Req.Request.run_request()
 
-          {:error, _reason} ->
+          {:error, {:unsupported_digest_algorithm, algorithm}} ->
+            Logger.warning("unsupported digest algorithm sent by the server: #{algorithm}")
             {request, response}
         end
 
@@ -2227,9 +2215,11 @@ defmodule Req.Steps do
 
   def hash_function(algorithm) do
     case String.upcase(algorithm) do
-      "MD5" <> _ -> {:ok, &md5_hash/1}
-      "SHA-256" <> _ -> {:ok, &sha256_hash/1}
-      _ -> {:error, :unsupported_digest_algorithm}
+      "MD5" -> {:ok, &md5_hash/1}
+      "MD5-SESS" -> {:ok, &md5_hash/1}
+      "SHA-256" -> {:ok, &sha256_hash/1}
+      "SHA-256-SESS" -> {:ok, &sha256_hash/1}
+      _ -> {:error, {:unsupported_digest_algorithm, algorithm}}
     end
   end
 
