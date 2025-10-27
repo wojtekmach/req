@@ -182,6 +182,8 @@ defmodule Req.Steps do
 
         * `{:bearer, token}` - uses Bearer HTTP authentication;
 
+        * `{:digest, userinfo}` - uses Digest HTTP authentication;
+
         * `:netrc` - load credentials from `.netrc` at path specified in `NETRC` environment variable.
           If `NETRC` is not set, load `.netrc` in user's home directory;
 
@@ -235,10 +237,6 @@ defmodule Req.Steps do
     Req.Request.put_header(request, "authorization", "Bearer " <> token)
   end
 
-  defp auth(request, {:digest, userinfo, count}) when is_binary(userinfo) and is_integer(count) do
-    authenticate_with_digest(request, userinfo, count)
-  end
-
   defp auth(request, {:digest, userinfo}) when is_binary(userinfo) do
     authenticate_with_digest(request, userinfo)
   end
@@ -274,14 +272,13 @@ defmodule Req.Steps do
     )
   end
 
-  defp authenticate_with_digest(request, userinfo, count \\ 1) do
+  defp authenticate_with_digest(request, userinfo) do
     [username, password] = String.split(userinfo, ":", parts: 2)
 
-    Req.Request.put_option(request, :http_digest,
+    Req.Request.put_private(request, :http_digest_credentials, %{
       username: username,
-      password: password,
-      count: count
-    )
+      password: password
+    })
   end
 
   defp authenticate_with_netrc(request, path_or_device) do
@@ -2080,32 +2077,27 @@ defmodule Req.Steps do
   end
 
   @doc """
-  Handles HTTP Digest authentication.
-
-  ## Request Options
-
-    * `:http_digest` - a keyword list with the following keys:
-
-      * `:username` - the username to use for authentication
-      * `:password` - the password to use for authentication
-      * `:count` - the count to use for authentication
+  Handles HTTP Digest authentication when auth is provided as `{:digest, userinfo}`
 
   ## Examples
 
-      iex> Req.get!("https://httpbin.org/digest-auth/auth/user/pass", http_digest: [username: "user", password: "pass"])
+      iex> Req.get!("https://httpbin.org/digest-auth/auth/user/pass", auth: {:digest, "user:pass"}])
       {:ok, %Req.Response{status: 200, body: %{"authenticated" => true, "user" => "user"}}}
   """
   @doc step: :response
   def handle_http_digest({request, %Req.Response{status: 401} = response}) do
-    case request.options[:http_digest] do
+    case Req.Request.get_private(request, :http_digest_credentials) do
       nil ->
         {request, response}
 
-      opts when is_list(opts) ->
-        if request.private[:http_digest_attempted] do
+      credentials when is_map(credentials) ->
+        if Req.Request.get_private(request, :http_digest_attempted, false) do
           {request, response}
         else
-          handle_challenge_reply(request, response, opts)
+          handle_challenge_reply(request, response,
+            username: credentials.username,
+            password: credentials.password
+          )
         end
     end
   end

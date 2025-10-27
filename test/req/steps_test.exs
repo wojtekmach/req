@@ -93,23 +93,10 @@ defmodule Req.StepsTest do
     test "digest" do
       req = Req.new(auth: {:digest, "foo:bar"}) |> Req.Request.prepare()
 
-      assert Req.Request.get_option(req, :http_digest) == [
+      assert Req.Request.get_private(req, :http_digest_credentials) == %{
                username: "foo",
-               password: "bar",
-               count: 1
-             ]
-    end
-
-    test "digest with client provided count" do
-      count = :rand.uniform(1000)
-
-      req = Req.new(auth: {:digest, "foo:bar", count}) |> Req.Request.prepare()
-
-      assert Req.Request.get_option(req, :http_digest) == [
-               username: "foo",
-               password: "bar",
-               count: count
-             ]
+               password: "bar"
+             }
     end
 
     @tag :tmp_dir
@@ -595,7 +582,7 @@ defmodule Req.StepsTest do
 
       req = Req.new(url: url)
 
-      resp = Req.get!(req, http_digest: [username: "foo", password: "bar"])
+      resp = Req.get!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 200
     end
 
@@ -631,7 +618,7 @@ defmodule Req.StepsTest do
 
       req = Req.new(url: url)
 
-      resp = Req.get!(req, http_digest: [username: "foo", password: "bar"])
+      resp = Req.get!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 200
     end
 
@@ -643,7 +630,7 @@ defmodule Req.StepsTest do
 
       req = Req.new(url: url)
 
-      resp = Req.get!(req, http_digest: [username: "foo", password: "bar"])
+      resp = Req.get!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 401
     end
 
@@ -678,7 +665,7 @@ defmodule Req.StepsTest do
 
       req = Req.new(url: %URI{url | path: "/some/path"})
 
-      resp = Req.get!(req, http_digest: [username: "foo \"bar\"", password: "bar"])
+      resp = Req.get!(req, auth: {:digest, "foo \"bar\":bar"})
       assert resp.status == 200
     end
 
@@ -730,7 +717,7 @@ defmodule Req.StepsTest do
 
       req = Req.new(url: url)
 
-      resp = Req.get!(req, http_digest: [username: "foo", password: "bar"])
+      resp = Req.get!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 200
     end
 
@@ -782,7 +769,7 @@ defmodule Req.StepsTest do
 
       req = Req.new(url: url)
 
-      resp = Req.get!(req, http_digest: [username: "foo", password: "bar"])
+      resp = Req.get!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 200
     end
   end
