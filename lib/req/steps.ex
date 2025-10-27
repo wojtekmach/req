@@ -2237,20 +2237,35 @@ defmodule Req.Steps do
     case String.upcase(algorithm) do
       "MD5" <> _ -> {:ok, &md5_hash/1}
       "SHA-256" <> _ -> {:ok, &sha256_hash/1}
-      # TODO: Add support for SHA-512-256
       _ -> {:error, :unsupported_digest_algorithm}
     end
   end
 
   defp build_auth_header(opts) do
-    header_parts =
-      opts
-      |> Keyword.take([:username, :realm, :nonce, :uri, :response, :opaque])
-      |> Enum.filter(&is_binary(elem(&1, 1)))
+    opts =
+      Keyword.validate!(opts, [
+        :username,
+        :realm,
+        :nonce,
+        :uri,
+        :response,
+        :nc,
+        :cnonce,
+        :algorithm,
+        opaque: nil,
+        qop: nil
+      ])
+
+    header_parts = Keyword.take(opts, [:username, :realm, :nonce, :uri, :response])
 
     qop_parts =
-      if opts[:qop] do
+      if is_binary(opts[:qop]) do
         Keyword.take(opts, [:qop, :nc, :cnonce])
+      end
+
+    opaque_part =
+      if is_binary(opts[:opaque]) do
+        Keyword.take(opts, [:opaque])
       end
 
     algorithm_parts =
@@ -2263,6 +2278,7 @@ defmodule Req.Steps do
     header =
       header_parts
       |> Keyword.merge(qop_parts || [])
+      |> Keyword.merge(opaque_part || [])
       |> Keyword.merge(algorithm_parts)
       |> Enum.map_join(", ", &encode_header_part/1)
 
