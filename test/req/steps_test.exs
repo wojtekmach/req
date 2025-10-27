@@ -654,6 +654,23 @@ defmodule Req.StepsTest do
              ]
     end
 
+    test "unauthorized after challenge" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          conn
+          |> Plug.Conn.put_resp_header(
+            "www-authenticate",
+            ~s|Digest realm="test", nonce="1234567890", algorithm=MD5|
+          )
+          |> Plug.Conn.send_resp(401, "Unauthorized")
+        end)
+
+      req = Req.new(url: url)
+
+      resp = Req.get!(req, auth: {:digest, "foo:bar"})
+      assert resp.status == 401
+    end
+
     test "quoted values and paths" do
       %{url: url} =
         start_http_server(fn conn ->

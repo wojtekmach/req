@@ -2106,6 +2106,7 @@ defmodule Req.Steps do
         case generate_auth_header(challenge, username, password, method, uri, count) do
           {:ok, auth_header_value} ->
             request
+            |> Req.Request.delete_option(:auth)
             |> Req.Request.put_header("authorization", auth_header_value)
             |> Req.Request.run_request()
 
