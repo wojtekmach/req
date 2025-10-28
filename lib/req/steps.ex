@@ -179,9 +179,9 @@ defmodule Req.Steps do
 
         * `{:basic, userinfo}` - uses Basic HTTP authentication;
 
-        * `{:bearer, token}` - uses Bearer HTTP authentication;
-
         * `{:digest, userinfo}` - uses Digest HTTP authentication;
+
+        * `{:bearer, token}` - uses Bearer HTTP authentication;
 
         * `:netrc` - load credentials from `.netrc` at path specified in `NETRC` environment variable.
           If `NETRC` is not set, load `.netrc` in user's home directory;
@@ -197,6 +197,9 @@ defmodule Req.Steps do
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:basic, "foo:bar"}).status
       200
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: fn -> {:basic, "foo:bar"} end).status
+      200
+
+      iex> Req.get!("https://httpbin.org/digest-auth/auth/user/pass", auth: {:digest, "user:pass"}).status
       200
 
       iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, ""}).status
