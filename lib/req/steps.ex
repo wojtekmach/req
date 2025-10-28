@@ -2101,7 +2101,7 @@ defmodule Req.Steps do
       {:ok, auth_header} ->
         challenge = parse_challenge(auth_header)
         method = request.method || :get
-        uri = URI.parse(request.url).path || "/"
+        uri = request.url.path || "/"
 
         case generate_auth_header(challenge, username, password, method, uri, count) do
           {:ok, auth_header_value} ->
