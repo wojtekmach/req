@@ -2161,11 +2161,11 @@ defmodule Req.Steps do
     cnonce = generate_cnonce()
     nc = count_to_nc(count)
 
-    with {:ok, hash_func} <- hash_function(algorithm) do
+    with {:ok, hash_func, sess?} <- hash_function(algorithm) do
       ha1 = hash_func.("#{username}:#{realm}:#{password}")
 
       ha1 =
-        if algorithm |> String.upcase() |> String.ends_with?("-SESS") do
+        if sess? do
           hash_func.("#{ha1}:#{nonce}:#{cnonce}")
         else
           ha1
@@ -2214,12 +2214,12 @@ defmodule Req.Steps do
     |> Base.encode16(case: :lower)
   end
 
-  def hash_function(algorithm) do
+  defp hash_function(algorithm) do
     case String.upcase(algorithm) do
-      "MD5" -> {:ok, &md5_hash/1}
-      "MD5-SESS" -> {:ok, &md5_hash/1}
-      "SHA-256" -> {:ok, &sha256_hash/1}
-      "SHA-256-SESS" -> {:ok, &sha256_hash/1}
+      "MD5" -> {:ok, &md5_hash/1, false}
+      "MD5-SESS" -> {:ok, &md5_hash/1, true}
+      "SHA-256" -> {:ok, &sha256_hash/1, false}
+      "SHA-256-SESS" -> {:ok, &sha256_hash/1, true}
       _ -> {:error, {:unsupported_digest_algorithm, algorithm}}
     end
   end
