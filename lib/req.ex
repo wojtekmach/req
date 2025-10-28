@@ -226,6 +226,8 @@ defmodule Req do
 
         * `{:basic, userinfo}` - uses Basic HTTP authentication.
 
+        * `{:digest, userinfo}` - uses Digest HTTP authentication.
+
         * `{:bearer, token}` - uses Bearer HTTP authentication.
 
         * `:netrc` - load credentials from the default .netrc file.

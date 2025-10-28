@@ -86,6 +86,7 @@ defmodule Req.Steps do
       retry: &Req.Steps.retry/1,
       handle_http_errors: &Req.Steps.handle_http_errors/1,
       redirect: &Req.Steps.redirect/1,
+      http_digest: &Req.Steps.handle_http_digest/1,
       decompress_body: &Req.Steps.decompress_body/1,
       verify_checksum: &Req.Steps.verify_checksum/1,
       decode_body: &Req.Steps.decode_body/1,
@@ -178,6 +179,8 @@ defmodule Req.Steps do
 
         * `{:basic, userinfo}` - uses Basic HTTP authentication;
 
+        * `{:digest, userinfo}` - uses Digest HTTP authentication;
+
         * `{:bearer, token}` - uses Bearer HTTP authentication;
 
         * `:netrc` - load credentials from `.netrc` at path specified in `NETRC` environment variable.
@@ -194,6 +197,9 @@ defmodule Req.Steps do
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:basic, "foo:bar"}).status
       200
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: fn -> {:basic, "foo:bar"} end).status
+      200
+
+      iex> Req.get!("https://httpbin.org/digest-auth/auth/user/pass", auth: {:digest, "user:pass"}).status
       200
 
       iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, ""}).status
@@ -231,6 +237,10 @@ defmodule Req.Steps do
 
   defp auth(request, {:bearer, token}) when is_binary(token) do
     Req.Request.put_header(request, "authorization", "Bearer " <> token)
+  end
+
+  defp auth(request, {:digest, userinfo}) when is_binary(userinfo) do
+    request
   end
 
   defp auth(request, fun) when is_function(fun, 0) do
@@ -2057,6 +2067,237 @@ defmodule Req.Steps do
 
   def handle_http_errors({request, response}) do
     {request, response}
+  end
+
+  @doc """
+  Handles HTTP Digest authentication.
+
+  This step is invoked when setting `:auth` option with `{:digest, ...}`. When response is HTTP 401 with `www-authenticate` header, this step will calculate `authorization: Digest ...` header and make another request.
+
+  See `auth/1`.
+
+  ## Examples
+
+      iex> resp = Req.get!("https://httpbin.org/digest-auth/auth/user/pass", auth: {:digest, "user:pass"})
+      iex> resp.status
+      200
+  """
+  @doc step: :response
+  def handle_http_digest({request, %Req.Response{status: 401} = response}) do
+    case request.options[:auth] do
+      {:digest, userinfo} ->
+        [username, password] = String.split(userinfo, ":", parts: 2)
+
+        handle_challenge_reply(request, response,
+          username: username,
+          password: password
+        )
+
+      _ ->
+        {request, response}
+    end
+  end
+
+  def handle_http_digest(other), do: other
+
+  defp handle_challenge_reply(request, response, opts) do
+    username = Keyword.get(opts, :username, "")
+    password = Keyword.get(opts, :password, "")
+    count = Keyword.get(opts, :count, 1)
+
+    case get_challenge_header(response) do
+      {:ok, auth_header} ->
+        challenge = parse_challenge(auth_header)
+        method = request.method || :get
+        uri = request.url.path || "/"
+
+        case generate_auth_header(challenge, username, password, method, uri, count) do
+          {:ok, auth_header_value} ->
+            request
+            |> Req.Request.delete_option(:auth)
+            |> Req.Request.put_header("authorization", auth_header_value)
+            |> Req.Request.run_request()
+
+          {:error, {:unsupported_digest_algorithm, algorithm}} ->
+            Logger.warning("unsupported digest algorithm sent by the server: #{algorithm}")
+            {request, response}
+        end
+
+      {:error, :no_digest_challenge} ->
+        {request, response}
+    end
+  end
+
+  defp get_challenge_header(%Req.Response{status: 401} = response) do
+    case Req.Response.get_header(response, "www-authenticate") do
+      [auth_header | _] ->
+        {:ok, auth_header}
+
+      _ ->
+        {:error, :no_digest_challenge}
+    end
+  end
+
+  defp parse_challenge(header) do
+    header
+    |> String.trim_leading("Digest ")
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Map.new(&parse_header_part/1)
+  end
+
+  defp parse_header_part(part) do
+    case String.split(part, "=", parts: 2) do
+      [key, value] ->
+        {String.trim(key), unquote_value(value)}
+
+      [key] ->
+        {String.trim(key), ""}
+    end
+  end
+
+  defp count_to_nc(count) do
+    String.pad_leading(Integer.to_string(count, 16), 8, "0")
+  end
+
+  defp generate_auth_header(challenge, username, password, method, uri, count) do
+    algorithm = Map.get(challenge, "algorithm", "MD5")
+    realm = Map.get(challenge, "realm", "")
+    nonce = Map.get(challenge, "nonce", "")
+    opaque = Map.get(challenge, "opaque")
+    qop = Map.get(challenge, "qop")
+    cnonce = generate_cnonce()
+    nc = count_to_nc(count)
+
+    with {:ok, hash_func, sess?} <- hash_function(algorithm) do
+      ha1 = hash_func.("#{username}:#{realm}:#{password}")
+
+      ha1 =
+        if sess? do
+          hash_func.("#{ha1}:#{nonce}:#{cnonce}")
+        else
+          ha1
+        end
+
+      method_str = method |> to_string() |> String.upcase()
+      ha2 = hash_func.("#{method_str}:#{uri}")
+
+      response =
+        if qop in ["auth", "auth-int"] do
+          hash_func.("#{ha1}:#{nonce}:#{nc}:#{cnonce}:#{qop}:#{ha2}")
+        else
+          hash_func.("#{ha1}:#{nonce}:#{ha2}")
+        end
+
+      build_auth_header(
+        username: username,
+        realm: realm,
+        nonce: nonce,
+        uri: uri,
+        response: response,
+        qop: qop,
+        nc: nc,
+        cnonce: cnonce,
+        opaque: opaque,
+        algorithm: algorithm
+      )
+    end
+  end
+
+  defp md5_hash(data) do
+    :md5
+    |> :crypto.hash(data)
+    |> Base.encode16(case: :lower)
+  end
+
+  defp sha256_hash(data) do
+    :sha256
+    |> :crypto.hash(data)
+    |> Base.encode16(case: :lower)
+  end
+
+  defp generate_cnonce do
+    16
+    |> :crypto.strong_rand_bytes()
+    |> Base.encode16(case: :lower)
+  end
+
+  defp hash_function(algorithm) do
+    case String.upcase(algorithm) do
+      "MD5" -> {:ok, &md5_hash/1, false}
+      "MD5-SESS" -> {:ok, &md5_hash/1, true}
+      "SHA-256" -> {:ok, &sha256_hash/1, false}
+      "SHA-256-SESS" -> {:ok, &sha256_hash/1, true}
+      _ -> {:error, {:unsupported_digest_algorithm, algorithm}}
+    end
+  end
+
+  defp build_auth_header(opts) do
+    opts =
+      Keyword.validate!(opts, [
+        :username,
+        :realm,
+        :nonce,
+        :uri,
+        :response,
+        :nc,
+        :cnonce,
+        :algorithm,
+        opaque: nil,
+        qop: nil
+      ])
+
+    header_parts = Keyword.take(opts, [:username, :realm, :nonce, :uri, :response])
+
+    qop_parts =
+      if is_binary(opts[:qop]) do
+        Keyword.take(opts, [:qop, :nc, :cnonce])
+      end
+
+    opaque_part =
+      if is_binary(opts[:opaque]) do
+        Keyword.take(opts, [:opaque])
+      end
+
+    algorithm_parts =
+      if opts[:algorithm] |> String.upcase() |> String.ends_with?("-SESS") do
+        Keyword.take(opts, [:algorithm, :cnonce])
+      else
+        Keyword.take(opts, [:algorithm])
+      end
+
+    header =
+      header_parts
+      |> Keyword.merge(qop_parts || [])
+      |> Keyword.merge(opaque_part || [])
+      |> Keyword.merge(algorithm_parts)
+      |> Enum.map_join(", ", &encode_header_part/1)
+
+    {:ok, "Digest #{header}"}
+  end
+
+  defp encode_header_part({key, value}) when key in [:algorithm, :qop, :nc] do
+    "#{key}=#{value}"
+  end
+
+  defp encode_header_part({key, value}) do
+    "#{key}=#{quote_value(value)}"
+  end
+
+  defp unquote_value(value) do
+    value = String.trim(value)
+
+    if String.starts_with?(value, ~s(")) and String.ends_with?(value, ~s(")) do
+      value
+      |> String.slice(1..-2//1)
+      |> Macro.unescape_string()
+    else
+      value
+    end
+  end
+
+  defp quote_value(str) when is_binary(str) do
+    inspect(str, printable_limit: :infinity)
   end
 
   ## Error steps
