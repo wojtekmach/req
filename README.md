@@ -43,7 +43,7 @@ write new ones.
 
   * Templated request paths (via [`put_path_params`] step.)
 
-  * Basic, bearer, and `.netrc` authentication (via [`auth`] step.)
+  * Basic, Digest, Bearer, and `.netrc`-based authentication (via [`auth`] step.)
 
   * Range requests (via [`put_range`]) step.)
 
