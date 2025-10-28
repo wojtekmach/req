@@ -700,7 +700,7 @@ defmodule Req.StepsTest do
           end
         end)
 
-      req = Req.new(url: %URI{url | path: "/some/path"})
+      req = Req.new(url: %{url | path: "/some/path"})
 
       resp = Req.get!(req, auth: {:digest, "foo \"bar\":bar"})
       assert resp.status == 200
