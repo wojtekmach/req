@@ -2080,7 +2080,7 @@ defmodule Req.Steps do
   @doc step: :response
   def handle_http_digest({request, %Req.Response{status: 401} = response}) do
     case request.options[:auth] do
-      {:digest, userinfo} when is_binary(userinfo) ->
+      {:digest, userinfo} ->
         [username, password] = String.split(userinfo, ":", parts: 2)
 
         handle_challenge_reply(request, response,
