@@ -2070,12 +2070,17 @@ defmodule Req.Steps do
   end
 
   @doc """
-  Handles HTTP Digest authentication when auth is provided as `{:digest, userinfo}`
+  Handles HTTP Digest authentication.
+
+  This step is invoked when setting `:auth` option with `{:digest, ...}`. When response is HTTP 401 with `www-authenticate` header, this step will calculate `authorization: Digest ...` header and make another request.
+
+  See `auth/1`.
 
   ## Examples
 
-      iex> Req.get!("https://httpbin.org/digest-auth/auth/user/pass", auth: {:digest, "user:pass"})
-      {:ok, %Req.Response{status: 200, body: %{"authenticated" => true, "user" => "user"}}}
+      iex> resp = Req.get!("https://httpbin.org/digest-auth/auth/user/pass", auth: {:digest, "user:pass"})
+      iex> resp.status
+      200
   """
   @doc step: :response
   def handle_http_digest({request, %Req.Response{status: 401} = response}) do
