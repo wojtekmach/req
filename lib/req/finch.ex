@@ -47,7 +47,9 @@ defmodule Req.Finch do
       |> add_private_options(request.options[:finch_private])
 
     finch_options =
-      request.options |> Map.take([:receive_timeout, :pool_timeout]) |> Enum.to_list()
+      request.options
+      |> Map.take([:receive_timeout, :pool_timeout, :request_timeout])
+      |> Enum.to_list()
 
     run(request, finch_request, finch_name, finch_options)
   end
