@@ -335,7 +335,7 @@ defmodule Req.StepsTest do
     assert URI.to_string(req.url) == "http://foo/abc%7Cdef:bar"
   end
 
-  test "puth_path_params when path_params are empty still sets the template" do
+  test "put_path_params when path_params are empty still sets the template" do
     req =
       Req.new(url: "http://foo/bar", path_params: []) |> Req.Request.prepare()
 
