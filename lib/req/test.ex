@@ -723,12 +723,19 @@ defmodule Req.Test do
   end
 
   @doc false
-  def init(name) do
-    name
+  def init(opts) when is_list(opts) do
+    opts
   end
 
   @doc false
-  def call(conn, name) do
+  def init(name) do
+    init(name: name)
+  end
+
+  @doc false
+  def call(conn, opts) do
+    name = Keyword.fetch!(opts, :name)
+
     case __fetch_plug__(name) do
       fun when is_function(fun, 1) ->
         fun.(conn)

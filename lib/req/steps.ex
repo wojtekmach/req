@@ -1000,6 +1000,15 @@ defmodule Req.Steps do
     def run_plug(request) do
       plug = request.options.plug
 
+      validate_utf8_query =
+        case plug do
+          {Req.Test, opts} when is_list(opts) ->
+            Keyword.get(opts, :validate_utf8_query, true)
+
+          _ ->
+            true
+        end
+
       req_body =
         case request.body do
           iodata when is_binary(iodata) or is_list(iodata) ->
@@ -1032,7 +1041,7 @@ defmodule Req.Steps do
       conn =
         Req.Test.Adapter.conn(%Plug.Conn{}, request.method, request.url, req_body)
         |> Map.replace!(:req_headers, req_headers)
-        |> Plug.Conn.fetch_query_params()
+        |> Plug.Conn.fetch_query_params(validate_utf8: validate_utf8_query)
         |> Plug.Parsers.call(parser_opts)
 
       # Handle cases where the body isn't read with Plug.Parsers
