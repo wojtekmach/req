@@ -190,6 +190,8 @@ defmodule Req.Steps do
 
         * `fn -> {:bearer, "eyJ0eXAi..." } end` - a 0-arity function that returns one of the aforementioned types.
 
+        * `{m, f, a} - an MFA tuple that returns one of the aforementioned types.
+
   ## Examples
 
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:basic, "foo:foo"}).status
@@ -249,6 +251,12 @@ defmodule Req.Steps do
     if is_function(value, 0) do
       raise ArgumentError, "setting `auth: fn -> ... end` should not return another function"
     end
+
+    auth(request, value)
+  end
+
+  defp auth(request, {m, f, a}) do
+    value = apply(m, f, a)
 
     auth(request, value)
   end

@@ -238,6 +238,8 @@ defmodule Req do
 
         * `&fun/0` - a function that returns one of the above (such as a `{:bearer, token}`).
 
+        * `{m, f, a}` - an MFA tuple that returns one of the above (such as a `{:bearer, token}`).
+
   Request body encoding options ([`encode_body`](`Req.Steps.encode_body/1`)):
 
     * `:form` - if set, encodes the request body as `application/x-www-form-urlencoded`
