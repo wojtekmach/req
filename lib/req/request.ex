@@ -1275,10 +1275,6 @@ defmodule Req.Request do
       {:bearer, redact(bearer)}
     end
 
-    defp redact_option(:auth, fun) when is_function(fun, 0) do
-      fun
-    end
-
     defp redact_option(:auth, {:basic, userinfo}) do
       {:basic, redact(userinfo)}
     end
