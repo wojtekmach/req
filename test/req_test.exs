@@ -63,7 +63,8 @@ defmodule ReqTest do
       def generate, do: {:bearer, "some-value"}
     end
 
-    assert inspect(Req.new(auth: [AuthToken, :generate, 0])) =~ ~s|auth: [ReqTest.AuthToken, :generate, 0]|
+    assert inspect(Req.new(auth: {AuthToken, :generate, []})) =~
+             ~s|auth: {ReqTest.AuthToken, :generate, []}|
 
     if Req.MixProject.legacy_headers_as_lists?() do
       assert inspect(Req.new(headers: [authorization: "bearer foobar"])) =~

@@ -1279,8 +1279,8 @@ defmodule Req.Request do
       fun
     end
 
-    defp redact_option(:auth, mfa) when is_list(mfa) do
-      mfa
+    defp redact_option(:auth, {mod, fun, args}) when is_atom(mod) and is_atom(fun) and is_list(args) do
+      {mod, fun, args}
     end
 
     defp redact_option(:auth, {:basic, userinfo}) do
