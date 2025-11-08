@@ -200,6 +200,8 @@ defmodule Req.Steps do
       200
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: fn -> {:basic, "foo:bar"} end).status
       200
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: [Authentication, :fetch_token, []]).status
+      200
 
       iex> Req.get!("https://httpbin.org/digest-auth/auth/user/pass", auth: {:digest, "user:pass"}).status
       200
@@ -210,6 +212,8 @@ defmodule Req.Steps do
       200
       iex> Req.get!("https://httpbin.org/bearer", auth: fn -> {:bearer, "foo"} end).status
       200
+      iex> Req.get!("https://httpbin.org/bearer", auth: [Authentication, :fetch_token, []]).status
+      200
 
       iex> System.put_env("NETRC", "./test/my_netrc")
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: :netrc).status
@@ -218,6 +222,8 @@ defmodule Req.Steps do
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:netrc, "./test/my_netrc"}).status
       200
       iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: fn -> {:netrc, "./test/my_netrc"} end).status
+      200
+      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: [Authentication, :fetch_token, []]).status
       200
   """
   @doc step: :request
