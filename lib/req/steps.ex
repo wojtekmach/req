@@ -255,8 +255,8 @@ defmodule Req.Steps do
     auth(request, value)
   end
 
-  defp auth(request, {m, f, a}) do
-    value = apply(m, f, a)
+  defp auth(request, {mod, fun, args}) when is_atom(mod) and is_atom(fun) and is_list(args) do
+    value = apply(mod, fun, args)
 
     auth(request, value)
   end
