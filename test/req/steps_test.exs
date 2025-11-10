@@ -391,18 +391,6 @@ defmodule Req.StepsTest do
       req = Req.new(url: url, compress_body: true)
       assert Req.get!(req).body == "ok"
     end
-
-    test "compress_body works with plug adapter" do
-      plug = fn conn ->
-        assert [] = Plug.Conn.get_req_header(conn, "content-encoding")
-        {:ok, body, conn} = Plug.Conn.read_body(conn)
-        assert Jason.decode!(body) == %{"test" => "data"}
-        Req.Test.json(conn, %{success: true})
-      end
-
-      resp = Req.post!(plug: plug, json: %{test: "data"}, compress_body: true)
-      assert resp.body == %{"success" => true}
-    end
   end
 
   describe "checksum" do
@@ -2072,6 +2060,17 @@ defmodule Req.StepsTest do
 
       assert Req.request(req) ==
                {:error, %Req.TransportError{reason: :timeout}}
+    end
+
+    test "compressed request body" do
+      plug = fn conn ->
+        assert Plug.Conn.get_req_header(conn, "content-encoding") == []
+        {:ok, ~s|{"test":"data"}|, conn} = Plug.Conn.read_body(conn)
+        Req.Test.json(conn, %{success: true})
+      end
+
+      resp = Req.post!(plug: plug, json: %{test: "data"}, compress_body: true)
+      assert resp.body == %{"success" => true}
     end
 
     test "bad return" do
