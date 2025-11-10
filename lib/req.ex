@@ -1387,9 +1387,10 @@ defmodule Req do
   """
   @doc type: :assigns
   @doc since: "0.6.0"
-  @spec assign(req_or_resp, Enumerable.t()) :: req_or_resp
+  @spec assign(req_or_resp, assigns :: map() | keyword()) :: req_or_resp
         when req_or_resp: Req.Request.t() | Req.Response.t()
-  def assign(%struct{} = req_or_resp, assigns) when struct in [Req.Request, Req.Response] do
+  def assign(%struct{} = req_or_resp, assigns)
+      when struct in [Req.Request, Req.Response] and (is_map(assigns) or is_list(assigns)) do
     update_in(req_or_resp.assigns, &Enum.into(assigns, &1))
   end
 
