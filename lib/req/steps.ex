@@ -2367,7 +2367,8 @@ defmodule Req.Steps do
 
     * `:retry_delay` - if not set, which is the default, the retry delay is determined by
       the value of the `Retry-After` header on HTTP 429/503 responses. If the header is not set,
-      the default delay follows a simple exponential backoff: 1s, 2s, 4s, 8s, ...
+      the default delay follows a simple exponential backoff with jitter, for example:
+      0.949s, 1.97s, 3.87s, 7.55s, ...
 
       `:retry_delay` can be set to a function that receives the retry count (starting at 0)
       and returns the delay, the number of milliseconds to sleep before making another attempt.
@@ -2380,17 +2381,7 @@ defmodule Req.Steps do
 
   ## Examples
 
-  With default options:
-
-      iex> Req.get!("https://httpbin.org/status/500,200").status
-      # 19:02:08.463 [warning] retry: got response with status 500, will retry in 2000ms, 2 attempts left
-      # 19:02:10.710 [warning] retry: got response with status 500, will retry in 4000ms, 1 attempt left
-      200
-
-  Delay with jitter:
-
-      iex> delay = fn n -> trunc(Integer.pow(2, n) * 1000 * (1 - 0.1 * :rand.uniform())) end
-      iex> Req.get!("https://httpbin.org/status/500,200", retry_delay: delay).status
+      iex> Req.get!("https://httpbin.org/status/500,200")
       # 08:43:19.101 [warning] retry: got response with status 500, will retry in 941ms, 2 attempts left
       # 08:43:22.958 [warning] retry: got response with status 500, will retry in 1877ms, 1 attempt left
       200
@@ -2518,7 +2509,7 @@ defmodule Req.Steps do
   end
 
   defp calculate_retry_delay(request, retry_count) do
-    case Req.Request.get_option(request, :retry_delay, &exp_backoff/1) do
+    case Req.Request.get_option(request, :retry_delay, &exp_backoff_with_jitter/1) do
       delay when is_integer(delay) ->
         {request, delay}
 
@@ -2534,8 +2525,8 @@ defmodule Req.Steps do
     end
   end
 
-  defp exp_backoff(n) do
-    Integer.pow(2, n) * 1000
+  defp exp_backoff_with_jitter(n) do
+    trunc(Integer.pow(2, n) * 1000 * (1 - 0.1 * :rand.uniform()))
   end
 
   defp log_retry(_, _, _, _, false), do: :ok
