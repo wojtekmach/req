@@ -1348,6 +1348,152 @@ defmodule Req do
   end
 
   @doc """
+  Returns the value of request/response header with the given `name`.
+
+  If there are multiple headers under that name, only the first one is received.
+
+  See also `get_header_values/2`.
+
+  ## Examples
+
+      iex> req = Req.new(headers: [{"accept", "application/json"}])
+      iex> Req.get_header(req, "accept")
+      "application/json"
+      iex> Req.get_header(req, "x-unknown")
+      nil
+  """
+  @doc type: :headers
+  @doc since: "0.6.0"
+  @spec get_header(req_or_resp, binary()) :: binary() | nil
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def get_header(%struct{} = req_or_resp, name) when struct in [Req.Request, Req.Response] do
+    Req.Fields.get(req_or_resp.headers, name)
+  end
+
+  @doc """
+  Returns the values of request/response headers with the given `name`.
+
+  See also `get_header/2`.
+
+  ## Examples
+
+      iex> req = Req.new(headers: [{"accept", "application/json"}])
+      iex> Req.get_header_values(req, "accept")
+      ["application/json"]
+      iex> Req.get_header_values(req, "x-unknown")
+      []
+  """
+  @doc type: :headers
+  @doc since: "0.6.0"
+  @spec get_header_values(req_or_resp, binary()) :: [binary()]
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def get_header_values(%struct{} = req_or_resp, name)
+      when struct in [Req.Request, Req.Response] do
+    Req.Fields.get_values(req_or_resp.headers, name)
+  end
+
+  @doc """
+  Sets request/response header `name` to `value`.
+
+  If the header was previously set, its value is overwritten.
+
+  See also `put_new_header/3`.
+
+  ## Examples
+
+      iex> req = Req.new(headers: [{"accept", "application/json"}])
+      iex> req = Req.put_header(req, "accept", "text/html")
+      iex> Req.get_header(req, "accept")
+      "text/html"
+
+  """
+  @doc type: :headers
+  @doc since: "0.6.0"
+  @spec put_header(req_or_resp, binary(), binary()) :: req_or_resp
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def put_header(%struct{} = req_or_resp, name, value)
+      when struct in [Req.Request, Req.Response] and is_binary(name) and is_binary(value) do
+    update_in(req_or_resp.headers, &Req.Fields.put(&1, name, value))
+  end
+
+  @doc """
+  Sets request/response header `name` to `value` unless already set.
+
+  See also `put_header/3`.
+
+  ## Examples
+
+      iex> req = Req.new(headers: [{"accept", "application/json"}])
+      iex> req = Req.put_new_header(req, "accept", "text/html")
+      iex> req = Req.put_new_header(req, "content-type", "text/html")
+      iex> Req.get_header(req, "accept")
+      "application/json"
+      iex> Req.get_header(req, "content-type")
+      "text/html"
+
+  """
+  @doc type: :headers
+  @doc since: "0.6.0"
+  @spec put_new_header(req_or_resp, binary(), binary()) :: req_or_resp
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def put_new_header(%struct{} = req_or_resp, name, value)
+      when struct in [Req.Request, Req.Response] and is_binary(name) and is_binary(value) do
+    update_in(req_or_resp.headers, &Req.Fields.put_new(&1, name, value))
+  end
+
+  @doc """
+  Deletes request/response headers with the given `name`.
+
+  All occurrences of the header are deleted, in case the header is repeated multiple times.
+
+  See also `drop_headers/2`.
+
+  ## Examples
+
+      iex> req = Req.new(headers: [{"accept", "application/json"}])
+      iex> Req.get_header(req, "accept")
+      "application/json"
+      iex> req = Req.delete_header(req, "accept")
+      iex> Req.get_header(req, "accept")
+      nil
+
+  """
+  @doc type: :headers
+  @doc since: "0.6.0"
+  @spec delete_header(req_or_resp, binary()) :: req_or_resp
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def delete_header(%struct{} = req_or_resp, name)
+      when struct in [Req.Request, Req.Response] and is_binary(name) do
+    update_in(req_or_resp.headers, &Req.Fields.delete(&1, name))
+  end
+
+  @doc """
+  Drops request/response headers with the given `names`.
+
+  All occurrences of the header are deleted, in case the header is repeated multiple times.
+
+  See also `delete_header/2`.
+
+  ## Examples
+
+      iex> req = Req.new(headers: [{"accept", "application/json"}])
+      iex> Req.get_header(req, "accept")
+      "application/json"
+      iex> req = Req.drop_headers(req, ["accept"])
+      iex> Req.get_header(req, "accept")
+      nil
+
+  """
+  @doc type: :headers
+  @doc since: "0.6.0"
+  @spec drop_headers(req_or_resp, [binary()]) :: req_or_resp
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def drop_headers(%struct{} = req_or_resp, names)
+      when struct in [Req.Request, Req.Response] and is_list(names) do
+    update_in(req_or_resp.headers, &Req.Fields.drop(&1, names))
+  end
+
+  @doc """
   Returns request/response headers as list.
 
   ## Examples
@@ -1360,8 +1506,10 @@ defmodule Req do
       iex> Req.get_headers_list(resp)
       [{"content-type", "application/json"}]
   """
+  @doc type: :headers
   @doc since: "0.5.10"
-  @spec get_headers_list(Req.Request.t() | Req.Response.t()) :: [{binary(), binary()}]
+  @spec get_headers_list(req_or_resp) :: [{binary(), binary()}]
+        when req_or_resp: Req.Request.t() | Req.Response.t()
   def get_headers_list(%struct{headers: headers}) when struct in [Req.Request, Req.Response] do
     Req.Fields.get_list(headers)
   end

@@ -133,6 +133,23 @@ defmodule Req.Fields do
   end
 
   @doc """
+  Returns field value.
+  """
+  def get(fields, name)
+
+  if @legacy? do
+    def get(fields, name) when is_binary(name) do
+      name = ensure_name_downcase(name)
+      Enum.find_value(fields, fn {name1, value} -> name1 == name && value end)
+    end
+  else
+    def get(fields, name) when is_binary(name) do
+      name = ensure_name_downcase(name)
+      fields |> Map.get(name, []) |> List.first()
+    end
+  end
+
+  @doc """
   Returns field values.
   """
   def get_values(fields, name)
@@ -210,6 +227,27 @@ defmodule Req.Fields do
     def delete(fields, name) when is_binary(name) do
       name = ensure_name_downcase(name)
       Map.delete(fields, name)
+    end
+  end
+
+  @doc """
+  Drops fields matching `names`.
+  """
+  def drop(fields, names)
+
+  if @legacy? do
+    def drop(fields, names) do
+      names_to_delete = Enum.map(names, &ensure_name_downcase/1)
+
+      for {name, value} <- fields,
+          name not in names_to_delete do
+        {name, value}
+      end
+    end
+  else
+    def drop(fields, names) do
+      names_to_delete = Enum.map(names, &ensure_name_downcase/1)
+      Map.drop(fields, names_to_delete)
     end
   end
 
