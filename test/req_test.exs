@@ -59,6 +59,13 @@ defmodule ReqTest do
 
     assert inspect(Req.new(auth: fn -> {:basic, "foo:bar"} end)) =~ ~s|auth: #Function|
 
+    defmodule AuthToken do
+      def generate, do: {:bearer, "some-value"}
+    end
+
+    assert inspect(Req.new(auth: {AuthToken, :generate, []})) =~
+             ~s|auth: {ReqTest.AuthToken, :generate, []}|
+
     if Req.MixProject.legacy_headers_as_lists?() do
       assert inspect(Req.new(headers: [authorization: "bearer foobar"])) =~
                ~s|{"authorization", "bearer foo***"}|

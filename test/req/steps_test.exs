@@ -97,6 +97,16 @@ defmodule Req.StepsTest do
       assert Req.Request.get_header(req, "authorization") == []
     end
 
+    test "mfa" do
+      defmodule AuthToken do
+        def generate, do: {:bearer, "abcd"}
+      end
+
+      req = Req.new(auth: {AuthToken, :generate, []}) |> Req.Request.prepare()
+
+      assert Req.Request.get_header(req, "authorization") == ["Bearer abcd"]
+    end
+
     @tag :tmp_dir
     test ":netrc", c do
       %{url: url} =
