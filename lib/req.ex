@@ -1449,7 +1449,8 @@ defmodule Req do
 
       iex> req = Req.new(assigns: [a: 1])
       iex> Req.update_assign(req, :b, & &1 * 2)
-      ** (KeyError) key :b not found in: %{a: 1}
+      ** (KeyError) key :b not found in:
+      ...
   """
   @doc since: "0.6.0"
   @spec update_assign(req_or_resp, key :: atom(), (term() -> term())) :: req_or_resp

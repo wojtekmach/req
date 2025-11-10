@@ -3,16 +3,23 @@ defmodule ReqTest do
   import TestHelper, only: [start_http_server: 1, start_https_server: 1]
 
   doctest Req,
-    only: [
-      new: 1,
-      merge: 2,
-      get_headers_list: 1,
-      assign: 2,
-      assign: 3,
-      assign_new: 3,
-      update_assign: 3,
-      update_assign: 4
-    ]
+    only:
+      [
+        new: 1,
+        merge: 2,
+        get_headers_list: 1,
+        assign: 2,
+        assign: 3,
+        assign_new: 3
+      ] ++
+        (if Version.match?(System.version(), ">= 1.18.0") do
+           [
+             update_assign: 3,
+             update_assign: 4
+           ]
+         else
+           []
+         end)
 
   setup do
     bypass = Bypass.open()
