@@ -1393,6 +1393,8 @@ defmodule Req do
     Req.Fields.get_list(headers)
   end
 
+  ## Assigns
+
   @doc """
   Assigns multiple values to request/response.
 
@@ -1405,6 +1407,7 @@ defmodule Req do
       iex> req.assigns
       %{a: 1, b: 2}
   """
+  @doc type: :assigns
   @doc since: "0.6.0"
   @spec assign(req_or_resp, Enumerable.t()) :: req_or_resp
         when req_or_resp: Req.Request.t() | Req.Response.t()
@@ -1424,12 +1427,43 @@ defmodule Req do
       iex> req.assigns
       %{a: 1}
   """
+  @doc type: :assigns
   @doc since: "0.6.0"
   @spec assign(req_or_resp, key :: atom(), value :: term()) :: req_or_resp
         when req_or_resp: Req.Request.t() | Req.Response.t()
   def assign(%struct{} = req_or_resp, key, value)
-      when is_atom(key) and struct in [Req.Request, Req.Response] do
+      when struct in [Req.Request, Req.Response] and is_atom(key) do
     update_in(req_or_resp.assigns, &Map.put(&1, key, value))
+  end
+
+  @doc """
+  Assigns multiple keys/values to request/response unless they are already set.
+
+  ## Examples
+
+      iex> req = Req.new()
+      iex> req.assigns
+      %{}
+      iex> req = Req.assign_new(req, a: 1)
+      iex> req.assigns
+      %{a: 1}
+      iex> req = Req.assign_new(req, a: 2, b: 2)
+      iex> req.assigns
+      %{a: 1, b: 2}
+  """
+  @doc type: :assigns
+  @doc since: "0.6.0"
+  @spec assign_new(req_or_resp, assigns :: keyword() | map()) :: req_or_resp
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def assign_new(req_or_resp, assigns)
+
+  def assign_new(%struct{} = req_or_resp, assigns)
+      when struct in [Req.Request, Req.Response] and is_map(assigns) do
+    update_in(req_or_resp.assigns, &Map.merge(&1, assigns, fn _k, v1, _v2 -> v1 end))
+  end
+
+  def assign_new(req_or_resp, assigns) when is_list(assigns) do
+    update_in(req_or_resp.assigns, &Map.merge(&1, Map.new(assigns), fn _k, v1, _v2 -> v1 end))
   end
 
   @doc """
@@ -1447,6 +1481,7 @@ defmodule Req do
       iex> req.assigns
       %{a: 1}
   """
+  @doc type: :assigns
   @doc since: "0.6.0"
   @spec assign_new(req_or_resp, key :: atom(), value :: term()) :: req_or_resp
         when req_or_resp: Req.Request.t() | Req.Response.t()
@@ -1474,6 +1509,7 @@ defmodule Req do
       ** (KeyError) key :b not found in:
       ...
   """
+  @doc type: :assigns
   @doc since: "0.6.0"
   @spec update_assign(req_or_resp, key :: atom(), (term() -> term())) :: req_or_resp
         when req_or_resp: Req.Request.t() | Req.Response.t()
@@ -1504,6 +1540,7 @@ defmodule Req do
       iex> req.assigns
       %{a: 1, b: 1}
   """
+  @doc type: :assigns
   @doc since: "0.6.0"
   @spec update_assign(req_or_resp, key :: atom(), default :: term(), (term() -> term())) ::
           req_or_resp

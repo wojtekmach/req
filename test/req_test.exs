@@ -10,6 +10,7 @@ defmodule ReqTest do
         get_headers_list: 1,
         assign: 2,
         assign: 3,
+        assign_new: 2,
         assign_new: 3
       ] ++
         (if Version.match?(System.version(), ">= 1.19.0") do
