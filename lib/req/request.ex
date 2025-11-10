@@ -469,11 +469,9 @@ defmodule Req.Request do
 
     * `:body` - the request body, defaults to `nil`.
 
-    * `:adapter` - the request adapter, defaults to calling [`run_finch`](`Req.Steps.run_finch/1`).
-
-    * `:options` - TODO
-
     * `:assigns` - TODO
+
+    * `:adapter` - the request adapter, defaults to calling [`run_finch`](`Req.Steps.run_finch/1`).
 
   ## Examples
 
