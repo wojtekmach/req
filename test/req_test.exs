@@ -12,7 +12,7 @@ defmodule ReqTest do
         assign: 3,
         assign_new: 3
       ] ++
-        (if Version.match?(System.version(), ">= 1.18.0") do
+        (if Version.match?(System.version(), ">= 1.19.0") do
            [
              update_assign: 3,
              update_assign: 4
