@@ -3,6 +3,11 @@ defmodule Req.IntegrationTest do
 
   @moduletag :integration
 
+  # for Req.Steps.auth/1 doctest
+  defmodule Authentication do
+    def fetch_token, do: {:basic, "foo:bar"}
+  end
+
   setup context do
     if context[:doctest] do
       original_gl = Process.group_leader()
