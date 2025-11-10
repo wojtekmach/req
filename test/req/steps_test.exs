@@ -2355,6 +2355,17 @@ defmodule Req.StepsTest do
                {:error, %Req.TransportError{reason: :timeout}}
     end
 
+    test "compressed request body" do
+      plug = fn conn ->
+        assert Plug.Conn.get_req_header(conn, "content-encoding") == []
+        {:ok, ~s|{"test":"data"}|, conn} = Plug.Conn.read_body(conn)
+        Req.Test.json(conn, %{success: true})
+      end
+
+      resp = Req.post!(plug: plug, json: %{test: "data"}, compress_body: true)
+      assert resp.body == %{"success" => true}
+    end
+
     test "bad return" do
       plug = fn _ ->
         :bad
