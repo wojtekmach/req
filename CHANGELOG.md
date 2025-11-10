@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v0.5.16 (2025-11-10)
+
+  * [`Req.Test`]: Fix `verify_on_exit!` accidentally using Mox name
+  * [`auth`]: Support MFArgs
+  * [`auth`]: Support digest auth
+  * [`put_aws_sigv4`]: Support MFArgs
+  * [`put_path_params`]: Encode `:path_params` even with reserved characters
+  * [`put_path_params`]: Set `:path_params_template` on empty params
+  * [`run_plug`]: Handle compressed request body
+
 ## v0.5.15 (2025-07-14)
 
   * [`Req.Response`]: Add [`Req.Response.to_map/1`].
