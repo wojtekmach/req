@@ -190,7 +190,7 @@ defmodule Req.Steps do
 
         * `fn -> {:bearer, "eyJ0eXAi..." } end` - a 0-arity function that returns one of the aforementioned types.
 
-        * `{mod, fun, args} - an MFArgs tuple that returns one of the aforementioned types.
+        * `{mod, fun, args}` - an MFArgs tuple that returns one of the aforementioned types.
 
   ## Examples
 
