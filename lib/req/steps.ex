@@ -805,7 +805,7 @@ defmodule Req.Steps do
 
         * `:proxy_headers` - Mint proxy headers, see `Mint.HTTP.connect/4` for more information.
 
-        * `:proxy` - Mint HTTP/1 proxy settings, a `{schema, address, port, options}` tuple.
+        * `:proxy` - Mint HTTP/1 proxy settings, a `{scheme, address, port, options}` tuple.
           See `Mint.HTTP.connect/4` for more information.
 
         * `:client_settings` - Mint HTTP/2 client settings, see `Mint.HTTP.connect/4` for more

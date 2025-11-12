@@ -416,7 +416,7 @@ defmodule Req do
 
         * `:proxy_headers` - Mint proxy headers.
 
-        * `:proxy` - Mint HTTP/1 proxy settings, a `{schema, address, port, options}` tuple.
+        * `:proxy` - Mint HTTP/1 proxy settings, a `{scheme, address, port, options}` tuple.
 
         * `:client_settings` - Mint HTTP/2 client settings.
 
