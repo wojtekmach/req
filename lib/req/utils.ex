@@ -1,5 +1,6 @@
 defmodule Req.Utils do
   @moduledoc false
+  require Logger
 
   defmacrop iodata({:<<>>, _, parts}) do
     Enum.map(parts, &to_iodata/1)
@@ -839,5 +840,90 @@ defmodule Req.Utils do
 
   defp encode_digest_header_part({key, value}) do
     "#{key}=#{quote_digest_value(value)}"
+  end
+
+  @doc false
+  defmacro brotli_loaded? do
+    Code.ensure_loaded?(:brotli)
+  end
+
+  @doc false
+  defmacro ezstd_loaded? do
+    Code.ensure_loaded?(:ezstd)
+  end
+
+  @doc false
+  def decompress_with_encoding([], body), do: {body, []}
+
+  def decompress_with_encoding(encoding_headers, body) do
+    codecs = compression_algorithms(encoding_headers)
+    decompress_body(codecs, body, [])
+  end
+
+  defp decompress_body([gzip | rest], body, acc) when gzip in ["gzip", "x-gzip"] do
+    try do
+      decompress_body(rest, :zlib.gunzip(body), acc)
+    rescue
+      e in ErlangError ->
+        if e.original == :data_error do
+          %Req.DecompressError{format: :gzip, data: body}
+        else
+          reraise e, __STACKTRACE__
+        end
+    end
+  end
+
+  defp decompress_body(["br" | rest], body, acc) do
+    if brotli_loaded?() do
+      case :brotli.decode(body) do
+        {:ok, decompressed} ->
+          decompress_body(rest, decompressed, acc)
+
+        :error ->
+          %Req.DecompressError{format: :br, data: body}
+      end
+    else
+      Logger.debug(":brotli library not loaded, skipping brotli decompression")
+      decompress_body(rest, body, ["br" | acc])
+    end
+  end
+
+  defp decompress_body(["zstd" | rest], body, acc) do
+    if ezstd_loaded?() do
+      case :ezstd.decompress(body) do
+        decompressed when is_binary(decompressed) ->
+          decompress_body(rest, decompressed, acc)
+
+        {:error, reason} ->
+          %Req.DecompressError{format: :zstd, data: body, reason: reason}
+      end
+    else
+      Logger.debug(":ezstd library not loaded, skipping zstd decompression")
+      decompress_body(rest, body, ["zstd" | acc])
+    end
+  end
+
+  defp decompress_body(["identity" | rest], body, acc) do
+    decompress_body(rest, body, acc)
+  end
+
+  defp decompress_body([codec | rest], body, acc) do
+    Logger.debug("algorithm #{inspect(codec)} is not supported")
+    decompress_body(rest, body, [codec | acc])
+  end
+
+  defp decompress_body([], body, acc) do
+    {body, acc}
+  end
+
+  defp compression_algorithms(values) do
+    values
+    |> Enum.flat_map(fn value ->
+      value
+      |> String.downcase()
+      |> String.split(",", trim: true)
+      |> Enum.map(&String.trim/1)
+    end)
+    |> Enum.reverse()
   end
 end

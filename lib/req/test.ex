@@ -774,7 +774,7 @@ defmodule Req.Test do
   if Code.ensure_loaded?(Plug.Test) do
     @spec raw_body(Plug.Conn.t()) :: iodata()
     def raw_body(%Plug.Conn{} = conn) do
-      {Req.Test.Adapter, %{raw_body: raw_body}} = conn.adapter
+      {Req.Plug.Adapter, %{raw_body: raw_body}} = conn.adapter
       raw_body
     end
   else
