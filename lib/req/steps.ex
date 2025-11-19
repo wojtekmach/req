@@ -1080,7 +1080,7 @@ defmodule Req.Steps do
 
     defp handle_plug_result(conn, request) do
       # consume messages sent by Plug.Test adapter
-      {_, %{ref: ref}} = conn.adapter
+      {Req.Test.Adapter, %{ref: ref, chunks: chunks}} = conn.adapter
 
       if conn.state == :unset do
         raise """
@@ -1124,16 +1124,23 @@ defmodule Req.Steps do
               headers: conn.resp_headers
             )
 
-          case fun.({:data, conn.resp_body}, {request, response}) do
-            {:cont, acc} ->
-              acc
+          Enum.reduce_while(
+            chunks || [conn.resp_body],
+            {request, response},
+            fn chunk, acc ->
+              case fun.({:data, chunk}, acc) do
+                {:cont, acc} ->
+                  {:cont, acc}
 
-            {:halt, acc} ->
-              acc
+                {:halt, acc} ->
+                  {:halt, acc}
 
-            other ->
-              raise ArgumentError, "expected {:cont, acc}, got: #{inspect(other)}"
-          end
+                other ->
+                  raise ArgumentError,
+                        "expected {:cont, acc} or {:halt, acc}, got: #{inspect(other)}"
+              end
+            end
+          )
 
         :self ->
           async = %Req.Response.Async{
@@ -1144,7 +1151,11 @@ defmodule Req.Steps do
           }
 
           resp = Req.Response.new(status: conn.status, headers: conn.resp_headers, body: async)
-          send(self(), {async.ref, {:data, conn.resp_body}})
+
+          for chunk <- chunks || [conn.resp_body] do
+            send(self(), {async.ref, {:data, chunk}})
+          end
+
           send(self(), {async.ref, :done})
           {request, resp}
 
@@ -1157,11 +1168,20 @@ defmodule Req.Steps do
 
           if conn.status == 200 do
             {acc, collector} = Collectable.into(collectable)
-            acc = collector.(acc, {:cont, conn.resp_body})
+
+            acc =
+              Enum.reduce(
+                chunks || [conn.resp_body],
+                acc,
+                fn chunk, acc ->
+                  collector.(acc, {:cont, chunk})
+                end
+              )
+
             acc = collector.(acc, :done)
             {request, %{response | body: acc}}
           else
-            {request, %{response | body: conn.resp_body}}
+            {request, put_in(response.body, conn.resp_body)}
           end
       end
     end
