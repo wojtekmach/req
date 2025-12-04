@@ -219,6 +219,7 @@ There are many packages that extend the Req library. To get yours listed here, s
   * [`curl_req`]
   * [`http_cookie`]
   * [`req_embed`]
+  * [`req_proxy`]
 
 ## Presentations
 
@@ -293,3 +294,4 @@ limitations under the License.
 [`curl_req`]: https://github.com/derekkraan/curl_req
 [`http_cookie`]: https://github.com/reisub/http_cookie
 [`req_embed`]: https://github.com/leandrocp/req_embed
+[`req_proxy`]: https://gitlab.com/wmde/technical-wishes/req_proxy
