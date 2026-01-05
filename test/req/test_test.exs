@@ -134,6 +134,26 @@ defmodule Req.TestTest do
       send(child_pid, :go)
       assert_receive {^ref, Plug.Logger}
     end
+
+    test "allows the request for descendant process" do
+      defmodule FooServer do
+        use GenServer, restart: :temporary
+
+        def init({test_pid, ref}) do
+          send(test_pid, {ref, Req.Test.__fetch_plug__(:foo)})
+          {:ok, nil}
+        end
+
+        def start_link(arg), do: GenServer.start_link(__MODULE__, arg)
+      end
+
+      ref = make_ref()
+      Req.Test.stub(:foo, Plug.Logger)
+
+      start_link_supervised!({FooServer, {self(), ref}})
+
+      assert_receive {^ref, Plug.Logger}
+    end
   end
 
   describe "transport_error/2" do
