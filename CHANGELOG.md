@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## HEAD
+
+  * [`retry`]: Use default delay if `retry-after` is "negative"
+
+    Previously, we were only handling "negative" retry-after in "http date"
+    format and slept for zero seconds. We were crashing on retry-after with
+    negative seconds.
+
+    Now, we're using the default delay (1s, 2s, 4s, ...) in either format.
+
 ## v0.5.16 (2025-11-10)
 
   * [`Req.Test`]: Fix `verify_on_exit!` accidentally using Mox name

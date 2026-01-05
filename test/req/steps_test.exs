@@ -1867,15 +1867,27 @@ defmodule Req.StepsTest do
 
         response =
           case attempt do
-            0 -> Req.Response.new(status: 429) |> retry_after(0)
-            1 -> Req.Response.new(status: 503) |> retry_after(DateTime.utc_now())
-            2 -> Req.Response.new(status: 200, body: "ok")
+            0 ->
+              Req.Response.new(status: 429) |> retry_after(0)
+
+            1 ->
+              Req.Response.new(status: 429) |> retry_after(-1)
+
+            2 ->
+              Req.Response.new(status: 503) |> retry_after(DateTime.utc_now())
+
+            3 ->
+              datetime = DateTime.add(DateTime.utc_now(), -3600)
+              Req.Response.new(status: 503) |> retry_after(datetime)
+
+            4 ->
+              Req.Response.new(status: 200, body: "ok")
           end
 
         {request, response}
       end
 
-      assert Req.request!(adapter: adapter, retry_delay: 10000).body == "ok"
+      assert Req.request!(adapter: adapter, retry_delay: 100, max_retries: 5).body == "ok"
     end
 
     defp retry_after(r, value), do: Req.Response.put_header(r, "retry-after", retry_after(value))

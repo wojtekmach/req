@@ -2119,7 +2119,8 @@ defmodule Req.Steps do
   def handle_http_digest({request, %Req.Response{status: 401} = response}) do
     with {:digest, userinfo} <- request.options[:auth],
          [username, password] <- String.split(userinfo, ":", parts: 2),
-         ["Digest " <> _ = challenge_header | _] <- Req.Response.get_header(response, "www-authenticate"),
+         ["Digest " <> _ = challenge_header | _] <-
+           Req.Response.get_header(response, "www-authenticate"),
          {:ok, auth_header_value} <-
            Req.Utils.http_digest_auth(
              challenge_header,
@@ -2180,7 +2181,8 @@ defmodule Req.Steps do
 
     * `:retry_delay` - if not set, which is the default, the retry delay is determined by
       the value of the `Retry-After` header on HTTP 429/503 responses. If the header is not set,
-      the default delay follows a simple exponential backoff: 1s, 2s, 4s, 8s, ...
+      or the header value is negative, the default delay follows a simple exponential backoff:
+      1s, 2s, 4s, 8s, ...
 
       `:retry_delay` can be set to a function that receives the retry count (starting at 0)
       and returns the delay, the number of milliseconds to sleep before making another attempt.
