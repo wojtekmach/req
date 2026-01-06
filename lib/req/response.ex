@@ -13,6 +13,8 @@ defmodule Req.Response do
 
     * `:trailers` - the HTTP response trailers. The trailer names must be downcased.
 
+    * `:assigns` - TODO
+
     * `:private` - a map reserved for libraries and frameworks to use.
       Prefix the keys with the name of your project to avoid any future
       conflicts. Only accepts `t:atom/0` keys.
@@ -23,6 +25,7 @@ defmodule Req.Response do
           headers: %{optional(binary()) => [binary()]},
           body: binary() | %Req.Response.Async{} | term(),
           trailers: %{optional(binary()) => [binary()]},
+          assigns: map(),
           private: map()
         }
 
@@ -30,6 +33,7 @@ defmodule Req.Response do
             headers: Req.Fields.new([]),
             body: "",
             trailers: Req.Fields.new([]),
+            assigns: %{},
             private: %{}
 
   @doc """
@@ -52,7 +56,7 @@ defmodule Req.Response do
 
   def new(%{} = options) do
     options =
-      Map.take(options, [:status, :headers, :body, :trailers])
+      Map.take(options, [:status, :headers, :body, :trailers, :assigns])
       |> Map.update(
         :headers,
         Req.Fields.new([]),

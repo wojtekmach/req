@@ -19,8 +19,8 @@ jobs:
               elixir: "1.14"
               otp: "24.3.4.10"
           - pair:
-              elixir: "1.18.4-otp-27"
-              otp: "28.0"
+              elixir: "1.19.2-otp-28"
+              otp: "28.1.1"
             lint: lint
     steps:
       - uses: actions/checkout@v4
