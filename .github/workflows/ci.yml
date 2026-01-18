@@ -17,21 +17,20 @@ jobs:
         include:
           - pair:
               elixir: "1.14"
-              otp: "24.3.4.10"
+              otp: "24"
           - pair:
-              elixir: "1.18.4-otp-27"
-              otp: "28.0"
+              elixir: "1.19"
+              otp: "28"
             lint: lint
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: erlef/setup-beam@main
         with:
           otp-version: ${{ matrix.pair.otp }}
           elixir-version: ${{ matrix.pair.elixir }}
-          version-type: strict
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: deps
           # ezstd and brotli are compiling native objects to deps/x/_build, not _build,
