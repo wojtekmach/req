@@ -478,6 +478,9 @@ defmodule Req.Test do
 
             %{expectations: []} = map ->
               {{:error, :no_expectations_and_no_stub}, map}
+
+            nil ->
+              {{:error, :no_expectations_and_no_stub}, %{}}
           end)
 
         case result do

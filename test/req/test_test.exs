@@ -2,41 +2,50 @@ defmodule Req.TestTest do
   use ExUnit.Case, async: true
   doctest Req.Test, except: [expect: 3, redirect: 2]
 
-  test "__fetch_plug__" do
-    assert_raise RuntimeError, ~r/cannot find mock/, fn ->
+  describe "__fetch_plug__/1" do
+    test "works as expected" do
+      assert_raise RuntimeError, ~r/cannot find mock/, fn ->
+        Req.Test.__fetch_plug__(:foo)
+      end
+
+      Req.Test.stub(:foo, {MyPlug, [1]})
+      assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [1]}
+
+      Req.Test.stub(:foo, {MyPlug, [2]})
+      assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [2]}
+
+      Task.async(fn ->
+        assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [2]}
+        Req.Test.stub(:foo, {MyPlug, [3]})
+      end)
+      |> Task.await()
+
+      assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [2]}
+
+      Req.Test.set_req_test_to_shared()
+      Req.Test.stub(:bar, {SharedPlug, [1]})
+
+      Task.async(fn ->
+        assert Req.Test.__fetch_plug__(:bar) == {SharedPlug, [1]}
+      end)
+      |> Task.await()
+
+      Req.Test.expect(:baz, {SharedPlug, [1]})
+
+      Task.async(fn ->
+        assert Req.Test.__fetch_plug__(:baz) == {SharedPlug, [1]}
+      end)
+      |> Task.await()
+    after
+      Req.Test.set_req_test_to_private()
+    end
+  end
+
+  test "raises expected error if called immediately after mode is set to shared" do
+    assert_raise RuntimeError, ~r/no mock or stub/, fn ->
+      Req.Test.set_req_test_to_shared()
       Req.Test.__fetch_plug__(:foo)
     end
-
-    Req.Test.stub(:foo, {MyPlug, [1]})
-    assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [1]}
-
-    Req.Test.stub(:foo, {MyPlug, [2]})
-    assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [2]}
-
-    Task.async(fn ->
-      assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [2]}
-      Req.Test.stub(:foo, {MyPlug, [3]})
-    end)
-    |> Task.await()
-
-    assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [2]}
-
-    Req.Test.set_req_test_to_shared()
-    Req.Test.stub(:bar, {SharedPlug, [1]})
-
-    Task.async(fn ->
-      assert Req.Test.__fetch_plug__(:bar) == {SharedPlug, [1]}
-    end)
-    |> Task.await()
-
-    Req.Test.expect(:baz, {SharedPlug, [1]})
-
-    Task.async(fn ->
-      assert Req.Test.__fetch_plug__(:baz) == {SharedPlug, [1]}
-    end)
-    |> Task.await()
-  after
-    Req.Test.set_req_test_to_private()
   end
 
   describe "expect/3" do
