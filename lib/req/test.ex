@@ -479,7 +479,7 @@ defmodule Req.Test do
             %{expectations: []} = map ->
               {{:error, :no_expectations_and_no_stub}, map}
 
-            nil ->
+            map when map == nil or map == %{} ->
               {{:error, :no_expectations_and_no_stub}, %{}}
           end)
 

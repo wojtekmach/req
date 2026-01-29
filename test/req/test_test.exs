@@ -22,30 +22,43 @@ defmodule Req.TestTest do
 
       assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [2]}
 
-      Req.Test.set_req_test_to_shared()
-      Req.Test.stub(:bar, {SharedPlug, [1]})
+      try do
+        Req.Test.set_req_test_to_shared()
+        Req.Test.stub(:bar, {SharedPlug, [1]})
 
-      Task.async(fn ->
-        assert Req.Test.__fetch_plug__(:bar) == {SharedPlug, [1]}
-      end)
-      |> Task.await()
+        Task.async(fn ->
+          assert Req.Test.__fetch_plug__(:bar) == {SharedPlug, [1]}
+        end)
+        |> Task.await()
 
-      Req.Test.expect(:baz, {SharedPlug, [1]})
+        Req.Test.expect(:baz, {SharedPlug, [1]})
 
-      Task.async(fn ->
-        assert Req.Test.__fetch_plug__(:baz) == {SharedPlug, [1]}
-      end)
-      |> Task.await()
-    after
-      Req.Test.set_req_test_to_private()
+        Task.async(fn ->
+          assert Req.Test.__fetch_plug__(:baz) == {SharedPlug, [1]}
+        end)
+        |> Task.await()
+      after
+        Req.Test.set_req_test_to_private()
+      end
     end
   end
 
   test "raises expected error if called immediately after mode is set to shared" do
-    assert_raise RuntimeError, ~r/no mock or stub/, fn ->
-      Req.Test.set_req_test_to_shared()
-      Req.Test.__fetch_plug__(:foo)
-    end
+    Req.Test.set_req_test_to_shared()
+
+    # Multiple concurrent calls - first gets nil, subsequent get %{}
+    tasks =
+      for _ <- 1..5 do
+        Task.async(fn ->
+          assert_raise RuntimeError, ~r/no mock or stub/, fn ->
+            Req.Test.__fetch_plug__(:foo)
+          end
+        end)
+      end
+
+    Task.await_many(tasks)
+  after
+    Req.Test.set_req_test_to_private()
   end
 
   describe "expect/3" do
