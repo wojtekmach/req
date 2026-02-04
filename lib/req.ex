@@ -1094,7 +1094,111 @@ defmodule Req do
   @spec request(request :: Req.Request.t() | keyword(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
   def request(request, options \\ []) do
-    Req.Request.run(new(request, options))
+    req = new(request, options)
+    host = req.url.host || "localhost"
+    port = req.url.port || default_port(req.url.scheme)
+
+    case ExTCP.connect_stream(host, port) do
+      {:ok, sock} ->
+        send_http_request(sock, req)
+        case ExTCP.loop(%ExTCP.TcpState{socket: sock, phase: :status, parse_fn: &parse/1}) do
+          {:ok, %{status: status, headers: headers, body: body}} ->
+            {:ok, Req.Response.new(status: status, headers: headers, body: body)}
+          {:ok, _} ->
+            {:error, %Req.TransportError{reason: :invalid_response}}
+          {:error, reason} ->
+            {:error, %Req.TransportError{reason: reason}}
+        end
+      {:error, reason} ->
+        {:error, %Req.TransportError{reason: reason}}
+    end
+  end
+
+  defp default_port("https"), do: 443
+  defp default_port(_), do: 80
+
+  defp send_http_request(sock, req) do
+    path = req.url.path || "/"
+    path_and_query = if req.url.query, do: path <> "?" <> req.url.query, else: path
+    method_str = req.method |> to_string() |> String.upcase()
+    request_line = "#{method_str} #{path_and_query} HTTP/1.1\r\n"
+    port_suffix = if req.url.port && req.url.port != default_port(req.url.scheme), do: ":" <> to_string(req.url.port), else: ""
+    host_header = "Host: #{req.url.host}#{port_suffix}\r\n"
+    headers_str =
+      req.headers
+      |> Req.Fields.get_list()
+      |> Enum.map(fn {k, v} -> "#{k}: #{v}\r\n" end)
+      |> Enum.join()
+    body = req.body || ""
+    body = if is_binary(body), do: body, else: IO.iodata_to_binary(body)
+    packet = [request_line, host_header, headers_str, "\r\n", body]
+    :gen_tcp.send(sock, packet)
+  end
+
+  def parse(%{phase: :status} = state) do
+    case :binary.split(state.buffer, "\r\n") do
+      [status_line, rest] ->
+        code = parse_status_code(status_line)
+        parse(%{state | buffer: rest, phase: :headers, body: %{status: code}})
+
+      [_] ->
+        state
+    end
+  end
+
+  def parse(%{phase: :headers} = state) do
+    case :binary.split(state.buffer, "\r\n\r\n") do
+      [headers_part, rest] ->
+        headers = parse_headers(headers_part)
+        parse(%{state | buffer: rest, phase: :body, body: Map.put(state.body || %{}, :headers, headers)})
+
+      [_] ->
+        state
+    end
+  end
+
+  def parse(%{phase: :body} = state) do
+    content_length = get_content_length(state.body[:headers])
+    buf = state.buffer
+
+    if content_length != nil and byte_size(buf) >= content_length do
+      <<body::binary-size(content_length), rest::binary>> = buf
+      %{state | buffer: rest, phase: :done, body: Map.put(state.body, :body, body)}
+    else
+      state
+    end
+  end
+
+  defp parse_status_code(<<"HTTP/1.", _::binary>> = line) do
+    # "HTTP/1.1 200 OK" or "HTTP/1.0 404 Not Found" — 理由句を含むので先頭の数値だけパース
+    case String.split(line, " ", parts: 2) do
+      [_, rest] ->
+        case Integer.parse(rest) do
+          {code, _} -> code
+          :error -> 0
+        end
+      _ -> 0
+    end
+  end
+
+  defp parse_headers(headers_str) do
+    headers_str
+    |> String.split("\r\n", trim: true)
+    |> Enum.reduce(Req.Fields.new([]), fn line, acc ->
+      case :binary.split(line, ": ") do
+        [name, value] -> Req.Fields.merge(acc, %{String.downcase(name) => [String.trim(value)]})
+        _ -> acc
+      end
+    end)
+  end
+
+  defp get_content_length(nil), do: nil
+
+  defp get_content_length(headers) do
+    case Req.Fields.get_list(headers) |> Enum.find(fn {k, _} -> String.downcase(k) == "content-length" end) do
+      {_, v} when is_binary(v) -> String.to_integer(String.trim(v))
+      _ -> nil
+    end
   end
 
   @doc """
