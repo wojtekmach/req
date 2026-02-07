@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## HEAD
+## v0.5.17 (2026-01-22)
 
   * [`retry`]: Use default delay if `retry-after` is "negative"
 
