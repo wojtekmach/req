@@ -716,7 +716,11 @@ defmodule Req.Test do
   ## Helpers
 
   defp callers do
-    [self() | Process.get(:"$callers") || []]
+    Enum.concat([
+      [self()],
+      List.wrap(Process.get(:"$callers")),
+      List.wrap(Process.get(:"$ancestors"))
+    ])
   end
 
   ## Plug callbacks
