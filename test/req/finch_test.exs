@@ -196,7 +196,10 @@ defmodule Req.FinchTest do
     end
 
     def send_telemetry_metadata_pid(_name, _measurements, metadata, _) do
-      send(metadata.request.private.pid, :telemetry_private)
+      if pid = metadata.request.private[:pid] do
+        send(pid, :telemetry_private)
+      end
+
       :ok
     end
 
@@ -218,6 +221,66 @@ defmodule Req.FinchTest do
 
       assert Req.get!(url, finch_private: %{pid: self()}).body == "finch_private"
       assert_received :telemetry_private
+    end
+
+    test "body: req_body_fun succeeded" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          assert {:ok, "foobar", conn} = Plug.Conn.read_body(conn)
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      req_body_fun = fn
+        %Req.Request{private: %{phase: :bar}} = request ->
+          request = Req.Request.put_private(request, :phase, :done)
+          {:cont, "bar", request}
+
+        %Req.Request{private: %{phase: :done}} = request ->
+          {:cont, request}
+
+        %Req.Request{} = request ->
+          request = Req.Request.put_private(request, :phase, :bar)
+          {:cont, "foo", request}
+      end
+
+      {req, resp} = Req.run!(method: :post, url: url, body: req_body_fun)
+      assert req.private[:phase] == :done
+      assert resp.status == 200
+      assert resp.body == "ok"
+    end
+
+    test "body: req_body_fun halted" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          assert {:ok, "", conn} = Plug.Conn.read_body(conn)
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      req_body_fun = fn
+        %Req.Request{} = request ->
+          request = Req.Request.put_private(request, :phase, :halted)
+          {:halt, request}
+      end
+
+      {req, resp} = Req.run!(method: :post, url: url, body: req_body_fun)
+      assert req.private[:phase] == :halted
+      assert resp.status == nil
+      assert resp.body == ""
+    end
+
+    test "body: req_body_fun errored" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      req_body_fun = fn %Req.Request{} -> :oops end
+
+      assert_raise RuntimeError,
+                   "expected {:cont, chunk, acc}, {:cont, acc}, or {:halt, acc} from req_body_fun, got: :oops",
+                   fn ->
+                     Req.post!(url: url, body: req_body_fun)
+                   end
     end
 
     test "into: fun" do

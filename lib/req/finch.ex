@@ -37,6 +37,9 @@ defmodule Req.Finch do
         nil ->
           nil
 
+        req_body_fun when is_function(req_body_fun, 1) ->
+          {:stream, req_body_fun}
+
         enumerable ->
           {:stream, enumerable}
       end
@@ -63,12 +66,12 @@ defmodule Req.Finch do
             "See Req.Steps.run_finch/1 for more information."
         )
 
-        {req, run_finch_request(deprecated_fun.(finch_req), finch_name, finch_options)}
+        run_finch_request(req, deprecated_fun.(finch_req), finch_name, finch_options)
 
       nil ->
         case req.into do
           nil ->
-            {req, run_finch_request(finch_req, finch_name, finch_options)}
+            run_finch_request(req, finch_req, finch_name, finch_options)
 
           fun when is_function(fun, 2) ->
             finch_stream_into_fun(req, finch_req, finch_name, finch_options, fun)
@@ -88,85 +91,77 @@ defmodule Req.Finch do
   defp finch_stream_into_fun(req, finch_req, finch_name, finch_options, fun) do
     resp = Req.Response.new()
 
-    fun = fn
-      {:status, status}, {req, resp} ->
-        {:cont, {req, %{resp | status: status}}}
+    stream_fun = fn
+      {:status, status}, {request, resp} ->
+        {:cont, {request, %{resp | status: status}}}
 
-      {:headers, fields}, {req, resp} ->
+      {:headers, fields}, {request, resp} ->
         resp =
           Enum.reduce(fields, resp, fn {name, value}, resp ->
             Req.Response.put_header(resp, name, value)
           end)
 
-        {:cont, {req, resp}}
+        {:cont, {request, resp}}
 
       {:data, data}, acc ->
         fun.({:data, data}, acc)
 
-      {:trailers, fields}, {req, resp} ->
+      {:trailers, fields}, {request, resp} ->
         fields = finch_fields_to_map(fields)
         resp = update_in(resp.trailers, &Map.merge(&1, fields))
-        {:cont, {req, resp}}
+        {:cont, {request, resp}}
     end
 
-    case Finch.stream_while(finch_req, finch_name, {req, resp}, fun, finch_options) do
-      {:ok, acc} ->
-        acc
+    case run_stream_while(req, finch_req, finch_name, resp, stream_fun, finch_options) do
+      {:ok, request, response} ->
+        {request, response}
 
-      # TODO: remove when we require Finch 0.20
-      {:error, exception} ->
-        {req, normalize_error(exception)}
-
-      {:error, exception, _acc} ->
-        {req, normalize_error(exception)}
+      {:error, request, exception, _response} ->
+        {request, exception}
     end
   end
 
   defp finch_stream_into_collectable(req, finch_req, finch_name, finch_options, collectable) do
     resp = Req.Response.new()
 
-    fun = fn
-      {:status, 200}, {nil, req, resp} ->
+    stream_fun = fn
+      {:status, 200}, {request, {nil, resp}} ->
         {acc, collector} = Collectable.into(collectable)
-        {{acc, collector}, req, %{resp | status: 200}}
+        {:cont, {request, {{acc, collector}, %{resp | status: 200}}}}
 
-      {:status, status}, {nil, req, resp} ->
+      {:status, status}, {request, {nil, resp}} ->
         {acc, collector} = Collectable.into("")
-        {{acc, collector}, req, %{resp | status: status}}
+        {:cont, {request, {{acc, collector}, %{resp | status: status}}}}
 
-      {:headers, fields}, {acc, req, resp} ->
+      {:headers, fields}, {request, {collector_acc, resp}} ->
         resp =
           Enum.reduce(fields, resp, fn {name, value}, resp ->
             Req.Response.put_header(resp, name, value)
           end)
 
-        {acc, req, resp}
+        {:cont, {request, {collector_acc, resp}}}
 
-      {:data, data}, {{acc, collector}, req, resp} ->
+      {:data, data}, {request, {{acc, collector}, resp}} ->
         acc = collector.(acc, {:cont, data})
-        {{acc, collector}, req, resp}
+        {:cont, {request, {{acc, collector}, resp}}}
 
-      {:trailers, fields}, {acc, req, resp} ->
+      {:trailers, fields}, {request, {collector_acc, resp}} ->
         fields = finch_fields_to_map(fields)
         resp = update_in(resp.trailers, &Map.merge(&1, fields))
-        {acc, req, resp}
+        {:cont, {request, {collector_acc, resp}}}
     end
 
-    case Finch.stream(finch_req, finch_name, {nil, req, resp}, fun, finch_options) do
-      {:ok, {{acc, collector}, req, resp}} ->
+    case run_stream_while(req, finch_req, finch_name, {nil, resp}, stream_fun, finch_options) do
+      {:ok, request, {{acc, collector}, resp}} ->
         acc = collector.(acc, :done)
-        {req, %{resp | body: acc}}
+        {request, %{resp | body: acc}}
 
-      # TODO: remove when we require Finch 0.20
-      {:error, exception} ->
-        {req, normalize_error(exception)}
+      {:error, request, exception, {nil, _resp}} ->
+        {request, exception}
 
-      {:error, exception, {nil, _req, _resp}} ->
-        {req, normalize_error(exception)}
-
-      {:error, exception, {{acc, collector}, _req, _resp}} ->
+      {:error, request, exception, {{acc, collector}, _resp}} ->
         collector.(acc, :halt)
-        {req, normalize_error(exception)}
+        {request, exception}
     end
   end
 
@@ -259,13 +254,81 @@ defmodule Req.Finch do
     end
   end
 
-  defp run_finch_request(finch_request, finch_name, finch_options) do
-    case Finch.request(finch_request, finch_name, finch_options) do
-      {:ok, response} ->
-        Req.Response.new(response)
+  defp run_finch_request(req, finch_request, finch_name, finch_options) do
+    response_acc = {nil, [], [], []}
 
-      {:error, exception} ->
-        normalize_error(exception)
+    response_from_acc = fn {status, headers, body, trailers} ->
+      Req.Response.new(
+        status: status,
+        headers: headers,
+        body: IO.iodata_to_binary(body),
+        trailers: trailers
+      )
+    end
+
+    stream_fun = fn
+      {:status, value}, {request, {_, headers, body, trailers}} ->
+        {:cont, {request, {value, headers, body, trailers}}}
+
+      {:headers, value}, {request, {status, headers, body, trailers}} ->
+        {:cont, {request, {status, headers ++ value, body, trailers}}}
+
+      {:data, value}, {request, {status, headers, body, trailers}} ->
+        {:cont, {request, {status, headers, [body | value], trailers}}}
+
+      {:trailers, value}, {request, {status, headers, body, trailers}} ->
+        {:cont, {request, {status, headers, body, trailers ++ value}}}
+    end
+
+    case run_stream_while(
+           req,
+           finch_request,
+           finch_name,
+           response_acc,
+           stream_fun,
+           finch_options
+         ) do
+      {:ok, request, response_acc} ->
+        {request, response_from_acc.(response_acc)}
+
+      {:error, request, exception, _response_acc} ->
+        {request, exception}
+    end
+  end
+
+  defp run_stream_while(request, finch_req, finch_name, state, fun, finch_options) do
+    finch_req =
+      case finch_req do
+        %{body: {:stream, req_body_fun}} when is_function(req_body_fun, 1) ->
+          wrapped_req_body_fun = fn
+            {request, state} ->
+              case req_body_fun.(request) do
+                {:cont, chunk, request} ->
+                  {:cont, chunk, {request, state}}
+
+                {:cont, request} ->
+                  {:cont, {request, state}}
+
+                {:halt, request} ->
+                  {:halt, {request, state}}
+
+                other ->
+                  other
+              end
+          end
+
+          put_in(finch_req.body, {:stream, wrapped_req_body_fun})
+
+        _ ->
+          finch_req
+      end
+
+    case Finch.stream_while(finch_req, finch_name, {request, state}, fun, finch_options) do
+      {:ok, {request, state}} ->
+        {:ok, request, state}
+
+      {:error, exception, {request, state}} ->
+        {:error, request, normalize_error(exception), state}
     end
   end
 

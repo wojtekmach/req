@@ -52,6 +52,7 @@ defmodule Req.Steps do
       :cache_dir,
       :plug,
       :finch,
+      # TODO: Deprecate :finch_request option.
       :finch_request,
       :finch_private,
       :connect_options,
@@ -1011,16 +1012,19 @@ defmodule Req.Steps do
     def run_plug(request) do
       plug = request.options.plug
 
-      req_body =
+      {req_body, request} =
         case request.body do
           iodata when is_binary(iodata) or is_list(iodata) ->
-            IO.iodata_to_binary(iodata)
+            {IO.iodata_to_binary(iodata), request}
 
           nil ->
-            ""
+            {"", request}
+
+          req_body_fun when is_function(req_body_fun, 1) ->
+            drain_req_body_fun(req_body_fun, request, [])
 
           enumerable ->
-            enumerable |> Enum.to_list() |> IO.iodata_to_binary()
+            {enumerable |> Enum.to_list() |> IO.iodata_to_binary(), request}
         end
 
       {req_body, request} =
@@ -1075,6 +1079,19 @@ defmodule Req.Steps do
         {request, exception}
       else
         handle_plug_result(conn, request)
+      end
+    end
+
+    defp drain_req_body_fun(req_body_fun, request, chunks) do
+      case req_body_fun.(request) do
+        {:cont, chunk, request} ->
+          drain_req_body_fun(req_body_fun, request, [chunk | chunks])
+
+        {:cont, request} ->
+          {chunks |> Enum.reverse() |> IO.iodata_to_binary(), request}
+
+        {:halt, request} ->
+          {chunks |> Enum.reverse() |> IO.iodata_to_binary(), request}
       end
     end
 
