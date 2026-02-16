@@ -19,6 +19,15 @@ defmodule Req.Finch do
 
     finch_name = finch_name(request)
 
+    # TODO: Remove when :finch_request is removed
+    if match?(
+         %{body: req_body_fun, options: %{finch_request: finch_request_fun}}
+         when is_function(req_body_fun, 1) and is_function(finch_request_fun),
+         request
+       ) do
+      raise ArgumentError, ":finch_request does not support body set to req_body_fun"
+    end
+
     request_headers =
       if unquote(Req.MixProject.legacy_headers_as_lists?()) do
         request.headers
@@ -38,7 +47,24 @@ defmodule Req.Finch do
           nil
 
         req_body_fun when is_function(req_body_fun, 1) ->
-          {:stream, req_body_fun}
+          wrapped_req_body_fun = fn
+            {request, state} ->
+              case req_body_fun.(request) do
+                {:cont, chunk, request} ->
+                  {:cont, chunk, {request, state}}
+
+                {:cont, request} ->
+                  {:cont, {request, state}}
+
+                {:halt, request} ->
+                  {:halt, {request, state}}
+
+                other ->
+                  other
+              end
+          end
+
+          {:stream, wrapped_req_body_fun}
 
         enumerable ->
           {:stream, enumerable}
@@ -297,32 +323,6 @@ defmodule Req.Finch do
   end
 
   defp run_stream_while(request, finch_req, finch_name, state, fun, finch_options) do
-    finch_req =
-      case finch_req do
-        %{body: {:stream, req_body_fun}} when is_function(req_body_fun, 1) ->
-          wrapped_req_body_fun = fn
-            {request, state} ->
-              case req_body_fun.(request) do
-                {:cont, chunk, request} ->
-                  {:cont, chunk, {request, state}}
-
-                {:cont, request} ->
-                  {:cont, {request, state}}
-
-                {:halt, request} ->
-                  {:halt, {request, state}}
-
-                other ->
-                  other
-              end
-          end
-
-          put_in(finch_req.body, {:stream, wrapped_req_body_fun})
-
-        _ ->
-          finch_req
-      end
-
     case Finch.stream_while(finch_req, finch_name, {request, state}, fun, finch_options) do
       {:ok, {request, state}} ->
         {:ok, request, state}
