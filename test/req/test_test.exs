@@ -131,6 +131,18 @@ defmodule Req.TestTest do
       Req.Test.stub(:foo, {Foo, "hi"})
       assert Req.get!(plug: {Req.Test, :foo}).body == "hi"
     end
+
+    test "extended configuration" do
+      Req.Test.stub(:accepts_non_utf8_query, fn conn ->
+        assert conn.query_params == %{"foo" => <<0xFF>>}
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end)
+
+      assert Req.get!(
+               plug: {Req.Test, name: :accepts_non_utf8_query, validate_utf8_query: false},
+               params: %{foo: <<0xFF>>}
+             ).body == "ok"
+    end
   end
 
   describe "allow/3" do
