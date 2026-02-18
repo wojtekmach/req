@@ -2252,6 +2252,14 @@ defmodule Req.Steps do
                 "expected :retry_delay not to be set when the :retry function is returning `{:delay, milliseconds}`"
         end
 
+        {:delay, delay, request_retry_modifier} when is_function(request_retry_modifier) ->
+          if !Req.Request.get_option(request, :retry_delay) do
+            retry(request, response_or_exception, delay, request_retry_modifier)
+          else
+            raise ArgumentError,
+                  "expected :retry_delay not to be set when the :retry function is returning `{:delay, milliseconds, request_retry_modifier}`"
+          end
+
       true ->
         retry(request, response_or_exception)
 
@@ -2295,14 +2303,18 @@ defmodule Req.Steps do
   defp retry(request, response_or_exception, delay_or_nil \\ nil)
 
   defp retry(request, response_or_exception, nil) do
-    do_retry(request, response_or_exception, &get_retry_delay/3)
+    do_retry(request, response_or_exception, &get_retry_delay/3, fn request -> request end)
   end
 
   defp retry(request, response_or_exception, delay) when is_integer(delay) do
-    do_retry(request, response_or_exception, fn request, _, _ -> {request, delay} end)
+    do_retry(request, response_or_exception, fn request, _, _ -> {request, delay} end, fn request -> request end)
   end
 
-  defp do_retry(request, response_or_exception, delay_getter) do
+  defp retry(request, response_or_exception, delay, request_retry_modifier) when is_integer(delay) and is_function(request_retry_modifier) do
+    do_retry(request, response_or_exception, fn request, _, _ -> {request, delay} end, request_retry_modifier)
+  end
+
+  defp do_retry(request, response_or_exception, delay_getter, request_retry_modifier) when is_function(request_retry_modifier) do
     retry_count = Req.Request.get_private(request, :req_retry_count, 0)
     {request, delay} = delay_getter.(request, response_or_exception, retry_count)
     max_retries = Req.Request.get_option(request, :max_retries, 3)
@@ -2311,6 +2323,7 @@ defmodule Req.Steps do
     if retry_count < max_retries do
       log_retry(response_or_exception, retry_count, max_retries, delay, log_level)
       Process.sleep(delay)
+      request = request_retry_modifier.(request)
       request = Req.Request.put_private(request, :req_retry_count, retry_count + 1)
       {request, response_or_exception} = Req.Request.run_request(%{request | halted: false})
       Req.Request.halt(request, response_or_exception)
