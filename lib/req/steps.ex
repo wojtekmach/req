@@ -1058,7 +1058,7 @@ defmodule Req.Steps do
       conn =
         Req.Test.Adapter.conn(%Plug.Conn{}, request.method, request.url, req_body)
         |> Map.replace!(:req_headers, req_headers)
-        |> Plug.Conn.fetch_query_params()
+        |> Plug.Conn.fetch_query_params(validate_utf8: false)
         |> Plug.Parsers.call(parser_opts)
 
       # Handle cases where the body isn't read with Plug.Parsers

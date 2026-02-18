@@ -2180,10 +2180,11 @@ defmodule Req.StepsTest do
       plug = fn conn ->
         {:ok, body, conn} = Plug.Conn.read_body(conn)
         assert body == ~s|{"a":1}|
+        assert conn.query_params == %{"foo" => <<0xFF>>}
         Plug.Conn.send_resp(conn, 200, "ok")
       end
 
-      assert Req.request!(plug: plug, json: %{a: 1}).body == "ok"
+      assert Req.request!(plug: plug, json: %{a: 1}, params: %{foo: <<0xFF>>}).body == "ok"
       refute_receive _
     end
 
