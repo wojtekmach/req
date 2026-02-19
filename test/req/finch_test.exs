@@ -233,14 +233,14 @@ defmodule Req.FinchTest do
       req_body_fun = fn
         %Req.Request{private: %{phase: :bar}} = request ->
           request = Req.Request.put_private(request, :phase, :done)
-          {:cont, "bar", request}
+          {:data, "bar", request}
 
         %Req.Request{private: %{phase: :done}} = request ->
           {:cont, request}
 
         %Req.Request{} = request ->
           request = Req.Request.put_private(request, :phase, :bar)
-          {:cont, "foo", request}
+          {:data, "foo", request}
       end
 
       {req, resp} = Req.run!(method: :post, url: url, body: req_body_fun)
@@ -277,7 +277,7 @@ defmodule Req.FinchTest do
       req_body_fun = fn %Req.Request{} -> :oops end
 
       assert_raise RuntimeError,
-                   "expected {:cont, chunk, acc}, {:cont, acc}, or {:halt, acc} from req_body_fun, got: :oops",
+                   "expected req_body_fun to return {:data, chunk, acc}, {:cont, acc}, or {:halt, acc}, got: :oops",
                    fn ->
                      Req.post!(url: url, body: req_body_fun)
                    end

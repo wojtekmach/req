@@ -50,8 +50,8 @@ defmodule Req.Finch do
           wrapped_req_body_fun = fn
             {request, state} ->
               case req_body_fun.(request) do
-                {:cont, chunk, request} ->
-                  {:cont, chunk, {request, state}}
+                {:data, chunk, request} ->
+                  {:data, chunk, {request, state}}
 
                 {:cont, request} ->
                   {:cont, {request, state}}
