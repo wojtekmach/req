@@ -2215,11 +2215,11 @@ defmodule Req.StepsTest do
             %Req.Request{private: %{count: count}} = request ->
               request = Req.Request.put_private(request, :count, count + 1)
               request = Req.Request.put_private(request, :done, count + 1 >= 3)
-              {:cont, "chunk#{count}", request}
+              {:data, "chunk#{count}", request}
 
             %Req.Request{} = request ->
               request = Req.Request.put_private(request, :count, 1)
-              {:cont, "chunk0", request}
+              {:data, "chunk0", request}
           end
         )
 

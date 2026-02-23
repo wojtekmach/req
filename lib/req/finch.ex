@@ -60,7 +60,7 @@ defmodule Req.Finch do
                   {:halt, {request, state}}
 
                 other ->
-                  other
+                  raise "expected req_body_fun to return {:data, chunk, acc}, {:cont, acc}, or {:halt, acc}, got: #{inspect(other)}"
               end
           end
 

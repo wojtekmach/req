@@ -85,7 +85,7 @@ defmodule Req.MixProject do
       true ->
         # TODO: Use upstream finch when updated
         # []
-        [github: "wojtekmach/finch", branch: "wm-stream-req-body-with-acc", override: true]
+        [github: "sneako/finch", branch: "main", override: true]
     end
   end
 

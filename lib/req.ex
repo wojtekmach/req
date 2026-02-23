@@ -204,7 +204,7 @@ defmodule Req do
 
           The function receives the `request` and should return one of:
 
-            * `{:cont, chunk, request}` - emit request body `chunk` and continue streaming.
+            * `{:data, chunk, request}` - emit request body `chunk` and continue streaming.
 
             * `{:cont, request}` - request body streaming is done.
 

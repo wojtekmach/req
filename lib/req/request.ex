@@ -78,7 +78,7 @@ defmodule Req.Request do
 
           It should return one of:
 
-            * `{:cont, chunk, request}` - emit request body `chunk`.
+            * `{:data, chunk, request}` - emit request body `chunk`.
 
             * `{:cont, request}` - request body is done.
 
@@ -366,7 +366,7 @@ defmodule Req.Request do
   The request struct.
   """
   @type req_body_fun() ::
-          (t() -> {:cont, iodata(), t()} | {:cont, t()} | {:halt, t()})
+          (t() -> {:data, binary(), t()} | {:cont, t()} | {:halt, t()})
 
   @type t() :: %Req.Request{
           method: atom(),
