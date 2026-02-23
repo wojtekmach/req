@@ -1084,7 +1084,7 @@ defmodule Req.Steps do
 
     defp drain_req_body_fun(req_body_fun, request, chunks) do
       case req_body_fun.(request) do
-        {:cont, chunk, request} ->
+        {:data, chunk, request} ->
           drain_req_body_fun(req_body_fun, request, [chunk | chunks])
 
         {:cont, request} ->
