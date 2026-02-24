@@ -1087,11 +1087,14 @@ defmodule Req.Steps do
         {:data, chunk, request} ->
           drain_req_body_fun(req_body_fun, request, [chunk | chunks])
 
-        {:cont, request} ->
+        {:done, request} ->
           {chunks |> Enum.reverse() |> IO.iodata_to_binary(), request}
 
         {:halt, request} ->
           {chunks |> Enum.reverse() |> IO.iodata_to_binary(), request}
+
+        other ->
+          raise "expected req_body_fun to return {:data, chunk, acc}, {:done, acc}, or {:halt, acc}, got: #{inspect(other)}"
       end
     end
 
