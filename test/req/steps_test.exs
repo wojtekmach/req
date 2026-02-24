@@ -2210,7 +2210,7 @@ defmodule Req.StepsTest do
           end,
           body: fn
             %Req.Request{private: %{done: true}} = request ->
-              {:cont, request}
+              {:done, request}
 
             %Req.Request{private: %{count: count}} = request ->
               request = Req.Request.put_private(request, :count, count + 1)
