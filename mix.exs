@@ -8,7 +8,7 @@ defmodule Req.MixProject do
     [
       app: :req,
       version: @version,
-      elixir: "~> 1.14",
+      elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       package: package(),
@@ -59,7 +59,7 @@ defmodule Req.MixProject do
 
   defp deps do
     [
-      {:finch, "~> 0.17", finch_opts()},
+      {:finch, "~> 0.21.0", finch_opts()},
       {:mime, "~> 2.0.6 or ~> 2.1"},
       {:jason, "~> 1.0"},
       {:nimble_csv, "~> 1.0", optional: true},
@@ -83,7 +83,9 @@ defmodule Req.MixProject do
         [github: "sneako/finch", ref: ref]
 
       true ->
-        []
+        # TODO: Use upstream finch when updated
+        # []
+        [github: "sneako/finch", branch: "main", override: true]
     end
   end
 

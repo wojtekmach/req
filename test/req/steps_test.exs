@@ -2201,6 +2201,34 @@ defmodule Req.StepsTest do
       refute_receive _
     end
 
+    test "request body fun" do
+      req =
+        Req.new(
+          plug: fn conn ->
+            {:ok, body, conn} = Plug.Conn.read_body(conn)
+            Plug.Conn.send_resp(conn, 200, body)
+          end,
+          body: fn
+            %Req.Request{private: %{done: true}} = request ->
+              {:done, request}
+
+            %Req.Request{private: %{count: count}} = request ->
+              request = Req.Request.put_private(request, :count, count + 1)
+              request = Req.Request.put_private(request, :done, count + 1 >= 3)
+              {:data, "chunk#{count}", request}
+
+            %Req.Request{} = request ->
+              request = Req.Request.put_private(request, :count, 1)
+              {:data, "chunk0", request}
+          end
+        )
+
+      {req, resp} = Req.run!(req)
+      assert resp.body == "chunk0chunk1chunk2"
+      assert req.private.count == 3
+      refute_receive _
+    end
+
     test "fetches query params" do
       plug = fn conn ->
         assert conn.query_params == %{"a" => "1"}

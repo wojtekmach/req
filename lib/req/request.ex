@@ -73,6 +73,17 @@ defmodule Req.Request do
 
         * `enumerable` - stream request body
 
+        * `req_body_fun` - stream request body chunks from a 1-arity function.
+          The function receives the request (as accumulator).
+
+          It should return one of:
+
+            * `{:data, chunk, request}` - emit request body `chunk`.
+
+            * `{:cont, request}` - request body is done.
+
+            * `{:halt, request}` - cancel request.
+
     * `:into` - where to send the response body. It can be one of:
 
         * `nil` - (default) read the whole response body and store it in the `response.body`
@@ -354,11 +365,14 @@ defmodule Req.Request do
   @typedoc """
   The request struct.
   """
+  @type req_body_fun() ::
+          (t() -> {:data, binary(), t()} | {:cont, t()} | {:halt, t()})
+
   @type t() :: %Req.Request{
           method: atom(),
           url: URI.t(),
           headers: %{optional(binary()) => [binary()]},
-          body: iodata() | Enumerable.t() | nil,
+          body: iodata() | Enumerable.t() | req_body_fun() | nil,
           into:
             nil
             | iodata()
