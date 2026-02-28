@@ -1561,7 +1561,7 @@ defmodule Req.Steps do
       response.body["brotli"]
       #=> true
 
-  [brotli]: http://hex.pm/packages/brotli
+  [brotli]: https://hex.pm/packages/brotli
   [ezstd]: https://hex.pm/packages/ezstd
   """
   @doc step: :response
