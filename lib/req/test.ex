@@ -124,9 +124,9 @@ defmodule Req.Test do
 
   ## Broadway
 
-  If you're using `Req.Test` with [Broadway](https://hex.pm/broadway), you may need to use
+  If you're using `Req.Test` with [Broadway](https://hex.pm/packages/broadway), you may need to use
   `allow/3` to make stubs available in the Broadway processors. A great way to do that is
-  to hook into the [Telemetry](https://hex.pm/telemetry) events that Broadway publishes to
+  to hook into the [Telemetry](https://hex.pm/packages/telemetry) events that Broadway publishes to
   manually allow the processors and batch processors to access the stubs. This approach is
   similar to what is [documented in Broadway
   itself](https://hexdocs.pm/broadway/Broadway.html#module-testing-with-ecto).
