@@ -56,6 +56,7 @@ defmodule Req.Steps do
       :finch_private,
       :connect_options,
       :inet6,
+      :request_timeout,
       :receive_timeout,
       :pool_timeout,
       :unix_socket,
@@ -820,6 +821,9 @@ defmodule Req.Steps do
     * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
 
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
+
+    * `:request_timeout` - response timeout in milliseconds, defaults to `:infinity`.
+      See `Finch.request/3`.
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket.
 
