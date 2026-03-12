@@ -481,7 +481,7 @@ defmodule Req.Steps do
 
   Automatically change GET to POST when body is set:
 
-      iex> Req.request!("https://httpbin.org/post", json: %{a: 1}).body
+      iex> Req.request!("https://httpbin.org/post", json: %{a: 1}).body["json"]
       %{"a" => 1}
   """
   @doc step: :request
@@ -1118,7 +1118,7 @@ defmodule Req.Steps do
 
         Please verify that you are using Plug.Conn.send_resp/3 in your plug:
 
-            Req.Test.stub(MyStub, fn conn, ->
+            Req.Test.stub(MyStub, fn conn ->
               Plug.Conn.send_resp(conn, 200, "Hello, World!")
             end)
         """
