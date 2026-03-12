@@ -1,3 +1,5 @@
+# TODO: When Finch v0.22 is out, remove "requires Finch main" from docs.
+
 defmodule Req.Finch do
   @moduledoc false
 

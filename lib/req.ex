@@ -204,11 +204,13 @@ defmodule Req do
 
           The function receives the `request` and should return one of:
 
-            * `{:data, chunk, request}` - emit request body `chunk` and continue streaming.
+            * `{:data, chunk, request}` - Emit request body `chunk` and continue streaming.
 
-            * `{:cont, request}` - request body streaming is done.
+            * `{:done, request}` - request body streaming is done.
 
-            * `{:halt, request}` - cancel request.
+            * `{:halt, request}` - cancel request. On HTTP/1, this closes the connection.
+
+          `req_body_fun` requires Finch main.
 
   Additional URL options:
 

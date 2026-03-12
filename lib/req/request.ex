@@ -80,9 +80,11 @@ defmodule Req.Request do
 
             * `{:data, chunk, request}` - emit request body `chunk`.
 
-            * `{:cont, request}` - request body is done.
+            * `{:done, request}` - request body is done.
 
-            * `{:halt, request}` - cancel request.
+            * `{:halt, request}` - cancel request. On HTTP/1, this closes the connection.
+
+          `req_body_fun` requires Finch main.
 
     * `:into` - where to send the response body. It can be one of:
 
@@ -366,7 +368,7 @@ defmodule Req.Request do
   The request struct.
   """
   @type req_body_fun() ::
-          (t() -> {:data, binary(), t()} | {:cont, t()} | {:halt, t()})
+          (t() -> {:data, binary(), t()} | {:done, t()} | {:halt, t()})
 
   @type t() :: %Req.Request{
           method: atom(),
