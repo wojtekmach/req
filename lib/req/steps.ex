@@ -2210,7 +2210,9 @@ defmodule Req.Steps do
 
         * integer
         * range
-        * list of integers/ranges
+        * atom - one of `:informational` (1xx), `:successful` (2xx), `:redirection` (3xx),
+          `:client_error` (4xx), or `:server_error` (5xx)
+        * list of integers/ranges/atoms
 
   > #### Order Matters! {: .info}
   >
@@ -2271,8 +2273,16 @@ defmodule Req.Steps do
     status in statuses
   end
 
+  @status_category_atoms [:informational, :successful, :redirection, :client_error, :server_error]
+
+  defp expect_success?(status, :informational), do: status in 100..199
+  defp expect_success?(status, :successful), do: status in 200..299
+  defp expect_success?(status, :redirection), do: status in 300..399
+  defp expect_success?(status, :client_error), do: status in 400..499
+  defp expect_success?(status, :server_error), do: status in 500..599
+
   defp expect_success?(status, [expect | tail])
-       when is_integer(expect) or is_struct(expect, Range) do
+       when is_integer(expect) or is_struct(expect, Range) or expect in @status_category_atoms do
     if expect_success?(status, expect) do
       true
     else
