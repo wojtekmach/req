@@ -37,18 +37,18 @@ defmodule Req.IntegrationTest do
   doctest Req.Steps,
     only: [
       auth: 1,
+      cache: 1,
       checksum: 1,
-      put_user_agent: 1,
       compressed: 1,
-      put_base_url: 1,
+      decompress_body: 1,
       encode_body: 1,
+      expect: 1,
+      handle_http_errors: 1,
+      put_base_url: 1,
       put_params: 1,
       put_path_params: 1,
       put_range: 1,
-      cache: 1,
-      decompress_body: 1,
-      handle_http_errors: 1,
-      expect: 1
+      put_user_agent: 1
     ]
 
   @tag :s3
