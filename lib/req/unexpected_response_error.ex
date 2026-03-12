@@ -1,4 +1,4 @@
-defmodule Req.UnexpectedResponseError do
+defmodule Req.UnexpectedResponseStatusError do
   @moduledoc """
   An exception returned by `Req.Steps.expect/1` when response has unexpected status.
 
