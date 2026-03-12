@@ -731,6 +731,8 @@ defmodule Req.Steps do
   @doc """
   Compresses the request body.
 
+  Not supported with `body: req_body_fun`.
+
   ## Request Options
 
     * `:compress_body` - if set to `true`, compresses the request body using gzip.
@@ -744,6 +746,9 @@ defmodule Req.Steps do
         case request.body do
           iodata when is_binary(iodata) or is_list(iodata) ->
             :zlib.gzip(iodata)
+
+          fun when is_function(fun, 1) ->
+            raise ArgumentError, "compress_body does not support req_body_fun"
 
           enumerable ->
             Req.Utils.stream_gzip(enumerable)

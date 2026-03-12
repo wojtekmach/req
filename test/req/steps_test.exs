@@ -419,6 +419,24 @@ defmodule Req.StepsTest do
       assert Req.post!(req).body == "foofoo"
     end
 
+    test "req_body_fun" do
+      req_body_fun = fn
+        %Req.Request{private: %{phase: :done}} = request ->
+          {:done, request}
+
+        %Req.Request{} = request ->
+          request = Req.Request.put_private(request, :phase, :done)
+          {:data, "foo", request}
+      end
+
+      assert_raise ArgumentError,
+                   "compress_body does not support req_body_fun",
+                   fn ->
+                     Req.new(method: :post, body: req_body_fun, compress_body: true)
+                     |> Req.Request.prepare()
+                   end
+    end
+
     test "nil body" do
       %{url: url} =
         start_http_server(fn conn ->
