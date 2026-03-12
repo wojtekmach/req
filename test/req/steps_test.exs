@@ -1725,6 +1725,31 @@ defmodule Req.StepsTest do
       assert {:error, e} = Req.get(plug: plug, expect: [201..202])
       assert Exception.message(e) =~ "expected status [201..202], got: 200"
     end
+
+    test "status category atom" do
+      plug_200 = fn conn -> Plug.Conn.send_resp(conn, 200, "ok") end
+      plug_301 = fn conn -> Plug.Conn.send_resp(conn, 301, "moved") end
+      plug_404 = fn conn -> Plug.Conn.send_resp(conn, 404, "not found") end
+      plug_500 = fn conn -> Plug.Conn.send_resp(conn, 500, "error") end
+
+      assert Req.get!(plug: plug_200, expect: :successful).body == "ok"
+      assert {:error, e} = Req.get(plug: plug_404, expect: :successful)
+      assert Exception.message(e) =~ "expected status :successful, got: 404"
+
+      assert Req.get!(plug: plug_301, expect: :redirection).body == "moved"
+      assert {:error, e} = Req.get(plug: plug_200, expect: :redirection)
+      assert Exception.message(e) =~ "expected status :redirection, got: 200"
+
+      assert Req.get!(plug: plug_404, expect: :client_error).body == "not found"
+      assert Req.get!(plug: plug_500, expect: :server_error).body == "error"
+    end
+
+    test "status category atom in list" do
+      plug = fn conn -> Plug.Conn.send_resp(conn, 200, "ok") end
+
+      assert Req.get!(plug: plug, expect: [:successful, :redirection]).body == "ok"
+      assert {:error, _} = Req.get(plug: plug, expect: [:redirection, :client_error])
+    end
   end
 
   ## Error steps
