@@ -57,7 +57,7 @@ write new ones.
 
   * Retries on errors (via [`retry`] step.)
 
-  * Raise on 4xx/5xx errors (via [`handle_http_errors`] step.)
+  * Raise on unexpected response status (via [`expect`] step.)
 
   * Verify response body against a checksum (via [`checksum`] step.)
 
@@ -268,8 +268,8 @@ limitations under the License.
 [`decode_body`]:        https://hexdocs.pm/req/Req.Steps.html#decode_body/1
 [`decompress_body`]:    https://hexdocs.pm/req/Req.Steps.html#decompress_body/1
 [`encode_body`]:        https://hexdocs.pm/req/Req.Steps.html#encode_body/1
+[`expect`]:             https://hexdocs.pm/req/Req.Steps.html#expect/1
 [`redirect`]:           https://hexdocs.pm/req/Req.Steps.html#redirect/1
-[`handle_http_errors`]: https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
 [`output`]:             https://hexdocs.pm/req/Req.Steps.html#output/1
 [`put_base_url`]:       https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
 [`put_params`]:         https://hexdocs.pm/req/Req.Steps.html#put_params/1

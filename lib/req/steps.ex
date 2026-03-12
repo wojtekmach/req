@@ -2128,6 +2128,7 @@ defmodule Req.Steps do
   @doc step: :response
   def handle_http_errors(request_response)
 
+  # TODO: deprecate
   def handle_http_errors({request, response}) when response.status >= 400 do
     case Map.get(request.options, :http_errors, :return) do
       :return ->
