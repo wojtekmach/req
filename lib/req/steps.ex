@@ -989,20 +989,6 @@ defmodule Req.Steps do
   which is particularly useful to create HTTP service stubs, similar to tools like
   [Bypass](https://github.com/PSPDFKit-labs/bypass).
 
-  Response streaming is also supported however at the moment the entire response
-  body is emitted as one chunk:
-
-      test "echo" do
-        plug = fn conn ->
-          conn = Plug.Conn.send_chunked(conn, 200)
-          {:ok, conn} = Plug.Conn.chunk(conn, "echo")
-          {:ok, conn} = Plug.Conn.chunk(conn, "echo")
-          conn
-        end
-
-        assert Req.get!(plug: plug, into: []).body == ["echoecho"]
-      end
-
   When testing JSON APIs, it's common to use the `Req.Test.json/2` helper:
 
       test "JSON" do
