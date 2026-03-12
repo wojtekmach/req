@@ -2194,7 +2194,7 @@ defmodule Req.Steps do
   Expect that response matches the given status.
 
   This step ensures the HTTP response has the given expected status, otherwise it
-  returns `Req.UnexpectedResponseError`.
+  returns `Req.UnexpectedResponseStatusError`.
 
   ## Request Options
 
@@ -2216,7 +2216,7 @@ defmodule Req.Steps do
 
   > #### Sensitive Response Data {: .warning}
   >
-  > This steps returns `Req.UnexpectedResponseError` which contains full `Req.Response`.
+  > This steps returns `Req.UnexpectedResponseStatusError` which contains full `Req.Response`.
   > Since response headers/body can contain sensitive data, be careful about raising
   > this error and automatically logging it, sending to exception trackers, etc.
 
@@ -2227,7 +2227,7 @@ defmodule Req.Steps do
       200
 
       iex> Req.get!("https://httpbin.org/status/404", expect: 200..299)
-      ** (Req.UnexpectedResponseError) expected status 200..299, got: 404
+      ** (Req.UnexpectedResponseStatusError) expected status 200..299, got: 404
 
       iex> {:error, e} = Req.get("https://httpbin.org/status/404", expect: 200..299)
       iex> e.expected_status
@@ -2244,7 +2244,7 @@ defmodule Req.Steps do
         {request, response}
       else
         {request,
-         Req.UnexpectedResponseError.exception(expected_status: expect, response: response)}
+         Req.UnexpectedResponseStatusError.exception(expected_status: expect, response: response)}
       end
     else
       {request, response}
