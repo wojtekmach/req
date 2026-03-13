@@ -447,7 +447,6 @@ defmodule Req.Request do
             error_steps: [],
             private: %{},
             registered_options: MapSet.new(),
-            current_request_steps: [],
             into: nil,
             async: nil
 
@@ -752,8 +751,7 @@ defmodule Req.Request do
   def append_request_steps(request, steps) do
     %{
       request
-      | request_steps: request.request_steps ++ steps,
-        current_request_steps: request.current_request_steps ++ Keyword.keys(steps)
+      | request_steps: request.request_steps ++ steps
     }
   end
 
@@ -774,8 +772,7 @@ defmodule Req.Request do
   def prepend_request_steps(request, steps) do
     %{
       request
-      | request_steps: steps ++ request.request_steps,
-        current_request_steps: Keyword.keys(steps) ++ request.current_request_steps
+      | request_steps: steps ++ request.request_steps
     }
   end
 
@@ -1112,12 +1109,10 @@ defmodule Req.Request do
   @spec run_request(t()) :: {t(), Req.Response.t() | Exception.t()}
   def run_request(request)
 
-  def run_request(%{current_request_steps: [step | rest]} = request) do
-    step = Keyword.fetch!(request.request_steps, step)
-
+  def run_request(%{request_steps: [{_name, step} | rest]} = request) do
     case run_step(step, request) do
       %Req.Request{} = request ->
-        run_request(%{request | current_request_steps: rest})
+        run_request(%{request | request_steps: rest})
 
       {%Req.Request{halted: true} = request, response_or_exception} ->
         {request, response_or_exception}
@@ -1130,7 +1125,7 @@ defmodule Req.Request do
     end
   end
 
-  def run_request(%{current_request_steps: []} = request) do
+  def run_request(%{request_steps: []} = request) do
     case run_step(request.adapter, request) do
       {request, %Req.Response{} = response} ->
         run_response(request, response)
