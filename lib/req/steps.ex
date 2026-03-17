@@ -2111,12 +2111,6 @@ defmodule Req.Steps do
     end
   end
 
-  @doc false
-  @deprecated "Use Req.Steps.redirect/1 instead"
-  def follow_redirects(request_response) do
-    follow_redirects(request_response)
-  end
-
   @doc """
   Handles HTTP 4xx/5xx error responses.
 
