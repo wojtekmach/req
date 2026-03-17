@@ -1546,15 +1546,11 @@ defmodule Req do
 
   ## Examples
 
-      iex> req = Req.new(assigns: [a: 1])
-      iex> req = Req.update_assign(req, :a, & &1 * 2)
+      iex> req = Req.new(assigns: [a: 10])
+      iex> req = Req.update_assign(req, :a, 1, & &1 + 1)
+      iex> req = Req.update_assign(req, :b, 1, & &1 + 1)
       iex> req.assigns
-      %{a: 2}
-
-      iex> req = Req.new(assigns: [a: 1])
-      iex> req = Req.update_assign(req, :b, 1, & &1 * 2)
-      iex> req.assigns
-      %{a: 1, b: 1}
+      %{a: 11, b: 1}
   """
   @doc since: "0.6.0"
   @spec update_assign(req_or_resp, key :: atom(), default :: term(), (term() -> term())) ::
