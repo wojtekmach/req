@@ -30,6 +30,10 @@ defmodule Req.Finch do
       raise ArgumentError, ":finch_request does not support body set to req_body_fun"
     end
 
+    if is_function(request.body, 1) and request.options[:into] in [:self, :legacy_self] do
+      raise ArgumentError, "into: :self does not support body set to req_body_fun"
+    end
+
     request_headers =
       if unquote(Req.MixProject.legacy_headers_as_lists?()) do
         request.headers
