@@ -1,6 +1,6 @@
 defmodule Req.TooManyRedirectsError do
   @moduledoc """
-  Represents an error when too many redirects occured, returned by `Req.Steps.redirect/1`.
+  Represents an error when too many redirects occurred, returned by `Req.Steps.redirect/1`.
   """
 
   defexception [:max_redirects]
