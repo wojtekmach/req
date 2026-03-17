@@ -113,7 +113,8 @@ defmodule Req.MixProject do
         "Request Steps": &(&1[:step] == :request),
         "Response Steps": &(&1[:step] == :response),
         "Error Steps": &(&1[:step] == :error),
-        Functions: &(&1[:kind] == :function and &1[:type] not in [:request, :mock, :async]),
+        Functions:
+          &(&1[:kind] == :function and &1[:type] not in [:request, :mock, :async, :assigns]),
         "Functions (Making Requests)": &(&1[:type] == :request),
         "Functions (Async Response)": &(&1[:type] == :async),
         "Functions (Mocks & Stubs)": &(&1[:type] == :mock)

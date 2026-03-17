@@ -59,6 +59,7 @@ defmodule Req do
       iex> resp =
       ...>   Req.get!("http://httpbin.org/stream/2", into: fn {:data, data}, {req, resp} ->
       ...>     IO.puts(data)
+      ...>     resp = Req.update_assign(resp, :count, 1, & &1 + 1)
       ...>     {:cont, {req, resp}}
       ...>   end)
       # output: {"url": "http://httpbin.org/stream/2", ...}
@@ -67,6 +68,8 @@ defmodule Req do
       200
       iex> resp.body
       ""
+      iex> resp.assigns
+      %{count: 2}
 
   Stream response body into a `Collectable`:
 
@@ -100,6 +103,19 @@ defmodule Req do
       :ok
 
   See `:into` option in `Req.new/1` documentation for more information on response body streaming.
+
+  ## Assigns and Private
+
+  `Req.Request` and `Req.Response` structs have two map fields for storing additional data:
+  `:assigns` and `:private`.
+
+  `:assigns` is a place for user data. It's commonly used when streaming response body with `into:
+  fun` or when using application-specific custom steps.
+
+  `:private` is a map reserved for libraries and frameworks to use. The keys must be atoms. Prefix
+  the keys with the name of your project to avoid any future conflicts. The `req_` prefix is
+  reserved for Req. For example, [`retry/1`](`Req.Steps.retry/1`) sets
+  `request.private.req_retry_count`.
 
   ## Headers
 
@@ -212,6 +228,8 @@ defmodule Req do
 
           `req_body_fun` requires Finch main.
 
+    * `:assigns` - shared user data as a map.
+
   Additional URL options:
 
     * `:base_url` - if set, the request URL is prepended with this base URL (via
@@ -302,13 +320,17 @@ defmodule Req do
 
         * `fun` - stream response body using a function. The first argument is a `{:data, data}`
           tuple containing the chunk of the response body. The second argument is a
-          `{request, response}` tuple. To continue streaming chunks, return `{:cont, {req, resp}}`.
+          `{req, resp}` tuple. To continue streaming chunks, return `{:cont, {req, resp}}`.
           To cancel, return `{:halt, {req, resp}}`. For example:
 
-              into: fn {:data, data}, {req, resp} ->
-                IO.puts(data)
-                {:cont, {req, resp}}
-              end
+              Req.request(
+                req,
+                into: fn {:data, data}, {req, resp} ->
+                  IO.puts(data)
+                  resp = Req.update_assign(resp, :count, 1, & &1 + 1)
+                  {:cont, {req, resp}}
+                end
+              )
 
         * `collectable` - stream response body into a `t:Collectable.t/0`. For example:
 
@@ -558,7 +580,7 @@ defmodule Req do
       IO.warn("Setting :redact_auth is deprecated and has no effect")
     end
 
-    request_option_names = [:method, :url, :headers, :body, :adapter, :into]
+    request_option_names = [:method, :url, :headers, :body, :adapter, :into, :assigns]
 
     {request_options, options} = Keyword.split(options, request_option_names)
 
@@ -581,6 +603,9 @@ defmodule Req do
 
         {:headers, new_headers}, acc ->
           update_in(acc.headers, &Req.Fields.merge(&1, new_headers))
+
+        {:assigns, assigns}, acc ->
+          update_in(acc.assigns, &Enum.into(assigns, &1))
 
         {name, value}, acc ->
           %{acc | name => value}
@@ -1386,6 +1411,158 @@ defmodule Req do
   @spec get_headers_list(Req.Request.t() | Req.Response.t()) :: [{binary(), binary()}]
   def get_headers_list(%struct{headers: headers}) when struct in [Req.Request, Req.Response] do
     Req.Fields.get_list(headers)
+  end
+
+  ## Assigns
+
+  @doc """
+  Assigns multiple values to request/response.
+
+  ## Examples
+
+      iex> req = Req.new()
+      iex> req.assigns
+      %{}
+      iex> req = Req.assign(req, a: 1, b: 2)
+      iex> req.assigns
+      %{a: 1, b: 2}
+  """
+  @doc since: "0.6.0"
+  @spec assign(req_or_resp, assigns :: map() | keyword()) :: req_or_resp
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def assign(%struct{} = req_or_resp, assigns)
+      when struct in [Req.Request, Req.Response] and (is_map(assigns) or is_list(assigns)) do
+    update_in(req_or_resp.assigns, &Enum.into(assigns, &1))
+  end
+
+  @doc """
+  Assigns key/value to request/response.
+
+  ## Examples
+
+      iex> req = Req.new()
+      iex> req.assigns
+      %{}
+      iex> req = Req.assign(req, :a, 1)
+      iex> req.assigns
+      %{a: 1}
+  """
+  @doc since: "0.6.0"
+  @spec assign(req_or_resp, key :: atom(), value :: term()) :: req_or_resp
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def assign(%struct{} = req_or_resp, key, value)
+      when struct in [Req.Request, Req.Response] and is_atom(key) do
+    update_in(req_or_resp.assigns, &Map.put(&1, key, value))
+  end
+
+  @doc """
+  Assigns multiple keys/values to request/response unless they are already set.
+
+  ## Examples
+
+      iex> req = Req.new()
+      iex> req.assigns
+      %{}
+      iex> req = Req.assign_new(req, a: 1)
+      iex> req.assigns
+      %{a: 1}
+      iex> req = Req.assign_new(req, a: 2, b: 2)
+      iex> req.assigns
+      %{a: 1, b: 2}
+  """
+  @doc since: "0.6.0"
+  @spec assign_new(req_or_resp, assigns :: keyword() | map()) :: req_or_resp
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def assign_new(req_or_resp, assigns)
+
+  def assign_new(%struct{} = req_or_resp, assigns)
+      when struct in [Req.Request, Req.Response] and is_map(assigns) do
+    update_in(req_or_resp.assigns, &Map.merge(&1, assigns, fn _k, v1, _v2 -> v1 end))
+  end
+
+  def assign_new(req_or_resp, assigns) when is_list(assigns) do
+    update_in(req_or_resp.assigns, &Map.merge(&1, Map.new(assigns), fn _k, v1, _v2 -> v1 end))
+  end
+
+  @doc """
+  Assigns key/value to request/response unless key is already set.
+
+  ## Examples
+
+      iex> req = Req.new()
+      iex> req.assigns
+      %{}
+      iex> req = Req.assign_new(req, :a, 1)
+      iex> req.assigns
+      %{a: 1}
+      iex> req = Req.assign_new(req, :a, 2)
+      iex> req.assigns
+      %{a: 1}
+  """
+  @doc since: "0.6.0"
+  @spec assign_new(req_or_resp, key :: atom(), value :: term()) :: req_or_resp
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def assign_new(%struct{} = req_or_resp, key, value)
+      when is_atom(key) and struct in [Req.Request, Req.Response] do
+    update_in(req_or_resp.assigns, &Map.put_new(&1, key, value))
+  end
+
+  @doc """
+  Updates assign `key` in request/response with the given function.
+
+  Raises if the `key` is not set.
+
+  See also `update_assign/4`.
+
+  ## Examples
+
+      iex> req = Req.new(assigns: [a: 1])
+      iex> req = Req.update_assign(req, :a, & &1 * 2)
+      iex> req.assigns
+      %{a: 2}
+
+      iex> req = Req.new(assigns: [a: 1])
+      iex> Req.update_assign(req, :b, & &1 * 2)
+      ** (KeyError) key :b not found in:
+      ...
+  """
+  @doc since: "0.6.0"
+  @spec update_assign(req_or_resp, key :: atom(), (term() -> term())) :: req_or_resp
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def update_assign(%struct{} = req_or_resp, key, fun)
+      when struct in [Req.Request, Req.Response] and is_atom(key) and is_function(fun, 1) do
+    update_in(req_or_resp.assigns, &Map.update!(&1, key, fun))
+  end
+
+  @doc """
+  Updates assign `key` in request/response with the given function or `default`.
+
+  If `key` is present in assigns then the existing value is passed to fun and its
+  result is used as the updated value of `key`. If `key` is not present in assigns,
+  `default` is inserted as the value of `key`. The `default` value will not be passed
+  through the update function.
+
+  See also `update_assign/3`.
+
+  ## Examples
+
+      iex> req = Req.new(assigns: [a: 1])
+      iex> req = Req.update_assign(req, :a, & &1 * 2)
+      iex> req.assigns
+      %{a: 2}
+
+      iex> req = Req.new(assigns: [a: 1])
+      iex> req = Req.update_assign(req, :b, 1, & &1 * 2)
+      iex> req.assigns
+      %{a: 1, b: 1}
+  """
+  @doc since: "0.6.0"
+  @spec update_assign(req_or_resp, key :: atom(), default :: term(), (term() -> term())) ::
+          req_or_resp
+        when req_or_resp: Req.Request.t() | Req.Response.t()
+  def update_assign(%struct{} = req_or_resp, key, default, fun)
+      when struct in [Req.Request, Req.Response] and is_atom(key) and is_function(fun, 1) do
+    update_in(req_or_resp.assigns, &Map.update(&1, key, default, fun))
   end
 
   # Plugins support is experimental and undocumented.
