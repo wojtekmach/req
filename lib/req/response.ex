@@ -67,6 +67,7 @@ defmodule Req.Response do
         Req.Fields.new([]),
         &Req.Fields.new_without_normalize_with_duplicates/1
       )
+      |> Map.update(:assigns, %{}, &Map.new/1)
 
     struct!(__MODULE__, options)
   end

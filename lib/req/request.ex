@@ -493,6 +493,7 @@ defmodule Req.Request do
       |> Keyword.update(:url, URI.new!(""), &URI.parse/1)
       |> Keyword.update(:headers, Req.Fields.new([]), &Req.Fields.new_without_normalize/1)
       |> Keyword.update(:options, %{}, &Map.new/1)
+      |> Keyword.update(:assigns, %{}, &Map.new/1)
 
     struct!(__MODULE__, options)
   end
