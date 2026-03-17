@@ -101,6 +101,19 @@ defmodule Req do
 
   See `:into` option in `Req.new/1` documentation for more information on response body streaming.
 
+  ## Assigns and Private
+
+  `Req.Request` and `Req.Response` structs have two map fields for storing additional data:
+  `:assigns` and `:private`.
+
+  `:assigns` is a place for user data. It's commonly used when streaming response body with `into:
+  fun` or when using application-specific custom steps.
+
+  `:private` is a map reserved for libraries and frameworks to use. The keys must be atoms. Prefix
+  the keys with the name of your project to avoid any future conflicts. The `req_` prefix is
+  reserved for Req. For example, [`retry/1`](`Req.Steps.retry/1`) sets
+  `request.private.req_retry_count`.
+
   ## Headers
 
   The HTTP specification requires that header names should be case-insensitive.
@@ -212,7 +225,7 @@ defmodule Req do
 
           `req_body_fun` requires Finch main.
 
-    * `:assigns` - TODO
+    * `:assigns` - shared user data as a map.
 
   Additional URL options:
 
@@ -304,13 +317,18 @@ defmodule Req do
 
         * `fun` - stream response body using a function. The first argument is a `{:data, data}`
           tuple containing the chunk of the response body. The second argument is a
-          `{request, response}` tuple. To continue streaming chunks, return `{:cont, {req, resp}}`.
+          `{req, resp}` tuple. To continue streaming chunks, return `{:cont, {req, resp}}`.
           To cancel, return `{:halt, {req, resp}}`. For example:
 
-              into: fn {:data, data}, {req, resp} ->
-                IO.puts(data)
-                {:cont, {req, resp}}
-              end
+              Req.request(
+                req,
+                assigns: %{count: 0},
+                into: fn {:data, data}, {req, resp} ->
+                  IO.puts(data)
+                  req = Req.update_assign(req, :count, & &1 + 1)
+                  {:cont, {req, resp}}
+                end
+              )
 
         * `collectable` - stream response body into a `t:Collectable.t/0`. For example:
 

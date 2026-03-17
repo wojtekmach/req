@@ -13,7 +13,7 @@ defmodule Req.Response do
 
     * `:trailers` - the HTTP response trailers. The trailer names must be downcased.
 
-    * `:assigns` - TODO
+    * `:assigns` - shared user data as a map.
 
     * `:private` - a map reserved for libraries and frameworks to use.
       Prefix the keys with the name of your project to avoid any future
