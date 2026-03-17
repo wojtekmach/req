@@ -59,6 +59,7 @@ defmodule Req do
       iex> resp =
       ...>   Req.get!("http://httpbin.org/stream/2", into: fn {:data, data}, {req, resp} ->
       ...>     IO.puts(data)
+      ...>     resp = Req.update_assign(resp, :count, 1, & &1 + 1)
       ...>     {:cont, {req, resp}}
       ...>   end)
       # output: {"url": "http://httpbin.org/stream/2", ...}
@@ -67,6 +68,8 @@ defmodule Req do
       200
       iex> resp.body
       ""
+      iex> resp.assigns
+      %{count: 2}
 
   Stream response body into a `Collectable`:
 
@@ -322,10 +325,9 @@ defmodule Req do
 
               Req.request(
                 req,
-                assigns: %{count: 0},
                 into: fn {:data, data}, {req, resp} ->
                   IO.puts(data)
-                  req = Req.update_assign(req, :count, & &1 + 1)
+                  resp = Req.update_assign(resp, :count, 1, & &1 + 1)
                   {:cont, {req, resp}}
                 end
               )
