@@ -1109,7 +1109,7 @@ defmodule Req.Steps do
           {chunks |> Enum.reverse() |> IO.iodata_to_binary(), request}
 
         other ->
-          raise "expected req_body_fun to return {:data, chunk, acc}, {:done, acc}, or {:halt, acc}, got: #{inspect(other)}"
+          raise "expected req_body_fun to return {:data, chunk, request}, {:done, request}, or {:halt, request}, got: #{inspect(other)}"
       end
     end
 
