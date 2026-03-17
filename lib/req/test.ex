@@ -329,7 +329,6 @@ defmodule Req.Test do
       ...>
       ...>   conn when conn.request_path == "/hello" ->
       ...>     Req.Test.text(conn, "Hello, World!")
-      ...>   conn -> dbg(conn)
       ...> end
       iex>
       iex> resp = Req.get!(plug: plug, url: "http://example.com")
@@ -638,7 +637,7 @@ defmodule Req.Test do
   @doc """
   Sets the `Req.Test` mode based on the given `ExUnit` context.
 
-  This works as a ExUnit callback:
+  This works as an ExUnit callback:
 
       setup :set_req_test_from_context
 
@@ -652,11 +651,11 @@ defmodule Req.Test do
   def set_req_test_from_context(context), do: set_req_test_to_shared(context)
 
   @doc """
-  Sets a ExUnit callback to verify the expectations on exit.
+  Sets an ExUnit callback to verify the expectations on exit.
 
   Similar to calling `verify!/0` at the end of your test.
 
-  This works as a ExUnit callback:
+  This works as an ExUnit callback:
 
       setup {Req.Test, :verify_on_exit!}
 

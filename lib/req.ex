@@ -1285,7 +1285,7 @@ defmodule Req do
     * `{:ok, chunks}` - where a chunk can be `{:data, binary}`, `{:trailers, trailers}`, or
       `:done`.
 
-    * `{:error, reason}` - an error occured
+    * `{:error, reason}` - an error occurred
 
     * `:unknown` - the message was not meant for this response.
 

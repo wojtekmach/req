@@ -15,7 +15,7 @@ if Code.ensure_loaded?(Plug.Conn) do
     ## Connection adapter
     def read_req_body(state, opts \\ []) do
       # We restore the body for the first automatic read for backwards
-      # compatability with Req 0.5.10 and below.
+      # compatibility with Req 0.5.10 and below.
       # TODO: remove in 0.6 if we allow opting out
 
       case Plug.Adapters.Test.Conn.read_req_body(state, opts) do

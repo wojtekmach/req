@@ -365,11 +365,14 @@ defmodule Req.Request do
   """
 
   @typedoc """
-  The request struct.
+  A function for streaming request body chunks.
   """
   @type req_body_fun() ::
           (t() -> {:data, binary(), t()} | {:done, t()} | {:halt, t()})
 
+  @typedoc """
+  The request struct.
+  """
   @type t() :: %Req.Request{
           method: atom(),
           url: URI.t(),

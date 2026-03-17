@@ -477,7 +477,7 @@ defmodule Req.Steps do
   Encoding JSON:
 
       iex> Req.post!("https://httpbin.org/post", json: %{a: 1}).body["json"]
-      %{"a" => 2}
+      %{"a" => 1}
 
   Automatically change GET to POST when body is set:
 
@@ -794,7 +794,7 @@ defmodule Req.Steps do
 
       Req.get!("https://httpbin.org/json", finch: MyFinch)
 
-  More commonly you'd add the the custom Finch pool as part of your supervision tree in your
+  More commonly you'd add the custom Finch pool as part of your supervision tree in your
   `application.ex`:
 
       children = [
@@ -2231,7 +2231,7 @@ defmodule Req.Steps do
 
   > #### Sensitive Response Data {: .warning}
   >
-  > This steps returns `Req.UnexpectedResponseStatusError` which contains full `Req.Response`.
+  > This step returns `Req.UnexpectedResponseStatusError` which contains full `Req.Response`.
   > Since response headers/body can contain sensitive data, be careful about raising
   > this error and automatically logging it, sending to exception trackers, etc.
 
@@ -2347,7 +2347,7 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> Req.get!("https://httpbin.org/status/500,200")
+      iex> Req.get!("https://httpbin.org/status/500,200").status
       # 08:43:19.101 [warning] retry: got response with status 500, will retry in 941ms, 2 attempts left
       # 08:43:22.958 [warning] retry: got response with status 500, will retry in 1877ms, 1 attempt left
       200
