@@ -1427,7 +1427,6 @@ defmodule Req do
       iex> req.assigns
       %{a: 1, b: 2}
   """
-  @doc type: :assigns
   @doc since: "0.6.0"
   @spec assign(req_or_resp, assigns :: map() | keyword()) :: req_or_resp
         when req_or_resp: Req.Request.t() | Req.Response.t()
@@ -1448,7 +1447,6 @@ defmodule Req do
       iex> req.assigns
       %{a: 1}
   """
-  @doc type: :assigns
   @doc since: "0.6.0"
   @spec assign(req_or_resp, key :: atom(), value :: term()) :: req_or_resp
         when req_or_resp: Req.Request.t() | Req.Response.t()
@@ -1472,7 +1470,6 @@ defmodule Req do
       iex> req.assigns
       %{a: 1, b: 2}
   """
-  @doc type: :assigns
   @doc since: "0.6.0"
   @spec assign_new(req_or_resp, assigns :: keyword() | map()) :: req_or_resp
         when req_or_resp: Req.Request.t() | Req.Response.t()
@@ -1502,7 +1499,6 @@ defmodule Req do
       iex> req.assigns
       %{a: 1}
   """
-  @doc type: :assigns
   @doc since: "0.6.0"
   @spec assign_new(req_or_resp, key :: atom(), value :: term()) :: req_or_resp
         when req_or_resp: Req.Request.t() | Req.Response.t()
@@ -1530,7 +1526,6 @@ defmodule Req do
       ** (KeyError) key :b not found in:
       ...
   """
-  @doc type: :assigns
   @doc since: "0.6.0"
   @spec update_assign(req_or_resp, key :: atom(), (term() -> term())) :: req_or_resp
         when req_or_resp: Req.Request.t() | Req.Response.t()
@@ -1561,7 +1556,6 @@ defmodule Req do
       iex> req.assigns
       %{a: 1, b: 1}
   """
-  @doc type: :assigns
   @doc since: "0.6.0"
   @spec update_assign(req_or_resp, key :: atom(), default :: term(), (term() -> term())) ::
           req_or_resp

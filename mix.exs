@@ -116,7 +116,6 @@ defmodule Req.MixProject do
         Functions:
           &(&1[:kind] == :function and &1[:type] not in [:request, :mock, :async, :assigns]),
         "Functions (Making Requests)": &(&1[:type] == :request),
-        "Functions (Assigns)": &(&1[:type] == :assigns),
         "Functions (Async Response)": &(&1[:type] == :async),
         "Functions (Mocks & Stubs)": &(&1[:type] == :mock)
       ],
