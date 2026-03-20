@@ -35,6 +35,7 @@ defmodule Req.Steps do
       :compress_body,
       :checksum,
       :aws_sigv4,
+      :escape_url,
 
       # response steps
       :raw,
@@ -85,7 +86,8 @@ defmodule Req.Steps do
       put_plug: &Req.Steps.put_plug/1,
       compress_body: &Req.Steps.compress_body/1,
       checksum: &Req.Steps.checksum/1,
-      put_aws_sigv4: &Req.Steps.put_aws_sigv4/1
+      put_aws_sigv4: &Req.Steps.put_aws_sigv4/1,
+      escape_url: &Req.Steps.escape_url/1
     )
     |> Req.Request.prepend_response_steps(
       retry: &Req.Steps.retry/1,
@@ -1320,6 +1322,86 @@ defmodule Req.Steps do
       _ -> nil
     end
   end
+
+  def escape_url(request) do
+    if Req.Request.get_option(request, :escape_url, true) do
+      request |> escape_host() |> escape_path() |> escape_query()
+    else
+      request
+    end
+  end
+
+  defp escape_host(request) when is_binary(request.url.host) do
+    with {:ok, host} <- decode_host_and_ensure_not_encoded_ip(request.url.host),
+         {:ok, host} <- encode_host(host, request.url.scheme) do
+      put_in(request.url.host, host)
+    else
+      :error -> raise ArgumentError, "invalid URL host: #{inspect(request.url.host)}"
+    end
+  end
+
+  defp escape_host(request), do: request
+
+  defp decode_host_and_ensure_not_encoded_ip(host) do
+    case :inet.parse_address(to_charlist(host)) do
+      {:ok, _} ->
+        {:ok, host}
+
+      {:error, _} ->
+        with decoded <- URI.decode(host),
+             {:error, _} <- :inet.parse_address(to_charlist(decoded)) do
+          {:ok, decoded}
+        else
+          # a non-IP host decoded to an IP address, this kind of scenario was a
+          # vulnerability in hackney: GHSA-pj7v
+          {:ok, _encoded_ip} -> :error
+        end
+    end
+  end
+
+  defp encode_host(host, "http+unix"), do: {:ok, host}
+
+  defp encode_host(host, _scheme) do
+    if host |> to_charlist |> List.ascii_printable?() do
+      {:ok, host}
+    else
+      {:ok, host |> :idna.encode() |> to_string()}
+    end
+  catch
+    :exit, {:bad_label, _} -> :error
+  end
+
+  defp escape_path(request) when is_binary(request.url.path) do
+    if escape_segment?(request.url.path) do
+      update_in(request.url.path, &URI.encode/1)
+    else
+      request
+    end
+  end
+
+  defp escape_path(request), do: request
+
+  defp escape_query(request) when is_binary(request.url.query) do
+    if escape_segment?(request.url.query) do
+      update_in(request.url.query, &URI.encode/1)
+    else
+      request
+    end
+  end
+
+  defp escape_query(request), do: request
+
+  defp escape_segment?(<<?%, octet::binary-size(2), rest::binary>>) do
+    case Base.decode16(octet) do
+      {:ok, _} -> escape_segment?(rest)
+      :error -> true
+    end
+  end
+
+  defp escape_segment?(<<?%, _rest::binary>>), do: true
+  defp escape_segment?(<<?\s, _rest::binary>>), do: true
+  defp escape_segment?(<<_, rest::binary>>), do: escape_segment?(rest)
+  defp escape_segment?(<<>>), do: false
 
   ## Response steps
 
