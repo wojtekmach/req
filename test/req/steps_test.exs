@@ -1471,6 +1471,34 @@ defmodule Req.StepsTest do
       end
     end
 
+    test "escapes location", c do
+      Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
+        location =
+          case conn.query_string do
+            "" -> "/oh hai?param=with spaces"
+            string -> "/oh hai?" <> string
+          end
+
+        redirect(conn, 302, location)
+      end)
+
+      Bypass.expect(c.bypass, "GET", "/oh%20hai", fn conn ->
+        Plug.Conn.send_resp(conn, 200, conn.query_string)
+      end)
+
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               response = Req.get!(c.url <> "/redirect")
+               assert response.status == 200
+               assert response.body == "param=with%20spaces"
+             end) =~ "[debug] redirecting to /oh%20hai?param=with%20spaces"
+
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               response = Req.get!(c.url <> "/redirect?a=1")
+               assert response.status == 200
+               assert response.body == "a=1"
+             end) =~ "[debug] redirecting to /oh%20hai?a=1"
+    end
+
     test "without location", c do
       Bypass.expect(c.bypass, "POST", "/redirect", fn conn ->
         Plug.Conn.send_resp(conn, 303, "")
