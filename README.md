@@ -223,8 +223,8 @@ There are many packages that extend the Req library. To get yours listed here, s
 
 ## Presentations
 
-  * [Req: A batteries-included HTTP client for Elixir - ElixirConf 2023, 2023-09-08](https://www.youtube.com/watch?v=owz2QacFuoQ "ElixirConf 2023 - Wojtek Mach - Req - a batteries-included HTTP client for Elixir")
-  * [Req: A batteries included HTTP client for Elixir - Elixir Kenya, 2022-08-26](https://www.youtube.com/watch?v=NxWgvHRN6mI "Req: A batteries included HTTP client for Elixir")
+  * [Building API Clients with Req -- ElixirConf EU 2024](https://www.youtube.com/watch?v=AexE5JKpNvA)
+  * [Req: A batteries-included HTTP client for Elixir -- ElixirConf 2023](https://www.youtube.com/watch?v=owz2QacFuoQ)
 
 ## Development
 
