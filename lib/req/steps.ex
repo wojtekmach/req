@@ -2032,7 +2032,7 @@ defmodule Req.Steps do
 
         request =
           request
-          |> build_redirect_request(response, location)
+          |> build_redirect_request(response, URI.encode(location))
           |> Req.Request.put_private(:req_redirect_count, redirect_count + 1)
 
         {request, response_or_exception} = Req.Request.run_request(request)
