@@ -2457,10 +2457,16 @@ defmodule Req.Steps do
 
   defp get_retry_delay(request, %Req.Response{status: status} = response, retry_count)
        when status in [429, 503] do
-    if delay = Req.Response.get_retry_after(response) do
-      {request, delay}
-    else
-      calculate_retry_delay(request, retry_count)
+    case Req.Request.fetch_option(request, :retry_delay) do
+      {:ok, _retry_delay} ->
+        calculate_retry_delay(request, retry_count)
+
+      :error ->
+        if delay = Req.Response.get_retry_after(response) do
+          {request, delay}
+        else
+          calculate_retry_delay(request, retry_count)
+        end
     end
   end
 

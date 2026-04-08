@@ -1979,6 +1979,33 @@ defmodule Req.StepsTest do
       assert Req.request!(adapter: adapter, retry_delay: 100, max_retries: 5).body == "ok"
     end
 
+    test "configured :retry_delay takes precedence over Retry-After" do
+      pid = self()
+
+      adapter = fn request ->
+        request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
+
+        response =
+          case request.private.attempt do
+            0 ->
+              Req.Response.new(status: 429) |> retry_after(0)
+
+            1 ->
+              Req.Response.new(status: 200, body: "ok")
+          end
+
+        {request, response}
+      end
+
+      retry_delay = fn retry_count ->
+        send(pid, {:retry_delay, retry_count})
+        0
+      end
+
+      assert Req.request!(adapter: adapter, retry_delay: retry_delay, max_retries: 1).body == "ok"
+      assert_received {:retry_delay, 0}
+    end
+
     defp retry_after(r, value), do: Req.Response.put_header(r, "retry-after", retry_after(value))
     defp retry_after(integer) when is_integer(integer), do: to_string(integer)
     defp retry_after(%DateTime{} = dt), do: Req.Utils.format_http_date(dt)
