@@ -214,13 +214,6 @@ defmodule Req.FinchTest do
       end
     end
 
-    test ":finch and :inet6" do
-      # :inet6 can be auto-set for IPv6 URLs; it should not conflict with :finch
-      assert_raise ArgumentError, "unknown registry: MyFinch", fn ->
-        Req.get!("http://localhost", finch: MyFinch, inet6: true)
-      end
-    end
-
     test ":finch with IPv6 URL" do
       start_supervised!(
         {Plug.Cowboy,
@@ -247,10 +240,12 @@ defmodule Req.FinchTest do
          }}
       )
 
-      # Before the fix, this would raise "cannot set both :finch and :connect_options"
-      # because Req auto-sets inet6: true for IPv6 URLs like [::1]
+      # :inet6 can be auto-set for IPv6 URLs; it should not conflict with :finch
       req = Req.new(url: "http://[::1]:#{ipv6_port}", finch: finch_name)
       assert Req.request!(req).body == "ok"
+
+      assert Req.request!("http://localhost:#{ipv6_port}", finch: finch_name, inet6: true).body ==
+               "ok"
     end
 
     def send_telemetry_metadata_pid(_name, _measurements, metadata, _) do
