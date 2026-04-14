@@ -195,6 +195,40 @@ defmodule Req.FinchTest do
       end
     end
 
+    test ":finch with IPv6 URL" do
+      start_supervised!(
+        {Plug.Cowboy,
+         scheme: :http,
+         plug: ExamplePlug,
+         ref: ExamplePlug.IPv6Named,
+         port: 0,
+         net: :inet6,
+         ipv6_v6only: true}
+      )
+
+      ipv6_port = :ranch.get_port(ExamplePlug.IPv6Named)
+
+      finch_name = __MODULE__.IPv6Finch
+
+      start_supervised!(
+        {Finch,
+         name: finch_name,
+         pools: %{
+           default: [
+             protocols: [:http1],
+             conn_opts: [transport_opts: [inet6: true]]
+           ]
+         }}
+      )
+
+      # :inet6 can be auto-set for IPv6 URLs; it should not conflict with :finch
+      req = Req.new(url: "http://[::1]:#{ipv6_port}", finch: finch_name)
+      assert Req.request!(req).body == "ok"
+
+      assert Req.request!("http://localhost:#{ipv6_port}", finch: finch_name, inet6: true).body ==
+               "ok"
+    end
+
     def send_telemetry_metadata_pid(_name, _measurements, metadata, _) do
       send(metadata.request.private.pid, :telemetry_private)
       :ok
