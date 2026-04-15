@@ -471,6 +471,10 @@ defmodule Req do
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket.
 
+    * `:pool_tag` - the tag to use when selecting which Finch pool to use for a request.
+      Defaults to `:default`. This allows routing requests to different pools for the same
+      host. See `Finch.Pool.new/2` for more information on configuring tagged pools.
+
     * `:pool_max_idle_time` - the maximum number of milliseconds that a pool can be
       idle before being terminated, used only by HTTP1 pools. Defaults to `:infinity`.
 

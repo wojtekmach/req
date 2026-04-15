@@ -76,9 +76,13 @@ defmodule Req.Finch do
           {:stream, enumerable}
       end
 
+    build_opts =
+      request.options
+      |> Map.take([:unix_socket, :pool_tag])
+      |> Enum.to_list()
+
     finch_request =
-      Finch.build(request.method, request.url, request_headers, body)
-      |> Map.replace!(:unix_socket, request.options[:unix_socket])
+      Finch.build(request.method, request.url, request_headers, body, build_opts)
       |> add_private_options(request.options[:finch_private])
 
     finch_options =
