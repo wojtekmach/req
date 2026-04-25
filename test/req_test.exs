@@ -65,6 +65,26 @@ defmodule ReqTest do
     assert headers == [{"x-a", "2"}, {"x-b", "1"}]
   end
 
+  test "warns and strips userinfo when set", c do
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      [user_agent] = Plug.Conn.get_req_header(conn, "user-agent")
+      Plug.Conn.send_resp(conn, 200, user_agent)
+    end)
+
+    url = String.replace(c.url, "http://", "http://foo:bar@")
+
+    assert ExUnit.CaptureLog.capture_log(fn ->
+             req = Req.new(url: url)
+
+             # userinfo has been stripped
+             refute inspect(req) =~ "foo:bar@"
+             assert inspect(req) =~ c.url
+
+             # request is sent without userinfo
+             assert Req.get!(req).status == 200
+           end) =~ "[warning] non-empty url userinfo will be ignored"
+  end
+
   test "redact" do
     assert inspect(Req.new(auth: {:bearer, "foo"})) =~ ~s|auth: {:bearer, "***"}|
 
