@@ -599,7 +599,14 @@ defmodule Req do
     request =
       Enum.reduce(request_options, request, fn
         {:url, url}, acc ->
-          put_in(acc.url, URI.parse(url))
+          case URI.parse(url) do
+            uri when is_binary(uri.userinfo) ->
+              acc = put_in(acc.url, %{uri | userinfo: nil})
+              update_in(acc.options, &Map.put_new(&1, :auth, {:basic, uri.userinfo}))
+
+            uri ->
+              put_in(acc.url, uri)
+          end
 
         {:headers, new_headers}, acc ->
           update_in(acc.headers, &Req.Fields.merge(&1, new_headers))
