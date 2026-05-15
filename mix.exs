@@ -59,7 +59,7 @@ defmodule Req.MixProject do
 
   defp deps do
     [
-      {:finch, "~> 0.21.0", finch_opts()},
+      {:finch, "~> 0.21 or ~> 0.22", finch_opts()},
       {:mime, "~> 2.0.6 or ~> 2.1"},
       {:jason, "~> 1.0"},
       {:nimble_csv, "~> 1.0", optional: true},

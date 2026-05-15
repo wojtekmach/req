@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## Unreleased
+
+  * [`run_finch`]: Normalize `Finch.TransportError` and `Finch.HTTPError`
+    (introduced in Finch v0.22.0) into `Req.TransportError` and `Req.HTTPError`,
+    matching the existing handling of `Mint.TransportError` / `Mint.HTTPError`.
+
 ## v0.5.17 (2026-01-22)
 
   * [`retry`]: Use default delay if `retry-after` is "negative"

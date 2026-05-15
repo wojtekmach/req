@@ -215,6 +215,17 @@ defmodule Req.Finch do
     %Req.HTTPError{protocol: :http2, reason: reason}
   end
 
+  # Finch >= 0.22 wraps Mint errors in its own structs. Use `is_struct/2` so
+  # this still compiles against older Finch versions where these modules don't exist.
+  defp normalize_error(error) when is_struct(error, Finch.TransportError) do
+    %Req.TransportError{reason: error.reason}
+  end
+
+  defp normalize_error(error) when is_struct(error, Finch.HTTPError) do
+    protocol = if error.module == Mint.HTTP2, do: :http2, else: :http1
+    %Req.HTTPError{protocol: protocol, reason: error.reason}
+  end
+
   defp normalize_error(error) do
     error
   end
