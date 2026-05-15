@@ -665,7 +665,7 @@ defmodule Req.FinchTest do
         {req, Req.Response.new(status: resp.status, headers: resp.headers, body: resp.body)}
       end
 
-      assert Req.get!(url, finch_request: fun, pool_tag: :bulk).body == "ok"
+      assert Req.get!(url, finch_request: fun, finch: {Req.Finch, pool_tag: :bulk}).body == "ok"
       assert_received {:pool_tag, :bulk}
     end
 

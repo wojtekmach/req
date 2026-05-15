@@ -441,6 +441,16 @@ defmodule Req do
   Finch options ([`run_finch`](`Req.Steps.run_finch/1`) step), see `Finch.start_link/1` for options:
 
     * `:finch` - the Finch pool to use. Defaults to pool automatically started by `Req`.
+      Can be either a pool name (atom) or a `{name, opts}` tuple where `opts` can include:
+
+        * `:pool_tag` - the tag to use when selecting which Finch pool to use for a request.
+          Defaults to `:default`. This allows routing requests to different pools for the same
+          host. See `Finch.Pool.new/2` for more information on configuring tagged pools.
+
+      Examples:
+
+          Req.get!("https://api.example.com/data", finch: MyFinch)
+          Req.get!("https://api.example.com/data", finch: {MyFinch, pool_tag: :bulk})
 
     * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
       the given connection options (see `Mint.HTTP.connect/4` for options):
@@ -470,10 +480,6 @@ defmodule Req do
       See `Finch.request/3`.
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket.
-
-    * `:pool_tag` - the tag to use when selecting which Finch pool to use for a request.
-      Defaults to `:default`. This allows routing requests to different pools for the same
-      host. See `Finch.Pool.new/2` for more information on configuring tagged pools.
 
     * `:pool_max_idle_time` - the maximum number of milliseconds that a pool can be
       idle before being terminated, used only by HTTP1 pools. Defaults to `:infinity`.
