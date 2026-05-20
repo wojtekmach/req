@@ -108,6 +108,7 @@ defmodule Req.FinchTest do
       {:error, %Req.HTTPError{protocol: :http1, reason: :invalid_status_line}} = Req.request(req)
     end
 
+    @tag :capture_log
     test ":connect_options :protocol" do
       %{url: url} =
         start_http_server(fn conn ->
@@ -115,7 +116,13 @@ defmodule Req.FinchTest do
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
 
-      req = Req.new(url: url, connect_options: [protocols: [:http2]], retry: false)
+      req =
+        Req.new(
+          url: url,
+          connect_options: [protocols: [:http2]],
+          retry_delay: 100
+        )
+
       assert Req.request!(req).body == "ok"
     end
 
