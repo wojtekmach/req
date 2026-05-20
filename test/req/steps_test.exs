@@ -899,6 +899,70 @@ defmodule Req.StepsTest do
       assert Req.put!(req).body == "ok"
     end
 
+    test "excludes accept-encoding, hop-by-hop, and trace-id headers from signature" do
+      plug = fn conn ->
+        [authorization] = Plug.Conn.get_req_header(conn, "authorization")
+
+        signed_headers =
+          authorization
+          |> String.split(",")
+          |> Enum.find_value(fn part ->
+            case String.split(part, "=", parts: 2) do
+              ["SignedHeaders", value] -> String.split(value, ";")
+              _ -> nil
+            end
+          end)
+
+        for excluded <- [
+              "accept-encoding",
+              "x-amzn-trace-id",
+              "connection",
+              "keep-alive",
+              "proxy-authenticate",
+              "proxy-authorization",
+              "te",
+              "trailer",
+              "transfer-encoding",
+              "upgrade"
+            ] do
+          refute excluded in signed_headers,
+                 "expected #{excluded} not in SignedHeaders, got: #{inspect(signed_headers)}"
+        end
+
+        # Headers excluded from the signature are still sent on the wire.
+        assert ["zstd, br, gzip"] = Plug.Conn.get_req_header(conn, "accept-encoding")
+        assert ["trace-123"] = Plug.Conn.get_req_header(conn, "x-amzn-trace-id")
+        assert ["keep-alive"] = Plug.Conn.get_req_header(conn, "connection")
+
+        # Non-excluded custom headers are still signed.
+        assert "x-custom" in signed_headers
+
+        Plug.Conn.send_resp(conn, 200, "ok")
+      end
+
+      req =
+        Req.new(
+          url: "https://s3.amazonaws.com",
+          aws_sigv4: [access_key_id: "foo", secret_access_key: "bar"],
+          headers: [
+            "x-amzn-trace-id": "trace-123",
+            connection: "keep-alive",
+            "keep-alive": "timeout=5",
+            "proxy-authenticate": "Basic",
+            "proxy-authorization": "Basic foo",
+            te: "trailers",
+            trailer: "Expires",
+            "transfer-encoding": "chunked",
+            upgrade: "websocket",
+            "x-custom": "signed"
+          ],
+          body: "hello",
+          plug: plug
+        )
+
+      assert Req.put!(req).body == "ok"
+    end
+
     test "missing :access_key_id" do
       req = Req.new(aws_sigv4: [])
 
