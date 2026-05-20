@@ -215,6 +215,9 @@ defmodule Req.Finch do
     %Req.HTTPError{protocol: :http2, reason: reason}
   end
 
+  # TODO: When using finch ~> 0.22.0, convert to pattern matching
+  # and revisit explicitly handling Mint errors.
+  #
   # Finch >= 0.22 wraps Mint errors in its own structs. Use `is_struct/2` so
   # this still compiles against older Finch versions where these modules don't exist.
   defp normalize_error(error) when is_struct(error, Finch.TransportError) do
