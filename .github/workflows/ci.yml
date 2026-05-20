@@ -17,10 +17,10 @@ jobs:
         include:
           - pair:
               elixir: "1.15"
-              otp: "24"
+              otp: "25"
           - pair:
-              elixir: "1.19.2-otp-28"
-              otp: "28.1.1"
+              elixir: "1.19.5-otp-28"
+              otp: "28.5"
             lint: lint
     steps:
       - uses: actions/checkout@v6
