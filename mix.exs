@@ -83,9 +83,7 @@ defmodule Req.MixProject do
         [github: "sneako/finch", ref: ref]
 
       true ->
-        # TODO: Use upstream finch when updated
-        # []
-        [github: "sneako/finch", ref: "db69afe", override: true]
+        []
     end
   end
 
