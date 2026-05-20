@@ -2164,7 +2164,7 @@ defmodule Req.Steps do
 
             * `Req.TransportError` with `reason: :timeout | :econnrefused | :closed`
 
-            * `Req.HTTPError` with `protocol: :http2, reason: :unprocessed`
+            * `Req.HTTPError` with `protocol: :http2, reason: :unprocessed | :pool_not_available`
 
         * `:transient` - same as `:safe_transient` except retries all HTTP methods (POST, DELETE, etc.)
 
@@ -2284,7 +2284,8 @@ defmodule Req.Steps do
     true
   end
 
-  defp transient?(%Req.HTTPError{protocol: :http2, reason: :unprocessed}) do
+  defp transient?(%Req.HTTPError{protocol: :http2, reason: reason})
+       when reason in [:unprocessed, :pool_not_available] do
     true
   end
 
