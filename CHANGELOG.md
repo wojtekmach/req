@@ -2,9 +2,16 @@
 
 ## Unreleased
 
+## v0.5.18 (2026-05-20)
+
+  * [`run_finch`]: Allow :finch option with IPv6 URLs.
+
   * [`run_finch`]: Normalize `Finch.TransportError` and `Finch.HTTPError`
-    (introduced in Finch v0.22.0) into `Req.TransportError` and `Req.HTTPError`,
-    matching the existing handling of `Mint.TransportError` / `Mint.HTTPError`.
+    (introduced in Finch v0.22.0) into `Req.TransportError` and `Req.HTTPError`.
+
+  * [`retry`]: Automatically retry on `:pool_not_available`.
+
+  * Require Finch ~> 0.21.0 or ~> 0.22.0.
 
 ## v0.5.17 (2026-01-22)
 
