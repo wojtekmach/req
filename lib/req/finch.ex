@@ -430,7 +430,7 @@ defmodule Req.Finch do
           pool_options
           |> :erlang.term_to_binary()
           |> :erlang.md5()
-          |> Base.url_encode64(padding: false)
+          |> Base.encode32(padding: false)
 
         name = Module.concat(Req.FinchSupervisor, "Pool_#{name}")
 
