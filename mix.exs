@@ -13,9 +13,8 @@ defmodule Req.MixProject do
       deps: deps(),
       package: package(),
       docs: docs(),
-      aliases: [
-        "test.all": ["test --include integration"]
-      ],
+      aliases: aliases(),
+      elixirc_paths: elixirc_paths(Mix.env()),
       xref: [
         exclude: [
           NimbleCSV.RFC4180,
@@ -32,7 +31,7 @@ defmodule Req.MixProject do
   def application do
     [
       mod: {Req.Application, []},
-      extra_applications: [:logger]
+      extra_applications: extra_applications(Mix.env())
     ]
   end
 
@@ -40,6 +39,7 @@ defmodule Req.MixProject do
     [
       preferred_envs: [
         "test.all": :test,
+        "test.adapters": :test,
         docs: :docs,
         "hex.publish": :docs
       ]
@@ -55,6 +55,33 @@ defmodule Req.MixProject do
         "Changelog" => "https://hexdocs.pm/req/changelog.html"
       }
     ]
+  end
+
+  defp aliases do
+    [
+      "test.all": ["test --include integration"],
+      "test.adapters": &test_adapters/1
+    ]
+  end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
+
+  defp extra_applications(:test), do: [:logger, :inets]
+  defp extra_applications(_), do: [:logger]
+
+  defp test_adapters(_args) do
+    for adapter <- ~w(finch httpc) do
+      {_, status} =
+        System.cmd("mix", ["test.all"],
+          env: [{"REQ_ADAPTER", adapter}],
+          into: IO.stream(:stdio, :line)
+        )
+
+      if status != 0 do
+        exit({:shutdown, status})
+      end
+    end
   end
 
   defp deps do

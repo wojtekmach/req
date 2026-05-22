@@ -1,5 +1,5 @@
 defmodule Req.IntegrationTest do
-  use ExUnit.Case, async: true
+  use Req.Case, async: true
 
   @moduletag :integration
 

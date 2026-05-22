@@ -1,6 +1,5 @@
 defmodule ReqTest do
-  use ExUnit.Case, async: true
-  import TestHelper, only: [start_http_server: 1, start_https_server: 1]
+  use Req.Case, async: true
 
   doctest Req,
     only:
@@ -117,6 +116,7 @@ defmodule ReqTest do
     assert Req.put!(echo_url, body: resp.body).body == "foobarbaz"
   end
 
+  @tag :http2
   test "http1 + http2" do
     %{url: url} =
       start_https_server(fn conn ->

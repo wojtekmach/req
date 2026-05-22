@@ -1,16 +1,25 @@
-defmodule TestHelper do
-  def start_http_server(plug) when is_function(plug, 1) do
-    options = [
-      scheme: :http,
-      port: 0,
-      plug: fn conn, _ -> plug.(conn) end,
-      startup_log: false,
-      http_options: [compress: false]
-    ]
+defmodule Req.Case do
+  use ExUnit.CaseTemplate
+
+  using do
+    quote do
+      import Req.Case
+    end
+  end
+
+  def start_http_server(plug, options \\ []) when is_function(plug, 1) do
+    options =
+      [
+        scheme: :http,
+        port: 0,
+        plug: fn conn, _ -> plug.(conn) end,
+        startup_log: false,
+        http_options: [compress: false]
+      ] ++ options
 
     pid = ExUnit.Callbacks.start_supervised!({Bandit, options})
-    {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)
-    %{pid: pid, url: URI.new!("http://localhost:#{port}")}
+    {:ok, {ip, port}} = ThousandIsland.listener_info(pid)
+    %{pid: pid, ip: ip, port: port, url: URI.new!("http://localhost:#{port}")}
   end
 
   def start_https_server(plug) when is_function(plug, 1) do
@@ -48,6 +57,19 @@ defmodule TestHelper do
 
     accept(listen_socket, fun)
   end
+
+  def adapter do
+    case System.get_env("REQ_ADAPTER", "finch") do
+      "finch" ->
+        :finch
+
+      "httpc" ->
+        :httpc
+
+      adapter ->
+        raise "unknown REQ_ADAPTER=#{inspect(adapter)}"
+    end
+  end
 end
 
 defmodule EzstdFilter do
@@ -67,5 +89,16 @@ end
 
 :logger.add_primary_filter(:ezstd_filter, {&EzstdFilter.filter/2, []})
 
-ExUnit.configure(exclude: :integration)
+exclude =
+  if Req.Case.adapter() == :httpc do
+    [:integration, :http2]
+  else
+    [:integration]
+  end
+
+if adapter = System.get_env("REQ_ADAPTER") do
+  IO.puts("Running with REQ_ADAPTER=#{adapter}")
+end
+
+ExUnit.configure(exclude: exclude)
 ExUnit.start()

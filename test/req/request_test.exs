@@ -1,5 +1,5 @@
 defmodule Req.RequestTest do
-  use ExUnit.Case, async: true
+  use Req.Case, async: true
   doctest Req.Request, except: [delete_header: 2]
 
   setup do

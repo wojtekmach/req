@@ -1,5 +1,5 @@
 defmodule Req.UtilsTest do
-  use ExUnit.Case, async: true
+  use Req.Case, async: true
 
   # TODO: Remove when we require Elixir 1.14
   if Version.match?(System.version(), "~> 1.14") do
