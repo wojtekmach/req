@@ -1477,12 +1477,7 @@ defmodule Req.Steps do
         end
 
       request = Req.Request.put_new_header(request, "host", request.url.host)
-
-      headers =
-        for {name, values} <- request.headers,
-            String.downcase(name) not in @aws_sigv4_excluded_headers,
-            value <- values,
-            do: {name, value}
+      headers = Req.Fields.drop(request.headers, @aws_sigv4_excluded_headers)
 
       headers =
         Req.Utils.aws_sigv4_headers(
