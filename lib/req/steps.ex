@@ -1357,6 +1357,27 @@ defmodule Req.Steps do
   defp hash_init(:sha1), do: hash_init(:sha)
   defp hash_init(type), do: :crypto.hash_init(type)
 
+  @aws_sigv4_excluded_headers [
+    # Services like R2 can rewrite this header when
+    # encodings it doesn't support are included, i.e. zstd
+    "accept-encoding",
+    # Trace ID can be rewritten by AWS infrastructure
+    "x-amzn-trace-id",
+    # Authorization is set by SigV4 itself / not part of canonical request
+    "authorization",
+    # RFC 2616 Section 13.5.1 "hop-by-hop" headers
+    # (list is historical; RFC 7230/9110 use Connection header as the
+    # authoritative mechanism, but this enumeration remains the practical baseline)
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailer",
+    "transfer-encoding",
+    "upgrade"
+  ]
+
   @doc """
   Signs request with AWS Signature Version 4.
 
@@ -1456,8 +1477,7 @@ defmodule Req.Steps do
         end
 
       request = Req.Request.put_new_header(request, "host", request.url.host)
-
-      headers = for {name, values} <- request.headers, value <- values, do: {name, value}
+      headers = Req.Fields.drop(request.headers, @aws_sigv4_excluded_headers)
 
       headers =
         Req.Utils.aws_sigv4_headers(

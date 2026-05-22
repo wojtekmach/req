@@ -214,6 +214,29 @@ defmodule Req.Fields do
   end
 
   @doc """
+  Drops the given `names`.
+  """
+  if @legacy? do
+    def drop(fields, names) when is_binary(name) do
+      names_to_drop = Enum.map(names, &ensure_name_downcase/1)
+
+      for {name, value} <- fields,
+          name not in names_to_drop do
+        {name, value}
+      end
+    end
+  else
+    def drop(fields, names) do
+      names_to_drop = Enum.map(names, &ensure_name_downcase/1)
+
+      for {name, values} <- fields,
+          name not in names_to_drop do
+        {name, values}
+      end
+    end
+  end
+
+  @doc """
   Returns fields as list.
   """
   def get_list(fields)
