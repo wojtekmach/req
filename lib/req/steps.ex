@@ -815,6 +815,16 @@ defmodule Req.Steps do
   ## Request Options
 
     * `:finch` - the name of the Finch pool. Defaults to a pool automatically started by Req.
+      Can be either a pool name (atom) or a `{name, opts}` tuple where `opts` can include:
+
+        * `:pool_tag` - the tag to use when selecting which Finch pool to use for a request.
+          Defaults to `:default`. This allows routing requests to different pools for the same
+          host. See `Finch.Pool.new/2` for more information on configuring tagged pools.
+
+      Examples:
+
+          Req.get!("https://api.example.com/data", finch: MyFinch)
+          Req.get!("https://api.example.com/data", finch: {MyFinch, pool_tag: :bulk})
 
     * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
       the given connection options:
