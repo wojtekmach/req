@@ -63,6 +63,7 @@ defmodule Req.Steps do
       :pool_timeout,
       :unix_socket,
       :pool_max_idle_time,
+      :conn_max_idle_time,
 
       # TODO: Remove on Req 1.0
       :output,
@@ -787,7 +788,11 @@ defmodule Req.Steps do
           pools: %{
             default: [
               # terminate idle {scheme, host, port} pool after 60s
-              pool_max_idle_time: 60_000
+              pool_max_idle_time: 60_000,
+              # discard HTTP1 connections that had been idle for more than
+              # 10 seconds at the time of the checkout
+              # can be useful for some network setups, e.g. AWS NAT Gateway
+              conn_max_idle_time: 10_000,
             ]
           }
         )
@@ -854,6 +859,10 @@ defmodule Req.Steps do
 
     * `:pool_max_idle_time` - the maximum number of milliseconds that a pool can be
       idle before being terminated, used only by HTTP1 pools. Default to `:infinity`.
+
+    * `:conn_max_idle_time` - The maximum number of milliseconds an HTTP1 connection
+      is allowed to be idle before being closed during a checkout attempt.
+      The default value is `:infinity`.
 
     * `:finch_private` - a map or keyword list of private metadata to add to the Finch request.
       May be useful for adding custom data when handling telemetry with `Finch.Telemetry`.
