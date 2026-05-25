@@ -149,6 +149,7 @@ defmodule Req do
   > For interopability with those, use
   > `Req.get_headers_list/1`.
   """
+  require Logger
 
   # Response streaming to caller:
   #
@@ -599,7 +600,7 @@ defmodule Req do
     request =
       Enum.reduce(request_options, request, fn
         {:url, url}, acc ->
-          put_in(acc.url, URI.parse(url))
+          put_in(acc.url, parse_url(url))
 
         {:headers, new_headers}, acc ->
           update_in(acc.headers, &Req.Fields.merge(&1, new_headers))
@@ -621,6 +622,24 @@ defmodule Req do
           new
       end)
     )
+  end
+
+  defp parse_url(url) do
+    url = URI.parse(url)
+
+    if url.userinfo do
+      Logger.warning("""
+      non-empty url userinfo will be ignored.
+
+      To use basic auth, use the :auth step:
+
+         auth: {:basic, "user:password"}
+      """)
+
+      %{url | userinfo: nil}
+    else
+      url
+    end
   end
 
   @doc """
