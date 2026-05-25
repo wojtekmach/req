@@ -2341,6 +2341,8 @@ defmodule Req.Steps do
 
             * `{:delay, milliseconds}` - retry with the given delay.
 
+            * :transient/:safe_transient - let built-in transient/safe-transient logic decide
+
             * `false/nil` - don't retry.
 
         * `false` - don't retry.
@@ -2372,32 +2374,9 @@ defmodule Req.Steps do
 
   def retry({request, response_or_exception}) do
     retry =
-      case Map.get(request.options, :retry, :safe_transient) do
-        :safe_transient ->
-          request.method in [:get, :head] and transient?(response_or_exception)
-
-        :transient ->
-          transient?(response_or_exception)
-
-        false ->
-          false
-
-        fun when is_function(fun) ->
-          apply_retry(fun, request, response_or_exception)
-
-        :safe ->
-          IO.warn("setting `retry: :safe` is deprecated in favour of `retry: :safe_transient`")
-          request.method in [:get, :head] and transient?(response_or_exception)
-
-        :never ->
-          IO.warn("setting `retry: :never` is deprecated in favour of `retry: false`")
-          false
-
-        other ->
-          raise ArgumentError,
-                "expected :retry to be :safe_transient, :transient, false, or a 2-arity function, " <>
-                  "got: #{inspect(other)}"
-      end
+      request.options
+      |> Map.get(:retry, :safe_transient)
+      |> should_retry?(request, response_or_exception)
 
     case retry do
       {:delay, delay} ->
@@ -2414,6 +2393,47 @@ defmodule Req.Steps do
       retry when retry in [false, nil] ->
         {request, response_or_exception}
     end
+  end
+
+  defp should_retry?(:safe_transient, request, response_or_exception) do
+    request.method in [:get, :head] and transient?(response_or_exception)
+  end
+
+  defp should_retry?(:transient, _request, response_or_exception) do
+    transient?(response_or_exception)
+  end
+
+  defp should_retry?(false, _request, _response_or_exception) do
+    false
+  end
+
+  defp should_retry?(fun, request, response_or_exception) when is_function(fun) do
+    case apply_retry(fun, request, response_or_exception) do
+      :safe_transient ->
+        should_retry?(:safe_transient, request, response_or_exception)
+
+      :transient ->
+        should_retry?(:transient, request, response_or_exception)
+
+      other ->
+        other
+    end
+  end
+
+  defp should_retry?(:safe, request, response_or_exception) do
+    IO.warn("setting `retry: :safe` is deprecated in favour of `retry: :safe_transient`")
+    request.method in [:get, :head] and transient?(response_or_exception)
+  end
+
+  defp should_retry?(:never, _request, _response_or_exception) do
+    IO.warn("setting `retry: :never` is deprecated in favour of `retry: false`")
+    false
+  end
+
+  defp should_retry?(other, _request, _response_or_exception) do
+    raise ArgumentError,
+          "expected :retry to be :safe_transient, :transient, false, or a 2-arity function, " <>
+            "got: #{inspect(other)}"
   end
 
   defp apply_retry(fun, request, response_or_exception)
