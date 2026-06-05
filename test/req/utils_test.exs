@@ -231,6 +231,28 @@ defmodule Req.UtilsTest do
              """
     end
 
+    test "escapes name, filename, and content_type to prevent header injection" do
+      %{body: body} =
+        Req.Utils.encode_form_multipart(
+          [
+            "na\"me\r\nX-Evil: 1":
+              {"value", filename: ~s(ev"il\r\n--foo\r\n), content_type: "text/plain\r\nX-Evil: 2"}
+          ],
+          boundary: "foo"
+        )
+
+      body = IO.iodata_to_binary(body)
+
+      assert body == """
+             --foo\r\n\
+             content-disposition: form-data; name=\"na%22me%0D%0AX-Evil: 1\"; filename=\"ev%22il%0D%0A--foo%0D%0A\"\r\n\
+             content-type: text/plain%0D%0AX-Evil: 2\r\n\
+             \r\n\
+             value\r\n\
+             --foo--\r\n\
+             """
+    end
+
     test "it works with size" do
       %{content_type: content_type, body: body, size: size} =
         Req.Utils.encode_form_multipart([field1: {"value", size: 5}], boundary: "foo")
