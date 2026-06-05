@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v0.6.0 (2026-06-08)
+
+  * [`encode_body`]: Security fix for `:form_multipart` header injection
+    ([GHSA-px9f-whj3-246m](https://github.com/wojtekmach/req/security/advisories/GHSA-px9f-whj3-246m)).
+
+    The multipart encoder interpolated the per-part `name`, `filename`, and
+    `content_type` into the part headers without escaping, so an
+    attacker-controlled value could inject extra headers or smuggle additional
+    parts into the request. These values are now escaped per RFC 7578 / WHATWG
+    form-data (`"`, CR, and LF are percent-encoded).
+
 ## v0.5.18 (2026-05-20)
 
   * [`run_finch`]: Allow :finch option with IPv6 URLs.
