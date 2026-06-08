@@ -1181,7 +1181,19 @@ defmodule Req.StepsTest do
         Req.Test.json(conn, %{a: 1})
       end
 
-      assert Req.get!(plug: plug, decode_json: [keys: :atoms]).body == %{a: 1}
+      assert Req.get!(plug: plug, decoders: [json: &Jason.decode(&1, keys: :atoms)]).body == %{
+               a: 1
+             }
+    end
+
+    test "deprecated :decode_json option" do
+      plug = fn conn ->
+        Req.Test.json(conn, %{a: 1})
+      end
+
+      assert ExUnit.CaptureIO.capture_io(:stderr, fn ->
+               assert Req.get!(plug: plug, decode_json: [keys: :atoms]).body == %{a: 1}
+             end) =~ "setting `decode_json: options` is deprecated"
     end
 
     test "json invalid" do

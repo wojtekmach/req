@@ -315,7 +315,9 @@ defmodule Req do
       Defaults to `[:json, :json_api]`. See [`decode_body`](`Req.Steps.decode_body/1`) for
       the supported formats and how to add custom decoders.
 
-    * `:decode_json` - options to pass to `Jason.decode!/2`, defaults to `[]`.
+    * `:decode_json` - (deprecated) options to pass to `Jason.decode/2`. Deprecated in favour
+      of passing a custom JSON decoder via the `:decoders` option, e.g.
+      `decoders: [json: &Jason.decode(&1, keys: :atoms)]`.
 
     * `:into` - where to send the response body. It can be one of:
 

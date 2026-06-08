@@ -1840,7 +1840,9 @@ defmodule Req.Steps do
     * `:decode_body` - if set to `false`, disables automatic response body decoding.
       Defaults to `true`.
 
-    * `:decode_json` - options to pass to `Jason.decode/2`, defaults to `[]`.
+    * `:decode_json` - (deprecated) options to pass to `Jason.decode/2`. Deprecated in favour
+      of passing a custom JSON decoder via the `:decoders` option, e.g.
+      `decoders: [json: &Jason.decode(&1, keys: :atoms)]`.
 
     * `:raw` - if set to `true`, disables response body decoding. Defaults to `false`.
 
@@ -1936,8 +1938,18 @@ defmodule Req.Steps do
   end
 
   defp builtin_codec(request, format) when format in [:json, :json_api] do
-    options = Req.Request.get_option(request, :decode_json, [])
-    fn body -> Jason.decode(body, options) end
+    case Req.Request.fetch_option(request, :decode_json) do
+      {:ok, options} ->
+        IO.warn(
+          "setting `decode_json: options` is deprecated in favour of " <>
+            "`decoders: [json: &Jason.decode(&1, options)]`"
+        )
+
+        fn body -> Jason.decode(body, options) end
+
+      :error ->
+        fn body -> Jason.decode(body) end
+    end
   end
 
   defp builtin_codec(_request, :zip), do: &Req.ZIP.decode/1

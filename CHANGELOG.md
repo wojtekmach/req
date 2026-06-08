@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## Unreleased
+
+  * [`decode_body`]: Deprecate `:decode_json` in favour of setting a custom JSON
+    decoder via `:decoders`:
+
+        # before:
+        Req.get!(url, decode_json: [keys: :atoms])
+
+        # after:
+        Req.get!(url, decoders: [json: &Jason.decode(&1, keys: :atoms)])
+
 ## v0.6.0 (2026-06-08)
 
   * [`encode_body`]: Security fix for `:form_multipart` header injection
@@ -47,6 +58,7 @@
         Req.get!(url, decoders: [:json, ics: &{:ok, ICal.from_ics(&1)}])
 
     Thanks to @PJUllrich for reporting it.
+
 ## v0.5.18 (2026-05-20)
 
   * [`run_finch`]: Allow :finch option with IPv6 URLs.
