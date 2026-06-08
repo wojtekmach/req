@@ -254,7 +254,13 @@ defmodule Req.RequestTest do
   @tag skip: System.otp_release() < "28"
   test "prepare/1" do
     request =
-      Req.new(method: :get, base_url: "http://foo", url: "/bar", auth: {:basic, "foo:bar"})
+      Req.new(
+        method: :get,
+        base_url: "http://foo",
+        url: "/bar",
+        auth: {:basic, "foo:bar"},
+        compressed: true
+      )
       |> Req.Request.prepare()
 
     assert request.url == URI.parse("http://foo/bar")
