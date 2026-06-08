@@ -64,6 +64,35 @@ defmodule ReqTest do
     assert headers == [{"x-a", "2"}, {"x-b", "1"}]
   end
 
+  test "respects userinfo in URL", c do
+    pid = self()
+
+    Bypass.expect(c.bypass, "GET", "/", fn conn ->
+      case List.keyfind(conn.req_headers, "authorization", 0) do
+        {_, auth_header} -> send(pid, {:authorization, auth_header})
+        _ -> nil
+      end
+
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    with_userinfo = String.replace(c.url, "http://", "http://foo:bar@")
+    Req.get!(with_userinfo)
+    assert_receive {:authorization, "Basic " <> _}
+
+    # explicit :auth option is favored over userinfo in URL
+    Req.get!(with_userinfo, auth: {:bearer, "token"})
+    assert_receive {:authorization, "Bearer token"}
+
+    req = Req.new(auth: {:bearer, "token"})
+    Req.get!(req, url: with_userinfo)
+    assert_receive {:authorization, "Bearer token"}
+
+    req = Req.new(url: with_userinfo)
+    refute inspect(req) =~ "foo:bar@"
+    assert inspect(req) =~ c.url
+  end
+
   test "redact" do
     assert inspect(Req.new(auth: {:bearer, "foo"})) =~ ~s|auth: {:bearer, "***"}|
 
