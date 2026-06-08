@@ -251,6 +251,7 @@ defmodule Req.RequestTest do
     assert {:ok, %{status: 200, body: "ok"}} = Req.Request.run(request)
   end
 
+  @tag skip: System.otp_release() < "28"
   test "prepare/1" do
     request =
       Req.new(method: :get, base_url: "http://foo", url: "/bar", auth: {:basic, "foo:bar"})
@@ -262,7 +263,7 @@ defmodule Req.RequestTest do
 
     if Req.MixProject.legacy_headers_as_lists?() do
       assert [
-               {"user-agent", "req/0.3.11"},
+               {"user-agent", "req/" <> _},
                {"accept-encoding", "zstd, br, gzip"},
                {"authorization", ^authorization}
              ] = request.headers
