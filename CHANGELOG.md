@@ -17,6 +17,12 @@
     kept the userinfo in the request URL (without converting it to auth). It is
     now dropped so credentials supplied by the redirecting server aren't sent.
 
+## v0.6.1 (2026-06-08)
+
+  * [`compressed`], [`decompress_body`]: Disable automatic decompression
+
+    Decompression is now opt-in by setting `compressed: true`.
+
 ## v0.6.0 (2026-06-08)
 
   * [`encode_body`]: Security fix for `:form_multipart` header injection
