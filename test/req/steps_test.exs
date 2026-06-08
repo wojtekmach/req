@@ -10,13 +10,18 @@ defmodule Req.StepsTest do
   ## Request steps
 
   describe "compressed" do
-    test "sets accept-encoding" do
-      req = Req.new() |> Req.Request.prepare()
+    test "sets accept-encoding when compressed: true" do
+      req = Req.new(compressed: true) |> Req.Request.prepare()
       assert req.headers["accept-encoding"] == ["zstd, br, gzip"]
     end
 
+    test "does not set accept-encoding by default" do
+      req = Req.new() |> Req.Request.prepare()
+      refute req.headers["accept-encoding"]
+    end
+
     test "does not set accept-encoding when streaming response body" do
-      req = Req.new(into: []) |> Req.Request.prepare()
+      req = Req.new(compressed: true, into: []) |> Req.Request.prepare()
       refute req.headers["accept-encoding"]
     end
   end
@@ -464,7 +469,7 @@ defmodule Req.StepsTest do
           |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
         end)
 
-      req = Req.new(url: url)
+      req = Req.new(url: url, compressed: true)
 
       resp = Req.get!(req, checksum: @foo_md5)
       assert resp.body == "foo"
@@ -905,6 +910,18 @@ defmodule Req.StepsTest do
   ## Response steps
 
   describe "decompress_body" do
+    test "is disabled by default" do
+      plug = fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("content-encoding", "gzip")
+        |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
+      end
+
+      resp = Req.get!(plug: plug)
+      assert Req.Response.get_header(resp, "content-encoding") == ["gzip"]
+      assert resp.body == :zlib.gzip("foo")
+    end
+
     test "gzip success" do
       plug = fn conn ->
         conn
@@ -912,7 +929,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
       end
 
-      resp = Req.get!(plug: plug)
+      resp = Req.get!(plug: plug, compressed: true)
       assert Req.Response.get_header(resp, "content-encoding") == []
       assert resp.body == "foo"
     end
@@ -925,7 +942,7 @@ defmodule Req.StepsTest do
       end
 
       assert_raise Req.DecompressError, "gzip decompression failed", fn ->
-        Req.get!(plug: plug)
+        Req.get!(plug: plug, compressed: true)
       end
     end
 
@@ -936,7 +953,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, "foo")
       end
 
-      resp = Req.get!(plug: plug)
+      resp = Req.get!(plug: plug, compressed: true)
       assert Req.Response.get_header(resp, "content-encoding") == []
       assert resp.body == "foo"
     end
@@ -950,7 +967,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, body)
       end
 
-      resp = Req.get!(plug: plug)
+      resp = Req.get!(plug: plug, compressed: true)
       assert resp.body == "foo"
     end
 
@@ -962,7 +979,7 @@ defmodule Req.StepsTest do
       end
 
       assert_raise Req.DecompressError, "br decompression failed", fn ->
-        Req.get!(plug: plug)
+        Req.get!(plug: plug, compressed: true)
       end
     end
 
@@ -973,7 +990,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, :ezstd.compress("foo"))
       end
 
-      resp = Req.get!(plug: plug)
+      resp = Req.get!(plug: plug, compressed: true)
       assert resp.body == "foo"
     end
 
@@ -987,7 +1004,7 @@ defmodule Req.StepsTest do
       assert_raise Req.DecompressError,
                    ~S[zstd decompression failed, reason: "failed to decompress: ZSTD_CONTENTSIZE_ERROR"],
                    fn ->
-                     Req.get!(plug: plug)
+                     Req.get!(plug: plug, compressed: true)
                    end
     end
 
@@ -998,7 +1015,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, "foo" |> :zlib.gzip() |> :ezstd.compress())
       end
 
-      resp = Req.get!(plug: plug)
+      resp = Req.get!(plug: plug, compressed: true)
       assert Req.Response.get_header(resp, "content-encoding") == []
       assert resp.body == "foo"
     end
@@ -1022,7 +1039,7 @@ defmodule Req.StepsTest do
           :ok = :gen_tcp.send(socket, data)
         end)
 
-      resp = Req.get!(url)
+      resp = Req.get!(url, compressed: true)
       assert Req.Response.get_header(resp, "content-encoding") == []
       assert Req.Response.get_header(resp, "content-length") == []
       assert resp.body == "foo"
@@ -1036,7 +1053,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, <<1, 2, 3>>)
       end
 
-      resp = Req.get!(plug: plug)
+      resp = Req.get!(plug: plug, compressed: true)
       assert Req.Response.get_header(resp, "content-encoding") == ["unknown1, unknown2"]
       assert resp.body == <<1, 2, 3>>
     end
@@ -1048,7 +1065,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, "")
       end
 
-      assert Req.head!(plug: plug).body == ""
+      assert Req.head!(plug: plug, compressed: true).body == ""
     end
   end
 
@@ -1383,7 +1400,7 @@ defmodule Req.StepsTest do
       |> Plug.Conn.send_resp(200, body)
     end
 
-    assert Req.get!("", plug: plug).body == %{"a" => 1}
+    assert Req.get!("", plug: plug, compressed: true).body == %{"a" => 1}
   end
 
   test "decompress and decode in raw mode" do
@@ -1399,7 +1416,9 @@ defmodule Req.StepsTest do
       |> Plug.Conn.send_resp(200, body)
     end
 
-    assert Req.get!("", plug: plug, raw: true).body |> :zlib.gunzip() |> Jason.decode!() == %{
+    assert Req.get!("", plug: plug, compressed: true, raw: true).body
+           |> :zlib.gunzip()
+           |> Jason.decode!() == %{
              "a" => 1
            }
   end
@@ -1419,7 +1438,7 @@ defmodule Req.StepsTest do
 
     {resp, log} =
       ExUnit.CaptureLog.with_log(fn ->
-        Req.get!(plug: plug)
+        Req.get!(plug: plug, compressed: true)
       end)
 
     assert resp.body |> :zlib.uncompress() |> Jason.decode!() == %{"a" => 1}

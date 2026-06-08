@@ -322,6 +322,9 @@ defmodule Req.Steps do
   @doc """
   Asks the server to return compressed response.
 
+  This step also enables the [`decompress_body`](`Req.Steps.decompress_body/1`) step, which
+  decompresses the response body. Both steps are off by default; set `compressed: true` to opt in.
+
   Supported formats:
 
     * `gzip`
@@ -330,32 +333,39 @@ defmodule Req.Steps do
 
     * `zstd` (if [ezstd] is installed)
 
+  > #### Only enable compression for trusted servers {: .info}
+  >
+  > The `decompress_body/1` step decompresses the whole response body into memory with no size
+  > limit, so a small response can expand into many gigabytes. A malicious or compromised server
+  > can exploit this to exhaust memory and crash the client (a decompression bomb / denial of
+  > service). For this reason compression is off by default; only set `compressed: true` for
+  > endpoints you trust.
+
   ## Request Options
 
     * `:compressed` - if set to `true`, sets the `accept-encoding` header with compression
-      algorithms that Req supports. Defaults to `true`.
+      algorithms that Req supports and decompresses the response body. Defaults to `false`.
 
-      When streaming response body (`into: fun | collectable`), `compressed` defaults to `false`.
+      This option has no effect when streaming the response body (`into: fun | collectable`).
 
   ## Examples
 
-  Req automatically decompresses response body (`decompress_body/1` step) so let's disable that by
-  passing `raw: true`.
+  By default, Req does not ask for a compressed response. Pass `compressed: true` to request one
+  and have Req decompress the body, so we get back the decompressed content:
 
-  By default, we ask the server to send compressed response. Let's look at the headers and the raw
-  body. Notice the body starts with `<<31, 139>>` (`<<0x1F, 0x8B>>`), the "magic bytes" for gzip:
+      iex> response = Req.get!("https://elixir-lang.org", compressed: true)
+      iex> response.body |> binary_part(0, 15)
+      "<!DOCTYPE html>"
 
-      iex> response = Req.get!("https://elixir-lang.org", raw: true)
+  To inspect the raw compressed bytes the server sent, additionally pass `raw: true`, which
+  disables decompression. Notice the body now starts with `<<31, 139>>`, the "magic bytes"
+  for gzip:
+
+      iex> response = Req.get!("https://elixir-lang.org", compressed: true, raw: true)
       iex> Req.Response.get_header(response, "content-encoding")
       ["gzip"]
       iex> response.body |> binary_part(0, 2)
       <<31, 139>>
-
-  Now, let's pass `compressed: false` and notice the raw body was not compressed:
-
-      iex> response = Req.get!("https://elixir-lang.org", raw: true, compressed: false)
-      iex> response.body |> binary_part(0, 15)
-      "<!DOCTYPE html>"
 
   The Brotli and Zstandard compression algorithms are also supported if the optional
   packages are installed:
@@ -366,7 +376,7 @@ defmodule Req.Steps do
         {:ezstd, "~> 1.0"}
       ])
 
-      response = Req.get!("https://httpbin.org/anything")
+      response = Req.get!("https://httpbin.org/anything", compressed: true)
       response.body["headers"]["Accept-Encoding"]
       #=> "zstd, br, gzip"
 
@@ -375,7 +385,7 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def compressed(%Req.Request{into: nil} = request) do
-    case Req.Request.get_option(request, :compressed, true) do
+    case Req.Request.get_option(request, :compressed, false) do
       true ->
         Req.Request.put_new_header(request, "accept-encoding", supported_accept_encoding())
 
@@ -1520,6 +1530,10 @@ defmodule Req.Steps do
   @doc """
   Decompresses the response body based on the `content-encoding` header.
 
+  This step only runs when the `:compressed` option is set to `true` (see the `compressed/1`
+  step); otherwise the body is left as is. This guards against decompression bombs, where a
+  small compressed response expands into a much larger body in memory.
+
   This step is disabled on response body streaming. If response body is not a binary, in other
   words it has been transformed by another step, it is left as is.
 
@@ -1539,13 +1553,16 @@ defmodule Req.Steps do
 
   ## Options
 
+    * `:compressed` - if set to `true`, decompresses the response body. Defaults to `false`.
+      See also the `compressed/1` step.
+
     * `:raw` - if set to `true`, disables response body decompression. Defaults to `false`.
 
       Note: setting `raw: true` also disables response body decoding in the `decode_body/1` step.
 
   ## Examples
 
-      iex> response = Req.get!("https://httpbin.org/gzip")
+      iex> response = Req.get!("https://httpbin.org/gzip", compressed: true)
       iex> response.body["gzipped"]
       true
 
@@ -1556,7 +1573,7 @@ defmodule Req.Steps do
         {:brotli, "~> 0.3.0"}
       ])
 
-      response = Req.get!("https://httpbin.org/brotli")
+      response = Req.get!("https://httpbin.org/brotli", compressed: true)
       Req.Response.get_header(response, "content-encoding")
       #=> ["br"]
       response.body["brotli"]
@@ -1576,7 +1593,10 @@ defmodule Req.Steps do
   end
 
   def decompress_body({request, response}) do
-    if request.options[:raw] do
+    compressed? = Req.Request.get_option(request, :compressed, false) == true
+    raw? = request.options[:raw] == true
+
+    if not compressed? or raw? do
       {request, response}
     else
       encoding_headers = Req.Response.get_header(response, "content-encoding")

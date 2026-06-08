@@ -269,11 +269,12 @@ defmodule Req do
 
   Response body options:
 
-    * `:compressed` - if set to `true`, asks the server to return compressed response.
-      (via [`compressed`](`Req.Steps.compressed/1`) step.) Defaults to `true`.
+    * `:compressed` - if set to `true`, asks the server to return a compressed response and
+      decompresses it (via the [`compressed`](`Req.Steps.compressed/1`) and
+      [`decompress_body`](`Req.Steps.decompress_body/1`) steps.) Defaults to `false`.
 
-    * `:raw` - if set to `true`, disables automatic body decompression
-      ([`decompress_body`](`Req.Steps.decompress_body/1`) step) and decoding
+    * `:raw` - if set to `true`, disables body decompression
+      ([`decompress_body`](`Req.Steps.decompress_body/1`) step) and automatic decoding
       ([`decode_body`](`Req.Steps.decode_body/1`) step.) Defaults to `false`.
 
     * `:decode_body` - if set to `false`, disables automatic response body decoding.
