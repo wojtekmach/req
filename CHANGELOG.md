@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## v0.6.0 (2026-06-08)
 
   * [`encode_body`]: Security fix for `:form_multipart` header injection
     ([GHSA-px9f-whj3-246m](https://github.com/wojtekmach/req/security/advisories/GHSA-px9f-whj3-246m)).
