@@ -15,8 +15,8 @@ defmodule Req.MixProject do
       docs: docs(),
       aliases: aliases(),
       elixirc_paths: elixirc_paths(Mix.env()),
-      xref: [
-        exclude: [
+      elixirc_options: [
+        no_warn_undefined: [
           NimbleCSV.RFC4180,
           Plug.Conn,
           Plug.HTML,
