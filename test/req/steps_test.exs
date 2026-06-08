@@ -2264,6 +2264,54 @@ defmodule Req.StepsTest do
     end
 
     @tag :capture_log
+    test "custom function returning :safe_transient", c do
+      pid = self()
+
+      Bypass.expect(c.bypass, "GET", "/", fn conn ->
+        send(pid, :ping)
+        Plug.Conn.send_resp(conn, 429, "oops")
+      end)
+
+      fun = fn _request, response ->
+        assert response.status == 429
+        :safe_transient
+      end
+
+      request = Req.new(url: c.url, retry: fun)
+
+      assert Req.get!(request).status == 429
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      refute_received _
+    end
+
+    @tag :capture_log
+    test "custom function returning :transient", c do
+      pid = self()
+
+      Bypass.expect(c.bypass, "POST", "/", fn conn ->
+        send(pid, :ping)
+        Plug.Conn.send_resp(conn, 429, "oops")
+      end)
+
+      fun = fn _request, response ->
+        assert response.status == 429
+        :transient
+      end
+
+      request = Req.new(url: c.url, retry: fun)
+
+      assert Req.post!(request).status == 429
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      refute_received _
+    end
+
+    @tag :capture_log
     test "raise on custom function returning {:delay, milliseconds} when `:retry_delay` is provided",
          c do
       pid = self()
