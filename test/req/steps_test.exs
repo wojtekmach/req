@@ -1061,7 +1061,7 @@ defmodule Req.StepsTest do
       plug = fn conn ->
         conn
         |> Plug.Conn.put_resp_header("content-encoding", "zstd")
-        |> Plug.Conn.send_resp(200, :ezstd.compress("foo"))
+        |> Plug.Conn.send_resp(200, :zstd.compress("foo"))
       end
 
       resp = Req.get!(plug: plug)
@@ -1076,7 +1076,7 @@ defmodule Req.StepsTest do
       end
 
       assert_raise Req.DecompressError,
-                   ~S[zstd decompression failed, reason: "failed to decompress: ZSTD_CONTENTSIZE_ERROR"],
+                   ~S[zstd decompression failed, reason: "Unknown frame descriptor"],
                    fn ->
                      Req.get!(plug: plug)
                    end
@@ -1086,7 +1086,7 @@ defmodule Req.StepsTest do
       plug = fn conn ->
         conn
         |> Plug.Conn.put_resp_header("content-encoding", "gzip, zstd")
-        |> Plug.Conn.send_resp(200, "foo" |> :zlib.gzip() |> :ezstd.compress())
+        |> Plug.Conn.send_resp(200, "foo" |> :zlib.gzip() |> :zstd.compress())
       end
 
       resp = Req.get!(plug: plug)
@@ -1099,7 +1099,7 @@ defmodule Req.StepsTest do
         start_tcp_server(fn socket ->
           assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
 
-          body = "foo" |> :zlib.gzip() |> :ezstd.compress()
+          body = "foo" |> :zlib.gzip() |> :zstd.compress() |> IO.iodata_to_binary()
 
           data = """
           HTTP/1.1 200 OK
@@ -1412,7 +1412,7 @@ defmodule Req.StepsTest do
       plug = fn conn ->
         conn
         |> Plug.Conn.put_resp_content_type("application/zstd", nil)
-        |> Plug.Conn.send_resp(200, :ezstd.compress("foo"))
+        |> Plug.Conn.send_resp(200, :zstd.compress("foo"))
       end
 
       assert Req.get!(plug: plug, decoders: [:zst]).body == "foo"
@@ -1422,7 +1422,7 @@ defmodule Req.StepsTest do
       plug = fn conn ->
         conn
         |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
-        |> Plug.Conn.send_resp(200, :ezstd.compress("foo"))
+        |> Plug.Conn.send_resp(200, :zstd.compress("foo"))
       end
 
       assert Req.get!(plug: plug, url: "/foo.zst", decoders: [:zst]).body == "foo"
@@ -1439,7 +1439,7 @@ defmodule Req.StepsTest do
       assert %RuntimeError{} = e
 
       assert Exception.message(e) ==
-               "Could not decompress Zstandard data: \"failed to decompress: ZSTD_CONTENTSIZE_ERROR\""
+               "Could not decompress Zstandard data: \"Unknown frame descriptor\""
     end
 
     test "csv" do

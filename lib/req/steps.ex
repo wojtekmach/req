@@ -332,7 +332,7 @@ defmodule Req.Steps do
 
     * `br` (if [brotli] is installed)
 
-    * `zstd` (if [ezstd] is installed)
+    * `zstd` (requires Erlang/OTP 28+)
 
   ## Request Options
 
@@ -361,13 +361,12 @@ defmodule Req.Steps do
       iex> response.body |> binary_part(0, 15)
       "<!DOCTYPE html>"
 
-  The Brotli and Zstandard compression algorithms are also supported if the optional
-  packages are installed:
+  Zstandard is supported out of the box on Erlang/OTP 28+ (via the built-in `:zstd` module).
+  Brotli is supported if the optional [brotli] package is installed:
 
       Mix.install([
         :req,
-        {:brotli, "~> 0.3.0"},
-        {:ezstd, "~> 1.0"}
+        {:brotli, "~> 0.3.0"}
       ])
 
       response = Req.get!("https://httpbin.org/anything")
@@ -375,7 +374,6 @@ defmodule Req.Steps do
       #=> "zstd, br, gzip"
 
   [brotli]: https://hex.pm/packages/brotli
-  [ezstd]: https://hex.pm/packages/ezstd
   """
   @doc step: :request
   def compressed(%Req.Request{into: nil} = request) do
@@ -396,14 +394,14 @@ defmodule Req.Steps do
     Code.ensure_loaded?(:brotli)
   end
 
-  defmacrop ezstd_loaded? do
-    Code.ensure_loaded?(:ezstd)
+  defp zstd_available? do
+    System.otp_release() >= "28"
   end
 
   defp supported_accept_encoding do
     value = "gzip"
     value = if brotli_loaded?(), do: "br, " <> value, else: value
-    if ezstd_loaded?(), do: "zstd, " <> value, else: value
+    if zstd_available?(), do: "zstd, " <> value, else: value
   end
 
   @doc """
@@ -1604,7 +1602,7 @@ defmodule Req.Steps do
   | ------------- | ----------------------------------------------- |
   | gzip, x-gzip  | `:zlib.gunzip/1`                                |
   | br            | `:brotli.decode/1` (if [brotli] is installed)   |
-  | zstd          | `:ezstd.decompress/1` (if [ezstd] is installed) |
+  | zstd          | `:zstd.decompress/1` (requires Erlang/OTP 28+)  |
   | _other_       | Returns data as is                              |
 
   This step updates the following headers to reflect the changes:
@@ -1638,7 +1636,6 @@ defmodule Req.Steps do
       #=> true
 
   [brotli]: https://hex.pm/packages/brotli
-  [ezstd]: https://hex.pm/packages/ezstd
   """
   @doc step: :response
   def decompress_body(request_response)
@@ -1717,16 +1714,19 @@ defmodule Req.Steps do
   end
 
   defp decompress_body(["zstd" | rest], body, acc) do
-    if ezstd_loaded?() do
-      case :ezstd.decompress(body) do
-        decompressed when is_binary(decompressed) ->
+    if zstd_available?() do
+      case zstd_decompress(body) do
+        {:ok, decompressed} ->
           decompress_body(rest, decompressed, acc)
 
         {:error, reason} ->
           %Req.DecompressError{format: :zstd, data: body, reason: reason}
       end
     else
-      Logger.debug(":ezstd library not loaded, skipping zstd decompression")
+      Logger.debug(
+        ":zstd module not available (requires Erlang/OTP 28+), skipping zstd decompression"
+      )
+
       decompress_body(rest, body, ["zstd" | acc])
     end
   end
@@ -1795,7 +1795,7 @@ defmodule Req.Steps do
   | `:zip`               | `Req.ZIP.decode(term)`                                      |
   | `:tar`, `:tgz`       | `Req.Tar.decode(term)`                                      |
   | `:gz`                | `:zlib.gunzip(term)`                                        |
-  | `:zst`               | `:ezstd.decompress(term)` ([ezstd] must be installed to use this format) |
+  | `:zst`               | `:zstd.decompress(term)` (requires Erlang/OTP 28+)          |
   | `:csv`               | `NimbleCSV.RFC4180.parse_string(term)` ([nimble_csv] must be installed to use this format) |
 
   The format is determined by the response `content-type` header. See `MIME` for registering
@@ -1862,7 +1862,6 @@ defmodule Req.Steps do
       "contents"
 
   [nimble_csv]: https://hex.pm/packages/nimble_csv
-  [ezstd]: https://hex.pm/packages/ezstd
   """
   @doc step: :response
   def decode_body(request_response)
@@ -1948,8 +1947,8 @@ defmodule Req.Steps do
 
   defp builtin_codec(_request, :zst) do
     fn body ->
-      case :ezstd.decompress(body) do
-        decompressed when is_binary(decompressed) ->
+      case zstd_decompress(body) do
+        {:ok, decompressed} ->
           {:ok, decompressed}
 
         {:error, reason} ->
@@ -1961,6 +1960,18 @@ defmodule Req.Steps do
 
   defp builtin_codec(_request, :csv) do
     fn body -> {:ok, NimbleCSV.RFC4180.parse_string(body, skip_headers: false)} end
+  end
+
+  # Decompresses zstd `body` using the built-in OTP 28+ `:zstd` module. `:zstd.decompress/1`
+  # returns iodata and raises `{:zstd_error, reason}` on invalid input.
+  defp zstd_decompress(body) do
+    {:ok, IO.iodata_to_binary(:zstd.decompress(body))}
+  rescue
+    e in ErlangError ->
+      case e.original do
+        {:zstd_error, reason} -> {:error, reason}
+        _ -> reraise(e, __STACKTRACE__)
+      end
   end
 
   defp run_decoder(request, response, codec) do
