@@ -11,6 +11,8 @@
     parts into the request. These values are now escaped per RFC 7578 / WHATWG
     form-data (`"`, CR, and LF are percent-encoded).
 
+    Thanks to @PJUllrich for reporting it.
+
   * [`decode_body`]: Drop automatic zip/tar/tgz/gz/zst/csv decoding,
     ([GHSA-655f-mp8p-96gv](https://github.com/wojtekmach/req/security/advisories/GHSA-655f-mp8p-96gv)).
 
@@ -43,6 +45,8 @@
     tuple, for example:
 
         Req.get!(url, decoders: [:json, ics: &{:ok, ICal.from_ics(&1)}])
+
+    Thanks to @PJUllrich for reporting it.
 
 ## v0.5.18 (2026-05-20)
 

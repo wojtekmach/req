@@ -1,7 +1,7 @@
 defmodule Req.MixProject do
   use Mix.Project
 
-  @version "0.5.18"
+  @version "0.6.0"
   @source_url "https://github.com/wojtekmach/req"
 
   def project do
