@@ -11,6 +11,12 @@
         # after:
         Req.get!(url, decoders: [json: &Jason.decode(&1, keys: :atoms)])
 
+  * [`redirect`]: Strip userinfo from redirect locations and log a warning.
+
+    Previously, redirecting to a URL with userinfo (e.g. `http://user:pass@host`)
+    kept the userinfo in the request URL (without converting it to auth). It is
+    now dropped so credentials supplied by the redirecting server aren't sent.
+
 ## v0.6.0 (2026-06-08)
 
   * [`encode_body`]: Security fix for `:form_multipart` header injection

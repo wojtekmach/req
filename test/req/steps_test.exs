@@ -1726,6 +1726,38 @@ defmodule Req.StepsTest do
              end) =~ "[debug] redirecting to https://trusted"
     end
 
+    test "userinfo in absolute location is stripped and warned about" do
+      adapter = fn request ->
+        case request.url.host do
+          "original" ->
+            response =
+              Req.Response.new(
+                status: 302,
+                headers: [{"location", "http://foo:bar@other/path"}]
+              )
+
+            {request, response}
+
+          "other" ->
+            # Userinfo in a redirect target is stripped, never converted to Basic auth.
+            assert request.url.userinfo == nil
+            assert Req.Request.get_header(request, "authorization") == []
+            assert request.options[:auth] == nil
+            {request, Req.Response.new(status: 200, body: "ok")}
+        end
+      end
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert Req.get!("http://original", adapter: adapter).status == 200
+        end)
+
+      assert log =~ "[warning] stripping userinfo from redirect location"
+      # the credentials are not leaked in the redirect log
+      assert log =~ "[debug] redirecting to http://other/path"
+      refute log =~ "foo:bar"
+    end
+
     test "skip params", c do
       Bypass.expect(c.bypass, "GET", "/redirect", fn conn ->
         redirect(conn, 302, c.url <> "/ok")

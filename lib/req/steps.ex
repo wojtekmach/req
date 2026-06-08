@@ -2133,6 +2133,7 @@ defmodule Req.Steps do
 
   defp build_redirect_request(request, response, location) do
     log_level = Req.Request.get_option(request, :redirect_log_level, :debug)
+    location = strip_redirect_userinfo(location)
     log_redirect(log_level, location)
 
     redirect_trusted =
@@ -2156,6 +2157,19 @@ defmodule Req.Steps do
     |> remove_credentials_if_untrusted(redirect_trusted, location_url)
     |> put_redirect_method(response.status)
     |> Map.replace!(:url, location_url)
+  end
+
+  # Userinfo in a redirect location is dropped (and never converted to auth) to avoid silently
+  # sending credentials supplied by the redirecting server. Done before logging so it isn't leaked.
+  defp strip_redirect_userinfo(location) do
+    case URI.parse(location) do
+      %URI{userinfo: nil} ->
+        location
+
+      %URI{} = uri ->
+        Logger.warning("stripping userinfo from redirect location")
+        URI.to_string(%{uri | userinfo: nil})
+    end
   end
 
   defp log_redirect(false, _location), do: :ok
