@@ -1,6 +1,10 @@
-# Experimental httpc adapter to test the adapter contract.
+# Experimental httpc adapter, used via `adapter: :httpc`.
+#
+# Requires the `:inets` application to be started.
 
 defmodule Req.HTTPC do
+  @moduledoc false
+
   def run(request) do
     {profile, request, httpc_http_options, httpc_options} = prepare_request(request)
     httpc_url = request.url |> URI.to_string() |> String.to_charlist()
@@ -54,7 +58,7 @@ defmodule Req.HTTPC do
       autoredirect: false,
       ssl: [
         verify: :verify_peer,
-        cacertfile: CAStore.file_path(),
+        cacerts: :public_key.cacerts_get(),
         depth: 2,
         customize_hostname_check: [
           match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
