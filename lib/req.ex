@@ -279,6 +279,10 @@ defmodule Req do
     * `:decode_body` - if set to `false`, disables automatic response body decoding.
       Defaults to `true`.
 
+    * `:decoders` - the list of decoders to use for automatic response body decoding.
+      Defaults to `[:json, :json_api]`. See [`decode_body`](`Req.Steps.decode_body/1`) for
+      the supported formats and how to add custom decoders.
+
     * `:decode_json` - options to pass to `Jason.decode!/2`, defaults to `[]`.
 
     * `:into` - where to send the response body. It can be one of:

@@ -11,6 +11,39 @@
     parts into the request. These values are now escaped per RFC 7578 / WHATWG
     form-data (`"`, CR, and LF are percent-encoded).
 
+  * [`decode_body`]: Drop automatic zip/tar/tgz/gz/zst/csv decoding,
+    ([GHSA-655f-mp8p-96gv](https://github.com/wojtekmach/req/security/advisories/GHSA-655f-mp8p-96gv)).
+
+    Req previously auto-decoded archive and compressed response bodies (`zip`,
+    `tar`, `tgz`, `gz`, `zst`, and `csv`) based on the server-supplied
+    `content-type`, materialising the full decompressed contents in memory with
+    no size cap. An attacker-controlled (or redirect-reachable) endpoint could
+    return a tiny "decompression bomb" that expanded to gigabytes and exhausted
+    the node's memory.
+
+    Now only JSON is decoded by default. Other formats are opt-in via the new
+    `:decoders` option, which defaults to `[:json, :json_api]`. Setting it
+    replaces the default (include `:json` to keep JSON decoding), and `false`
+    disables all decoding:
+
+        # opt into archives (only for endpoints you trust):
+        Req.get!(url, decoders: [:json, :zip])
+
+    **Note**: The decoded zip/tar is still list of
+    `{filename :: charlist(), contents :: binary}` tuples.
+    In the future release, this will be list of
+    `{filename :: binary(), contents :: binary()}` tuples.
+
+    While automatic CSV decoding wasn't a security issue, the behaviour based
+    on presence/absence of `nimble_csv` dependency was suprising. CSV support
+    is still built-in but need to be enabled with `decoders: [:csv]`.
+
+    Custom decoders are supported via `{format, codec}` tuples, where `codec` is
+    a module exporting `decode/1` or a 1-arity function returning an `:ok`/`:error`
+    tuple, for example:
+
+        Req.get!(url, decoders: [:json, ics: &{:ok, ICal.from_ics(&1)}])
+
 ## v0.5.18 (2026-05-20)
 
   * [`run_finch`]: Allow :finch option with IPv6 URLs.

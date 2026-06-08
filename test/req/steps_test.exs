@@ -1103,6 +1103,90 @@ defmodule Req.StepsTest do
       assert {:error, %Jason.DecodeError{}} = Req.get(plug: plug)
     end
 
+    test "archives are not decoded by default" do
+      files = [{~c"foo.txt", "bar"}]
+
+      plug = fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/zip", nil)
+        |> Plug.Conn.send_resp(200, create_zip(files))
+      end
+
+      body = Req.get!(plug: plug).body
+      assert is_binary(body)
+    end
+
+    test "decoders: false disables JSON decoding" do
+      plug = fn conn ->
+        Req.Test.json(conn, %{a: 1})
+      end
+
+      assert Req.get!(plug: plug, decoders: false).body == ~s|{"a":1}|
+    end
+
+    test "setting :decoders overwrites the default" do
+      req = Req.new(decoders: [:zip]) |> Req.merge(decoders: [:tar])
+      assert req.options[:decoders] == [:tar]
+    end
+
+    test "setting :decoders replaces the default, so JSON is not decoded unless included" do
+      plug = fn conn -> Req.Test.json(conn, %{a: 1}) end
+      assert Req.get!(plug: plug, decoders: [:zip]).body == ~s|{"a":1}|
+    end
+
+    test "unknown decoder format raises" do
+      assert_raise ArgumentError, ~r/unknown decoder format: :bogus/, fn ->
+        Req.get!("/", plug: fn conn -> Req.Test.json(conn, %{}) end, decoders: [:bogus])
+      end
+    end
+
+    test "custom decoder (function)" do
+      plug = fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("text/calendar")
+        |> Plug.Conn.send_resp(200, "raw-ics")
+      end
+
+      resp = Req.get!(plug: plug, decoders: [ics: &{:ok, String.upcase(&1)}])
+      assert resp.body == "RAW-ICS"
+    end
+
+    test "custom decoder (module exporting decode/1)" do
+      # An EPUB is a ZIP archive, so Req.ZIP doubles as its decoder.
+      files = [{~c"mimetype", "application/epub+zip"}]
+
+      plug = fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/epub+zip", nil)
+        |> Plug.Conn.send_resp(200, create_zip(files))
+      end
+
+      assert Req.get!(plug: plug, decoders: [epub: Req.ZIP]).body == files
+    end
+
+    test "custom decoder error" do
+      plug = fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("text/calendar")
+        |> Plug.Conn.send_resp(200, "raw-ics")
+      end
+
+      assert {:error, %RuntimeError{} = e} =
+               Req.get(plug: plug, decoders: [ics: fn _ -> {:error, :nope} end])
+
+      assert Exception.message(e) == "decoding response body failed: :nope"
+    end
+
+    test "{format, format} reuses a built-in decoder" do
+      plug = fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("text/calendar")
+        |> Plug.Conn.send_resp(200, ~s|{"a":1}|)
+      end
+
+      assert Req.get!(plug: plug, decoders: [ics: :json]).body == %{"a" => 1}
+    end
+
     test "tar (content-type)" do
       files = [{~c"foo.txt", "bar"}]
 
@@ -1112,7 +1196,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, create_tar(files))
       end
 
-      assert Req.get!(plug: plug).body == files
+      assert Req.get!(plug: plug, decoders: [:tar]).body == files
     end
 
     test "tar (path)" do
@@ -1124,7 +1208,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, create_tar(files))
       end
 
-      assert Req.get!(plug: plug, url: "/foo.tar").body == files
+      assert Req.get!(plug: plug, url: "/foo.tar", decoders: [:tar]).body == files
     end
 
     test "tar (path, content type with charset utf8)" do
@@ -1136,7 +1220,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, create_tar(files))
       end
 
-      resp = Req.get!(plug: plug, url: "/foo.tar")
+      resp = Req.get!(plug: plug, url: "/foo.tar", decoders: [:tar])
       assert resp.headers["content-type"] == ["application/octet-stream; charset=utf-8"]
       assert resp.body == files
     end
@@ -1148,7 +1232,7 @@ defmodule Req.StepsTest do
         Plug.Conn.send_resp(conn, 200, create_tar(files))
       end
 
-      assert Req.get!(plug: plug, url: "/foo.tar.gz").body == files
+      assert Req.get!(plug: plug, url: "/foo.tar.gz", decoders: [:tgz]).body == files
     end
 
     test "tar.gz (path)" do
@@ -1160,7 +1244,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, create_tar(files, compressed: true))
       end
 
-      assert Req.get!(plug: plug, url: "/foo.tar.gz").body == files
+      assert Req.get!(plug: plug, url: "/foo.tar.gz", decoders: [:tgz]).body == files
     end
 
     test "tar invalid" do
@@ -1170,7 +1254,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, "invalid")
       end
 
-      assert {:error, e} = Req.get(plug: plug)
+      assert {:error, e} = Req.get(plug: plug, decoders: [:tar])
       assert e == %Req.ArchiveError{format: :tar, reason: :eof, data: "invalid"}
       assert Exception.message(e) == "tar unpacking failed: Unexpected end of file"
     end
@@ -1184,7 +1268,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, create_zip(files))
       end
 
-      assert Req.get!(plug: plug).body == files
+      assert Req.get!(plug: plug, decoders: [:zip]).body == files
     end
 
     test "zip (path)" do
@@ -1196,7 +1280,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, create_zip(files))
       end
 
-      assert Req.get!(plug: plug, url: "/foo.zip").body == files
+      assert Req.get!(plug: plug, url: "/foo.zip", decoders: [:zip]).body == files
     end
 
     test "zip invalid" do
@@ -1206,7 +1290,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, "invalid")
       end
 
-      assert {:error, e} = Req.get(plug: plug)
+      assert {:error, e} = Req.get(plug: plug, decoders: [:zip])
       assert e == %Req.ArchiveError{format: :zip, reason: nil, data: "invalid"}
       assert Exception.message(e) == "zip unpacking failed"
     end
@@ -1218,7 +1302,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
       end
 
-      assert Req.get!(plug: plug).body == "foo"
+      assert Req.get!(plug: plug, decoders: [:gz]).body == "foo"
     end
 
     test "gzip invalid" do
@@ -1229,7 +1313,7 @@ defmodule Req.StepsTest do
       end
 
       assert_raise ErlangError, "Erlang error: :data_error", fn ->
-        Req.get(plug: plug)
+        Req.get(plug: plug, decoders: [:gz])
       end
     end
 
@@ -1240,7 +1324,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, :ezstd.compress("foo"))
       end
 
-      assert Req.get!(plug: plug).body == "foo"
+      assert Req.get!(plug: plug, decoders: [:zst]).body == "foo"
     end
 
     test "zstd (path)" do
@@ -1250,7 +1334,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, :ezstd.compress("foo"))
       end
 
-      assert Req.get!(plug: plug, url: "/foo.zst").body == "foo"
+      assert Req.get!(plug: plug, url: "/foo.zst", decoders: [:zst]).body == "foo"
     end
 
     test "zstd invalid" do
@@ -1260,7 +1344,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, "bad")
       end
 
-      assert {:error, e} = Req.get(plug: plug)
+      assert {:error, e} = Req.get(plug: plug, decoders: [:zst])
       assert %RuntimeError{} = e
 
       assert Exception.message(e) ==
@@ -1282,7 +1366,7 @@ defmodule Req.StepsTest do
         |> Plug.Conn.send_resp(200, data)
       end
 
-      assert Req.get!(plug: plug).body == csv
+      assert Req.get!(plug: plug, decoders: [:csv]).body == csv
     end
   end
 

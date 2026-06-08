@@ -39,6 +39,7 @@ defmodule Req.Steps do
       :raw,
       :http_errors,
       :decode_body,
+      :decoders,
       :decode_json,
       :redirect,
       :redirect_trusted,
@@ -1679,10 +1680,6 @@ defmodule Req.Steps do
     |> Enum.reverse()
   end
 
-  defmacrop nimble_csv_loaded? do
-    Code.ensure_loaded?(NimbleCSV)
-  end
-
   @doc false
   def output(request_response)
 
@@ -1712,27 +1709,58 @@ defmodule Req.Steps do
   @doc """
   Decodes response body based on the detected format.
 
-  Supported formats:
+  By default, only JSON responses are decoded. To decode other formats, or to add support for
+  custom ones, use the `:decoders` option.
 
-  | Format       | Decoder                                                           |
-  | ------------ | ----------------------------------------------------------------- |
-  | `json`       | `Jason.decode/2`                                                  |
-  | `tar`, `tgz` | `:erl_tar.extract/2`                                              |
-  | `zip`        | `:zip.unzip/2`                                                    |
-  | `gzip`       | `:zlib.gunzip/1`                                                  |
-  | `zst`        | `:ezstd.decompress/1` (if [ezstd] is installed)                   |
-  | `csv`        | `NimbleCSV.RFC4180.parse_string/2` (if [nimble_csv] is installed) |
+  ## Built-in decoders
 
-  The format is determined based on the `content-type` header of the response. For example,
-  if the `content-type` is `application/json`, the response body is decoded as JSON. The built-in
-  decoders also understand format extensions, such as decoding as JSON for a content-type of
-  `application/vnd.api+json`. To do this, Req falls back to `MIME.extensions/1`; check the
-  documentation for that function for more information.
+  | Format               | Decoder                                                     |
+  | -------------------- | ----------------------------------------------------------- |
+  | `:json`, `:json_api` | `Jason.decode(term)` (enabled by default)                   |
+  | `:zip`               | `Req.ZIP.decode(term)`                                      |
+  | `:tar`, `:tgz`       | `Req.Tar.decode(term)`                                      |
+  | `:gz`                | `:zlib.gunzip(term)`                                        |
+  | `:zst`               | `:ezstd.decompress(term)` ([ezstd] must be installed to use this format) |
+  | `:csv`               | `NimbleCSV.RFC4180.parse_string(term)` ([nimble_csv] must be installed to use this format) |
+
+  The format is determined by the response `content-type` header. See `MIME` for registering
+  content-type/format mapping.
 
   This step is disabled on response body streaming. If response body is not a binary, in other
   words it has been transformed by another step, it is left as is.
 
+  > #### Decompression Bombs {: .warning}
+  >
+  > The archive and compression decoders (`:zip`, `:tar`, `:tgz`, `:gz`, and `:zst`) decompress
+  > the whole response body into memory with no size limit, so a small response can expand to
+  > many gigabytes. For this reason they are **not** enabled by default; only opt into them via
+  > the `:decoders` option for endpoints you trust.
+
   ## Request Options
+
+    * `:decoders` - the list of decoders to use. Defaults to `[:json, :json_api]`.
+
+      Each element is either:
+
+        * a format (atom) handled by a [built-in decoder](#decode_body/1-built-in-decoders),
+          e.g. `:json` or `:zip`;
+
+        * a `{format, codec}` tuple, where `format` is an atom and `codec` is one of:
+
+            * another format (atom), to reuse a built-in decoder, e.g. `{:json5, :json}`;
+
+            * a module exporting `decode/1` that returns `{:ok, term}` or `{:error, exception}`;
+
+            * a 1-arity function that returns `{:ok, term}` or `{:error, exception}`.
+
+      Setting `:decoders` replaces the default, so include `:json` if you still want JSON decoded:
+
+          # handles json, zip, and tar:
+          Req.new(decoders: [:json, :zip, :tar])
+
+      Set `:decoders` to `false` to disable all decoding, including JSON. A custom decoder:
+
+          Req.get!(url, decoders: [ics: &{:ok, ICal.from_ics(&1)}])
 
     * `:decode_body` - if set to `false`, disables automatic response body decoding.
       Defaults to `true`.
@@ -1752,11 +1780,11 @@ defmodule Req.Steps do
       ...> response.body["slideshow"]["title"]
       "Sample Slide Show"
 
-  Decode gzip:
+  Decode a ZIP archive (opt-in):
 
-      iex> response = Req.get!("https://httpbin.org/gzip")
-      ...> response.body["gzipped"]
-      true
+      iex> response = Req.get!("https://example.com/archive.zip", decoders: [:zip])
+      ...> response.body["file.txt"]
+      "contents"
 
   [nimble_csv]: https://hex.pm/packages/nimble_csv
   [ezstd]: https://hex.pm/packages/ezstd
@@ -1777,86 +1805,100 @@ defmodule Req.Steps do
 
     if request.options[:raw] == true or
          request.options[:decode_body] == false or
+         request.options[:decoders] == false or
          output? or
          Req.Response.get_header(response, "content-encoding") != [] do
       {request, response}
     else
-      decode_body({request, response}, format(request, response))
+      decoders = build_decoders(request, request.options[:decoders] || [:json, :json_api])
+
+      case decoders[format(request, response)] do
+        nil ->
+          {request, response}
+
+        codec ->
+          run_decoder(request, response, codec)
+      end
     end
   end
 
-  defp decode_body({request, response}, format) when format in ~w(json json-api) do
-    options = Req.Request.get_option(request, :decode_json, [])
+  @builtin_decoders [:json, :json_api, :zip, :tar, :tgz, :gz, :zst, :csv]
 
-    case Jason.decode(response.body, options) do
+  # Build a map of MIME extension (e.g. "json", "json-api") to codec function, so it can be
+  # looked up by the extension detected from the response content-type.
+  defp build_decoders(request, decoders) do
+    for decoder <- decoders, into: %{} do
+      {format, codec} = normalize_decoder(request, decoder)
+      {format |> Atom.to_string() |> String.replace("_", "-"), codec}
+    end
+  end
+
+  defp normalize_decoder(request, format) when is_atom(format) do
+    if format in @builtin_decoders do
+      {format, builtin_codec(request, format)}
+    else
+      raise ArgumentError,
+            "unknown decoder format: #{inspect(format)}. Built-in formats are: " <>
+              Enum.map_join(@builtin_decoders, ", ", &inspect/1) <>
+              ". To use a custom format, pass a {format, codec} tuple."
+    end
+  end
+
+  defp normalize_decoder(request, {format, codec}) when is_atom(format) do
+    {format, resolve_codec(request, codec)}
+  end
+
+  defp resolve_codec(_request, codec) when is_function(codec, 1) do
+    codec
+  end
+
+  defp resolve_codec(request, codec) when is_atom(codec) do
+    if codec in @builtin_decoders do
+      builtin_codec(request, codec)
+    else
+      # a module exporting decode/1
+      &codec.decode/1
+    end
+  end
+
+  defp builtin_codec(request, format) when format in [:json, :json_api] do
+    options = Req.Request.get_option(request, :decode_json, [])
+    fn body -> Jason.decode(body, options) end
+  end
+
+  defp builtin_codec(_request, :zip), do: &Req.ZIP.decode/1
+  defp builtin_codec(_request, :tar), do: &Req.Tar.decode/1
+  defp builtin_codec(_request, :tgz), do: &Req.Tar.decode/1
+  defp builtin_codec(_request, :gz), do: fn body -> {:ok, :zlib.gunzip(body)} end
+
+  defp builtin_codec(_request, :zst) do
+    fn body ->
+      case :ezstd.decompress(body) do
+        decompressed when is_binary(decompressed) ->
+          {:ok, decompressed}
+
+        {:error, reason} ->
+          {:error,
+           %RuntimeError{message: "Could not decompress Zstandard data: #{inspect(reason)}"}}
+      end
+    end
+  end
+
+  defp builtin_codec(_request, :csv) do
+    fn body -> {:ok, NimbleCSV.RFC4180.parse_string(body, skip_headers: false)} end
+  end
+
+  defp run_decoder(request, response, codec) do
+    case codec.(response.body) do
       {:ok, decoded} ->
         {request, put_in(response.body, decoded)}
 
-      {:error, e} ->
-        {request, e}
-    end
-  end
-
-  defp decode_body({request, response}, "tar") do
-    case :erl_tar.extract({:binary, response.body}, [:memory]) do
-      {:ok, files} ->
-        {request, put_in(response.body, files)}
+      {:error, %{__exception__: true} = exception} ->
+        {request, exception}
 
       {:error, reason} ->
-        {request, %Req.ArchiveError{format: :tar, data: response.body, reason: reason}}
+        {request, %RuntimeError{message: "decoding response body failed: #{inspect(reason)}"}}
     end
-  end
-
-  defp decode_body({request, response}, "tgz") do
-    case :erl_tar.extract({:binary, response.body}, [:memory, :compressed]) do
-      {:ok, files} ->
-        {request, put_in(response.body, files)}
-
-      {:error, reason} ->
-        {request, %Req.ArchiveError{format: :tar, data: response.body, reason: reason}}
-    end
-  end
-
-  defp decode_body({request, response}, "zip") do
-    case :zip.extract(response.body, [:memory]) do
-      {:ok, files} ->
-        {request, put_in(response.body, files)}
-
-      {:error, _} ->
-        {request, %Req.ArchiveError{format: :zip, data: response.body}}
-    end
-  end
-
-  defp decode_body({request, response}, "gz") do
-    {request, update_in(response.body, &:zlib.gunzip/1)}
-  end
-
-  defp decode_body({request, response}, "zst") do
-    if ezstd_loaded?() do
-      case :ezstd.decompress(response.body) do
-        decompressed when is_binary(decompressed) ->
-          {request, put_in(response.body, decompressed)}
-
-        {:error, reason} ->
-          err = %RuntimeError{message: "Could not decompress Zstandard data: #{inspect(reason)}"}
-          {request, err}
-      end
-    else
-      {request, response}
-    end
-  end
-
-  defp decode_body({request, response}, "csv") do
-    if nimble_csv_loaded?() do
-      options = [skip_headers: false]
-      {request, update_in(response.body, &NimbleCSV.RFC4180.parse_string(&1, options))}
-    else
-      {request, response}
-    end
-  end
-
-  defp decode_body({request, response}, _format) do
-    {request, response}
   end
 
   defp format(request, response) do
