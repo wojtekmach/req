@@ -129,8 +129,6 @@ defmodule ReqTest do
     assert req.options.foo == 42
   end
 
-  # TODO: implement enumerable request body in Req.HTTPC adapter
-  @tag skip: Req.Case.adapter() == :httpc
   test "async enumerable" do
     %{req: origin} =
       serve(fn conn ->

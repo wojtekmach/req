@@ -1,8 +1,6 @@
 defmodule Req.StepsTest do
   use Req.Case, async: true
 
-  @adapter Req.Case.adapter()
-
   ## Request steps
 
   describe "compressed" do
@@ -225,8 +223,6 @@ defmodule Req.StepsTest do
       assert Req.post!(req, body: "foo").body == "foo"
     end
 
-    # TODO: implement enumerable request body in Req.HTTPC adapter
-    @tag skip: @adapter == :httpc
     test "body stream" do
       %{req: req} =
         serve(fn conn ->
@@ -393,8 +389,6 @@ defmodule Req.StepsTest do
       assert Req.Request.get_header(req, "content-encoding") == ["gzip"]
     end
 
-    # TODO: implement enumerable request body in Req.HTTPC adapter
-    @tag skip: @adapter == :httpc
     test "stream" do
       %{req: req} =
         serve(fn conn ->
@@ -536,8 +530,6 @@ defmodule Req.StepsTest do
                    end
     end
 
-    # TODO: implement Collectable into in Req.HTTPC adapter
-    @tag skip: @adapter == :httpc
     test "into: collectable" do
       %{req: req} =
         serve(fn conn ->

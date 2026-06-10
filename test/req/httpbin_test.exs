@@ -1,8 +1,6 @@
 defmodule HTTPBinTest do
   use Req.Case, async: true
 
-  @adapter Req.Case.adapter()
-
   # TODO: Use JSON when we depend on Elixir 1.18.
   @json Jason
 
@@ -42,8 +40,6 @@ defmodule HTTPBinTest do
     assert Req.post!(req, url: "#{url}/post", json: %{a: 1}).body["json"] == %{"a" => 1}
   end
 
-  # TODO: implement enumerable request body in Req.HTTPC adapter
-  @tag skip: @adapter == :httpc
   test "/post streaming body", %{req: req, url: url} do
     stream = Stream.duplicate("foo", 3)
     assert Req.post!(req, url: "#{url}/post", body: stream).body["data"] == "foofoofoo"
@@ -56,8 +52,6 @@ defmodule HTTPBinTest do
     assert resp.body["files"] == %{"b" => "2"}
   end
 
-  # TODO: implement enumerable request body in Req.HTTPC adapter
-  @tag skip: @adapter == :httpc
   test "/anything multipart streaming", %{req: req, url: url} do
     stream = Stream.cycle(["abc"]) |> Stream.take(3)
 
@@ -105,7 +99,7 @@ defmodule HTTPBinTest do
     lines =
       Req.get!(req, url: "#{url}/stream/2", decode_body: false).body
       |> String.split("\n", trim: true)
-      |> Enum.map(&Jason.decode!/1)
+      |> Enum.map(&@json.decode!/1)
 
     assert Enum.map(lines, & &1["id"]) == [0, 1]
   end

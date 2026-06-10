@@ -131,8 +131,6 @@ defmodule Req.AdapterTest do
       {:error, %Req.TransportError{reason: :econnrefused}} = Req.request(req)
     end
 
-    # TODO: implement :receive_timeout in Req.HTTPC adapter
-    @tag skip: @adapter == :httpc
     @tag :transport
     test ":receive_timeout" do
       pid = self()
@@ -160,8 +158,6 @@ defmodule Req.AdapterTest do
       assert_received :ping
     end
 
-    # TODO: implement :request_timeout in Req.HTTPC adapter
-    @tag skip: @adapter == :httpc
     @tag :transport
     test ":request_timeout" do
       pid = self()
@@ -177,13 +173,11 @@ defmodule Req.AdapterTest do
           :ok = :gen_tcp.send(socket, body)
         end)
 
-      req = Req.new(adapter: adapter_fun(), url: url, request_timeout: 0, retry: false)
+      req = Req.new(adapter: adapter_fun(), url: url, request_timeout: 50, retry: false)
       assert {:error, %Req.TransportError{reason: :timeout}} = Req.request(req)
       assert_receive :ping
     end
 
-    # TODO: implement req_body_fun support in Req.HTTPC adapter
-    @tag skip: @adapter == :httpc
     test "body: req_body_fun succeeded" do
       %{req: req} =
         serve(fn conn ->
@@ -210,8 +204,6 @@ defmodule Req.AdapterTest do
       assert resp.body == "ok"
     end
 
-    # TODO: implement req_body_fun support in Req.HTTPC adapter
-    @tag skip: @adapter == :httpc
     test "body: req_body_fun halted" do
       %{req: req} =
         serve(fn conn ->
@@ -231,8 +223,6 @@ defmodule Req.AdapterTest do
       assert resp.body == ""
     end
 
-    # TODO: implement req_body_fun support in Req.HTTPC adapter
-    @tag skip: @adapter == :httpc
     test "body: req_body_fun errored" do
       %{req: req} =
         serve(fn conn ->
@@ -337,8 +327,6 @@ defmodule Req.AdapterTest do
       assert resp.body == "foo"
     end
 
-    # TODO: normalize transport errors in Req.HTTPC adapter's async path
-    @tag skip: @adapter == :httpc
     @tag :transport
     test "into: fun handle error" do
       assert {:error, %Req.TransportError{reason: :econnrefused}} =
@@ -353,8 +341,6 @@ defmodule Req.AdapterTest do
                )
     end
 
-    # TODO: implement Collectable into in Req.HTTPC adapter
-    @tag skip: @adapter == :httpc
     @tag :transport
     test "into: collectable" do
       %{url: url} =
@@ -393,11 +379,10 @@ defmodule Req.AdapterTest do
       assert resp.trailers["x-foo"] == ["foo"]
       assert resp.trailers["x-bar"] == ["bar"]
 
-      assert resp.body == ["chunk1", "chunk2"]
+      # adapter might emit one chunk
+      assert resp.body in [["chunk1", "chunk2"], ["chunk1chunk2"]]
     end
 
-    # TODO: implement Collectable into in Req.HTTPC adapter
-    @tag skip: @adapter == :httpc
     test "into: collectable non-200" do
       # Ignores the collectable and returns body as usual
 
@@ -412,8 +397,6 @@ defmodule Req.AdapterTest do
       assert resp.body == %{"error" => "not found"}
     end
 
-    # TODO: implement Collectable into in Req.HTTPC adapter
-    @tag skip: @adapter == :httpc
     @tag :transport
     test "into: collectable handle error" do
       assert {:error, %Req.TransportError{reason: :econnrefused}} =
@@ -497,8 +480,6 @@ defmodule Req.AdapterTest do
       assert_received :other
     end
 
-    # TODO: implement :receive_timeout in Req.HTTPC adapter
-    @tag skip: @adapter == :httpc
     @tag :transport
     test "into: :self with :receive_timeout" do
       %{url: url} =

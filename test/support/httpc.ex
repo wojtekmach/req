@@ -2,6 +2,16 @@
 
 defmodule Req.HTTPC do
   def run(request) do
+    case prepare_body(request) do
+      {:halt, request} ->
+        {request, Req.Response.new(status: nil, body: "")}
+
+      {request, body} ->
+        run(request, body)
+    end
+  end
+
+  defp run(request, body) do
     {profile, request, httpc_http_options, httpc_options} = prepare_request(request)
     httpc_url = request.url |> URI.to_string() |> String.to_charlist()
 
@@ -23,18 +33,6 @@ defmodule Req.HTTPC do
               ~c"application/octet-stream"
           end
 
-        body =
-          case request.body do
-            {:stream, enumerable} ->
-              httpc_enumerable_to_fun(enumerable)
-
-            nil ->
-              ""
-
-            iodata ->
-              iodata
-          end
-
         {httpc_url, httpc_headers, content_type, body}
       else
         {httpc_url, httpc_headers}
@@ -47,8 +45,55 @@ defmodule Req.HTTPC do
       :self ->
         httpc_async(request, httpc_req, httpc_http_options, httpc_options, :self, profile)
 
-      fun ->
+      fun when is_function(fun, 2) ->
         httpc_async(request, httpc_req, httpc_http_options, httpc_options, fun, profile)
+
+      collectable ->
+        httpc_async(
+          request,
+          httpc_req,
+          httpc_http_options,
+          httpc_options,
+          {:collectable, collectable},
+          profile
+        )
+    end
+  end
+
+  # Enumerables (including Req.Response.Async, which must be consumed in the
+  # caller process) and req_body_fun are materialized eagerly.
+  defp prepare_body(request) do
+    case request.body do
+      nil ->
+        {request, ""}
+
+      iodata when is_binary(iodata) or is_list(iodata) ->
+        {request, iodata}
+
+      fun when is_function(fun, 1) ->
+        drain_req_body_fun(fun, request, [])
+
+      {:stream, enumerable} ->
+        {request, Enum.to_list(enumerable)}
+
+      enumerable ->
+        {request, Enum.to_list(enumerable)}
+    end
+  end
+
+  defp drain_req_body_fun(fun, request, acc) do
+    case fun.(request) do
+      {:data, chunk, request} ->
+        drain_req_body_fun(fun, request, [acc | chunk])
+
+      {:done, request} ->
+        {request, acc}
+
+      {:halt, request} ->
+        {:halt, request}
+
+      other ->
+        raise "expected req_body_fun to return {:data, chunk, request}, {:done, request}, or {:halt, request}, got: #{inspect(other)}"
     end
   end
 
@@ -68,6 +113,13 @@ defmodule Req.HTTPC do
     httpc_options = [
       body_format: :binary
     ]
+
+    httpc_http_options =
+      if timeout = request.options[:request_timeout] || request.options[:receive_timeout] do
+        Keyword.put(httpc_http_options, :timeout, timeout)
+      else
+        httpc_http_options
+      end
 
     connect_options = request.options[:connect_options] || []
 
@@ -156,14 +208,23 @@ defmodule Req.HTTPC do
 
         {request, Req.Response.new(status: status, headers: headers, body: body)}
 
-      {:error, {:failed_connect, _} = reason} ->
-        {request, %Req.TransportError{reason: transport_error_reason(reason)}}
-
-      {:error, {:could_not_parse_as_http, _}} ->
-        {request, %Req.HTTPError{protocol: :http1, reason: :invalid_status_line}}
+      {:error, reason} ->
+        {request, normalize_error(reason)}
     end
   after
     stop_profile(profile)
+  end
+
+  defp normalize_error(:timeout) do
+    %Req.TransportError{reason: :timeout}
+  end
+
+  defp normalize_error({:failed_connect, _} = reason) do
+    %Req.TransportError{reason: transport_error_reason(reason)}
+  end
+
+  defp normalize_error({:could_not_parse_as_http, _}) do
+    %Req.HTTPError{protocol: :http1, reason: :invalid_status_line}
   end
 
   defp transport_error_reason({:failed_connect, [{:to_address, _}, {_family, _opts, reason}]}) do
@@ -177,36 +238,13 @@ defmodule Req.HTTPC do
     reason2
   end
 
-  defp httpc_enumerable_to_fun(enumerable) do
-    reducer = fn item, _acc ->
-      {:suspend, item}
-    end
-
-    {_, _, fun} = Enumerable.reduce(enumerable, {:suspend, nil}, reducer)
-
-    {:chunkify, &httpc_next/1, fun}
-  end
-
-  defp httpc_next(fun) do
-    case fun.({:cont, nil}) do
-      {:suspended, element, fun} ->
-        {:ok, element, fun}
-
-      {:done, nil} ->
-        :eof
-
-      {:halted, element} ->
-        {:ok, element, fn _ -> {:done, nil} end}
-    end
-  end
-
   defp httpc_async(request, httpc_req, httpc_http_options, httpc_options, self_or_fun, profile) do
     stream =
       case self_or_fun do
         :self ->
           :self
 
-        fun when is_function(fun) ->
+        _fun_or_collectable ->
           {:self, :once}
       end
 
@@ -244,8 +282,14 @@ defmodule Req.HTTPC do
 
           fun when is_function(fun) ->
             httpc_loop(request, response, ref, pid, fun)
+
+          {:collectable, collectable} ->
+            {acc, collector} = Collectable.into(collectable)
+            httpc_collect_loop(request, response, ref, pid, acc, collector)
         end
 
+      # httpc only streams 200/206 responses; others arrive complete, so a
+      # collectable is ignored and the body is returned as usual.
       {^ref, :complete, {{_, status, _}, headers, body}} ->
         headers =
           for {name, value} <- headers do
@@ -254,6 +298,9 @@ defmodule Req.HTTPC do
 
         response = Req.Response.new(status: status, headers: headers, body: body)
         {request, response}
+
+      {^ref, {:error, reason}} ->
+        {request, normalize_error(reason)}
     end
   end
 
@@ -324,6 +371,10 @@ defmodule Req.HTTPC do
     send(caller, {ref, :complete, result})
   end
 
+  defp httpc_receiver({ref, {:error, reason}}, caller) do
+    send(caller, {ref, {:error, reason}})
+  end
+
   defp decode_trailers(trailers) do
     Enum.reduce(trailers, %{}, fn {name, value}, acc ->
       name = List.to_string(name)
@@ -336,6 +387,7 @@ defmodule Req.HTTPC do
   def httpc_stream(ref, {ref, {:data, data}}), do: {:ok, [data: data]}
   def httpc_stream(ref, {ref, :done}), do: {:ok, [:done]}
   def httpc_stream(ref, {ref, {:trailers, trailers}}), do: {:ok, [trailers: trailers]}
+  def httpc_stream(ref, {ref, {:error, reason}}), do: {:error, normalize_error(reason)}
   def httpc_stream(_, _), do: :unknown
 
   @doc false
@@ -362,6 +414,29 @@ defmodule Req.HTTPC do
 
       {^ref, :done} ->
         {request, response}
+
+      {^ref, {:error, reason}} ->
+        {request, normalize_error(reason)}
+    end
+  end
+
+  defp httpc_collect_loop(request, response, ref, pid, acc, collector) do
+    :ok = :httpc.stream_next(pid)
+
+    receive do
+      {^ref, {:data, data}} ->
+        httpc_collect_loop(request, response, ref, pid, collector.(acc, {:cont, data}), collector)
+
+      {^ref, {:trailers, trailers}} ->
+        response = update_in(response.trailers, &Map.merge(&1, trailers))
+        httpc_collect_loop(request, response, ref, pid, acc, collector)
+
+      {^ref, :done} ->
+        {request, %{response | body: collector.(acc, :done)}}
+
+      {^ref, {:error, reason}} ->
+        collector.(acc, :halt)
+        {request, normalize_error(reason)}
     end
   end
 
