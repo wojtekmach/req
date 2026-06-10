@@ -549,9 +549,8 @@ defmodule Req.Utils do
         stream = %File.Stream{} ->
           filename = Path.basename(stream.path)
 
-          # TODO: Simplify when we require Elixir v1.15
           size =
-            if not Map.has_key?(stream, :node) or stream.node == node() do
+            if stream.node == node() do
               File.stat!(stream.path).size
             else
               :erpc.call(stream.node, fn -> File.stat!(stream.path).size end)
