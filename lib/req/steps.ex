@@ -1033,22 +1033,34 @@ defmodule Req.Steps do
 
   if Code.ensure_loaded?(Plug.Test) do
     def run_plug(request) do
-      plug = request.options.plug
-
-      {req_body, request} =
+      result =
         case request.body do
           iodata when is_binary(iodata) or is_list(iodata) ->
-            {IO.iodata_to_binary(iodata), request}
+            {:ok, IO.iodata_to_binary(iodata), request}
 
           nil ->
-            {"", request}
+            {:ok, "", request}
 
           req_body_fun when is_function(req_body_fun, 1) ->
             drain_req_body_fun(req_body_fun, request, [])
 
           enumerable ->
-            {enumerable |> Enum.to_list() |> IO.iodata_to_binary(), request}
+            {:ok, enumerable |> Enum.to_list() |> IO.iodata_to_binary(), request}
         end
+
+      case result do
+        {:ok, req_body, request} ->
+          run_plug(request, req_body)
+
+        # Halting req_body_fun closes the connection without reading the
+        # response, so the plug is never called.
+        {:halt, request} ->
+          {request, Req.Response.new(status: nil)}
+      end
+    end
+
+    defp run_plug(request, req_body) do
+      plug = request.options.plug
 
       {req_body, request} =
         case Req.Request.get_header(request, "content-encoding") do
@@ -1112,10 +1124,10 @@ defmodule Req.Steps do
           drain_req_body_fun(req_body_fun, request, [chunk | chunks])
 
         {:done, request} ->
-          {chunks |> Enum.reverse() |> IO.iodata_to_binary(), request}
+          {:ok, chunks |> Enum.reverse() |> IO.iodata_to_binary(), request}
 
         {:halt, request} ->
-          {chunks |> Enum.reverse() |> IO.iodata_to_binary(), request}
+          {:halt, request}
 
         other ->
           raise "expected req_body_fun to return {:data, chunk, request}, {:done, request}, or {:halt, request}, got: #{inspect(other)}"

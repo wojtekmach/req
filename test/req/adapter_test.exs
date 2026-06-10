@@ -4,8 +4,7 @@ defmodule Req.AdapterTest do
   @adapter Req.Case.adapter()
 
   describe "run" do
-    @describetag :adapter
-
+    @tag :transport
     test ":inet6" do
       %{url: ipv4_url} =
         start_http_server(fn conn ->
@@ -28,6 +27,7 @@ defmodule Req.AdapterTest do
       assert Req.request!(adapter: @adapter, url: ipv6_url).body == "ok"
     end
 
+    @tag :transport
     test ":unix_socket" do
       socket_path = Path.join(System.tmp_dir!(), "req-#{System.unique_integer([:positive])}.sock")
       on_exit(fn -> File.rm(socket_path) end)
@@ -44,6 +44,7 @@ defmodule Req.AdapterTest do
                "ok"
     end
 
+    @tag :transport
     test "connect_options[:timeout]" do
       %{url: url} =
         start_http_server(fn conn ->
@@ -56,6 +57,7 @@ defmodule Req.AdapterTest do
 
     @tag :capture_log
     @tag :http2
+    @tag :transport
     test "connect_options[:protocols]", %{test: test} do
       %{url: url} =
         start_http_server(fn conn ->
@@ -71,6 +73,7 @@ defmodule Req.AdapterTest do
       assert Req.request!(req).body == "ok"
     end
 
+    @tag :transport
     test "connect_options[:transport_opts]" do
       %{url: url} =
         start_http_server(fn conn ->
@@ -89,6 +92,7 @@ defmodule Req.AdapterTest do
       end
     end
 
+    @tag :transport
     test "Req.HTTPError" do
       %{url: url} =
         start_tcp_server(fn socket ->
@@ -100,11 +104,13 @@ defmodule Req.AdapterTest do
       {:error, %Req.HTTPError{protocol: :http1, reason: :invalid_status_line}} = Req.request(req)
     end
 
+    @tag :transport
     test "Req.TransportError" do
       req = Req.new(adapter: @adapter, url: "http://localhost:9999", retry: false)
       {:error, %Req.TransportError{reason: :econnrefused}} = Req.request(req)
     end
 
+    @tag :transport
     test "Req.TransportError with :inet6" do
       req = Req.new(adapter: @adapter, url: "http://localhost:9999", inet6: true, retry: false)
       {:error, %Req.TransportError{reason: :econnrefused}} = Req.request(req)
@@ -112,6 +118,7 @@ defmodule Req.AdapterTest do
 
     # TODO: implement :receive_timeout in Req.HTTPC adapter
     @tag skip: @adapter == :httpc
+    @tag :transport
     test ":receive_timeout" do
       pid = self()
 
@@ -140,6 +147,7 @@ defmodule Req.AdapterTest do
 
     # TODO: implement :request_timeout in Req.HTTPC adapter
     @tag skip: @adapter == :httpc
+    @tag :transport
     test ":request_timeout" do
       pid = self()
 
@@ -162,8 +170,8 @@ defmodule Req.AdapterTest do
     # TODO: implement req_body_fun support in Req.HTTPC adapter
     @tag skip: @adapter == :httpc
     test "body: req_body_fun succeeded" do
-      %{url: url} =
-        start_http_server(fn conn ->
+      %{req: req} =
+        serve(fn conn ->
           assert {:ok, "foobar", conn} = Plug.Conn.read_body(conn)
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
@@ -181,7 +189,7 @@ defmodule Req.AdapterTest do
           {:data, "foo", request}
       end
 
-      {req, resp} = Req.run!(adapter: @adapter, method: :post, url: url, body: req_body_fun)
+      {req, resp} = Req.run!(req, method: :post, body: req_body_fun)
       assert req.private[:phase] == :done
       assert resp.status == 200
       assert resp.body == "ok"
@@ -190,8 +198,8 @@ defmodule Req.AdapterTest do
     # TODO: implement req_body_fun support in Req.HTTPC adapter
     @tag skip: @adapter == :httpc
     test "body: req_body_fun halted" do
-      %{url: url} =
-        start_http_server(fn conn ->
+      %{req: req} =
+        serve(fn conn ->
           assert {:ok, "", conn} = Plug.Conn.read_body(conn)
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
@@ -202,7 +210,7 @@ defmodule Req.AdapterTest do
           {:halt, request}
       end
 
-      {req, resp} = Req.run!(adapter: @adapter, method: :post, url: url, body: req_body_fun)
+      {req, resp} = Req.run!(req, method: :post, body: req_body_fun)
       assert req.private[:phase] == :halted
       assert resp.status == nil
       assert resp.body == ""
@@ -211,8 +219,8 @@ defmodule Req.AdapterTest do
     # TODO: implement req_body_fun support in Req.HTTPC adapter
     @tag skip: @adapter == :httpc
     test "body: req_body_fun errored" do
-      %{url: url} =
-        start_http_server(fn conn ->
+      %{req: req} =
+        serve(fn conn ->
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
 
@@ -221,10 +229,11 @@ defmodule Req.AdapterTest do
       assert_raise RuntimeError,
                    "expected req_body_fun to return {:data, chunk, request}, {:done, request}, or {:halt, request}, got: :oops",
                    fn ->
-                     Req.post!(adapter: @adapter, url: url, body: req_body_fun)
+                     Req.post!(req, body: req_body_fun)
                    end
     end
 
+    @tag :transport
     test "into: fun" do
       %{url: url} =
         start_tcp_server(fn socket ->
@@ -283,8 +292,8 @@ defmodule Req.AdapterTest do
     end
 
     test "into: fun with halt" do
-      %{url: url} =
-        start_http_server(fn conn ->
+      %{req: req} =
+        serve(fn conn ->
           conn = Plug.Conn.send_chunked(conn, 200)
           {:ok, conn} = Plug.Conn.chunk(conn, "foo")
           {:ok, conn} = Plug.Conn.chunk(conn, "bar")
@@ -301,8 +310,7 @@ defmodule Req.AdapterTest do
 
       resp =
         Req.get!(
-          adapter: @adapter,
-          url: url,
+          req,
           connect_options: connect_options,
           into: fn {:data, data}, {req, resp} ->
             resp = update_in(resp.body, &(&1 <> data))
@@ -316,6 +324,7 @@ defmodule Req.AdapterTest do
 
     # TODO: normalize transport errors in Req.HTTPC adapter's async path
     @tag skip: @adapter == :httpc
+    @tag :transport
     test "into: fun handle error" do
       assert {:error, %Req.TransportError{reason: :econnrefused}} =
                Req.get(
@@ -331,6 +340,7 @@ defmodule Req.AdapterTest do
 
     # TODO: implement Collectable into in Req.HTTPC adapter
     @tag skip: @adapter == :httpc
+    @tag :transport
     test "into: collectable" do
       %{url: url} =
         start_tcp_server(fn socket ->
@@ -376,17 +386,12 @@ defmodule Req.AdapterTest do
     test "into: collectable non-200" do
       # Ignores the collectable and returns body as usual
 
-      %{url: url} =
-        start_http_server(fn conn ->
+      %{req: req} =
+        serve(fn conn ->
           Req.Test.json(%{conn | status: 404}, %{error: "not found"})
         end)
 
-      resp =
-        Req.get!(
-          adapter: @adapter,
-          url: url,
-          into: :not_a_collectable
-        )
+      resp = Req.get!(req, into: :not_a_collectable)
 
       assert resp.status == 404
       assert resp.body == %{"error" => "not found"}
@@ -394,6 +399,7 @@ defmodule Req.AdapterTest do
 
     # TODO: implement Collectable into in Req.HTTPC adapter
     @tag skip: @adapter == :httpc
+    @tag :transport
     test "into: collectable handle error" do
       assert {:error, %Req.TransportError{reason: :econnrefused}} =
                Req.get(
@@ -405,8 +411,8 @@ defmodule Req.AdapterTest do
     end
 
     test "into: :self" do
-      %{url: url} =
-        start_http_server(fn conn ->
+      %{req: req} =
+        serve(fn conn ->
           conn = Plug.Conn.send_chunked(conn, 200)
           {:ok, conn} = Plug.Conn.chunk(conn, "foo")
           {:ok, conn} = Plug.Conn.chunk(conn, "bar")
@@ -421,7 +427,7 @@ defmodule Req.AdapterTest do
           []
         end
 
-      resp = Req.get!(adapter: @adapter, url: url, connect_options: connect_options, into: :self)
+      resp = Req.get!(req, connect_options: connect_options, into: :self)
       assert resp.status == 200
       assert {:ok, [data: "foo"]} = Req.parse_message(resp, assert_receive(_))
       assert {:ok, [data: "bar"]} = Req.parse_message(resp, assert_receive(_))
@@ -431,57 +437,54 @@ defmodule Req.AdapterTest do
     end
 
     test "into: :self cancel" do
-      %{url: url} =
-        start_http_server(fn conn ->
+      %{req: req} =
+        serve(fn conn ->
           conn = Plug.Conn.send_chunked(conn, 200)
           {:ok, conn} = Plug.Conn.chunk(conn, "foo")
           {:ok, conn} = Plug.Conn.chunk(conn, "bar")
           conn
         end)
 
-      resp = Req.get!(adapter: @adapter, url: url, into: :self)
+      resp = Req.get!(req, into: :self)
       assert resp.status == 200
       assert :ok = Req.cancel_async_response(resp)
     end
 
     @tag :capture_log
     test "into: :self with redirect" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
+      %{req: req, url: url} =
+        serve(fn conn ->
+          case conn.request_path do
+            "/redirect" ->
+              conn
+              |> Plug.Conn.put_resp_header("location", "/")
+              |> Plug.Conn.send_resp(307, "redirecting to /")
+
+            "/" ->
+              Plug.Conn.send_resp(conn, 200, "ok")
+          end
         end)
 
-      %{url: url} =
-        start_http_server(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("location", to_string(url))
-          |> Plug.Conn.send_resp(307, "redirecting to #{url}")
-        end)
-
-      req =
-        Req.new(
-          adapter: @adapter,
-          url: url,
-          into: :self
-        )
+      req = Req.merge(req, url: %{url | path: "/redirect"}, into: :self)
 
       assert Req.get!(req).body |> Enum.to_list() == ["ok"]
     end
 
     test "into: :self enumerable with unrelated message" do
-      %{url: url} =
-        start_http_server(fn conn ->
+      %{req: req} =
+        serve(fn conn ->
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
 
       send(self(), :other)
-      resp = Req.get!(adapter: @adapter, url: url, into: :self)
+      resp = Req.get!(req, into: :self)
       assert Enum.to_list(resp.body) == ["ok"]
       assert_received :other
     end
 
     # TODO: implement :receive_timeout in Req.HTTPC adapter
     @tag skip: @adapter == :httpc
+    @tag :transport
     test "into: :self with :receive_timeout" do
       %{url: url} =
         start_http_server(fn conn ->
