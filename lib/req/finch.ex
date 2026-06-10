@@ -81,9 +81,10 @@ defmodule Req.Finch do
           {:stream, enumerable}
       end
 
+    build_opts = finch_build_opts(request)
+
     finch_request =
-      Finch.build(request.method, request.url, request_headers, body)
-      |> Map.replace!(:unix_socket, request.options[:unix_socket])
+      Finch.build(request.method, request.url, request_headers, body, build_opts)
       |> add_private_options(request.options[:finch_private])
 
     finch_options =
@@ -416,16 +417,37 @@ defmodule Req.Finch do
     end
   end
 
+  defp finch_build_opts(request) do
+    pool_tag_opts =
+      case request.options[:finch] do
+        {_name, opts} when is_list(opts) ->
+          Keyword.take(opts, [:pool_tag])
+
+        _ ->
+          []
+      end
+
+    unix_socket_opts =
+      request.options
+      |> Map.take([:unix_socket])
+      |> Enum.to_list()
+
+    pool_tag_opts ++ unix_socket_opts
+  end
+
   defp finch_name(request) do
     custom_options? =
       Map.has_key?(request.options, :connect_options) or Map.has_key?(request.options, :inet6)
 
     cond do
-      name = request.options[:finch] ->
+      finch_opt = request.options[:finch] ->
         if Map.has_key?(request.options, :connect_options) do
           raise ArgumentError, "cannot set both :finch and :connect_options"
-        else
-          name
+        end
+
+        case finch_opt do
+          {name, _opts} -> name
+          name -> name
         end
 
       custom_options? ->

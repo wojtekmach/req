@@ -239,5 +239,41 @@ defmodule Req.FinchTest do
                  conn_opts: [transport_opts: [timeout: 0, inet6: true, cacerts: []]]
                ]
     end
+
+    test ":pool_tag is forwarded to Finch request" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      pid = self()
+
+      fun = fn req, finch_request, finch_name, finch_opts ->
+        send(pid, {:pool_tag, finch_request.pool_tag})
+        {:ok, resp} = Finch.request(finch_request, finch_name, finch_opts)
+        {req, Req.Response.new(status: resp.status, headers: resp.headers, body: resp.body)}
+      end
+
+      assert Req.get!(url, finch_request: fun, finch: {Req.Finch, pool_tag: :bulk}).body == "ok"
+      assert_received {:pool_tag, :bulk}
+    end
+
+    test ":pool_tag defaults to :default" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      pid = self()
+
+      fun = fn req, finch_request, finch_name, finch_opts ->
+        send(pid, {:pool_tag, finch_request.pool_tag})
+        {:ok, resp} = Finch.request(finch_request, finch_name, finch_opts)
+        {req, Req.Response.new(status: resp.status, headers: resp.headers, body: resp.body)}
+      end
+
+      assert Req.get!(url, finch_request: fun).body == "ok"
+      assert_received {:pool_tag, :default}
+    end
   end
 end
