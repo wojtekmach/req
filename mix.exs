@@ -59,7 +59,7 @@ defmodule Req.MixProject do
 
   defp aliases do
     [
-      "test.all": ["test --include integration"],
+      "test.all": &test_all/1,
       "test.adapters": &test_adapters/1
     ]
   end
@@ -70,10 +70,14 @@ defmodule Req.MixProject do
   defp extra_applications(:test), do: [:logger, :inets]
   defp extra_applications(_), do: [:logger]
 
+  defp test_all(args) do
+    test_adapters(["--include", "integration" | args])
+  end
+
   defp test_adapters(args) do
     for adapter <- ~w(finch httpc plug) do
       {_, status} =
-        System.cmd("mix", ["test.all" | args],
+        System.cmd("mix", ["test" | args],
           env: [{"REQ_ADAPTER", adapter}],
           into: IO.stream(:stdio, :line)
         )

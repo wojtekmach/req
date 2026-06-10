@@ -50,8 +50,8 @@ jobs:
       - run: mix compile --no-optional-deps --warnings-as-errors
         if: ${{ matrix.lint }}
 
-      - run: mix test.adapters --slowest 5
+      - run: mix test.all --slowest 5
         if: ${{ ! matrix.lint }}
 
-      - run: mix test.adapters --slowest 5 --warnings-as-errors
+      - run: mix test.all --slowest 5 --warnings-as-errors
         if: ${{ matrix.lint }}
