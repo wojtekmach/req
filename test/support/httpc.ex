@@ -1,10 +1,6 @@
-# Experimental httpc adapter, used via `adapter: :httpc`.
-#
-# Requires the `:inets` application to be started.
+# Experimental httpc adapter to test the adapter contract.
 
 defmodule Req.HTTPC do
-  @moduledoc false
-
   def run(request) do
     {profile, request, httpc_http_options, httpc_options} = prepare_request(request)
     httpc_url = request.url |> URI.to_string() |> String.to_charlist()

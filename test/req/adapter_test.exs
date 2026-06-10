@@ -19,12 +19,12 @@ defmodule Req.AdapterTest do
           [:inet6, ip: {0, 0, 0, 0, 0, 0, 0, 1}]
         )
 
-      assert Req.request!(adapter: @adapter, url: ipv4_url).body == "ok"
-      assert Req.request!(adapter: @adapter, url: ipv4_url, inet6: true).body == "ok"
-      assert Req.request!(adapter: @adapter, url: ipv6_url, inet6: true).body == "ok"
+      assert Req.request!(adapter: adapter_fun(), url: ipv4_url).body == "ok"
+      assert Req.request!(adapter: adapter_fun(), url: ipv4_url, inet6: true).body == "ok"
+      assert Req.request!(adapter: adapter_fun(), url: ipv6_url, inet6: true).body == "ok"
 
       ipv6_url = %{ipv6_url | host: "::1"}
-      assert Req.request!(adapter: @adapter, url: ipv6_url).body == "ok"
+      assert Req.request!(adapter: adapter_fun(), url: ipv6_url).body == "ok"
     end
 
     @tag :transport
@@ -40,7 +40,11 @@ defmodule Req.AdapterTest do
         port: 0
       )
 
-      assert Req.request!(adapter: @adapter, url: "http://localhost", unix_socket: socket_path).body ==
+      assert Req.request!(
+               adapter: adapter_fun(),
+               url: "http://localhost",
+               unix_socket: socket_path
+             ).body ==
                "ok"
     end
 
@@ -51,7 +55,7 @@ defmodule Req.AdapterTest do
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
 
-      assert Req.request!(adapter: @adapter, url: url, connect_options: [timeout: 5000]).body ==
+      assert Req.request!(adapter: adapter_fun(), url: url, connect_options: [timeout: 5000]).body ==
                "ok"
     end
 
@@ -68,7 +72,7 @@ defmodule Req.AdapterTest do
       # Finch H2 pool re-connects forever so start custom pool under test supervisor.
       start_supervised!({Req.Finch, name: test, connect_options: [protocols: [:http2]]})
 
-      req = Req.new(adapter: @adapter, url: url, finch: test, retry_delay: 100)
+      req = Req.new(adapter: adapter_fun(), url: url, finch: test, retry_delay: 100)
 
       assert Req.request!(req).body == "ok"
     end
@@ -82,7 +86,7 @@ defmodule Req.AdapterTest do
 
       req =
         Req.new(
-          adapter: @adapter,
+          adapter: adapter_fun(),
           url: %{url | scheme: "https"},
           connect_options: [transport_opts: [cacertfile: "bad.pem"]]
         )
@@ -100,19 +104,21 @@ defmodule Req.AdapterTest do
           :ok = :gen_tcp.send(socket, "HTTP/1.1 bad\r\ncontent-length: 0\r\n\r\n")
         end)
 
-      req = Req.new(adapter: @adapter, url: url, retry: false)
+      req = Req.new(adapter: adapter_fun(), url: url, retry: false)
       {:error, %Req.HTTPError{protocol: :http1, reason: :invalid_status_line}} = Req.request(req)
     end
 
     @tag :transport
     test "Req.TransportError" do
-      req = Req.new(adapter: @adapter, url: "http://localhost:9999", retry: false)
+      req = Req.new(adapter: adapter_fun(), url: "http://localhost:9999", retry: false)
       {:error, %Req.TransportError{reason: :econnrefused}} = Req.request(req)
     end
 
     @tag :transport
     test "Req.TransportError with :inet6" do
-      req = Req.new(adapter: @adapter, url: "http://localhost:9999", inet6: true, retry: false)
+      req =
+        Req.new(adapter: adapter_fun(), url: "http://localhost:9999", inet6: true, retry: false)
+
       {:error, %Req.TransportError{reason: :econnrefused}} = Req.request(req)
     end
 
@@ -140,7 +146,7 @@ defmodule Req.AdapterTest do
           :ok = :gen_tcp.send(socket, data)
         end)
 
-      req = Req.new(adapter: @adapter, url: url, receive_timeout: 50, retry: false)
+      req = Req.new(adapter: adapter_fun(), url: url, receive_timeout: 50, retry: false)
       assert {:error, %Req.TransportError{reason: :timeout}} = Req.request(req)
       assert_received :ping
     end
@@ -162,7 +168,7 @@ defmodule Req.AdapterTest do
           :ok = :gen_tcp.send(socket, body)
         end)
 
-      req = Req.new(adapter: @adapter, url: url, request_timeout: 0, retry: false)
+      req = Req.new(adapter: adapter_fun(), url: url, request_timeout: 0, retry: false)
       assert {:error, %Req.TransportError{reason: :timeout}} = Req.request(req)
       assert_received :ping
     end
@@ -261,7 +267,7 @@ defmodule Req.AdapterTest do
 
       resp =
         Req.get!(
-          adapter: @adapter,
+          adapter: adapter_fun(),
           url: url,
           into: fn {:data, data}, acc ->
             send(pid, {:data, data})
@@ -328,7 +334,7 @@ defmodule Req.AdapterTest do
     test "into: fun handle error" do
       assert {:error, %Req.TransportError{reason: :econnrefused}} =
                Req.get(
-                 adapter: @adapter,
+                 adapter: adapter_fun(),
                  url: "http://localhost:9999",
                  retry: false,
                  into: fn {:data, data}, {req, resp} ->
@@ -366,7 +372,7 @@ defmodule Req.AdapterTest do
 
       resp =
         Req.get!(
-          adapter: @adapter,
+          adapter: adapter_fun(),
           url: url,
           into: []
         )
@@ -403,7 +409,7 @@ defmodule Req.AdapterTest do
     test "into: collectable handle error" do
       assert {:error, %Req.TransportError{reason: :econnrefused}} =
                Req.get(
-                 adapter: @adapter,
+                 adapter: adapter_fun(),
                  url: "http://localhost:9999",
                  retry: false,
                  into: IO.stream()
@@ -492,7 +498,13 @@ defmodule Req.AdapterTest do
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
 
-      assert Req.get(adapter: @adapter, url: url, into: :self, receive_timeout: 0, retry: false) ==
+      assert Req.get(
+               adapter: adapter_fun(),
+               url: url,
+               into: :self,
+               receive_timeout: 0,
+               retry: false
+             ) ==
                {:error, %Req.TransportError{reason: :timeout}}
     end
   end

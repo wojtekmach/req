@@ -19,7 +19,7 @@ defmodule Req.Case do
 
       :httpc ->
         %{url: url} = start_http_server(plug, options)
-        %{req: Req.new(url: url, adapter: :httpc), url: url}
+        %{req: Req.new(url: url, adapter: &Req.HTTPC.run/1), url: url}
     end
   end
 
@@ -72,6 +72,16 @@ defmodule Req.Case do
     end
 
     accept(listen_socket, fun)
+  end
+
+  def adapter_fun do
+    case adapter() do
+      :finch ->
+        &Req.Steps.run_finch/1
+
+      :httpc ->
+        &Req.HTTPC.run/1
+    end
   end
 
   def adapter do

@@ -1142,14 +1142,7 @@ defmodule Req.Request do
   end
 
   def run_request(%{current_request_steps: []} = request) do
-    adapter =
-      case request.adapter do
-        :httpc -> &Req.HTTPC.run/1
-        :finch -> &Req.Steps.run_finch/1
-        other -> other
-      end
-
-    case run_step(adapter, request) do
+    case run_step(request.adapter, request) do
       {request, %Req.Response{} = response} ->
         run_response(request, response)
 
