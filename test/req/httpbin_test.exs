@@ -3,6 +3,9 @@ defmodule HTTPBinTest do
 
   @adapter Req.Case.adapter()
 
+  # TODO: Use JSON when we depend on Elixir 1.18.
+  @json Jason
+
   setup do
     serve(fn conn -> HTTPBin.call(conn, []) end)
   end
@@ -102,7 +105,7 @@ defmodule HTTPBinTest do
     lines =
       Req.get!(req, url: "#{url}/stream/2", decode_body: false).body
       |> String.split("\n", trim: true)
-      |> Enum.map(&JSON.decode!/1)
+      |> Enum.map(&Jason.decode!/1)
 
     assert Enum.map(lines, & &1["id"]) == [0, 1]
   end

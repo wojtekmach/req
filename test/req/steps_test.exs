@@ -6,6 +6,8 @@ defmodule Req.StepsTest do
   ## Request steps
 
   describe "compressed" do
+    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+    @tag skip: System.otp_release() < "28"
     test "sets accept-encoding when compressed: true" do
       req = Req.new(compressed: true) |> Req.Request.prepare()
       assert req.headers["accept-encoding"] == ["zstd, br, gzip"]
@@ -475,6 +477,8 @@ defmodule Req.StepsTest do
                    end
     end
 
+    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+    @tag skip: System.otp_release() < "28"
     test "into: binary with gzip" do
       %{req: req} =
         serve(fn conn ->
@@ -870,6 +874,8 @@ defmodule Req.StepsTest do
       assert Req.put!(req).body == "ok"
     end
 
+    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+    @tag skip: System.otp_release() < "28"
     test "excludes accept-encoding, hop-by-hop, and trace-id headers from signature" do
       plug = fn conn ->
         [authorization] = Plug.Conn.get_req_header(conn, "authorization")
@@ -1042,6 +1048,8 @@ defmodule Req.StepsTest do
       end
     end
 
+    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+    @tag skip: System.otp_release() < "28"
     test "zstd success" do
       plug = fn conn ->
         conn
@@ -1053,6 +1061,8 @@ defmodule Req.StepsTest do
       assert resp.body == "foo"
     end
 
+    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+    @tag skip: System.otp_release() < "28"
     test "zstd error" do
       plug = fn conn ->
         conn
@@ -1067,6 +1077,8 @@ defmodule Req.StepsTest do
                    end
     end
 
+    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+    @tag skip: System.otp_release() < "28"
     test "multiple codecs" do
       plug = fn conn ->
         conn
@@ -1079,6 +1091,8 @@ defmodule Req.StepsTest do
       assert resp.body == "foo"
     end
 
+    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+    @tag skip: System.otp_release() < "28"
     @tag :transport
     test "multiple codecs with multiple headers" do
       %{url: url} =
@@ -1406,6 +1420,8 @@ defmodule Req.StepsTest do
       end
     end
 
+    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+    @tag skip: System.otp_release() < "28"
     test "zstd (content-type)" do
       plug = fn conn ->
         conn
@@ -1416,6 +1432,8 @@ defmodule Req.StepsTest do
       assert Req.get!(plug: plug, decoders: [:zst]).body == "foo"
     end
 
+    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+    @tag skip: System.otp_release() < "28"
     test "zstd (path)" do
       plug = fn conn ->
         conn
@@ -1426,6 +1444,8 @@ defmodule Req.StepsTest do
       assert Req.get!(plug: plug, url: "/foo.zst", decoders: [:zst]).body == "foo"
     end
 
+    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+    @tag skip: System.otp_release() < "28"
     test "zstd invalid" do
       plug = fn conn ->
         conn

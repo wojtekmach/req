@@ -253,6 +253,7 @@ defmodule Req.RequestTest do
     assert {:ok, %{status: 200, body: "ok"}} = Req.Request.run(request)
   end
 
+  # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
   @tag skip: System.otp_release() < "28"
   test "prepare/1" do
     request =
