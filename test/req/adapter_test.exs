@@ -69,10 +69,19 @@ defmodule Req.AdapterTest do
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
 
-      # Finch H2 pool re-connects forever so start custom pool under test supervisor.
-      start_supervised!({Req.Finch, name: test, connect_options: [protocols: [:http2]]})
-
-      req = Req.new(adapter: adapter_fun(), url: url, finch: test, retry_delay: 100)
+      req =
+        if @adapter == :finch do
+          # Finch H2 pool re-connects forever so start custom pool under test supervisor.
+          start_supervised!({Req.Finch, name: test, connect_options: [protocols: [:http2]]})
+          Req.new(adapter: adapter_fun(), url: url, finch: test, retry_delay: 100)
+        else
+          Req.new(
+            adapter: adapter_fun(),
+            url: url,
+            connect_options: [protocols: [:http2]],
+            retry_delay: 100
+          )
+        end
 
       assert Req.request!(req).body == "ok"
     end
@@ -170,7 +179,7 @@ defmodule Req.AdapterTest do
 
       req = Req.new(adapter: adapter_fun(), url: url, request_timeout: 0, retry: false)
       assert {:error, %Req.TransportError{reason: :timeout}} = Req.request(req)
-      assert_received :ping
+      assert_receive :ping
     end
 
     # TODO: implement req_body_fun support in Req.HTTPC adapter

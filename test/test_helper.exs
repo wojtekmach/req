@@ -20,6 +20,10 @@ defmodule Req.Case do
       :httpc ->
         %{url: url} = start_http_server(plug, options)
         %{req: Req.new(url: url, adapter: &Req.HTTPC.run/1), url: url}
+
+      :mint ->
+        %{url: url} = start_http_server(plug, options)
+        %{req: Req.new(url: url, adapter: &Req.Mint.run/1), url: url}
     end
   end
 
@@ -81,6 +85,9 @@ defmodule Req.Case do
 
       :httpc ->
         &Req.HTTPC.run/1
+
+      :mint ->
+        &Req.Mint.run/1
     end
   end
 
@@ -91,6 +98,9 @@ defmodule Req.Case do
 
       "httpc" ->
         :httpc
+
+      "mint" ->
+        :mint
 
       "plug" ->
         :plug
@@ -108,6 +118,9 @@ exclude =
 
     :httpc ->
       [:integration, :http2]
+
+    :mint ->
+      [:integration]
 
     :plug ->
       [:integration, :http2, :transport, :adapter_finch, :adapter_httpc]
