@@ -32,6 +32,9 @@ defmodule Req.HTTPC do
             {:stream, enumerable} ->
               httpc_enumerable_to_fun(enumerable)
 
+            nil ->
+              ""
+
             iodata ->
               iodata
           end

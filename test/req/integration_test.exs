@@ -34,6 +34,12 @@ defmodule Req.IntegrationTest do
       run!: 2
     ]
 
+  doctest Req.Request,
+    only: [
+      new: 1,
+      run_request: 1
+    ]
+
   doctest Req.Steps,
     only: [
       auth: 1,

@@ -1,6 +1,8 @@
 defmodule Req.RequestTest do
   use Req.Case, async: true
-  doctest Req.Request, except: [delete_header: 2]
+  # new/1 and run_request/1 doctests hit api.github.com, they run as part of
+  # integration tests instead.
+  doctest Req.Request, except: [delete_header: 2, new: 1, run_request: 1]
 
   setup do
     bypass = Bypass.open()

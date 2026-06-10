@@ -7,6 +7,22 @@ defmodule Req.Case do
     end
   end
 
+  def serve(plug, options \\ []) when is_function(plug, 1) do
+    case adapter() do
+      :plug ->
+        url = URI.new!("http://localhost")
+        %{req: Req.new(url: url, plug: plug), url: url}
+
+      :finch ->
+        %{url: url} = start_http_server(plug, options)
+        %{req: Req.new(url: url), url: url}
+
+      :httpc ->
+        %{url: url} = start_http_server(plug, options)
+        %{req: Req.new(url: url, adapter: :httpc), url: url}
+    end
+  end
+
   def start_http_server(plug, options \\ []) when is_function(plug, 1) do
     options =
       [
@@ -66,6 +82,9 @@ defmodule Req.Case do
       "httpc" ->
         :httpc
 
+      "plug" ->
+        :plug
+
       adapter ->
         raise "unknown REQ_ADAPTER=#{inspect(adapter)}"
     end
@@ -73,10 +92,15 @@ defmodule Req.Case do
 end
 
 exclude =
-  if Req.Case.adapter() == :httpc do
-    [:integration, :http2]
-  else
-    [:integration]
+  case Req.Case.adapter() do
+    :finch ->
+      [:integration]
+
+    :httpc ->
+      [:integration, :http2]
+
+    :plug ->
+      [:integration, :http2, :adapter]
   end
 
 if adapter = System.get_env("REQ_ADAPTER") do

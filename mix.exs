@@ -71,7 +71,7 @@ defmodule Req.MixProject do
   defp extra_applications(_), do: [:logger]
 
   defp test_adapters(args) do
-    for adapter <- ~w(finch httpc) do
+    for adapter <- ~w(finch httpc plug) do
       {_, status} =
         System.cmd("mix", ["test.all" | args],
           env: [{"REQ_ADAPTER", adapter}],
