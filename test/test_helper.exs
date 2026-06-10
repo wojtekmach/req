@@ -100,7 +100,7 @@ exclude =
       [:integration, :http2]
 
     :plug ->
-      [:integration, :http2, :transport]
+      [:integration, :http2, :transport, :adapter_finch, :adapter_httpc]
   end
 
 if adapter = System.get_env("REQ_ADAPTER") do

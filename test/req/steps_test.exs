@@ -24,40 +24,40 @@ defmodule Req.StepsTest do
 
   describe "put_base_url" do
     test "it works" do
-      %{url: url} =
-        start_http_server(fn conn ->
+      %{req: req, url: url} =
+        serve(fn conn ->
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
 
-      assert Req.get!("/", base_url: url).body == "ok"
-      assert Req.get!("", base_url: url).body == "ok"
+      assert Req.get!(req, base_url: url, url: "/").body == "ok"
+      assert Req.get!(req, base_url: url, url: "").body == "ok"
 
-      req = Req.new(base_url: url)
+      req = Req.merge(req, base_url: url)
       assert Req.get!(req, url: "/").body == "ok"
       assert Req.get!(req, url: "").body == "ok"
     end
 
     test "with absolute url" do
-      %{url: url} =
-        start_http_server(fn conn ->
+      %{req: req, url: url} =
+        serve(fn conn ->
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
 
-      assert Req.get!(url, base_url: "ignored").body == "ok"
+      assert Req.get!(req, base_url: "ignored", url: url).body == "ok"
     end
 
     test "with base path" do
-      %{url: url} =
-        start_http_server(fn conn ->
+      %{req: req, url: url} =
+        serve(fn conn ->
           assert conn.request_path == "/api/v2/foo"
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
 
-      assert Req.get!("/foo", base_url: "#{url}/api/v2", retry: false).body == "ok"
-      assert Req.get!("foo", base_url: "#{url}/api/v2").body == "ok"
-      assert Req.get!("/foo", base_url: "#{url}/api/v2/").body == "ok"
-      assert Req.get!("foo", base_url: "#{url}/api/v2/").body == "ok"
-      assert Req.get!("", base_url: "#{url}/api/v2/foo").body == "ok"
+      assert Req.get!(req, base_url: "#{url}/api/v2", url: "/foo", retry: false).body == "ok"
+      assert Req.get!(req, base_url: "#{url}/api/v2", url: "foo").body == "ok"
+      assert Req.get!(req, base_url: "#{url}/api/v2/", url: "/foo").body == "ok"
+      assert Req.get!(req, base_url: "#{url}/api/v2/", url: "foo").body == "ok"
+      assert Req.get!(req, base_url: "#{url}/api/v2/foo", url: "").body == "ok"
     end
 
     test "function" do
@@ -1079,6 +1079,7 @@ defmodule Req.StepsTest do
       assert resp.body == "foo"
     end
 
+    @tag :transport
     test "multiple codecs with multiple headers" do
       %{url: url} =
         start_tcp_server(fn socket ->
@@ -1651,51 +1652,40 @@ defmodule Req.StepsTest do
     end
 
     test "auth location trusted" do
-      adapter = fn request ->
-        case request.url.host do
-          "original" ->
-            assert [_] = Req.Request.get_header(request, "authorization")
+      %{req: req} =
+        serve(fn
+          conn when conn.host == "localhost" ->
+            assert [_] = Plug.Conn.get_req_header(conn, "authorization")
+            redirect(conn, 301, absolute_url(%{conn | host: "127.0.0.1"}, "/ok"))
 
-            response =
-              Req.Response.new(
-                status: 301,
-                headers: [{"location", "http://untrusted"}],
-                body: "redirecting"
-              )
-
-            {request, response}
-
-          "untrusted" ->
-            assert [_] = Req.Request.get_header(request, "authorization")
-
-            response =
-              Req.Response.new(
-                status: 200,
-                body: "bad things"
-              )
-
-            {request, response}
-        end
-      end
+          conn when conn.host == "127.0.0.1" ->
+            assert [_] = Plug.Conn.get_req_header(conn, "authorization")
+            Plug.Conn.send_resp(conn, 200, "ok")
+        end)
 
       assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.get!("http://original",
-                        adapter: adapter,
+               assert Req.get!(req,
                         auth: {:basic, "authorization:credentials"},
                         redirect_trusted: true
                       ).status == 200
-             end) =~ "[debug] redirecting to http://untrusted"
+             end) =~ "[debug] redirecting to http://127.0.0.1"
     end
 
     test "auth different host" do
-      adapter = untrusted_redirect_adapter(:host, "trusted", "untrusted")
+      %{req: req} =
+        serve(fn
+          conn when conn.host == "localhost" ->
+            assert [_] = Plug.Conn.get_req_header(conn, "authorization")
+            redirect(conn, 301, absolute_url(%{conn | host: "127.0.0.1"}, "/ok"))
+
+          conn when conn.host == "127.0.0.1" ->
+            assert [] = Plug.Conn.get_req_header(conn, "authorization")
+            Plug.Conn.send_resp(conn, 200, "ok")
+        end)
 
       assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.get!("http://trusted",
-                        adapter: adapter,
-                        auth: {:basic, "authorization:credentials"}
-                      ).status == 200
-             end) =~ "[debug] redirecting to http://untrusted"
+               assert Req.get!(req, auth: {:basic, "authorization:credentials"}).status == 200
+             end) =~ "[debug] redirecting to http://127.0.0.1"
     end
 
     test "auth different port" do
@@ -1721,34 +1711,34 @@ defmodule Req.StepsTest do
     end
 
     test "userinfo in absolute location is stripped and warned about" do
-      adapter = fn request ->
-        case request.url.host do
-          "original" ->
-            response =
-              Req.Response.new(
-                status: 302,
-                headers: [{"location", "http://foo:bar@other/path"}]
-              )
+      %{req: req} =
+        serve(fn
+          conn when conn.host == "localhost" ->
+            location =
+              to_string(%URI{
+                scheme: "#{conn.scheme}",
+                userinfo: "foo:bar",
+                host: "127.0.0.1",
+                port: conn.port,
+                path: "/path"
+              })
 
-            {request, response}
+            redirect(conn, 302, location)
 
-          "other" ->
+          conn when conn.host == "127.0.0.1" ->
             # Userinfo in a redirect target is stripped, never converted to Basic auth.
-            assert request.url.userinfo == nil
-            assert Req.Request.get_header(request, "authorization") == []
-            assert request.options[:auth] == nil
-            {request, Req.Response.new(status: 200, body: "ok")}
-        end
-      end
+            assert Plug.Conn.get_req_header(conn, "authorization") == []
+            Plug.Conn.send_resp(conn, 200, "ok")
+        end)
 
       log =
         ExUnit.CaptureLog.capture_log(fn ->
-          assert Req.get!("http://original", adapter: adapter).status == 200
+          assert Req.get!(req).status == 200
         end)
 
       assert log =~ "[warning] stripping userinfo from redirect location"
       # the credentials are not leaked in the redirect log
-      assert log =~ "[debug] redirecting to http://other/path"
+      assert log =~ "[debug] redirecting to http://127.0.0.1"
       refute log =~ "foo:bar"
     end
 
@@ -1974,30 +1964,23 @@ defmodule Req.StepsTest do
   describe "retry" do
     @tag :capture_log
     test "eventually successful - function" do
-      adapter = fn request ->
-        request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
-        attempt = request.private.attempt
+      counter = :counters.new(1, [])
 
-        response =
-          case attempt do
-            0 ->
-              Req.Response.new(status: 500, body: "oops")
+      %{req: req} =
+        serve(fn conn ->
+          :counters.add(counter, 1, 1)
 
-            1 ->
-              Req.Response.new(status: 500, body: "oops")
+          case :counters.get(counter, 1) do
+            attempt when attempt <= 3 ->
+              Plug.Conn.send_resp(conn, 500, "oops")
 
-            2 ->
-              Req.Response.new(status: 500, body: "oops")
-
-            3 ->
-              Req.Response.new(status: 200, body: "ok")
+            4 ->
+              Plug.Conn.send_resp(conn, 200, "ok")
           end
-
-        {request, response}
-      end
+        end)
 
       request =
-        Req.new(adapter: adapter, url: "http://localhost", retry_delay: &Integer.pow(2, &1))
+        Req.merge(req, retry_delay: &Integer.pow(2, &1))
         |> Req.Request.prepend_response_steps(
           foo: fn {request, response} ->
             {request, update_in(response.body, &(&1 <> " - updated"))}
@@ -2017,11 +2000,12 @@ defmodule Req.StepsTest do
     end
 
     test "invalid :retry_delay" do
-      adapter = fn request ->
-        {request, Req.Response.new(status: 500)}
-      end
+      %{req: req} =
+        serve(fn conn ->
+          Plug.Conn.send_resp(conn, 500, "")
+        end)
 
-      req = Req.new(adapter: adapter, retry_delay: fn _ -> :ok end)
+      req = Req.merge(req, retry_delay: fn _ -> :ok end)
 
       assert_raise ArgumentError,
                    "expected :retry_delay function to return non-negative integer, got: :ok",
@@ -2032,27 +2016,23 @@ defmodule Req.StepsTest do
 
     @tag :capture_log
     test "eventually successful - integer" do
-      adapter = fn request ->
-        request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
-        attempt = request.private.attempt
+      counter = :counters.new(1, [])
 
-        response =
-          case attempt do
-            0 ->
-              Req.Response.new(status: 500, body: "oops")
+      %{req: req} =
+        serve(fn conn ->
+          :counters.add(counter, 1, 1)
 
-            1 ->
-              Req.Response.new(status: 500, body: "oops")
+          case :counters.get(counter, 1) do
+            attempt when attempt <= 2 ->
+              Plug.Conn.send_resp(conn, 500, "oops")
 
-            2 ->
-              Req.Response.new(status: 200, body: "ok")
+            3 ->
+              Plug.Conn.send_resp(conn, 200, "ok")
           end
-
-        {request, response}
-      end
+        end)
 
       request =
-        Req.new(adapter: adapter, url: "http://localhost", retry_delay: 1)
+        Req.merge(req, retry_delay: 1)
         |> Req.Request.prepend_response_steps(
           foo: fn {request, response} ->
             {request, update_in(response.body, &(&1 <> " - updated"))}
@@ -2071,23 +2051,22 @@ defmodule Req.StepsTest do
 
     @tag :capture_log
     test "default log_level" do
-      adapter = fn request ->
-        request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
-        attempt = request.private.attempt
+      counter = :counters.new(1, [])
 
-        response =
-          case attempt do
-            0 ->
-              Req.Response.new(status: 500, body: "oops")
+      %{req: req} =
+        serve(fn conn ->
+          :counters.add(counter, 1, 1)
 
+          case :counters.get(counter, 1) do
             1 ->
-              Req.Response.new(status: 200, body: "ok")
+              Plug.Conn.send_resp(conn, 500, "oops")
+
+            2 ->
+              Plug.Conn.send_resp(conn, 200, "ok")
           end
+        end)
 
-        {request, response}
-      end
-
-      request = Req.new(adapter: adapter, url: "http://localhost", retry_delay: 1)
+      request = Req.merge(req, retry_delay: 1)
       log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
 
       assert String.match?(
@@ -2098,24 +2077,22 @@ defmodule Req.StepsTest do
 
     @tag :capture_log
     test "custom log_level" do
-      adapter = fn request ->
-        request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
-        attempt = request.private.attempt
+      counter = :counters.new(1, [])
 
-        response =
-          case attempt do
-            0 ->
-              Req.Response.new(status: 500, body: "oops")
+      %{req: req} =
+        serve(fn conn ->
+          :counters.add(counter, 1, 1)
 
+          case :counters.get(counter, 1) do
             1 ->
-              Req.Response.new(status: 200, body: "ok")
+              Plug.Conn.send_resp(conn, 500, "oops")
+
+            2 ->
+              Plug.Conn.send_resp(conn, 200, "ok")
           end
+        end)
 
-        {request, response}
-      end
-
-      request =
-        Req.new(adapter: adapter, url: "http://localhost", retry_delay: 1, retry_log_level: :info)
+      request = Req.merge(req, retry_delay: 1, retry_log_level: :info)
 
       log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
 
@@ -2127,24 +2104,22 @@ defmodule Req.StepsTest do
 
     @tag :capture_log
     test "logging disabled" do
-      adapter = fn request ->
-        request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
-        attempt = request.private.attempt
+      counter = :counters.new(1, [])
 
-        response =
-          case attempt do
-            0 ->
-              Req.Response.new(status: 500, body: "oops")
+      %{req: req} =
+        serve(fn conn ->
+          :counters.add(counter, 1, 1)
 
+          case :counters.get(counter, 1) do
             1 ->
-              Req.Response.new(status: 200, body: "ok")
+              Plug.Conn.send_resp(conn, 500, "oops")
+
+            2 ->
+              Plug.Conn.send_resp(conn, 200, "ok")
           end
+        end)
 
-        {request, response}
-      end
-
-      request =
-        Req.new(adapter: adapter, url: "http://localhost", retry_delay: 1, retry_log_level: false)
+      request = Req.merge(req, retry_delay: 1, retry_log_level: false)
 
       log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
       assert log == ""
@@ -2153,36 +2128,38 @@ defmodule Req.StepsTest do
     @tag :capture_log
     @tag timeout: 1000
     test "retry_delay" do
-      adapter = fn request ->
-        request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
-        attempt = request.private.attempt
+      counter = :counters.new(1, [])
 
-        response =
-          case attempt do
-            0 ->
-              Req.Response.new(status: 429) |> retry_after(0)
+      %{req: req} =
+        serve(fn conn ->
+          :counters.add(counter, 1, 1)
 
+          case :counters.get(counter, 1) do
             1 ->
-              Req.Response.new(status: 429) |> retry_after(-1)
+              conn |> retry_after(0) |> Plug.Conn.send_resp(429, "")
 
             2 ->
-              Req.Response.new(status: 503) |> retry_after(DateTime.utc_now())
+              conn |> retry_after(-1) |> Plug.Conn.send_resp(429, "")
 
             3 ->
-              datetime = DateTime.add(DateTime.utc_now(), -3600)
-              Req.Response.new(status: 503) |> retry_after(datetime)
+              conn |> retry_after(DateTime.utc_now()) |> Plug.Conn.send_resp(503, "")
 
             4 ->
-              Req.Response.new(status: 200, body: "ok")
+              datetime = DateTime.add(DateTime.utc_now(), -3600)
+              conn |> retry_after(datetime) |> Plug.Conn.send_resp(503, "")
+
+            5 ->
+              Plug.Conn.send_resp(conn, 200, "ok")
           end
+        end)
 
-        {request, response}
-      end
-
-      assert Req.request!(adapter: adapter, retry_delay: 100, max_retries: 5).body == "ok"
+      assert Req.request!(req, retry_delay: 100, max_retries: 5).body == "ok"
     end
 
-    defp retry_after(r, value), do: Req.Response.put_header(r, "retry-after", retry_after(value))
+    defp retry_after(conn, value) do
+      Plug.Conn.put_resp_header(conn, "retry-after", retry_after(value))
+    end
+
     defp retry_after(integer) when is_integer(integer), do: to_string(integer)
     defp retry_after(%DateTime{} = dt), do: Req.Utils.format_http_date(dt)
 
