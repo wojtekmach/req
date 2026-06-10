@@ -56,20 +56,17 @@ defmodule Req.AdapterTest do
 
     @tag :capture_log
     @tag :http2
-    test "connect_options[:protocols]" do
+    test "connect_options[:protocols]", %{test: test} do
       %{url: url} =
         start_http_server(fn conn ->
           assert Plug.Conn.get_http_protocol(conn) == :"HTTP/2"
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
 
-      req =
-        Req.new(
-          adapter: @adapter,
-          url: url,
-          connect_options: [protocols: [:http2]],
-          retry_delay: 100
-        )
+      # Finch H2 pool re-connects forever so start custom pool under test supervisor.
+      start_supervised!({Req.Finch, name: test, connect_options: [protocols: [:http2]]})
+
+      req = Req.new(adapter: @adapter, url: url, finch: test, retry_delay: 100)
 
       assert Req.request!(req).body == "ok"
     end

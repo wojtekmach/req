@@ -3,6 +3,11 @@
 defmodule Req.Finch do
   @moduledoc false
 
+  def child_spec(options) do
+    {name, options} = Keyword.pop!(options, :name)
+    Finch.child_spec(name: name, pools: %{default: pool_options(options)})
+  end
+
   @doc """
   Runs the request using `Finch`.
   """
@@ -425,14 +430,7 @@ defmodule Req.Finch do
 
       custom_options? ->
         pool_options = pool_options(request.options)
-
-        name =
-          pool_options
-          |> :erlang.term_to_binary()
-          |> :erlang.md5()
-          |> Base.encode32(padding: false)
-
-        name = Module.concat(Req.FinchSupervisor, "Pool_#{name}")
+        name = pool_name(pool_options)
 
         case DynamicSupervisor.start_child(
                Req.FinchSupervisor,
@@ -448,6 +446,17 @@ defmodule Req.Finch do
       true ->
         Req.Finch
     end
+  end
+
+  @doc false
+  def pool_name(pool_options) do
+    hash =
+      pool_options
+      |> :erlang.term_to_binary()
+      |> :erlang.md5()
+      |> Base.encode32(padding: false)
+
+    Module.concat(Req.FinchSupervisor, "Pool_#{hash}")
   end
 
   @doc """
