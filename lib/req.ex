@@ -481,6 +481,10 @@ defmodule Req do
     * `:pool_max_idle_time` - the maximum number of milliseconds that a pool can be
       idle before being terminated, used only by HTTP1 pools. Defaults to `:infinity`.
 
+    * `:conn_max_idle_time` - The maximum number of milliseconds an HTTP1 connection
+      is allowed to be idle before being closed during a checkout attempt.
+      The default value is `:infinity`.
+
     * `:finch_private` - a map or keyword list of private metadata to add to the Finch request. May be useful
       for adding custom data when handling telemetry with `Finch.Telemetry`.
 
