@@ -217,7 +217,7 @@ defmodule Req.Fields do
   Drops the given `names`.
   """
   if @legacy? do
-    def drop(fields, names) when is_binary(name) do
+    def drop(fields, names) when is_list(names) do
       names_to_drop = Enum.map(names, &ensure_name_downcase/1)
 
       for {name, value} <- fields,
@@ -226,7 +226,7 @@ defmodule Req.Fields do
       end
     end
   else
-    def drop(fields, names) do
+    def drop(fields, names) when is_list(names) do
       names_to_drop = Enum.map(names, &ensure_name_downcase/1)
 
       for {name, values} <- fields,
