@@ -446,7 +446,7 @@ defmodule Req.Steps do
            some servers. There is no need to pass `:size` for `integer`,
            `iodata`, and `File.Stream` values as it's automatically calculated.
 
-    * `:json` - if set, encodes the request body as JSON (using `Jason.encode_to_iodata!/1`), sets
+    * `:json` - if set, encodes the request body as JSON (using `JSON.encode_to_iodata!/1`), sets
       the `accept` header to `application/json`, and the `content-type` header to `application/json`.
 
   When the request has the default HTTP method, GET, and the request body is set, this step
@@ -508,7 +508,7 @@ defmodule Req.Steps do
         |> then(&maybe_put_content_length(&1, multipart.size))
 
       data = request.options[:json] ->
-        %{request | body: Jason.encode_to_iodata!(data)}
+        %{request | body: JSON.encode_to_iodata!(data)}
         |> Req.Request.put_new_header("content-type", "application/json")
         |> Req.Request.put_new_header("accept", "application/json")
 
