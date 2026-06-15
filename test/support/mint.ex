@@ -196,121 +196,52 @@ defmodule Req.Mint do
 
     case request.into do
       nil ->
-        recv_into_nil(request, conn, ref, timeouts)
-
-      fun when is_function(fun, 2) ->
-        recv_into_fun(request, conn, ref, timeouts, fun)
+        recv_into_stream(request, conn, ref, timeouts)
 
       :self ->
         recv_into_self(request, conn, ref, timeouts)
-
-      collectable ->
-        recv_into_collectable(request, conn, ref, timeouts, collectable)
     end
   end
 
-  defp recv_into_nil(request, conn, ref, timeouts) do
-    acc = %{status: nil, headers: [], body: [], trailers: []}
+  defp recv_into_stream(request, conn, ref, timeouts) do
+    stream = request.stream
+    acc = request.private[:req_stream_acc]
+    resp = %{Req.Response.new() | request: request, status: nil}
 
-    fun = fn
-      {:status, status}, {request, acc} ->
-        {:cont, {request, %{acc | status: status}}}
-
-      {:headers, fields}, {request, acc} ->
-        {:cont, {request, %{acc | headers: acc.headers ++ fields}}}
-
-      {:data, data}, {request, acc} ->
-        {:cont, {request, %{acc | body: [acc.body | data]}}}
-
-      {:trailers, fields}, {request, acc} ->
-        {:cont, {request, %{acc | trailers: acc.trailers ++ fields}}}
-    end
-
-    case recv_stream(conn, ref, {request, acc}, fun, timeouts) do
-      {:ok, {request, acc}} ->
-        response =
-          Req.Response.new(
-            status: acc.status,
-            headers: acc.headers,
-            body: IO.iodata_to_binary(acc.body),
-            trailers: fields_to_map(acc.trailers)
-          )
-
-        {request, response}
-
-      {:error, {request, _acc}, exception} ->
-        {request, exception}
-    end
-  end
-
-  defp recv_into_fun(request, conn, ref, timeouts, fun) do
     stream_fun = fn
-      {:status, status}, {request, resp} ->
-        {:cont, {request, %{resp | status: status}}}
+      {:status, status}, {resp, acc} ->
+        {:cont, {%{resp | status: status}, acc}}
 
-      {:headers, fields}, {request, resp} ->
-        resp =
-          Enum.reduce(fields, resp, fn {name, value}, resp ->
-            Req.Response.put_header(resp, name, value)
-          end)
+      {:headers, fields}, {resp, acc} ->
+        resp = update_in(resp.headers, &Req.Fields.prepend(&1, fields))
+        {:cont, {resp, acc}}
 
-        {:cont, {request, resp}}
+      {:data, data}, {resp, acc} ->
+        case stream.(data, resp, acc) do
+          {:ok, resp, acc} ->
+            {:cont, {resp, acc}}
 
-      {:data, data}, acc ->
-        fun.({:data, data}, acc)
+          {:error, resp, exception, acc} ->
+            {:error, {resp, acc}, exception}
+        end
 
-      {:trailers, fields}, {request, resp} ->
+      {:trailers, fields}, {resp, acc} ->
         resp = update_in(resp.trailers, &Map.merge(&1, fields_to_map(fields)))
-        {:cont, {request, resp}}
+        {:cont, {resp, acc}}
     end
 
-    case recv_stream(conn, ref, {request, Req.Response.new()}, stream_fun, timeouts) do
-      {:ok, {request, response}} ->
-        {request, response}
+    case recv_stream(conn, ref, {resp, acc}, stream_fun, timeouts) do
+      {:ok, {resp, acc}} ->
+        case stream.(:eof, resp, acc) do
+          {:ok, resp, acc} ->
+            {request, put_in(resp.private[:req_stream_acc], acc)}
 
-      {:error, {request, _response}, exception} ->
-        {request, exception}
-    end
-  end
+          {:error, resp, exception, acc} ->
+            {Req.Request.put_private(resp.request, :req_stream_acc, acc), exception}
+        end
 
-  defp recv_into_collectable(request, conn, ref, timeouts, collectable) do
-    stream_fun = fn
-      {:status, 200}, {request, {nil, resp}} ->
-        {acc, collector} = Collectable.into(collectable)
-        {:cont, {request, {{acc, collector}, %{resp | status: 200}}}}
-
-      {:status, status}, {request, {nil, resp}} ->
-        {acc, collector} = Collectable.into("")
-        {:cont, {request, {{acc, collector}, %{resp | status: status}}}}
-
-      {:headers, fields}, {request, {collector_acc, resp}} ->
-        resp =
-          Enum.reduce(fields, resp, fn {name, value}, resp ->
-            Req.Response.put_header(resp, name, value)
-          end)
-
-        {:cont, {request, {collector_acc, resp}}}
-
-      {:data, data}, {request, {{acc, collector}, resp}} ->
-        acc = collector.(acc, {:cont, data})
-        {:cont, {request, {{acc, collector}, resp}}}
-
-      {:trailers, fields}, {request, {collector_acc, resp}} ->
-        resp = update_in(resp.trailers, &Map.merge(&1, fields_to_map(fields)))
-        {:cont, {request, {collector_acc, resp}}}
-    end
-
-    case recv_stream(conn, ref, {request, {nil, Req.Response.new()}}, stream_fun, timeouts) do
-      {:ok, {request, {{acc, collector}, resp}}} ->
-        acc = collector.(acc, :done)
-        {request, %{resp | body: acc}}
-
-      {:error, {request, {nil, _resp}}, exception} ->
-        {request, exception}
-
-      {:error, {request, {{acc, collector}, _resp}}, exception} ->
-        collector.(acc, :halt)
-        {request, exception}
+      {:error, {resp, acc}, exception} ->
+        {Req.Request.put_private(resp.request, :req_stream_acc, acc), exception}
     end
   end
 
@@ -336,9 +267,6 @@ defmodule Req.Mint do
             recv_loop(conn, ref, phase, acc, fun, timeouts)
 
           {:done, acc} ->
-            {:ok, conn, acc}
-
-          {:halt, acc} ->
             {:ok, conn, acc}
 
           {:error, acc, error} ->
@@ -381,8 +309,8 @@ defmodule Req.Mint do
       {:cont, acc} ->
         handle_entries(rest, ref, phase, acc, fun)
 
-      {:halt, acc} ->
-        {:halt, acc}
+      {:error, acc, error} ->
+        {:error, acc, error}
     end
   end
 
@@ -400,9 +328,18 @@ defmodule Req.Mint do
         }
 
         response =
-          Req.Response.new(status: status, headers: fields_to_map(headers), body: async)
+          %{
+            Req.Response.new(status: status, headers: fields_to_map(headers), body: async)
+            | request: request
+          }
 
-        {request, response}
+        case request.stream.(:eof, response, request.private[:req_stream_acc]) do
+          {:ok, response, _acc} ->
+            {request, response}
+
+          {:error, response, exception, acc} ->
+            {Req.Request.put_private(response.request, :req_stream_acc, acc), exception}
+        end
 
       {:error, conn, exception} ->
         Mint.HTTP.close(conn)

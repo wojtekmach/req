@@ -13,7 +13,7 @@ defmodule HTTPBinTest do
     assert resp.status == 200
     assert resp.body["slideshow"]["title"] == "Sample Slide Show"
 
-    raw = Req.get!(req, url: "#{url}/json", decode_body: false).body
+    raw = Req.get!(req, url: "#{url}/json", decoders: false).body
     sha1 = :crypto.hash(:sha, raw) |> Base.encode16(case: :lower)
     assert Req.get!(req, url: "#{url}/json", checksum: "sha1:#{sha1}").status == 200
   end
@@ -97,7 +97,7 @@ defmodule HTTPBinTest do
 
   test "/stream", %{req: req, url: url} do
     lines =
-      Req.get!(req, url: "#{url}/stream/2", decode_body: false).body
+      Req.get!(req, url: "#{url}/stream/2", decoders: false).body
       |> String.split("\n", trim: true)
       |> Enum.map(&@json.decode!/1)
 

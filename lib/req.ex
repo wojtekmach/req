@@ -150,21 +150,6 @@ defmodule Req do
   > `Req.get_headers_list/1`.
   """
 
-  # Response streaming to caller:
-  #
-  #     iex> {req, resp} = Req.async_request!("http://httpbin.org/stream/2")
-  #     iex> resp.status
-  #     200
-  #     iex> resp.body
-  #     ""
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [:done]
-  #     ""
-
   @type url() :: URI.t() | String.t()
 
   @req Req.Request.new()
@@ -309,11 +294,11 @@ defmodule Req do
       ([`decompress_body`](`Req.Steps.decompress_body/1`) step) and automatic decoding
       ([`decode_body`](`Req.Steps.decode_body/1`) step.) Defaults to `false`.
 
-    * `:decode_body` - if set to `false`, disables automatic response body decoding.
-      Defaults to `true`.
+    * `:decode_body` - (deprecated) if set to `false`, disables automatic response body decoding.
+      Deprecated in favour of `decoders: false`.
 
     * `:decoders` - the list of decoders to use for automatic response body decoding.
-      Defaults to `[:json, :json_api]`. See [`decode_body`](`Req.Steps.decode_body/1`) for
+      Defaults to `[:json, :json_api, :ndjson]`. See [`decode_body`](`Req.Steps.decode_body/1`) for
       the supported formats and how to add custom decoders.
 
     * `:decode_json` - (deprecated) options to pass to `Jason.decode/2`. Deprecated in favour
@@ -325,10 +310,11 @@ defmodule Req do
         * `nil` - (default) read the whole response body and store it in the `response.body`
           field.
 
-        * `fun` - stream response body using a function. The first argument is a `{:data, data}`
-          tuple containing the chunk of the response body. The second argument is a
-          `{req, resp}` tuple. To continue streaming chunks, return `{:cont, {req, resp}}`.
-          To cancel, return `{:halt, {req, resp}}`. For example:
+        * `fun` - (deprecated) stream response body using a function. Deprecated in favour of
+          `Req.stream/4`. The first argument is a `{:data, data}` tuple containing the chunk of
+          the response body. The second argument is a `{req, resp}` tuple. To continue streaming
+          chunks, return `{:cont, {req, resp}}`. To cancel, return `{:halt, {req, resp}}`. For
+          example:
 
               Req.request(
                 req,
@@ -610,6 +596,10 @@ defmodule Req do
 
     if options[:output] do
       IO.warn("setting `output: path` is deprecated in favour of `into: File.stream!(path)`")
+    end
+
+    if is_function(request_options[:into], 2) do
+      IO.warn("setting `into: fun` is deprecated in favour of `Req.stream/4`", [])
     end
 
     registered =
@@ -1312,24 +1302,6 @@ defmodule Req do
     end
   end
 
-  @doc false
-  @deprecated "use Req.request(into: self()) instead"
-  def async_request(request, options \\ []) do
-    Req.Request.run_request(%{new(request, options) | into: :legacy_self})
-  end
-
-  @deprecated "use Req.request!(into: self()) instead"
-  @doc false
-  def async_request!(request, options \\ []) do
-    case async_request(request, options) do
-      {request, %Req.Response{} = response} ->
-        {request, response}
-
-      {_request, exception} ->
-        raise exception
-    end
-  end
-
   @doc """
   Parses asynchronous response body message.
 
@@ -1614,5 +1586,50 @@ defmodule Req do
       headers: Keyword.get(options, :headers, []),
       body: Keyword.get(options, :body, "")
     }
+  end
+
+  def stream(req, acc, fun, options \\ [])
+
+  def stream(req, acc, fun, options) when is_function(fun, 3) and is_list(options) do
+    stream = fn
+      # `:eof` drives the stream decoders (flush/finish); the caller's function never sees it.
+      :eof, resp, acc ->
+        {:ok, resp, acc}
+
+      data, resp, acc ->
+        case fun.(data, resp, acc) do
+          {:ok, acc} ->
+            {:ok, resp, acc}
+
+          {:error, exception, acc} ->
+            {:error, resp, exception, acc}
+
+          other ->
+            raise ArgumentError,
+                  "expected {:ok, acc} or {:error, exception, acc}, got: #{inspect(other)}"
+        end
+    end
+
+    req = Req.merge(%{Req.new(req) | stream: stream}, options)
+
+    case Req.Request.stream_request(req, acc) do
+      {:ok, _resp, acc} ->
+        {:ok, acc}
+
+      {:error, _resp, exception, acc} ->
+        {:error, exception, acc}
+    end
+  end
+
+  def stream!(req, acc, fun, options \\ [])
+
+  def stream!(req, acc, fun, options) when is_function(fun, 3) and is_list(options) do
+    case stream(req, acc, fun, options) do
+      {:ok, acc} ->
+        acc
+
+      {:error, exception, _acc} ->
+        raise exception
+    end
   end
 end

@@ -11,10 +11,15 @@ defmodule Req.Tar do
 
   Returns `{:ok, entries}` or `{:error, exception}`.
   """
-  @spec decode(binary()) :: {:ok, [{charlist(), binary()}]} | {:error, %Req.ArchiveError{}}
+  @spec decode(binary()) :: {:ok, [{binary(), binary()}]} | {:error, %Req.ArchiveError{}}
   def decode(binary) when is_binary(binary) do
     case :erl_tar.extract({:binary, binary}, [:memory | modes(binary)]) do
       {:ok, files} ->
+        files =
+          for {path, contents} <- files do
+            {List.to_string(path), contents}
+          end
+
         {:ok, files}
 
       {:error, reason} ->

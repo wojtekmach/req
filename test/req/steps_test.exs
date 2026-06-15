@@ -22,6 +22,257 @@ defmodule Req.StepsTest do
     end
   end
 
+  describe "redirect (streaming)" do
+    @tag :capture_log
+    test "follows redirect, discarding the redirect response body" do
+      %{url: target_url} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      %{url: url} =
+        start_http_server(fn conn ->
+          conn
+          |> Plug.Conn.put_resp_header("location", URI.to_string(target_url))
+          |> Plug.Conn.send_resp(302, "redirecting")
+        end)
+
+      assert stream_body(url, []) == {:ok, "ok"}
+    end
+
+    @tag :capture_log
+    test "follows redirect before decompression" do
+      %{url: target_url} = start_http_server(fn conn -> send_resp_gzip(conn, "foo") end)
+
+      %{url: url} =
+        start_http_server(fn conn ->
+          conn
+          |> Plug.Conn.put_resp_header("location", URI.to_string(target_url))
+          |> Plug.Conn.send_resp(302, "redirecting")
+        end)
+
+      assert stream_body(url, compressed: true) == {:ok, "foo"}
+    end
+
+    test "redirect: false passes the redirect body through" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          conn
+          |> Plug.Conn.put_resp_header("location", "/elsewhere")
+          |> Plug.Conn.send_resp(302, "redirecting")
+        end)
+
+      assert stream_body(url, redirect: false) == {:ok, "redirecting"}
+    end
+
+    @tag :capture_log
+    test "max redirects" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          conn
+          |> Plug.Conn.put_resp_header("location", "/")
+          |> Plug.Conn.send_resp(302, "")
+        end)
+
+      assert {:error, %Req.TooManyRedirectsError{max_redirects: 3}, []} =
+               Req.stream(
+                 url,
+                 [],
+                 fn data, _resp, acc ->
+                   {:ok, [data | acc]}
+                 end,
+                 max_redirects: 3
+               )
+    end
+  end
+
+  describe "expect (stream)" do
+    test "matching status" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      assert stream_body(url, expect: 200) == {:ok, "ok"}
+    end
+
+    test "unexpected status stops streaming before any chunk is delivered" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 404, "nope")
+        end)
+
+      assert {:error, %Req.UnexpectedStatusError{expected_status: 200..299} = e, []} =
+               Req.stream(
+                 url,
+                 [],
+                 fn data, _resp, acc ->
+                   {:ok, [data | acc]}
+                 end,
+                 expect: 200..299
+               )
+
+      assert e.response.status == 404
+    end
+
+    test "unexpected status with empty body" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 500, "")
+        end)
+
+      assert {:error, %Req.UnexpectedStatusError{} = e, []} =
+               Req.stream(
+                 url,
+                 [],
+                 fn data, _resp, acc ->
+                   {:ok, [data | acc]}
+                 end,
+                 expect: 200,
+                 retry: false
+               )
+
+      assert e.response.status == 500
+    end
+
+    @tag :capture_log
+    test "checks the final response after redirect" do
+      %{url: target_url} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      %{url: url} =
+        start_http_server(fn conn ->
+          conn
+          |> Plug.Conn.put_resp_header("location", URI.to_string(target_url))
+          |> Plug.Conn.send_resp(302, "redirecting")
+        end)
+
+      assert stream_body(url, expect: 200) == {:ok, "ok"}
+    end
+  end
+
+  describe "retry (streaming)" do
+    @tag :capture_log
+    test "retries a retryable status, discarding its body" do
+      {:ok, counter} = Agent.start_link(fn -> 0 end)
+
+      %{url: url} =
+        start_http_server(fn conn ->
+          n = Agent.get_and_update(counter, &{&1, &1 + 1})
+
+          if n < 2 do
+            Plug.Conn.send_resp(conn, 503, "try again")
+          else
+            Plug.Conn.send_resp(conn, 200, "ok")
+          end
+        end)
+
+      assert stream_body(url, retry_delay: 1) == {:ok, "ok"}
+      assert Agent.get(counter, & &1) == 3
+    end
+
+    @tag :capture_log
+    test "stops after max_retries and delivers the last response body" do
+      {:ok, counter} = Agent.start_link(fn -> 0 end)
+
+      %{url: url} =
+        start_http_server(fn conn ->
+          Agent.update(counter, &(&1 + 1))
+          Plug.Conn.send_resp(conn, 503, "error")
+        end)
+
+      assert stream_body(url, retry_delay: 1, max_retries: 2) == {:ok, "error"}
+      assert Agent.get(counter, & &1) == 3
+    end
+
+    test "retry: false passes the response body through" do
+      {:ok, counter} = Agent.start_link(fn -> 0 end)
+
+      %{url: url} =
+        start_http_server(fn conn ->
+          Agent.update(counter, &(&1 + 1))
+          Plug.Conn.send_resp(conn, 503, "error")
+        end)
+
+      assert stream_body(url, retry: false) == {:ok, "error"}
+      assert Agent.get(counter, & &1) == 1
+    end
+  end
+
+  describe "decode_body (streaming)" do
+    test "is a no-op when not streaming" do
+      req = Req.new() |> Req.Request.prepare()
+      assert req.stream == nil
+    end
+
+    test "decodes text/event-stream into events" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          conn =
+            conn
+            |> Plug.Conn.put_resp_content_type("text/event-stream")
+            |> Plug.Conn.send_chunked(200)
+
+          {:ok, conn} = Plug.Conn.chunk(conn, "event: ping\ndata: 1\n\n")
+          {:ok, conn} = Plug.Conn.chunk(conn, "id: 2\ndata: 2\n\n")
+          conn
+        end)
+
+      {:ok, {resp, acc}} =
+        Req.stream(url, {nil, []}, fn event, resp, {_resp, acc} ->
+          {:ok, {resp, [event | acc]}}
+        end)
+
+      assert resp.status == 200
+      assert Enum.reverse(acc) == [%{event: "ping", data: "1"}, %{id: "2", data: "2"}]
+    end
+
+    test "buffers events split across chunks" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          conn =
+            conn
+            |> Plug.Conn.put_resp_content_type("text/event-stream")
+            |> Plug.Conn.send_chunked(200)
+
+          {:ok, conn} = Plug.Conn.chunk(conn, "data: hel")
+          {:ok, conn} = Plug.Conn.chunk(conn, "lo\n")
+          {:ok, conn} = Plug.Conn.chunk(conn, "\n")
+          conn
+        end)
+
+      {:ok, acc} =
+        Req.stream(url, [], fn event, _resp, acc ->
+          {:ok, [event | acc]}
+        end)
+
+      assert acc == [%{data: "hello"}]
+    end
+
+    test "passes through non-event-stream content as raw chunks" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          conn =
+            conn
+            |> Plug.Conn.put_resp_content_type("text/plain")
+            |> Plug.Conn.send_chunked(200)
+
+          {:ok, conn} = Plug.Conn.chunk(conn, "data: 1\n\n")
+          {:ok, conn} = Plug.Conn.chunk(conn, "data: 2\n\n")
+          conn
+        end)
+
+      {:ok, acc} =
+        Req.stream(url, [], fn data, _resp, acc ->
+          {:ok, [data | acc]}
+        end)
+
+      assert Enum.reverse(acc) == ["data: 1\n\n", "data: 2\n\n"]
+    end
+  end
+
   describe "put_base_url" do
     test "it works" do
       %{req: req, url: url} =
@@ -1005,9 +1256,7 @@ defmodule Req.StepsTest do
     end
   end
 
-  ## Response steps
-
-  describe "decompress_body" do
+  describe "decompress_body (eager)" do
     test "is disabled by default" do
       %{req: req} = serve(fn conn -> send_resp_gzip(conn, "foo") end)
 
@@ -1165,6 +1414,123 @@ defmodule Req.StepsTest do
     end
   end
 
+  describe "decompress_body (streaming)" do
+    test "gzip" do
+      %{req: req} = serve(fn conn -> send_resp_gzip(conn, "foo") end)
+
+      assert stream_body(req, compressed: true) == {:ok, "foo"}
+    end
+
+    test "br" do
+      %{req: req} = serve(fn conn -> send_resp_br(conn, "foo") end)
+
+      assert stream_body(req, compressed: true) == {:ok, "foo"}
+    end
+
+    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+    @tag skip: System.otp_release() < "28"
+    test "zstd" do
+      %{req: req} = serve(fn conn -> send_resp_zstd(conn, "foo") end)
+
+      assert stream_body(req, compressed: true) == {:ok, "foo"}
+    end
+
+    test "multiple codecs" do
+      %{req: req} =
+        serve(fn conn ->
+          conn
+          |> Plug.Conn.put_resp_header("content-encoding", "gzip, gzip")
+          |> Plug.Conn.send_resp(200, "foo" |> :zlib.gzip() |> :zlib.gzip())
+        end)
+
+      assert stream_body(req, compressed: true) == {:ok, "foo"}
+    end
+
+    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+    @tag skip: System.otp_release() < "28"
+    test "multiple codecs with zstd" do
+      %{req: req} =
+        serve(fn conn ->
+          body = "foo" |> :zlib.gzip() |> :zstd.compress() |> IO.iodata_to_binary()
+
+          conn
+          |> Plug.Conn.put_resp_header("content-encoding", "gzip, zstd")
+          |> Plug.Conn.send_resp(200, body)
+        end)
+
+      assert stream_body(req, compressed: true) == {:ok, "foo"}
+    end
+
+    test "decompresses before decoding" do
+      %{req: req} =
+        serve(fn conn ->
+          conn
+          |> Plug.Conn.put_resp_content_type("text/event-stream")
+          |> Plug.Conn.put_resp_header("content-encoding", "gzip")
+          |> Plug.Conn.send_resp(200, :zlib.gzip("data: hello\n\ndata: world\n\n"))
+        end)
+
+      {:ok, events} =
+        Req.stream(
+          req,
+          [],
+          fn event, _resp, acc ->
+            {:ok, [event | acc]}
+          end,
+          compressed: true
+        )
+
+      assert events == [%{data: "world"}, %{data: "hello"}]
+    end
+
+    test "without compressed: true, passes chunks through" do
+      gzipped = :zlib.gzip("foo")
+      %{req: req} = serve(fn conn -> send_resp_gzip(conn, "foo") end)
+
+      assert stream_body(req, []) == {:ok, gzipped}
+    end
+
+    test "passes through content-encoding not in accept-encoding" do
+      compressed = :zlib.compress("foo")
+
+      %{req: req} =
+        serve(fn conn ->
+          conn
+          |> Plug.Conn.put_resp_header("content-encoding", "deflate")
+          |> Plug.Conn.send_resp(200, compressed)
+        end)
+
+      assert stream_body(req, compressed: true) == {:ok, compressed}
+    end
+
+    test "accept-encoding with q-values and mixed case" do
+      %{req: req} = serve(fn conn -> send_resp_gzip(conn, "foo") end)
+
+      options = [compressed: true, headers: [accept_encoding: "GZIP;q=1.0, br"]]
+      assert stream_body(req, options) == {:ok, "foo"}
+    end
+
+    test "invalid body" do
+      %{req: req} =
+        serve(fn conn ->
+          conn
+          |> Plug.Conn.put_resp_header("content-encoding", "gzip")
+          |> Plug.Conn.send_resp(200, "bad")
+        end)
+
+      {:error, %Req.DecompressError{format: :gzip}, []} =
+        Req.stream(
+          req,
+          [],
+          fn data, _resp, acc ->
+            {:ok, [data | acc]}
+          end,
+          compressed: true,
+          retry: false
+        )
+    end
+  end
+
   describe "decode_body" do
     test "multiple types" do
       %{req: req} =
@@ -1200,6 +1566,28 @@ defmodule Req.StepsTest do
       assert Req.get!(req).body == %{"a" => 1}
     end
 
+    test "ndjson via Req.NDJSON codec" do
+      plug = fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.send_resp(200, ~s|{"id":1}\n{"id":2}\n|)
+      end
+
+      assert Req.get!(plug: plug, decoders: [json: Req.NDJSON]).body ==
+               [%{"id" => 1}, %{"id" => 2}]
+    end
+
+    test "event-stream via Req.EventStream codec" do
+      plug = fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("text/event-stream")
+        |> Plug.Conn.send_resp(200, "data: hello\n\ndata: world\n\n")
+      end
+
+      assert Req.get!(plug: plug, decoders: [event_stream: Req.EventStream]).body ==
+               [%{data: "hello"}, %{data: "world"}]
+    end
+
     test "json with custom options" do
       %{req: req} =
         serve(fn conn ->
@@ -1222,6 +1610,17 @@ defmodule Req.StepsTest do
              end) =~ "setting `decode_json: options` is deprecated"
     end
 
+    test "deprecated :decode_body option still works but warns" do
+      plug = fn conn ->
+        Req.Test.json(conn, %{a: 1})
+      end
+
+      assert ExUnit.CaptureIO.capture_io(:stderr, fn ->
+               # still works: decoding is disabled, body is left raw
+               assert Req.get!(plug: plug, decode_body: false).body == ~s|{"a":1}|
+             end) =~ "the `:decode_body` option is deprecated"
+    end
+
     test "json invalid" do
       %{req: req} =
         serve(fn conn ->
@@ -1234,7 +1633,7 @@ defmodule Req.StepsTest do
     end
 
     test "archives are not decoded by default" do
-      files = [{~c"foo.txt", "bar"}]
+      files = [{"foo.txt", "bar"}]
       %{req: req} = serve(fn conn -> send_resp_zip(conn, files) end)
 
       body = Req.get!(req).body
@@ -1282,15 +1681,13 @@ defmodule Req.StepsTest do
 
     test "custom decoder (module exporting decode/1)" do
       # An EPUB is a ZIP archive, so Req.ZIP doubles as its decoder.
-      files = [{~c"mimetype", "application/epub+zip"}]
+      files = [{"mimetype", "application/epub+zip"}]
 
       %{req: req} =
         serve(fn conn ->
-          {:ok, {_name, zip}} = :zip.create(~c"a.zip", files, [:memory])
-
           conn
           |> Plug.Conn.put_resp_content_type("application/epub+zip", nil)
-          |> Plug.Conn.send_resp(200, zip)
+          |> send_resp_zip(files)
         end)
 
       assert Req.get!(req, decoders: [epub: Req.ZIP]).body == files
@@ -1322,14 +1719,14 @@ defmodule Req.StepsTest do
     end
 
     test "tar (content-type)" do
-      files = [{~c"foo.txt", "bar"}]
+      files = [{"foo.txt", "bar"}]
       %{req: req} = serve(fn conn -> send_resp_tar(conn, files) end)
 
       assert Req.get!(req, decoders: [:tar]).body == files
     end
 
     test "tar (path)" do
-      files = [{~c"foo.txt", "bar"}]
+      files = [{"foo.txt", "bar"}]
 
       %{req: req, url: url} =
         serve(fn conn ->
@@ -1342,7 +1739,7 @@ defmodule Req.StepsTest do
     end
 
     test "tar (path, content type with charset utf8)" do
-      files = [{~c"foo.txt", "bar"}]
+      files = [{"foo.txt", "bar"}]
 
       %{req: req, url: url} =
         serve(fn conn ->
@@ -1357,7 +1754,7 @@ defmodule Req.StepsTest do
     end
 
     test "tar (path, no content-type)" do
-      files = [{~c"foo.txt", "bar"}]
+      files = [{"foo.txt", "bar"}]
 
       %{req: req, url: url} =
         serve(fn conn ->
@@ -1368,7 +1765,7 @@ defmodule Req.StepsTest do
     end
 
     test "tar.gz (path)" do
-      files = [{~c"foo.txt", "bar"}]
+      files = [{"foo.txt", "bar"}]
 
       %{req: req, url: url} =
         serve(fn conn ->
@@ -1394,14 +1791,14 @@ defmodule Req.StepsTest do
     end
 
     test "zip (content-type)" do
-      files = [{~c"foo.txt", "bar"}]
+      files = [{"foo.txt", "bar"}]
       %{req: req} = serve(fn conn -> send_resp_zip(conn, files) end)
 
       assert Req.get!(req, decoders: [:zip]).body == files
     end
 
     test "zip (path)" do
-      files = [{~c"foo.txt", "bar"}]
+      files = [{"foo.txt", "bar"}]
 
       %{req: req, url: url} =
         serve(fn conn ->
@@ -2568,6 +2965,107 @@ defmodule Req.StepsTest do
       refute_receive _
     end
 
+    test "Req.stream: decodes text/event-stream chunks into events" do
+      plug = fn conn ->
+        conn =
+          conn
+          |> Plug.Conn.put_resp_content_type("text/event-stream")
+          |> Plug.Conn.send_chunked(200)
+
+        {:ok, conn} = Plug.Conn.chunk(conn, "data: hel")
+        {:ok, conn} = Plug.Conn.chunk(conn, "lo\n\n")
+        {:ok, conn} = Plug.Conn.chunk(conn, "data: world\n\n")
+        conn
+      end
+
+      {:ok, {resp, acc}} =
+        Req.stream([plug: plug], {nil, []}, fn event, resp, {_resp, acc} ->
+          {:ok, {resp, [event | acc]}}
+        end)
+
+      assert resp.status == 200
+      assert Enum.reverse(acc) == [%{data: "hello"}, %{data: "world"}]
+      refute_receive _
+    end
+
+    test "Req.stream: passes other content through as raw chunks" do
+      plug = fn conn ->
+        conn = Plug.Conn.send_chunked(conn, 200)
+        {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+        {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+        conn
+      end
+
+      {:ok, acc} =
+        Req.stream([plug: plug], [], fn data, _resp, acc ->
+          {:ok, [data | acc]}
+        end)
+
+      assert Enum.reverse(acc) == ["foo", "bar"]
+      refute_receive _
+    end
+
+    test "Req.stream: with send_resp" do
+      plug = fn conn ->
+        Plug.Conn.send_resp(conn, 200, "foo")
+      end
+
+      {:ok, acc} =
+        Req.stream([plug: plug], [], fn data, _resp, acc ->
+          {:ok, [data | acc]}
+        end)
+
+      assert acc == ["foo"]
+      refute_receive _
+    end
+
+    test "Req.stream!: returns the acc and raises on error" do
+      plug = fn conn ->
+        Plug.Conn.send_resp(conn, 200, "foo")
+      end
+
+      assert Req.stream!([plug: plug], [], fn data, _resp, acc -> {:ok, [data | acc]} end) ==
+               ["foo"]
+
+      assert_raise RuntimeError, "oops", fn ->
+        Req.stream!([plug: plug], [], fn _data, _resp, acc ->
+          {:error, %RuntimeError{message: "oops"}, acc}
+        end)
+      end
+    end
+
+    test "Req.stream: invalid return" do
+      plug = fn conn ->
+        Plug.Conn.send_resp(conn, 200, "foo")
+      end
+
+      assert_raise ArgumentError,
+                   "expected {:ok, acc} or {:error, exception, acc}, got: nil",
+                   fn ->
+                     Req.stream([plug: plug], [], fn _data, _resp, _acc -> nil end)
+                   end
+    end
+
+    test "Req.stream: error halts the stream" do
+      plug = fn conn ->
+        conn = Plug.Conn.send_chunked(conn, 200)
+        {:ok, conn} = Plug.Conn.chunk(conn, "foo")
+        {:ok, conn} = Plug.Conn.chunk(conn, "bar")
+        conn
+      end
+
+      assert {:error, %RuntimeError{message: "oops"}, ["foo"]} =
+               Req.stream([plug: plug], [], fn
+                 "foo", _resp, acc ->
+                   {:ok, ["foo" | acc]}
+
+                 "bar", _resp, acc ->
+                   {:error, %RuntimeError{message: "oops"}, acc}
+               end)
+
+      refute_receive _
+    end
+
     test "into: fun with send_file" do
       req =
         Req.new(
@@ -2766,6 +3264,7 @@ defmodule Req.StepsTest do
   end
 
   defp send_resp_zip(conn, files) when is_list(files) do
+    files = for {path, content} <- files, do: {to_charlist(path), content}
     {:ok, {_name, zip}} = :zip.create(~c"a.zip", files, [:memory])
 
     conn
@@ -2804,6 +3303,20 @@ defmodule Req.StepsTest do
     case Plug.Conn.get_resp_header(conn, name) do
       [] -> Plug.Conn.put_resp_header(conn, name, value)
       _ -> conn
+    end
+  end
+
+  defp stream_body(url, options) do
+    with {:ok, chunks} <-
+           Req.stream(
+             url,
+             [],
+             fn data, _resp, acc ->
+               {:ok, [data | acc]}
+             end,
+             options
+           ) do
+      {:ok, chunks |> Enum.reverse() |> IO.iodata_to_binary()}
     end
   end
 end

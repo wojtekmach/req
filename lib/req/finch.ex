@@ -38,7 +38,7 @@ defmodule Req.Finch do
       raise ArgumentError, ":finch_request does not support body set to req_body_fun"
     end
 
-    if is_function(request.body, 1) and request.options[:into] in [:self, :legacy_self] do
+    if is_function(request.body, 1) and request.options[:into] == :self do
       raise ArgumentError, "into: :self does not support body set to req_body_fun"
     end
 
@@ -115,104 +115,75 @@ defmodule Req.Finch do
             "See Req.Steps.run_finch/1 for more information."
         )
 
-        run_finch_request(req, deprecated_fun.(finch_req), finch_name, finch_options)
+        finch_stream(req, deprecated_fun.(finch_req), finch_name, finch_options)
 
       nil ->
         case req.into do
           nil ->
-            run_finch_request(req, finch_req, finch_name, finch_options)
-
-          fun when is_function(fun, 2) ->
-            finch_stream_into_fun(req, finch_req, finch_name, finch_options, fun)
-
-          :legacy_self ->
-            finch_stream_into_legacy_self(req, finch_req, finch_name, finch_options)
+            finch_stream(req, finch_req, finch_name, finch_options)
 
           :self ->
             finch_stream_into_self(req, finch_req, finch_name, finch_options)
-
-          collectable ->
-            finch_stream_into_collectable(req, finch_req, finch_name, finch_options, collectable)
         end
     end
   end
 
-  defp finch_stream_into_fun(req, finch_req, finch_name, finch_options, fun) do
-    resp = Req.Response.new()
+  defp finch_stream(req, finch_req, finch_name, finch_options) do
+    stream = req.stream
+    acc = req.private[:req_stream_acc]
+
+    # `status: nil` so that if the response is never read (e.g. a halted request body) the
+    # response reflects that, rather than the `Req.Response` struct default of 200.
+    resp = %{Req.Response.new() | request: req, status: nil}
 
     stream_fun = fn
-      {:status, status}, {request, resp} ->
-        {:cont, {request, %{resp | status: status}}}
+      {:status, status}, {request, {resp, acc}} ->
+        {:cont, {request, {%{resp | status: status}, acc}}}
 
-      {:headers, fields}, {request, resp} ->
-        resp =
-          Enum.reduce(fields, resp, fn {name, value}, resp ->
-            Req.Response.put_header(resp, name, value)
-          end)
+      {:headers, headers}, {request, {resp, acc}} ->
+        resp = update_in(resp.headers, &Req.Fields.prepend(&1, headers))
+        {:cont, {request, {resp, acc}}}
 
-        {:cont, {request, resp}}
+      {:data, data}, {request, {resp, acc}} ->
+        resp = update_in(resp.request.private, &Map.merge(&1, request.private))
 
-      {:data, data}, acc ->
-        fun.({:data, data}, acc)
+        case stream.(data, resp, acc) do
+          {:ok, resp, acc} ->
+            {:cont, {request, {resp, acc}}}
 
-      {:trailers, fields}, {request, resp} ->
+          {:error, resp, exception, acc} ->
+            request = put_in(request.private[:req_stream_error], exception)
+            {:halt, {request, {resp, acc}}}
+        end
+
+      {:trailers, fields}, {request, {resp, acc}} ->
         fields = finch_fields_to_map(fields)
         resp = update_in(resp.trailers, &Map.merge(&1, fields))
-        {:cont, {request, resp}}
+        {:cont, {request, {resp, acc}}}
     end
 
-    case run_stream_while(req, finch_req, finch_name, resp, stream_fun, finch_options) do
-      {:ok, request, response} ->
-        {request, response}
+    case run_stream_while(req, finch_req, finch_name, {resp, acc}, stream_fun, finch_options) do
+      {:ok, request, {resp, acc}} ->
+        case request.private[:req_stream_error] do
+          nil ->
+            # The body is done, let the stream decoder flush any buffered data.
+            case stream.(:eof, resp, acc) do
+              {:ok, resp, acc} ->
+                {request, put_in(resp.private[:req_stream_acc], acc)}
 
-      {:error, request, exception, _response} ->
-        {request, exception}
+              {:error, resp, exception, acc} ->
+                {Req.Request.put_private(resp.request, :req_stream_acc, acc), exception}
+            end
+
+          exception ->
+            {Req.Request.put_private(resp.request, :req_stream_acc, acc), exception}
+        end
+
+      {:error, request, exception, {_resp, acc}} ->
+        {put_in(request.private[:req_stream_acc], acc), exception}
     end
   end
 
-  defp finch_stream_into_collectable(req, finch_req, finch_name, finch_options, collectable) do
-    resp = Req.Response.new()
-
-    stream_fun = fn
-      {:status, 200}, {request, {nil, resp}} ->
-        {acc, collector} = Collectable.into(collectable)
-        {:cont, {request, {{acc, collector}, %{resp | status: 200}}}}
-
-      {:status, status}, {request, {nil, resp}} ->
-        {acc, collector} = Collectable.into("")
-        {:cont, {request, {{acc, collector}, %{resp | status: status}}}}
-
-      {:headers, fields}, {request, {collector_acc, resp}} ->
-        resp =
-          Enum.reduce(fields, resp, fn {name, value}, resp ->
-            Req.Response.put_header(resp, name, value)
-          end)
-
-        {:cont, {request, {collector_acc, resp}}}
-
-      {:data, data}, {request, {{acc, collector}, resp}} ->
-        acc = collector.(acc, {:cont, data})
-        {:cont, {request, {{acc, collector}, resp}}}
-
-      {:trailers, fields}, {request, {collector_acc, resp}} ->
-        fields = finch_fields_to_map(fields)
-        resp = update_in(resp.trailers, &Map.merge(&1, fields))
-        {:cont, {request, {collector_acc, resp}}}
-    end
-
-    case run_stream_while(req, finch_req, finch_name, {nil, resp}, stream_fun, finch_options) do
-      {:ok, request, {{acc, collector}, resp}} ->
-        acc = collector.(acc, :done)
-        {request, %{resp | body: acc}}
-
-      {:error, request, exception, {nil, _resp}} ->
-        {request, exception}
-
-      {:error, request, exception, {{acc, collector}, _resp}} ->
-        collector.(acc, :halt)
-        {request, exception}
-    end
-  end
 
   defp normalize_error(%Mint.TransportError{reason: reason}) do
     %Req.TransportError{reason: reason}
@@ -248,35 +219,6 @@ defmodule Req.Finch do
     error
   end
 
-  defp finch_stream_into_legacy_self(req, finch_req, finch_name, finch_options) do
-    ref = Finch.async_request(finch_req, finch_name, finch_options)
-
-    {:status, status} =
-      receive do
-        {^ref, message} ->
-          message
-      end
-
-    headers =
-      receive do
-        {^ref, message} ->
-          {:headers, headers} = message
-
-          handle_finch_headers(headers)
-      end
-
-    async = %Req.Response.Async{
-      pid: self(),
-      ref: ref,
-      stream_fun: &parse_message/2,
-      cancel_fun: &cancel/1
-    }
-
-    req = put_in(req.async, async)
-    resp = Req.Response.new(status: status, headers: headers)
-    {req, resp}
-  end
-
   defp finch_stream_into_self(req, finch_req, finch_name, finch_options) do
     ref = Finch.async_request(finch_req, finch_name, finch_options)
 
@@ -292,8 +234,15 @@ defmodule Req.Finch do
         cancel_fun: &cancel/1
       }
 
-      resp = Req.Response.new(status: status, headers: headers, body: async)
-      {req, resp}
+      resp = %{Req.Response.new(status: status, headers: headers, body: async) | request: req}
+
+      case req.stream.(:eof, resp, req.private[:req_stream_acc]) do
+        {:ok, resp, _acc} ->
+          {req, resp}
+
+        {:error, resp, exception, acc} ->
+          {Req.Request.put_private(resp.request, :req_stream_acc, acc), exception}
+      end
     end
   end
 
@@ -314,48 +263,6 @@ defmodule Req.Finch do
 
       {^ref, {:error, exception}} ->
         {req, normalize_error(exception)}
-    end
-  end
-
-  defp run_finch_request(req, finch_request, finch_name, finch_options) do
-    response_acc = {nil, [], [], []}
-
-    response_from_acc = fn {status, headers, body, trailers} ->
-      Req.Response.new(
-        status: status,
-        headers: headers,
-        body: IO.iodata_to_binary(body),
-        trailers: trailers
-      )
-    end
-
-    stream_fun = fn
-      {:status, value}, {request, {_, headers, body, trailers}} ->
-        {:cont, {request, {value, headers, body, trailers}}}
-
-      {:headers, value}, {request, {status, headers, body, trailers}} ->
-        {:cont, {request, {status, headers ++ value, body, trailers}}}
-
-      {:data, value}, {request, {status, headers, body, trailers}} ->
-        {:cont, {request, {status, headers, [body | value], trailers}}}
-
-      {:trailers, value}, {request, {status, headers, body, trailers}} ->
-        {:cont, {request, {status, headers, body, trailers ++ value}}}
-    end
-
-    case run_stream_while(
-           req,
-           finch_request,
-           finch_name,
-           response_acc,
-           stream_fun,
-           finch_options
-         ) do
-      {:ok, request, response_acc} ->
-        {request, response_from_acc.(response_acc)}
-
-      {:error, request, exception, _response_acc} ->
-        {request, exception}
     end
   end
 

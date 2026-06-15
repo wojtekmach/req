@@ -31,6 +31,28 @@ defmodule ReqTest do
     assert "req/" <> _ = Req.get!(req).body
   end
 
+  describe "stream/3" do
+    test "it works" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          conn = Plug.Conn.send_chunked(conn, 200)
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk1")
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk2")
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk3")
+          conn
+        end)
+
+      {:ok, {resp, acc}} =
+        Req.stream(url, {nil, []}, fn data, resp, {_resp, acc} ->
+          {:ok, {resp, [data | acc]}}
+        end)
+
+      assert resp.status == 200
+      assert resp.request.url == url
+      assert acc == ["chunk3", "chunk2", "chunk1"]
+    end
+  end
+
   test "headers" do
     pid = self()
 
@@ -165,5 +187,75 @@ defmodule ReqTest do
              ],
              retry: false
            ).body == "ok"
+  end
+
+  test "proxy" do
+    %{url: upstream_url} = upstream()
+    %{url: proxy_url} = proxy(upstream_url)
+
+    body = String.duplicate("chunk", 2_000_000)
+    resp = Req.post!(proxy_url, body: body)
+    assert resp.status == 201
+    assert resp.body == String.duplicate("CHUNK", 2_000_000)
+  end
+
+  defp upstream do
+    start_http_server(fn conn ->
+      conn = Plug.Conn.send_chunked(conn, 201)
+      upcase_body(conn)
+    end)
+  end
+
+  defp proxy(upstream_url) do
+    start_http_server(fn conn ->
+      req =
+        Req.new(method: :post, url: upstream_url)
+        |> Req.Request.put_private(:conn, conn)
+
+      req_body_fun = fn request ->
+        case Plug.Conn.read_body(request.private.conn, length: 64 * 1024) do
+          {:more, chunk, conn} ->
+            {:data, chunk, put_in(request.private.conn, conn)}
+
+          {:ok, "", conn} ->
+            {:done, put_in(request.private.conn, conn)}
+
+          {:ok, chunk, conn} ->
+            {:data, chunk, put_in(request.private.conn, conn)}
+        end
+      end
+
+      {:ok, conn} =
+        Req.stream(
+          req,
+          nil,
+          fn data, resp, conn ->
+            conn =
+              if conn do
+                conn
+              else
+                Plug.Conn.send_chunked(resp.request.private.conn, resp.status)
+              end
+
+            {:ok, conn} = Plug.Conn.chunk(conn, data)
+            {:ok, conn}
+          end,
+          body: req_body_fun
+        )
+
+      conn
+    end)
+  end
+
+  defp upcase_body(conn) do
+    case Plug.Conn.read_body(conn, length: 64 * 1024) do
+      {:ok, chunk, conn} ->
+        {:ok, conn} = Plug.Conn.chunk(conn, String.upcase(chunk))
+        conn
+
+      {:more, chunk, conn} ->
+        {:ok, conn} = Plug.Conn.chunk(conn, String.upcase(chunk))
+        upcase_body(conn)
+    end
   end
 end

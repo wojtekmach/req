@@ -26,7 +26,8 @@ defmodule Req.Response do
           body: binary() | %Req.Response.Async{} | term(),
           trailers: %{optional(binary()) => [binary()]},
           assigns: map(),
-          private: map()
+          private: map(),
+          request: Req.Request.t()
         }
 
   defstruct status: 200,
@@ -34,7 +35,8 @@ defmodule Req.Response do
             body: "",
             trailers: Req.Fields.new([]),
             assigns: %{},
-            private: %{}
+            private: %{},
+            request: nil
 
   @doc """
   Returns a new response.

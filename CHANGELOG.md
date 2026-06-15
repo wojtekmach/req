@@ -1,6 +1,18 @@
 # CHANGELOG
 
-## Unreleased
+## 0.7.0-dev
+
+  Requires Elixir 1.18.
+
+  * [`Req`]: Treat userinfo as basic auth if present in URL
+
+  * [`encode_body`]: `json: term` now uses [`JSON.encode_to_iodata!/2`] (previously [`Jason.encode_to_iodata!/2`])
+
+  * [`decode_body`]: [`decode_body`] is now a request step.
+
+  * [`decode_body`]: Support NDJSON
+
+  * [`decode_body`]: Support SSE (Server-Sent Events)
 
   * [`decode_body`]: Deprecate `:decode_json` in favour of setting a custom JSON
     decoder via `:decoders`:
@@ -11,11 +23,9 @@
         # after:
         Req.get!(url, decoders: [json: &Jason.decode(&1, keys: :atoms)])
 
-  * [`redirect`]: Strip userinfo from redirect locations and log a warning.
+  * [`decode_body`]: Deprecate `decode_body: false` in favour of `decoders: false`
 
-    Previously, redirecting to a URL with userinfo (e.g. `http://user:pass@host`)
-    kept the userinfo in the request URL (without converting it to auth). It is
-    now dropped so credentials supplied by the redirecting server aren't sent.
+  * [`decompress_body`]: [`decompress_body`] is now a request step.
 
 ## v0.6.2 (2026-06-19)
 
@@ -1471,3 +1481,6 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
 [`Enumerable`]:  https://hexdocs.pm/elixir/Enumerable.html
 [`Collectable`]: https://hexdocs.pm/elixir/Collectable.html
+
+[`JSON.Encoder`]: https://hexdocs.pm/elixir/JSON.html#encode_to_iodata!/2
+[`Jason.Encoder`]: https://hexdocs.pm/jason/Jason.html#encode_to_iodata!/2

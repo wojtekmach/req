@@ -99,7 +99,8 @@ defmodule Req.MixProject do
       {:aws_signature, "~> 0.3.2", only: :test},
       {:bypass, "~> 2.1", only: :test},
       {:ex_doc, ">= 0.0.0", only: :docs, warn_if_outdated: true},
-      {:bandit, "~> 1.0", only: :test}
+      {:bandit, "~> 1.0", only: :test},
+      {:server_sent_events, "~> 1.0"}
     ]
   end
 
