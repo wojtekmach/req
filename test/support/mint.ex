@@ -40,11 +40,17 @@ defmodule Req.Mint do
 
     scheme =
       case request.url.scheme do
-        "https" ->
-          :https
+        "http" -> :http
+        "https" -> :https
+      end
 
-        _ ->
-          :http
+    transport_opts =
+      if scheme == :https do
+        transport_opts
+      else
+        # when redirecting from https to http, we may still have these ssl options which we need
+        # to drop because mint errors otherwise
+        Keyword.drop(transport_opts, [:cacertfile, :certfile, :keyfile])
       end
 
     {address, port, address_options} =

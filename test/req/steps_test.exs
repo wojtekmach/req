@@ -1543,7 +1543,7 @@ defmodule Req.StepsTest do
       %{req: req, url: url} =
         serve(fn
           conn when conn.request_path == "/redirect" ->
-            redirect(conn, 302, absolute_url(conn, "/ok"))
+            redirect(conn, 302, "http://#{conn.host}:#{conn.port}/ok")
 
           conn when conn.request_path == "/ok" ->
             redirect(conn, 200, "/ok")
@@ -1588,7 +1588,7 @@ defmodule Req.StepsTest do
         %{req: req, url: url} =
           serve(fn
             conn when conn.request_path == "/redirect" and conn.method == "POST" ->
-              redirect(conn, status, absolute_url(conn, "/ok"))
+              redirect(conn, status, "http://#{conn.host}:#{conn.port}/ok")
 
             conn when conn.request_path == "/ok" and conn.method == "GET" ->
               Plug.Conn.send_resp(conn, 200, "ok")
@@ -1605,7 +1605,7 @@ defmodule Req.StepsTest do
         %{req: req, url: url} =
           serve(fn
             conn when conn.request_path == "/redirect" and conn.method == "POST" ->
-              redirect(conn, status, absolute_url(conn, "/ok"))
+              redirect(conn, status, "http://#{conn.host}:#{conn.port}/ok")
 
             conn when conn.request_path == "/ok" and conn.method == "POST" ->
               Plug.Conn.send_resp(conn, 200, "ok")
@@ -1622,7 +1622,7 @@ defmodule Req.StepsTest do
         %{req: req, url: url} =
           serve(fn
             conn when conn.request_path == "/redirect" and conn.method == "HEAD" ->
-              redirect(conn, status, absolute_url(conn, "/ok"))
+              redirect(conn, status, "http://#{conn.host}:#{conn.port}/ok")
 
             conn when conn.request_path == "/ok" and conn.method == "HEAD" ->
               Plug.Conn.send_resp(conn, 200, "")
@@ -1650,7 +1650,7 @@ defmodule Req.StepsTest do
         serve(fn
           conn when conn.request_path == "/redirect" ->
             assert auth_header in conn.req_headers
-            redirect(conn, 302, absolute_url(conn, "/auth"))
+            redirect(conn, 302, "http://#{conn.host}:#{conn.port}/auth")
 
           conn when conn.request_path == "/auth" ->
             assert auth_header in conn.req_headers
@@ -1668,7 +1668,7 @@ defmodule Req.StepsTest do
         serve(fn
           conn when conn.host == "localhost" ->
             assert [_] = Plug.Conn.get_req_header(conn, "authorization")
-            redirect(conn, 301, absolute_url(%{conn | host: "127.0.0.1"}, "/ok"))
+            redirect(conn, 301, "http://127.0.0.1:#{conn.port}/ok")
 
           conn when conn.host == "127.0.0.1" ->
             assert [_] = Plug.Conn.get_req_header(conn, "authorization")
@@ -1688,7 +1688,7 @@ defmodule Req.StepsTest do
         serve(fn
           conn when conn.host == "localhost" ->
             assert [_] = Plug.Conn.get_req_header(conn, "authorization")
-            redirect(conn, 301, absolute_url(%{conn | host: "127.0.0.1"}, "/ok"))
+            redirect(conn, 301, "http://127.0.0.1:#{conn.port}/ok")
 
           conn when conn.host == "127.0.0.1" ->
             assert [] = Plug.Conn.get_req_header(conn, "authorization")
@@ -1696,30 +1696,55 @@ defmodule Req.StepsTest do
         end)
 
       assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.get!(req, auth: {:basic, "authorization:credentials"}).status == 200
+               assert Req.get!(req, auth: {:basic, "foo:bar"}).status == 200
              end) =~ "[debug] redirecting to http://127.0.0.1"
     end
 
+    @tag :transport
     test "auth different port" do
-      adapter = untrusted_redirect_adapter(:port, 12345, 23456)
+      %{url: untrusted_url} =
+        start_http_server(fn conn ->
+          assert [] = Plug.Conn.get_req_header(conn, "authorization")
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      %{url: trusted_url} =
+        start_http_server(fn conn ->
+          assert ["Basic " <> _] = Plug.Conn.get_req_header(conn, "authorization")
+          redirect(conn, 301, "#{untrusted_url}/ok")
+        end)
+
+      req = Req.new(url: trusted_url, adapter: adapter_fun())
 
       assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.get!("http://trusted:12345",
-                        adapter: adapter,
-                        auth: {:basic, "authorization:credentials"}
-                      ).status == 200
-             end) =~ "[debug] redirecting to http://trusted:23456"
+               assert Req.get!(req, auth: {:basic, "foo:bar"}).status == 200
+             end) =~ "[debug] redirecting to #{untrusted_url}/ok"
     end
 
+    @tag :transport
     test "auth different scheme" do
-      adapter = untrusted_redirect_adapter(:scheme, "http", "https")
+      %{url: untrusted_url} =
+        start_https_server(fn conn ->
+          assert [] = Plug.Conn.get_req_header(conn, "authorization")
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      %{url: trusted_url} =
+        start_http_server(fn conn ->
+          assert ["Basic " <> _] = Plug.Conn.get_req_header(conn, "authorization")
+          redirect(conn, 301, "#{untrusted_url}/ok")
+        end)
+
+      req =
+        Req.new(
+          url: trusted_url,
+          adapter: adapter_fun(),
+          connect_options: [transport_opts: [cacertfile: "#{__DIR__}/../support/ca.pem"]]
+        )
 
       assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.get!("http://trusted",
-                        adapter: adapter,
-                        auth: {:basic, "authorization:credentials"}
-                      ).status == 200
-             end) =~ "[debug] redirecting to https://trusted"
+               assert Req.get!(req, auth: {:basic, "authorization:credentials"}).status == 200
+             end) =~ "[debug] redirecting to #{untrusted_url}/ok"
     end
 
     test "userinfo in absolute location is stripped and warned about" do
@@ -1738,8 +1763,7 @@ defmodule Req.StepsTest do
             redirect(conn, 302, location)
 
           conn when conn.host == "127.0.0.1" ->
-            # Userinfo in a redirect target is stripped, never converted to Basic auth.
-            assert Plug.Conn.get_req_header(conn, "authorization") == []
+            assert [] = Plug.Conn.get_req_header(conn, "authorization")
             Plug.Conn.send_resp(conn, 200, "ok")
         end)
 
@@ -1749,7 +1773,6 @@ defmodule Req.StepsTest do
         end)
 
       assert log =~ "[warning] stripping userinfo from redirect location"
-      # the credentials are not leaked in the redirect log
       assert log =~ "[debug] redirecting to http://127.0.0.1"
       refute log =~ "foo:bar"
     end
@@ -1758,7 +1781,7 @@ defmodule Req.StepsTest do
       %{req: req, url: url} =
         serve(fn
           conn when conn.request_path == "/redirect" ->
-            redirect(conn, 302, absolute_url(conn, "/ok"))
+            redirect(conn, 302, "http://#{conn.host}:#{conn.port}/ok")
 
           conn when conn.request_path == "/ok" ->
             assert conn.query_string == ""
@@ -1776,7 +1799,7 @@ defmodule Req.StepsTest do
       %{req: req} =
         serve(fn conn ->
           send(pid, :ping)
-          redirect(conn, 302, absolute_url(conn, "/"))
+          redirect(conn, 302, "http://#{conn.host}:#{conn.port}/")
         end)
 
       req = Req.merge(req, max_redirects: 3, redirect_log_level: false)
@@ -1797,8 +1820,51 @@ defmodule Req.StepsTest do
       %{req: req, url: url} =
         serve(fn
           conn when conn.request_path == "/redirect" ->
-            "http:" <> no_scheme = absolute_url(conn, "/ok")
-            redirect(conn, 302, no_scheme)
+            redirect(conn, 302, "/ok")
+
+          conn when conn.request_path == "/ok" ->
+            Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert Req.get!(req, url: "#{url}/redirect").status == 200
+             end) =~ "[debug] redirecting to /ok"
+    end
+
+    test "redirect_log_level, set to :error" do
+      %{req: req, url: url} =
+        serve(fn
+          conn when conn.request_path == "/redirect" ->
+            redirect(conn, 302, "/ok")
+
+          conn when conn.request_path == "/ok" ->
+            Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert Req.get!(req, url: "#{url}/redirect", redirect_log_level: :error).status ==
+                        200
+             end) =~ "[error] redirecting to /ok"
+    end
+
+    test "redirect_log_level, disabled" do
+      %{req: req, url: url} =
+        serve(fn
+          conn when conn.request_path == "/redirect" ->
+            redirect(conn, 302, "/ok")
+
+          conn when conn.request_path == "/ok" ->
+            Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      assert Req.get!(req, url: "#{url}/redirect", redirect_log_level: false).status == 200
+    end
+
+    test "inherit scheme" do
+      %{req: req, url: url} =
+        serve(fn
+          conn when conn.request_path == "/redirect" ->
+            redirect(conn, 302, "//#{conn.host}:#{conn.port}/ok")
 
           conn when conn.request_path == "/ok" ->
             Plug.Conn.send_resp(conn, 200, "ok")
@@ -1810,103 +1876,12 @@ defmodule Req.StepsTest do
                assert Req.get!(req, url: "#{url}/redirect").status == 200
              end) =~ "[debug] redirecting to #{no_scheme}/ok"
     end
-
-    test "redirect_log_level, set to :error" do
-      %{req: req, url: url} =
-        serve(fn
-          conn when conn.request_path == "/redirect" ->
-            "http:" <> no_scheme = absolute_url(conn, "/ok")
-            redirect(conn, 302, no_scheme)
-
-          conn when conn.request_path == "/ok" ->
-            Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      "http:" <> no_scheme = "#{url}"
-
-      assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.get!(req, url: "#{url}/redirect", redirect_log_level: :error).status ==
-                        200
-             end) =~ "[error] redirecting to #{no_scheme}/ok"
-    end
-
-    test "redirect_log_level, disabled" do
-      %{req: req, url: url} =
-        serve(fn
-          conn when conn.request_path == "/redirect" ->
-            "http:" <> no_scheme = absolute_url(conn, "/ok")
-            redirect(conn, 302, no_scheme)
-
-          conn when conn.request_path == "/ok" ->
-            Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.get!(req, url: "#{url}/redirect", redirect_log_level: false).status ==
-                        200
-             end) =~ ""
-    end
-
-    test "inherit scheme" do
-      adapter = fn
-        request when request.url.path == "/redirect" ->
-          response = Req.Response.new(status: 302, headers: %{"location" => ["//localhost/ok"]})
-          {request, response}
-
-        request ->
-          assert request.url == URI.parse("http://localhost/ok")
-          response = Req.Response.new(status: 200)
-          {request, response}
-      end
-
-      assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.get!(adapter: adapter, url: "http://localhost/redirect").status == 200
-             end) =~ "[debug] redirecting to //localhost/ok"
-    end
   end
 
   defp redirect(conn, status, url) do
     conn
     |> Plug.Conn.put_resp_header("location", url)
     |> Plug.Conn.send_resp(status, "redirecting to #{url}")
-  end
-
-  defp absolute_url(conn, path) do
-    to_string(%URI{scheme: "#{conn.scheme}", host: conn.host, port: conn.port, path: path})
-  end
-
-  defp untrusted_redirect_adapter(component, original_value, updated_value) do
-    fn request ->
-      case Map.get(request.url, component) do
-        ^original_value ->
-          assert [_] = Req.Request.get_header(request, "authorization")
-
-          new_url =
-            request.url
-            |> Map.put(component, updated_value)
-            |> to_string()
-
-          response =
-            Req.Response.new(
-              status: 301,
-              headers: [{"location", new_url}],
-              body: "redirecting"
-            )
-
-          {request, response}
-
-        ^updated_value ->
-          assert [] = Req.Request.get_header(request, "authorization")
-
-          response =
-            Req.Response.new(
-              status: 200,
-              body: "bad things"
-            )
-
-          {request, response}
-      end
-    end
   end
 
   describe "expect" do
@@ -2346,17 +2321,20 @@ defmodule Req.StepsTest do
 
     @tag :capture_log
     test "does not carry `halted` status over" do
-      adapter = fn request ->
-        request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
+      counter = :counters.new(1, [])
 
-        attempt = request.private.attempt
+      %{req: req} =
+        serve(fn conn ->
+          :counters.add(counter, 1, 1)
 
-        if attempt < 2 do
-          Req.Request.halt(request, Req.Response.new(status: 500, body: "oops"))
-        else
-          {request, Req.Response.new(status: 200, body: "ok")}
-        end
-      end
+          case :counters.get(counter, 1) do
+            1 ->
+              Plug.Conn.send_resp(conn, 500, "oops")
+
+            2 ->
+              Plug.Conn.send_resp(conn, 200, "ok")
+          end
+        end)
 
       response_step = fn
         {request, %Req.Response{} = response} ->
@@ -2368,7 +2346,7 @@ defmodule Req.StepsTest do
       end
 
       response =
-        Req.new(url: "http://localhost", adapter: adapter, retry_delay: &Integer.pow(2, &1))
+        Req.merge(req, retry_delay: 1)
         |> Req.Request.append_response_steps(response_step: response_step)
         |> Req.request!()
 

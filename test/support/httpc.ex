@@ -123,7 +123,7 @@ defmodule Req.HTTPC do
 
     connect_options = request.options[:connect_options] || []
 
-    {profile_options, httpc_http_options, httpc_options} =
+    {httpc_http_options, httpc_options} =
       httpc_connect_options(request, connect_options, httpc_http_options, httpc_options)
 
     httpc_options =
@@ -135,9 +135,9 @@ defmodule Req.HTTPC do
 
     profile_options =
       if request.options[:inet6] == true or String.contains?(request.url.host || "", ":") do
-        Keyword.put(profile_options, :ipfamily, :inet6fb4)
+        [ipfamily: :inet6fb4]
       else
-        profile_options
+        []
       end
 
     profile_options =
@@ -164,12 +164,10 @@ defmodule Req.HTTPC do
   end
 
   defp httpc_connect_options(_request, [], httpc_http_options, httpc_options) do
-    {[], httpc_http_options, httpc_options}
+    {httpc_http_options, httpc_options}
   end
 
   defp httpc_connect_options(request, connect_options, httpc_http_options, httpc_options) do
-    profile_options = []
-
     httpc_http_options =
       if timeout = connect_options[:timeout] do
         Keyword.put(httpc_http_options, :connect_timeout, timeout)
@@ -177,25 +175,31 @@ defmodule Req.HTTPC do
         httpc_http_options
       end
 
-    profile_options =
-      if transport_opts = connect_options[:transport_opts] do
-        if cacertfile = transport_opts[:cacertfile] do
-          File.read!(cacertfile)
-        end
+    {ssl_opts, socket_opts} =
+      Keyword.split(connect_options[:transport_opts] || [], [:cacertfile, :certfile, :keyfile])
 
-        Keyword.update(profile_options, :socket_opts, transport_opts, &(transport_opts ++ &1))
+    httpc_options =
+      if socket_opts != [] do
+        Keyword.put(httpc_options, :socket_opts, socket_opts)
       else
-        profile_options
+        httpc_options
       end
 
     httpc_http_options =
-      if (transport_opts = connect_options[:transport_opts]) && request.url.scheme == "https" do
-        Keyword.put(httpc_http_options, :ssl, transport_opts)
+      if ssl_opts != [] and request.url.scheme == "https" do
+        if cacertfile = ssl_opts[:cacertfile], do: File.read!(cacertfile)
+
+        Keyword.update!(httpc_http_options, :ssl, fn ssl ->
+          ssl
+          |> Keyword.delete(:cacerts)
+          |> Keyword.merge(ssl_opts)
+          |> Keyword.replace_lazy(:cacertfile, &String.to_charlist/1)
+        end)
       else
         httpc_http_options
       end
 
-    {profile_options, httpc_http_options, httpc_options}
+    {httpc_http_options, httpc_options}
   end
 
   defp httpc_request(request, httpc_req, httpc_http_options, httpc_options, profile) do

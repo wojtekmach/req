@@ -10,7 +10,7 @@ defmodule Req.Case do
   def serve(plug, options \\ []) when is_function(plug, 1) do
     case adapter() do
       :plug ->
-        url = URI.new!("http://localhost")
+        url = URI.new!("http://localhost:8000")
         %{req: Req.new(url: url, plug: plug), url: url}
 
       :finch ->
@@ -127,7 +127,7 @@ exclude =
   end
 
 if adapter = System.get_env("REQ_ADAPTER") do
-  IO.puts("Running with REQ_ADAPTER=#{adapter}")
+  IO.puts("\nRunning with REQ_ADAPTER=#{adapter}\n")
 end
 
 ExUnit.configure(exclude: exclude)
