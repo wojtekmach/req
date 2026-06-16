@@ -968,11 +968,7 @@ defmodule Req.StepsTest do
 
   describe "decompress_body" do
     test "is disabled by default" do
-      plug = fn conn ->
-        conn
-        |> Plug.Conn.put_resp_header("content-encoding", "gzip")
-        |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
-      end
+      plug = fn conn -> send_gzip_resp(conn, "foo") end
 
       resp = Req.get!(plug: plug)
       assert Req.Response.get_header(resp, "content-encoding") == ["gzip"]
@@ -1016,13 +1012,7 @@ defmodule Req.StepsTest do
     end
 
     test "brotli success" do
-      plug = fn conn ->
-        {:ok, body} = :brotli.encode("foo")
-
-        conn
-        |> Plug.Conn.put_resp_header("content-encoding", "br")
-        |> Plug.Conn.send_resp(200, body)
-      end
+      plug = fn conn -> send_br_resp(conn, "foo") end
 
       resp = Req.get!(plug: plug, compressed: true)
       assert resp.body == "foo"
@@ -1043,11 +1033,7 @@ defmodule Req.StepsTest do
     # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
     @tag skip: System.otp_release() < "28"
     test "zstd success" do
-      plug = fn conn ->
-        conn
-        |> Plug.Conn.put_resp_header("content-encoding", "zstd")
-        |> Plug.Conn.send_resp(200, :zstd.compress("foo"))
-      end
+      plug = fn conn -> send_zstd_resp(conn, "foo") end
 
       resp = Req.get!(plug: plug, compressed: true)
       assert resp.body == "foo"
@@ -1200,12 +1186,7 @@ defmodule Req.StepsTest do
 
     test "archives are not decoded by default" do
       files = [{~c"foo.txt", "bar"}]
-
-      plug = fn conn ->
-        conn
-        |> Plug.Conn.put_resp_content_type("application/zip", nil)
-        |> Plug.Conn.send_resp(200, create_zip(files))
-      end
+      plug = fn conn -> send_zip_resp(conn, files) end
 
       body = Req.get!(plug: plug).body
       assert is_binary(body)
@@ -1251,9 +1232,11 @@ defmodule Req.StepsTest do
       files = [{~c"mimetype", "application/epub+zip"}]
 
       plug = fn conn ->
+        {:ok, {_name, zip}} = :zip.create(~c"a.zip", files, [:memory])
+
         conn
         |> Plug.Conn.put_resp_content_type("application/epub+zip", nil)
-        |> Plug.Conn.send_resp(200, create_zip(files))
+        |> Plug.Conn.send_resp(200, zip)
       end
 
       assert Req.get!(plug: plug, decoders: [epub: Req.ZIP]).body == files
@@ -1284,12 +1267,7 @@ defmodule Req.StepsTest do
 
     test "tar (content-type)" do
       files = [{~c"foo.txt", "bar"}]
-
-      plug = fn conn ->
-        conn
-        |> Plug.Conn.put_resp_content_type("application/x-tar")
-        |> Plug.Conn.send_resp(200, create_tar(files))
-      end
+      plug = fn conn -> send_tar_resp(conn, files) end
 
       assert Req.get!(plug: plug, decoders: [:tar]).body == files
     end
@@ -1356,12 +1334,7 @@ defmodule Req.StepsTest do
 
     test "zip (content-type)" do
       files = [{~c"foo.txt", "bar"}]
-
-      plug = fn conn ->
-        conn
-        |> Plug.Conn.put_resp_content_type("application/zip", nil)
-        |> Plug.Conn.send_resp(200, create_zip(files))
-      end
+      plug = fn conn -> send_zip_resp(conn, files) end
 
       assert Req.get!(plug: plug, decoders: [:zip]).body == files
     end
@@ -1370,9 +1343,11 @@ defmodule Req.StepsTest do
       files = [{~c"foo.txt", "bar"}]
 
       plug = fn conn ->
+        {:ok, {_name, zip}} = :zip.create(~c"a.zip", files, [:memory])
+
         conn
         |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
-        |> Plug.Conn.send_resp(200, create_zip(files))
+        |> Plug.Conn.send_resp(200, zip)
       end
 
       assert Req.get!(plug: plug, url: "/foo.zip", decoders: [:zip]).body == files
@@ -2752,8 +2727,52 @@ defmodule Req.StepsTest do
     if compressed, do: :zlib.gzip(data), else: data
   end
 
-  defp create_zip(files) when is_list(files) do
-    {:ok, {"a.zip", files}} = :zip.create("a.zip", files, [:memory])
-    files
+  defp send_gzip_resp(conn, body) when is_binary(body) do
+    conn
+    |> Plug.Conn.put_resp_header("content-encoding", "gzip")
+    |> Plug.Conn.send_resp(200, :zlib.gzip(body))
+  end
+
+  defp send_br_resp(conn, body) when is_binary(body) do
+    {:ok, compressed} = :brotli.encode(body)
+
+    conn
+    |> Plug.Conn.put_resp_header("content-encoding", "br")
+    |> Plug.Conn.send_resp(200, compressed)
+  end
+
+  defp send_zstd_resp(conn, body) when is_binary(body) do
+    conn
+    |> Plug.Conn.put_resp_header("content-encoding", "zstd")
+    |> Plug.Conn.send_resp(200, IO.iodata_to_binary(:zstd.compress(body)))
+  end
+
+  defp send_zip_resp(conn, files) when is_list(files) do
+    {:ok, {_name, zip}} = :zip.create(~c"a.zip", files, [:memory])
+
+    conn
+    |> Plug.Conn.put_resp_content_type("application/zip", nil)
+    |> Plug.Conn.send_resp(200, zip)
+  end
+
+  defp send_tar_resp(conn, files) when is_list(files) do
+    fun = fn
+      :write, {pid, data} -> IO.write(pid, data)
+      :position, {_pid, {:cur, 0}} -> {:ok, 0}
+      :close, _pid -> :ok
+    end
+
+    {:ok, pid} = StringIO.open("")
+    {:ok, tar} = :erl_tar.init(pid, :write, fun)
+
+    for {path, content} <- files do
+      :ok = :erl_tar.add(tar, content, to_charlist(path), [])
+    end
+
+    :ok = :erl_tar.close(tar)
+
+    conn
+    |> Plug.Conn.put_resp_content_type("application/x-tar", nil)
+    |> Plug.Conn.send_resp(200, StringIO.flush(pid))
   end
 end
