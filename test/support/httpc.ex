@@ -60,8 +60,6 @@ defmodule Req.HTTPC do
     end
   end
 
-  # Enumerables (including Req.Response.Async, which must be consumed in the
-  # caller process) and req_body_fun are materialized eagerly.
   defp prepare_body(request) do
     case request.body do
       nil ->
@@ -73,11 +71,59 @@ defmodule Req.HTTPC do
       fun when is_function(fun, 1) ->
         drain_req_body_fun(fun, request, [])
 
+      %Req.Response.Async{} = async ->
+        # Async's Enumerable reads response chunks from this (the caller's) process
+        # mailbox, so it must be consumed here rather than driven from httpc's process.
+        {request, Enum.to_list(async)}
+
       {:stream, enumerable} ->
-        {request, Enum.to_list(enumerable)}
+        {request, stream_body(request, enumerable)}
 
       enumerable ->
-        {request, Enum.to_list(enumerable)}
+        {request, stream_body(request, enumerable)}
+    end
+  end
+
+  # Stream the body lazily, framing it the same way the finch and mint adapters do:
+  # when Req has computed the size (content-length is set) send it with that length
+  # (plain generator), otherwise use chunked transfer-encoding (`:chunkify`).
+  defp stream_body(request, enumerable) do
+    reducer = fn element, _acc -> {:suspend, {:elem, element}} end
+    start = fn command -> Enumerable.reduce(enumerable, command, reducer) end
+
+    case Req.Request.get_header(request, "content-length") do
+      [] -> {:chunkify, &next_chunk/1, start}
+      _ -> {&next_chunk/1, start}
+    end
+  end
+
+  # Resume the suspended reduction and emit one element, carrying the next
+  # continuation. Elements are wrapped in `{:elem, _}` so a combinator like
+  # `Stream.take` that halts on the same step it yields its last element (returning
+  # `{:halted, {:elem, _}}`) is distinguishable from a halt with nothing pending.
+  # Empty elements are skipped because httpc encodes a zero-length chunk as the
+  # "0\r\n\r\n" body terminator, which would end a chunked request body early.
+  defp next_chunk(continuation) do
+    case continuation.({:cont, :none}) do
+      {:suspended, {:elem, element}, next} ->
+        emit_chunk(element, next)
+
+      {:halted, {:elem, element}} ->
+        emit_chunk(element, fn _command -> {:halted, :none} end)
+
+      {:halted, :none} ->
+        :eof
+
+      {:done, _acc} ->
+        :eof
+    end
+  end
+
+  defp emit_chunk(element, next) do
+    if IO.iodata_length(element) == 0 do
+      next_chunk(next)
+    else
+      {:ok, element, next}
     end
   end
 

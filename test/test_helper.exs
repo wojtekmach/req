@@ -8,26 +8,34 @@ defmodule Req.Case do
   end
 
   def serve(plug, options \\ []) when is_function(plug, 1) do
+    plugs = [{Plug.Parsers, parsers: [:multipart], pass: ["*/*"]}, plug]
+
     case adapter() do
       :plug ->
         url = URI.new!("http://localhost:8000")
         %{req: Req.new(url: url, plug: plug), url: url}
 
       :finch ->
-        %{url: url} = start_http_server(plug, options)
+        %{url: url} = start_http_server(plugs, options)
         %{req: Req.new(url: url), url: url}
 
       :httpc ->
-        %{url: url} = start_http_server(plug, options)
+        %{url: url} = start_http_server(plugs, options)
         %{req: Req.new(url: url, adapter: &Req.HTTPC.run/1), url: url}
 
       :mint ->
-        %{url: url} = start_http_server(plug, options)
+        %{url: url} = start_http_server(plugs, options)
         %{req: Req.new(url: url, adapter: &Req.Mint.run/1), url: url}
     end
   end
 
-  def start_http_server(plug, options \\ []) when is_function(plug, 1) do
+  def start_http_server(plug_or_plugs, options \\ [])
+
+  def start_http_server(plugs, options) when is_list(plugs) do
+    start_http_server(&Plug.run(&1, plugs), options)
+  end
+
+  def start_http_server(plug, options) when is_function(plug, 1) do
     options =
       [
         scheme: :http,
