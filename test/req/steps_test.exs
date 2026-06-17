@@ -2503,21 +2503,32 @@ defmodule Req.StepsTest do
         serve(
           sequence: [
             &Plug.Conn.send_resp(&1, 500, "oops"),
-            &Plug.Conn.send_resp(&1, 200, "ok"),
-            &Plug.Conn.send_resp(&1, 500, "oops"),
             &Plug.Conn.send_resp(&1, 200, "ok")
           ]
         )
 
-      request = Req.merge(req, retry_delay: 1)
-      log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          Req.get!(req, retry_delay: 1)
+        end)
 
       assert String.match?(
                log,
                ~r/\[warning\][[:blank:]]+retry: got response with status 500, will retry in 1ms, 3 attempts left/u
              )
 
-      log = ExUnit.CaptureLog.capture_log(fn -> stream_body(request, []) end)
+      %{req: req} =
+        serve(
+          sequence: [
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 200, "ok")
+          ]
+        )
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          stream_body(req, retry_delay: 1)
+        end)
 
       assert String.match?(
                log,
@@ -2535,9 +2546,28 @@ defmodule Req.StepsTest do
           ]
         )
 
-      request = Req.merge(req, retry_delay: 1, retry_log_level: :info)
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          Req.get!(req, retry_delay: 1, retry_log_level: :info)
+        end)
 
-      log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
+      assert String.match?(
+               log,
+               ~r/\[info\][[:blank:]]+retry: got response with status 500, will retry in 1ms, 3 attempts left/u
+             )
+
+      %{req: req} =
+        serve(
+          sequence: [
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 200, "ok")
+          ]
+        )
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          stream_body(req, retry_delay: 1, retry_log_level: :info)
+        end)
 
       assert String.match?(
                log,
@@ -2555,27 +2585,45 @@ defmodule Req.StepsTest do
           ]
         )
 
-      request = Req.merge(req, retry_delay: 1, retry_log_level: false)
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          Req.get!(req, retry_delay: 1, retry_log_level: false)
+        end)
 
-      log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
+      assert log == ""
+
+      %{req: req} =
+        serve(
+          sequence: [
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 200, "ok")
+          ]
+        )
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          stream_body(req, retry_delay: 1, retry_log_level: false)
+        end)
+
       assert log == ""
     end
 
     @tag :capture_log
     @tag timeout: 1000
     test "retry_delay" do
-      %{req: req} =
-        serve(
-          sequence: [
-            &send_resp_retry_after(&1, 0),
-            &send_resp_retry_after(&1, -1),
-            &send_resp_retry_after(%{&1 | status: 503}, DateTime.utc_now()),
-            &send_resp_retry_after(%{&1 | status: 503}, DateTime.add(DateTime.utc_now(), -3600)),
-            &Plug.Conn.send_resp(&1, 200, "ok")
-          ]
-        )
+      sequence = [
+        &send_resp_retry_after(&1, 0),
+        &send_resp_retry_after(&1, -1),
+        &send_resp_retry_after(%{&1 | status: 503}, DateTime.utc_now()),
+        &send_resp_retry_after(%{&1 | status: 503}, DateTime.add(DateTime.utc_now(), -3600)),
+        &Plug.Conn.send_resp(&1, 200, "ok")
+      ]
 
+      %{req: req} = serve(sequence: sequence)
       assert Req.request!(req, retry_delay: 100, max_retries: 5).body == "ok"
+
+      %{req: req} = serve(sequence: sequence)
+      assert stream_body(req, retry_delay: 100, max_retries: 5) == {:ok, "ok"}
     end
 
     defp send_resp_retry_after(conn, retry_after) do
