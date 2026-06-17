@@ -1956,13 +1956,13 @@ defmodule Req.StepsTest do
   describe "retry" do
     @tag :capture_log
     test "eventually successful - function" do
-      counter = :counters.new(1, [])
+      counter = counters_new()
 
       %{req: req} =
         serve(fn conn ->
-          :counters.add(counter, 1, 1)
+          counters_add(counter, 1)
 
-          case :counters.get(counter, 1) do
+          case counters_get(counter) do
             attempt when attempt <= 3 ->
               Plug.Conn.send_resp(conn, 500, "oops")
 
@@ -2008,13 +2008,13 @@ defmodule Req.StepsTest do
 
     @tag :capture_log
     test "eventually successful - integer" do
-      counter = :counters.new(1, [])
+      counter = counters_new()
 
       %{req: req} =
         serve(fn conn ->
-          :counters.add(counter, 1, 1)
+          counters_add(counter, 1)
 
-          case :counters.get(counter, 1) do
+          case counters_get(counter) do
             attempt when attempt <= 2 ->
               Plug.Conn.send_resp(conn, 500, "oops")
 
@@ -2043,13 +2043,13 @@ defmodule Req.StepsTest do
 
     @tag :capture_log
     test "default log_level" do
-      counter = :counters.new(1, [])
+      counter = counters_new()
 
       %{req: req} =
         serve(fn conn ->
-          :counters.add(counter, 1, 1)
+          counters_add(counter, 1)
 
-          case :counters.get(counter, 1) do
+          case counters_get(counter) do
             1 ->
               Plug.Conn.send_resp(conn, 500, "oops")
 
@@ -2069,13 +2069,13 @@ defmodule Req.StepsTest do
 
     @tag :capture_log
     test "custom log_level" do
-      counter = :counters.new(1, [])
+      counter = counters_new()
 
       %{req: req} =
         serve(fn conn ->
-          :counters.add(counter, 1, 1)
+          counters_add(counter, 1)
 
-          case :counters.get(counter, 1) do
+          case counters_get(counter) do
             1 ->
               Plug.Conn.send_resp(conn, 500, "oops")
 
@@ -2096,13 +2096,13 @@ defmodule Req.StepsTest do
 
     @tag :capture_log
     test "logging disabled" do
-      counter = :counters.new(1, [])
+      counter = counters_new()
 
       %{req: req} =
         serve(fn conn ->
-          :counters.add(counter, 1, 1)
+          counters_add(counter, 1)
 
-          case :counters.get(counter, 1) do
+          case counters_get(counter) do
             1 ->
               Plug.Conn.send_resp(conn, 500, "oops")
 
@@ -2120,13 +2120,13 @@ defmodule Req.StepsTest do
     @tag :capture_log
     @tag timeout: 1000
     test "retry_delay" do
-      counter = :counters.new(1, [])
+      counter = counters_new()
 
       %{req: req} =
         serve(fn conn ->
-          :counters.add(counter, 1, 1)
+          counters_add(counter, 1)
 
-          case :counters.get(counter, 1) do
+          case counters_get(counter) do
             1 ->
               conn |> retry_after(0) |> Plug.Conn.send_resp(429, "")
 
@@ -2326,13 +2326,13 @@ defmodule Req.StepsTest do
 
     @tag :capture_log
     test "does not carry `halted` status over" do
-      counter = :counters.new(1, [])
+      counter = counters_new()
 
       %{req: req} =
         serve(fn conn ->
-          :counters.add(counter, 1, 1)
+          counters_add(counter, 1)
 
-          case :counters.get(counter, 1) do
+          case counters_get(counter) do
             1 ->
               Plug.Conn.send_resp(conn, 500, "oops")
 
@@ -2399,7 +2399,7 @@ defmodule Req.StepsTest do
   @tag :capture_log
   test "cache + retry", c do
     pid = self()
-    {:ok, _} = Agent.start_link(fn -> 0 end, name: :counter)
+    counter = counters_new()
 
     %{req: request} =
       serve(fn conn ->
@@ -2413,9 +2413,9 @@ defmodule Req.StepsTest do
 
           _ ->
             send(pid, :cache_hit)
-            count = Agent.get_and_update(:counter, &{&1, &1 + 1})
+            counters_add(counter, 1)
 
-            if count < 2 do
+            if counters_get(counter) < 3 do
               Plug.Conn.send_resp(conn, 500, "")
             else
               conn
@@ -2817,5 +2817,17 @@ defmodule Req.StepsTest do
       [] -> Plug.Conn.put_resp_header(conn, name, value)
       _ -> conn
     end
+  end
+
+  defp counters_new do
+    :counters.new(1, [])
+  end
+
+  defp counters_add(ref, incr) do
+    :counters.add(ref, 1, incr)
+  end
+
+  defp counters_get(ref) do
+    :counters.get(ref, 1)
   end
 end
