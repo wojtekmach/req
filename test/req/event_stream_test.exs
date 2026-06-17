@@ -37,6 +37,28 @@ defmodule Req.EventStreamTest do
       assert events == [%{data: "world"}, %{data: "hello"}]
     end
 
+    test "buffers events split across chunks" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          conn =
+            conn
+            |> Plug.Conn.put_resp_content_type("text/event-stream")
+            |> Plug.Conn.send_chunked(200)
+
+          {:ok, conn} = Plug.Conn.chunk(conn, "data: hel")
+          {:ok, conn} = Plug.Conn.chunk(conn, "lo\n")
+          {:ok, conn} = Plug.Conn.chunk(conn, "\n")
+          conn
+        end)
+
+      {:ok, events} =
+        Req.stream(url, [], fn event, _resp, acc ->
+          {:ok, [event | acc]}
+        end)
+
+      assert events == [%{data: "hello"}]
+    end
+
     test "invalid response body" do
       %{url: url} =
         start_http_server(fn conn ->

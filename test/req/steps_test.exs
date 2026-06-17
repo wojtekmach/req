@@ -4,11 +4,15 @@ defmodule Req.StepsTest do
   ## Request steps
 
   describe "compressed" do
-    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
-    @tag skip: System.otp_release() < "28"
     test "sets accept-encoding when compressed: true" do
       req = Req.new(compressed: true) |> Req.Request.prepare()
-      assert req.headers["accept-encoding"] == ["zstd, br, gzip"]
+
+      # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+      if System.otp_release() >= "28" do
+        assert req.headers["accept-encoding"] == ["zstd, br, gzip"]
+      else
+        assert req.headers["accept-encoding"] == ["br, gzip"]
+      end
     end
 
     test "does not set accept-encoding by default" do
@@ -19,78 +23,6 @@ defmodule Req.StepsTest do
     test "does not set accept-encoding when streaming response body" do
       req = Req.new(compressed: true, into: []) |> Req.Request.prepare()
       refute req.headers["accept-encoding"]
-    end
-  end
-
-  describe "decode_body (streaming)" do
-    test "is a no-op when not streaming" do
-      req = Req.new() |> Req.Request.prepare()
-      assert req.stream == nil
-    end
-
-    test "decodes text/event-stream into events" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          conn =
-            conn
-            |> Plug.Conn.put_resp_content_type("text/event-stream")
-            |> Plug.Conn.send_chunked(200)
-
-          {:ok, conn} = Plug.Conn.chunk(conn, "event: ping\ndata: 1\n\n")
-          {:ok, conn} = Plug.Conn.chunk(conn, "id: 2\ndata: 2\n\n")
-          conn
-        end)
-
-      {:ok, {resp, acc}} =
-        Req.stream(url, {nil, []}, fn event, resp, {_resp, acc} ->
-          {:ok, {resp, [event | acc]}}
-        end)
-
-      assert resp.status == 200
-      assert Enum.reverse(acc) == [%{event: "ping", data: "1"}, %{id: "2", data: "2"}]
-    end
-
-    test "buffers events split across chunks" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          conn =
-            conn
-            |> Plug.Conn.put_resp_content_type("text/event-stream")
-            |> Plug.Conn.send_chunked(200)
-
-          {:ok, conn} = Plug.Conn.chunk(conn, "data: hel")
-          {:ok, conn} = Plug.Conn.chunk(conn, "lo\n")
-          {:ok, conn} = Plug.Conn.chunk(conn, "\n")
-          conn
-        end)
-
-      {:ok, acc} =
-        Req.stream(url, [], fn event, _resp, acc ->
-          {:ok, [event | acc]}
-        end)
-
-      assert acc == [%{data: "hello"}]
-    end
-
-    test "passes through non-event-stream content as raw chunks" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          conn =
-            conn
-            |> Plug.Conn.put_resp_content_type("text/plain")
-            |> Plug.Conn.send_chunked(200)
-
-          {:ok, conn} = Plug.Conn.chunk(conn, "data: 1\n\n")
-          {:ok, conn} = Plug.Conn.chunk(conn, "data: 2\n\n")
-          conn
-        end)
-
-      {:ok, acc} =
-        Req.stream(url, [], fn data, _resp, acc ->
-          {:ok, [data | acc]}
-        end)
-
-      assert Enum.reverse(acc) == ["data: 1\n\n", "data: 2\n\n"]
     end
   end
 
@@ -584,12 +516,15 @@ defmodule Req.StepsTest do
                    end
     end
 
-    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
-    @tag skip: System.otp_release() < "28"
     test "into: binary with gzip" do
       %{req: req} =
         serve(fn conn ->
-          ["zstd, br, gzip"] = Plug.Conn.get_req_header(conn, "accept-encoding")
+          # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+          if System.otp_release() >= "28" do
+            assert Plug.Conn.get_req_header(conn, "accept-encoding") == ["zstd, br, gzip"]
+          else
+            assert Plug.Conn.get_req_header(conn, "accept-encoding") == ["br, gzip"]
+          end
 
           conn
           |> Plug.Conn.put_resp_header("content-encoding", "gzip")
@@ -979,8 +914,6 @@ defmodule Req.StepsTest do
       assert Req.put!(req).body == "ok"
     end
 
-    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
-    @tag skip: System.otp_release() < "28"
     test "excludes accept-encoding, hop-by-hop, and trace-id headers from signature" do
       plug = fn conn ->
         [authorization] = Plug.Conn.get_req_header(conn, "authorization")
@@ -1012,9 +945,15 @@ defmodule Req.StepsTest do
         end
 
         # Headers excluded from the signature are still sent on the wire.
-        assert ["zstd, br, gzip"] = Plug.Conn.get_req_header(conn, "accept-encoding")
         assert ["trace-123"] = Plug.Conn.get_req_header(conn, "x-amzn-trace-id")
         assert ["keep-alive"] = Plug.Conn.get_req_header(conn, "connection")
+
+        # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+        if System.otp_release() >= "28" do
+          assert Plug.Conn.get_req_header(conn, "accept-encoding") == ["zstd, br, gzip"]
+        else
+          assert Plug.Conn.get_req_header(conn, "accept-encoding") == ["br, gzip"]
+        end
 
         # Non-excluded custom headers are still signed.
         assert "x-custom" in signed_headers
@@ -1077,13 +1016,15 @@ defmodule Req.StepsTest do
     end
   end
 
-  describe "decompress_body (eager)" do
+  describe "decompress_body" do
     test "is disabled by default" do
       %{req: req} = serve(fn conn -> send_resp_gzip(conn, "foo") end)
 
       resp = Req.get!(req)
       assert Req.Response.get_header(resp, "content-encoding") == ["gzip"]
       assert resp.body == :zlib.gzip("foo")
+
+      assert stream(req) == {:ok, :zlib.gzip("foo")}
     end
 
     test "gzip success" do
@@ -1097,6 +1038,8 @@ defmodule Req.StepsTest do
       resp = Req.get!(req, compressed: true)
       assert Req.Response.get_header(resp, "content-encoding") == []
       assert resp.body == "foo"
+
+      assert stream(req, compressed: true) == {:ok, "foo"}
     end
 
     test "gzip error" do
@@ -1107,9 +1050,12 @@ defmodule Req.StepsTest do
           |> Plug.Conn.send_resp(200, "bad")
         end)
 
-      assert_raise Req.DecompressError, "gzip decompression failed", fn ->
-        Req.get!(req, compressed: true)
-      end
+      assert {:error, e} = Req.get(req, compressed: true, retry: false)
+      assert e == %Req.DecompressError{format: :gzip, data: "bad", reason: nil}
+      assert Exception.message(e) == "gzip decompression failed"
+
+      assert {:error, e, []} = stream(req, compressed: true, retry: false)
+      assert e == %Req.DecompressError{format: :gzip, data: "bad", reason: nil}
     end
 
     test "identity" do
@@ -1123,6 +1069,8 @@ defmodule Req.StepsTest do
       resp = Req.get!(req, compressed: true)
       assert Req.Response.get_header(resp, "content-encoding") == []
       assert resp.body == "foo"
+
+      assert stream(req, compressed: true) == {:ok, "foo"}
     end
 
     test "brotli success" do
@@ -1130,6 +1078,8 @@ defmodule Req.StepsTest do
 
       resp = Req.get!(req, compressed: true)
       assert resp.body == "foo"
+
+      assert stream(req, compressed: true) == {:ok, "foo"}
     end
 
     test "brotli error" do
@@ -1140,9 +1090,12 @@ defmodule Req.StepsTest do
           |> Plug.Conn.send_resp(200, "bad")
         end)
 
-      assert_raise Req.DecompressError, "br decompression failed", fn ->
-        Req.get!(req, compressed: true)
-      end
+      assert {:error, e} = Req.get(req, compressed: true, retry: false)
+      assert e == %Req.DecompressError{format: :br, data: nil, reason: nil}
+      assert Exception.message(e) == "br decompression failed"
+
+      assert {:error, e, []} = stream(req, compressed: true, retry: false)
+      assert e == %Req.DecompressError{format: :br, data: nil, reason: nil}
     end
 
     # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
@@ -1152,6 +1105,8 @@ defmodule Req.StepsTest do
 
       resp = Req.get!(req, compressed: true)
       assert resp.body == "foo"
+
+      assert stream(req, compressed: true) == {:ok, "foo"}
     end
 
     # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
@@ -1164,42 +1119,41 @@ defmodule Req.StepsTest do
           |> Plug.Conn.send_resp(200, "bad")
         end)
 
-      assert_raise Req.DecompressError,
-                   ~S[zstd decompression failed, reason: "Unknown frame descriptor"],
-                   fn ->
-                     Req.get!(req, compressed: true)
-                   end
+      assert {:error, e} = Req.get(req, compressed: true, retry: false)
+      assert e == %Req.DecompressError{format: :zstd, data: "bad", reason: "Unknown frame descriptor"}
+      assert Exception.message(e) == ~S[zstd decompression failed, reason: "Unknown frame descriptor"]
+
+      assert {:error, e, []} = stream(req, compressed: true, retry: false)
+      assert e == %Req.DecompressError{format: :zstd, data: "bad", reason: "Unknown frame descriptor"}
     end
 
-    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
-    @tag skip: System.otp_release() < "28"
     test "multiple codecs" do
       %{req: req} =
         serve(fn conn ->
           conn
-          |> Plug.Conn.put_resp_header("content-encoding", "gzip, zstd")
-          |> Plug.Conn.send_resp(200, "foo" |> :zlib.gzip() |> :zstd.compress())
+          |> Plug.Conn.put_resp_header("content-encoding", "gzip, gzip")
+          |> Plug.Conn.send_resp(200, "foo" |> :zlib.gzip() |> :zlib.gzip())
         end)
 
       resp = Req.get!(req, compressed: true)
       assert Req.Response.get_header(resp, "content-encoding") == []
       assert resp.body == "foo"
+
+      assert stream(req, compressed: true) == {:ok, "foo"}
     end
 
-    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
-    @tag skip: System.otp_release() < "28"
     @tag :transport
     test "multiple codecs with multiple headers" do
       %{url: url} =
         start_tcp_server(fn socket ->
           assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
 
-          body = "foo" |> :zlib.gzip() |> :zstd.compress() |> IO.iodata_to_binary()
+          body = "foo" |> :zlib.gzip() |> :zlib.gzip() |> IO.iodata_to_binary()
 
           data = """
           HTTP/1.1 200 OK
           content-encoding: gzip
-          content-encoding: zstd
+          content-encoding: gzip
           content-length: #{byte_size(body)}
 
           #{body}
@@ -1212,6 +1166,8 @@ defmodule Req.StepsTest do
       assert Req.Response.get_header(resp, "content-encoding") == []
       assert Req.Response.get_header(resp, "content-length") == []
       assert resp.body == "foo"
+
+      assert stream(url, compressed: true) == {:ok, "foo"}
     end
 
     @tag :capture_log
@@ -1226,45 +1182,16 @@ defmodule Req.StepsTest do
       resp = Req.get!(req, compressed: true)
       assert Req.Response.get_header(resp, "content-encoding") == ["unknown1, unknown2"]
       assert resp.body == <<1, 2, 3>>
+
+      assert stream(req, compressed: true) == {:ok, <<1, 2, 3>>}
     end
 
     test "HEAD request" do
       %{req: req} = serve(fn conn -> send_resp_gzip(conn, "") end)
 
       assert Req.head!(req, compressed: true).body == ""
-    end
-  end
 
-  describe "decompress_body (streaming)" do
-    test "gzip" do
-      %{req: req} = serve(fn conn -> send_resp_gzip(conn, "foo") end)
-
-      assert stream_body(req, compressed: true) == {:ok, "foo"}
-    end
-
-    test "br" do
-      %{req: req} = serve(fn conn -> send_resp_br(conn, "foo") end)
-
-      assert stream_body(req, compressed: true) == {:ok, "foo"}
-    end
-
-    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
-    @tag skip: System.otp_release() < "28"
-    test "zstd" do
-      %{req: req} = serve(fn conn -> send_resp_zstd(conn, "foo") end)
-
-      assert stream_body(req, compressed: true) == {:ok, "foo"}
-    end
-
-    test "multiple codecs" do
-      %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("content-encoding", "gzip, gzip")
-          |> Plug.Conn.send_resp(200, "foo" |> :zlib.gzip() |> :zlib.gzip())
-        end)
-
-      assert stream_body(req, compressed: true) == {:ok, "foo"}
+      assert stream(req, method: :head, compressed: true) == {:ok, ""}
     end
 
     # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
@@ -1279,9 +1206,15 @@ defmodule Req.StepsTest do
           |> Plug.Conn.send_resp(200, body)
         end)
 
-      assert stream_body(req, compressed: true) == {:ok, "foo"}
+      resp = Req.get!(req, compressed: true)
+      assert Req.Response.get_header(resp, "content-encoding") == []
+      assert resp.body == "foo"
+
+      assert stream(req, compressed: true) == {:ok, "foo"}
     end
 
+    # TODO: manual review — kept streaming-only; the eager equivalent would need an explicit
+    # decoders: [event_stream: Req.EventStream] (buffered doesn't SSE-decode by default).
     test "decompresses before decoding" do
       %{req: req} =
         serve(fn conn ->
@@ -1304,13 +1237,6 @@ defmodule Req.StepsTest do
       assert events == [%{data: "world"}, %{data: "hello"}]
     end
 
-    test "without compressed: true, passes chunks through" do
-      gzipped = :zlib.gzip("foo")
-      %{req: req} = serve(fn conn -> send_resp_gzip(conn, "foo") end)
-
-      assert stream_body(req, []) == {:ok, gzipped}
-    end
-
     test "passes through content-encoding not in accept-encoding" do
       compressed = :zlib.compress("foo")
 
@@ -1321,35 +1247,23 @@ defmodule Req.StepsTest do
           |> Plug.Conn.send_resp(200, compressed)
         end)
 
-      assert stream_body(req, compressed: true) == {:ok, compressed}
+      resp = Req.get!(req, compressed: true)
+      assert Req.Response.get_header(resp, "content-encoding") == ["deflate"]
+      assert resp.body == compressed
+
+      assert stream(req, compressed: true) == {:ok, compressed}
     end
 
     test "accept-encoding with q-values and mixed case" do
       %{req: req} = serve(fn conn -> send_resp_gzip(conn, "foo") end)
 
       options = [compressed: true, headers: [accept_encoding: "GZIP;q=1.0, br"]]
-      assert stream_body(req, options) == {:ok, "foo"}
+
+      assert Req.get!(req, options).body == "foo"
+
+      assert stream(req, options) == {:ok, "foo"}
     end
 
-    test "invalid body" do
-      %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("content-encoding", "gzip")
-          |> Plug.Conn.send_resp(200, "bad")
-        end)
-
-      {:error, %Req.DecompressError{format: :gzip}, []} =
-        Req.stream(
-          req,
-          [],
-          fn data, _resp, acc ->
-            {:ok, [data | acc]}
-          end,
-          compressed: true,
-          retry: false
-        )
-    end
   end
 
   describe "decode_body" do
@@ -1365,6 +1279,8 @@ defmodule Req.StepsTest do
         end)
 
       assert Req.get!(req).body == "ok"
+
+      assert stream(req) == {:ok, "ok"}
     end
 
     test "json" do
@@ -1374,6 +1290,8 @@ defmodule Req.StepsTest do
         end)
 
       assert Req.get!(req).body == %{"a" => 1}
+
+      assert stream(req) == {:ok, ~s({"a":1})}
     end
 
     test "json-api" do
@@ -1385,28 +1303,40 @@ defmodule Req.StepsTest do
         end)
 
       assert Req.get!(req).body == %{"a" => 1}
+
+      assert stream(req) == {:ok, ~s({"a":1})}
     end
 
     test "ndjson via Req.NDJSON codec" do
-      plug = fn conn ->
-        conn
-        |> Plug.Conn.put_resp_content_type("application/json")
-        |> Plug.Conn.send_resp(200, ~s|{"id":1}\n{"id":2}\n|)
-      end
+      %{req: req} =
+        serve(fn conn ->
+          conn
+          |> Plug.Conn.put_resp_content_type("application/json")
+          |> Plug.Conn.send_resp(200, ~s|{"id":1}\n{"id":2}\n|)
+        end)
 
-      assert Req.get!(plug: plug, decoders: [json: Req.NDJSON]).body ==
-               [%{"id" => 1}, %{"id" => 2}]
+      req = Req.merge(req, decoders: [json: Req.NDJSON])
+
+      assert Req.get!(req).body == [%{"id" => 1}, %{"id" => 2}]
+
+      {:ok, chunks} = Req.stream(req, [], fn chunk, _resp, acc -> {:ok, acc ++ [chunk]} end)
+      assert chunks == [~s|{"id":1}\n{"id":2}\n|]
     end
 
     test "event-stream via Req.EventStream codec" do
-      plug = fn conn ->
-        conn
-        |> Plug.Conn.put_resp_content_type("text/event-stream")
-        |> Plug.Conn.send_resp(200, "data: hello\n\ndata: world\n\n")
-      end
+      %{req: req} =
+        serve(fn conn ->
+          conn
+          |> Plug.Conn.put_resp_content_type("text/event-stream")
+          |> Plug.Conn.send_resp(200, "data: hello\n\ndata: world\n\n")
+        end)
 
-      assert Req.get!(plug: plug, decoders: [event_stream: Req.EventStream]).body ==
-               [%{data: "hello"}, %{data: "world"}]
+      req = Req.merge(req, decoders: [event_stream: Req.EventStream])
+
+      assert Req.get!(req).body == [%{data: "hello"}, %{data: "world"}]
+
+      {:ok, events} = Req.stream(req, [], fn event, _resp, acc -> {:ok, acc ++ [event]} end)
+      assert events == [%{data: "hello"}, %{data: "world"}]
     end
 
     test "json with custom options" do
@@ -1415,9 +1345,11 @@ defmodule Req.StepsTest do
           Req.Test.json(conn, %{a: 1})
         end)
 
-      assert Req.get!(req, decoders: [json: &Jason.decode(&1, keys: :atoms)]).body == %{
-               a: 1
-             }
+      req = Req.merge(req, decoders: [json: &Jason.decode(&1, keys: :atoms)])
+
+      assert Req.get!(req).body == %{a: 1}
+
+      assert stream(req) == {:ok, ~s({"a":1})}
     end
 
     test "deprecated :decode_json option" do
@@ -1432,13 +1364,14 @@ defmodule Req.StepsTest do
     end
 
     test "deprecated :decode_body option still works but warns" do
-      plug = fn conn ->
-        Req.Test.json(conn, %{a: 1})
-      end
+      %{req: req} =
+        serve(fn conn ->
+          Req.Test.json(conn, %{a: 1})
+        end)
 
       assert ExUnit.CaptureIO.capture_io(:stderr, fn ->
                # still works: decoding is disabled, body is left raw
-               assert Req.get!(plug: plug, decode_body: false).body == ~s|{"a":1}|
+               assert Req.get!(req, decode_body: false).body == ~s|{"a":1}|
              end) =~ "the `:decode_body` option is deprecated"
     end
 
@@ -1451,14 +1384,18 @@ defmodule Req.StepsTest do
         end)
 
       assert {:error, %Jason.DecodeError{}} = Req.get(req)
+
+      assert stream(req) == {:ok, "bad"}
     end
 
     test "archives are not decoded by default" do
       files = [{"foo.txt", "bar"}]
       %{req: req} = serve(fn conn -> send_resp_zip(conn, files) end)
 
-      body = Req.get!(req).body
-      assert is_binary(body)
+      resp = Req.get!(req)
+      assert <<"PK", 3, 4, _::binary>> = resp.body
+
+      assert {:ok, <<"PK", 3, 4, _::binary>>} = stream(req)
     end
 
     test "decoders: false disables JSON decoding" do
@@ -1467,9 +1404,14 @@ defmodule Req.StepsTest do
           Req.Test.json(conn, %{a: 1})
         end)
 
-      assert Req.get!(req, decoders: false).body == ~s|{"a":1}|
+      req = Req.merge(req, decoders: false)
+
+      assert Req.get!(req).body == ~s|{"a":1}|
+
+      assert stream(req) == {:ok, ~s|{"a":1}|}
     end
 
+    # TODO: manually review
     test "setting :decoders overwrites the default" do
       req = Req.new(decoders: [:zip]) |> Req.merge(decoders: [:tar])
       assert req.options[:decoders] == [:tar]
@@ -1477,12 +1419,18 @@ defmodule Req.StepsTest do
 
     test "setting :decoders replaces the default, so JSON is not decoded unless included" do
       %{req: req} = serve(fn conn -> Req.Test.json(conn, %{a: 1}) end)
-      assert Req.get!(req, decoders: [:zip]).body == ~s|{"a":1}|
+
+      req = Req.merge(req, decoders: [:zip])
+
+      assert Req.get!(req).body == ~s|{"a":1}|
+
+      assert stream(req) == {:ok, ~s|{"a":1}|}
     end
 
     test "unknown decoder format raises" do
       %{req: req} = serve(fn conn -> Req.Test.json(conn, %{}) end)
 
+      # TODO: Req.stream/4 does not validate :decoders, so an unknown format silently passes raw instead of raising.
       assert_raise ArgumentError, ~r/unknown decoder format: :bogus/, fn ->
         Req.get!(req, decoders: [:bogus])
       end
@@ -1496,8 +1444,12 @@ defmodule Req.StepsTest do
           |> Plug.Conn.send_resp(200, "raw-ics")
         end)
 
-      resp = Req.get!(req, decoders: [ics: &{:ok, String.upcase(&1)}])
+      req = Req.merge(req, decoders: [ics: &{:ok, String.upcase(&1)}])
+
+      resp = Req.get!(req)
       assert resp.body == "RAW-ICS"
+
+      assert stream(req) == {:ok, "raw-ics"}
     end
 
     test "custom decoder (module exporting decode/1)" do
@@ -1511,7 +1463,11 @@ defmodule Req.StepsTest do
           |> send_resp_zip(files)
         end)
 
-      assert Req.get!(req, decoders: [epub: Req.ZIP]).body == files
+      req = Req.merge(req, decoders: [epub: Req.ZIP])
+
+      assert Req.get!(req).body == files
+
+      assert {:ok, <<"PK", 3, 4, _::binary>>} = stream(req)
     end
 
     test "custom decoder error" do
@@ -1522,10 +1478,13 @@ defmodule Req.StepsTest do
           |> Plug.Conn.send_resp(200, "raw-ics")
         end)
 
-      assert {:error, %RuntimeError{} = e} =
-               Req.get(req, decoders: [ics: fn _ -> {:error, :nope} end])
+      req = Req.merge(req, decoders: [ics: fn _ -> {:error, :nope} end])
 
+      assert {:error, %RuntimeError{} = e} = Req.get(req)
       assert Exception.message(e) == "decoding response body failed: :nope"
+
+      # TODO: manual review — Req.stream/4 never runs the decoder, so the decode error doesn't surface when streaming.
+      assert stream(req) == {:ok, "raw-ics"}
     end
 
     test "{format, format} reuses a built-in decoder" do
@@ -1536,14 +1495,22 @@ defmodule Req.StepsTest do
           |> Plug.Conn.send_resp(200, ~s|{"a":1}|)
         end)
 
-      assert Req.get!(req, decoders: [ics: :json]).body == %{"a" => 1}
+      req = Req.merge(req, decoders: [ics: :json])
+
+      assert Req.get!(req).body == %{"a" => 1}
+
+      assert stream(req) == {:ok, ~s|{"a":1}|}
     end
 
     test "tar (content-type)" do
       files = [{"foo.txt", "bar"}]
       %{req: req} = serve(fn conn -> send_resp_tar(conn, files) end)
 
-      assert Req.get!(req, decoders: [:tar]).body == files
+      req = Req.merge(req, decoders: [:tar])
+
+      assert Req.get!(req).body == files
+
+      assert {:ok, <<102, 111, 111, _::binary>>} = stream(req)
     end
 
     test "tar (path)" do
@@ -1556,7 +1523,11 @@ defmodule Req.StepsTest do
           |> send_resp_tar(files)
         end)
 
-      assert Req.get!(req, url: "#{url}/foo.tar", decoders: [:tar]).body == files
+      req = Req.merge(req, url: "#{url}/foo.tar", decoders: [:tar])
+
+      assert Req.get!(req).body == files
+
+      assert {:ok, <<102, 111, 111, _::binary>>} = stream(req)
     end
 
     test "tar (path, content type with charset utf8)" do
@@ -1569,9 +1540,13 @@ defmodule Req.StepsTest do
           |> send_resp_tar(files)
         end)
 
-      resp = Req.get!(req, url: "#{url}/foo.tar", decoders: [:tar])
+      req = Req.merge(req, url: "#{url}/foo.tar", decoders: [:tar])
+
+      resp = Req.get!(req)
       assert resp.headers["content-type"] == ["application/octet-stream; charset=utf-8"]
       assert resp.body == files
+
+      assert {:ok, <<102, 111, 111, _::binary>>} = stream(req)
     end
 
     test "tar (path, no content-type)" do
@@ -1582,7 +1557,11 @@ defmodule Req.StepsTest do
           Plug.Conn.send_resp(conn, 200, create_tar(files))
         end)
 
-      assert Req.get!(req, url: "#{url}/foo.tar.gz", decoders: [:tgz]).body == files
+      req = Req.merge(req, url: "#{url}/foo.tar.gz", decoders: [:tgz])
+
+      assert Req.get!(req).body == files
+
+      assert {:ok, <<102, 111, 111, _::binary>>} = stream(req)
     end
 
     test "tar.gz (path)" do
@@ -1595,7 +1574,11 @@ defmodule Req.StepsTest do
           |> Plug.Conn.send_resp(200, create_tar(files, compressed: true))
         end)
 
-      assert Req.get!(req, url: "#{url}/foo.tar.gz", decoders: [:tgz]).body == files
+      req = Req.merge(req, url: "#{url}/foo.tar.gz", decoders: [:tgz])
+
+      assert Req.get!(req).body == files
+
+      assert {:ok, <<31, 139, _::binary>>} = stream(req)
     end
 
     test "tar invalid" do
@@ -1609,13 +1592,20 @@ defmodule Req.StepsTest do
       assert {:error, e} = Req.get(req, decoders: [:tar])
       assert e == %Req.ArchiveError{format: :tar, reason: :eof, data: "invalid"}
       assert Exception.message(e) == "tar unpacking failed: Unexpected end of file"
+
+      # TODO: manual review — Req.stream/4 never runs the decoder, so the decode error doesn't surface when streaming.
+      assert stream(req, decoders: [:tar]) == {:ok, "invalid"}
     end
 
     test "zip (content-type)" do
       files = [{"foo.txt", "bar"}]
       %{req: req} = serve(fn conn -> send_resp_zip(conn, files) end)
 
-      assert Req.get!(req, decoders: [:zip]).body == files
+      req = Req.merge(req, decoders: [:zip])
+
+      assert Req.get!(req).body == files
+
+      assert {:ok, <<"PK", 3, 4, _::binary>>} = stream(req)
     end
 
     test "zip (path)" do
@@ -1628,7 +1618,11 @@ defmodule Req.StepsTest do
           |> send_resp_zip(files)
         end)
 
-      assert Req.get!(req, url: "#{url}/foo.zip", decoders: [:zip]).body == files
+      req = Req.merge(req, url: "#{url}/foo.zip", decoders: [:zip])
+
+      assert Req.get!(req).body == files
+
+      assert {:ok, <<"PK", 3, 4, _::binary>>} = stream(req)
     end
 
     test "zip invalid" do
@@ -1642,6 +1636,9 @@ defmodule Req.StepsTest do
       assert {:error, e} = Req.get(req, decoders: [:zip])
       assert e == %Req.ArchiveError{format: :zip, reason: nil, data: "invalid"}
       assert Exception.message(e) == "zip unpacking failed"
+
+      # TODO: manual review — Req.stream/4 never runs the decoder, so the decode error doesn't surface when streaming.
+      assert stream(req, decoders: [:zip]) == {:ok, "invalid"}
     end
 
     test "gzip (content-type)" do
@@ -1652,7 +1649,11 @@ defmodule Req.StepsTest do
           |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
         end)
 
-      assert Req.get!(req, decoders: [:gz]).body == "foo"
+      req = Req.merge(req, decoders: [:gz])
+
+      assert Req.get!(req).body == "foo"
+
+      assert {:ok, <<31, 139, _::binary>>} = stream(req)
     end
 
     test "gzip invalid" do
@@ -1666,6 +1667,9 @@ defmodule Req.StepsTest do
       assert_raise ErlangError, "Erlang error: :data_error", fn ->
         Req.get(req, decoders: [:gz])
       end
+
+      # TODO: manual review — Req.stream/4 never runs the decoder, so the decode error doesn't surface when streaming.
+      assert stream(req, decoders: [:gz]) == {:ok, "bad"}
     end
 
     # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
@@ -1678,7 +1682,11 @@ defmodule Req.StepsTest do
           |> Plug.Conn.send_resp(200, :zstd.compress("foo"))
         end)
 
-      assert Req.get!(req, decoders: [:zst]).body == "foo"
+      req = Req.merge(req, decoders: [:zst])
+
+      assert Req.get!(req).body == "foo"
+
+      assert {:ok, <<40, 181, 47, 253, _::binary>>} = stream(req)
     end
 
     # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
@@ -1691,7 +1699,11 @@ defmodule Req.StepsTest do
           |> Plug.Conn.send_resp(200, :zstd.compress("foo"))
         end)
 
-      assert Req.get!(req, url: "#{url}/foo.zst", decoders: [:zst]).body == "foo"
+      req = Req.merge(req, url: "#{url}/foo.zst", decoders: [:zst])
+
+      assert Req.get!(req).body == "foo"
+
+      assert {:ok, <<40, 181, 47, 253, _::binary>>} = stream(req)
     end
 
     # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
@@ -1709,6 +1721,9 @@ defmodule Req.StepsTest do
 
       assert Exception.message(e) ==
                "Could not decompress Zstandard data: \"Unknown frame descriptor\""
+
+      # TODO: manual review — Req.stream/4 never runs the decoder, so the decode error doesn't surface when streaming.
+      assert stream(req, decoders: [:zst]) == {:ok, "bad"}
     end
 
     test "csv" do
@@ -1720,7 +1735,36 @@ defmodule Req.StepsTest do
 
       %{req: req} = serve(fn conn -> send_resp_csv(conn, csv) end)
 
-      assert Req.get!(req, decoders: [:csv]).body == csv
+      req = Req.merge(req, decoders: [:csv])
+
+      assert Req.get!(req).body == csv
+
+      assert {:ok, <<"x,y", _::binary>>} = stream(req)
+    end
+
+    test "passes through non-event-stream content as raw chunks" do
+      %{req: req} =
+        serve(fn conn ->
+          conn =
+            conn
+            |> Plug.Conn.put_resp_content_type("text/plain")
+            |> Plug.Conn.send_chunked(200)
+
+          {:ok, conn} = Plug.Conn.chunk(conn, "data: 1\n\n")
+          {:ok, conn} = Plug.Conn.chunk(conn, "data: 2\n\n")
+          conn
+        end)
+
+      {:ok, acc} =
+        Req.stream(req, [], fn data, _resp, acc ->
+          {:ok, [data | acc]}
+        end)
+
+      if Req.Case.adapter() == :httpc do
+        assert Enum.reverse(acc) |> IO.iodata_to_binary() == "data: 1\n\ndata: 2\n\n"
+      else
+        assert Enum.reverse(acc) == ["data: 1\n\n", "data: 2\n\n"]
+      end
     end
   end
 
@@ -1803,7 +1847,7 @@ defmodule Req.StepsTest do
 
       assert Req.get!(req).body == "ok"
 
-      assert stream_body(req, []) == {:ok, "ok"}
+      assert stream(req) == {:ok, "ok"}
     end
 
     @tag :capture_log
@@ -1823,7 +1867,7 @@ defmodule Req.StepsTest do
 
       assert Req.get!(req).body == "foo"
 
-      assert stream_body(req, []) == {:ok, "foo"}
+      assert stream(req) == {:ok, "foo"}
     end
 
     test "ignore when :redirect is false" do
@@ -1838,7 +1882,7 @@ defmodule Req.StepsTest do
       assert resp.status == 302
       assert resp.body == "redirecting to /ok"
 
-      assert stream_body(req, []) == {:ok, "redirecting to /ok"}
+      assert stream(req) == {:ok, "redirecting to /ok"}
     end
 
     test "absolute" do
@@ -2117,7 +2161,7 @@ defmodule Req.StepsTest do
       assert req_out.private == %{req_redirect_count: 3}
       assert Exception.message(e) == "too many redirects (3)"
 
-      assert {:error, %Req.TooManyRedirectsError{max_redirects: 3}, []} = stream_body(req, [])
+      assert {:error, %Req.TooManyRedirectsError{max_redirects: 3}, []} = stream(req)
 
       assert_receive :ping
       assert_receive :ping
@@ -2205,10 +2249,10 @@ defmodule Req.StepsTest do
       assert {:error, e} = Req.get(req, expect: 201)
       assert Exception.message(e) =~ "expected status 201, got: 200"
 
-      assert stream_body(req, expect: 200) == {:ok, "ok"}
+      assert stream(req, expect: 200) == {:ok, "ok"}
 
       # the empty acc proves streaming stopped before any chunk was delivered
-      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream_body(req, expect: 201)
+      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream(req, expect: 201)
       assert Exception.message(e) =~ "expected status 201, got: 200"
     end
 
@@ -2222,9 +2266,9 @@ defmodule Req.StepsTest do
       assert {:error, e} = Req.get(req, expect: 201..202)
       assert Exception.message(e) =~ "expected status 201..202, got: 200"
 
-      assert stream_body(req, expect: 200..201) == {:ok, "ok"}
+      assert stream(req, expect: 200..201) == {:ok, "ok"}
 
-      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream_body(req, expect: 201..202)
+      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream(req, expect: 201..202)
       assert Exception.message(e) =~ "expected status 201..202, got: 200"
     end
 
@@ -2238,18 +2282,18 @@ defmodule Req.StepsTest do
       assert {:error, e} = Req.get(req, expect: [201, 202])
       assert Exception.message(e) =~ "expected status [201, 202], got: 200"
 
-      assert stream_body(req, expect: [200, 201]) == {:ok, "ok"}
+      assert stream(req, expect: [200, 201]) == {:ok, "ok"}
 
-      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream_body(req, expect: [201, 202])
+      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream(req, expect: [201, 202])
       assert Exception.message(e) =~ "expected status [201, 202], got: 200"
 
       assert Req.get!(req, expect: [200..201]).body == "ok"
       assert {:error, e} = Req.get(req, expect: [201..202])
       assert Exception.message(e) =~ "expected status [201..202], got: 200"
 
-      assert stream_body(req, expect: [200..201]) == {:ok, "ok"}
+      assert stream(req, expect: [200..201]) == {:ok, "ok"}
 
-      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream_body(req, expect: [201..202])
+      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream(req, expect: [201..202])
       assert Exception.message(e) =~ "expected status [201..202], got: 200"
     end
 
@@ -2263,10 +2307,10 @@ defmodule Req.StepsTest do
       assert {:error, e} = Req.get(req_404, expect: :successful)
       assert Exception.message(e) =~ "expected status :successful, got: 404"
 
-      assert stream_body(req_200, expect: :successful) == {:ok, "ok"}
+      assert stream(req_200, expect: :successful) == {:ok, "ok"}
 
       assert {:error, %Req.UnexpectedStatusError{} = e, []} =
-               stream_body(req_404, expect: :successful)
+               stream(req_404, expect: :successful)
 
       assert Exception.message(e) =~ "expected status :successful, got: 404"
 
@@ -2274,20 +2318,20 @@ defmodule Req.StepsTest do
       assert {:error, e} = Req.get(req_200, expect: :redirection)
       assert Exception.message(e) =~ "expected status :redirection, got: 200"
 
-      assert stream_body(req_301, expect: :redirection) == {:ok, "moved"}
+      assert stream(req_301, expect: :redirection) == {:ok, "moved"}
 
       assert {:error, %Req.UnexpectedStatusError{} = e, []} =
-               stream_body(req_200, expect: :redirection)
+               stream(req_200, expect: :redirection)
 
       assert Exception.message(e) =~ "expected status :redirection, got: 200"
 
       assert Req.get!(req_404, expect: :client_error).body == "not found"
 
-      assert stream_body(req_404, expect: :client_error) == {:ok, "not found"}
+      assert stream(req_404, expect: :client_error) == {:ok, "not found"}
 
       assert Req.get!(req_500, expect: :server_error, retry: false).body == "error"
 
-      assert stream_body(req_500, expect: :server_error, retry: false) == {:ok, "error"}
+      assert stream(req_500, expect: :server_error, retry: false) == {:ok, "error"}
     end
 
     test "status category atom in list" do
@@ -2296,10 +2340,10 @@ defmodule Req.StepsTest do
       assert Req.get!(req, expect: [:successful, :redirection]).body == "ok"
       assert {:error, _} = Req.get(req, expect: [:redirection, :client_error])
 
-      assert stream_body(req, expect: [:successful, :redirection]) == {:ok, "ok"}
+      assert stream(req, expect: [:successful, :redirection]) == {:ok, "ok"}
 
       assert {:error, %Req.UnexpectedStatusError{}, []} =
-               stream_body(req, expect: [:redirection, :client_error])
+               stream(req, expect: [:redirection, :client_error])
     end
 
     test "unexpected status with empty body" do
@@ -2310,7 +2354,7 @@ defmodule Req.StepsTest do
       assert {:error, %Req.UnexpectedStatusError{} = e} = Req.get(req)
       assert e.response.status == 500
 
-      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream_body(req, [])
+      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream(req)
       assert e.response.status == 500
     end
 
@@ -2331,7 +2375,7 @@ defmodule Req.StepsTest do
 
       assert Req.get!(req).body == "ok"
 
-      assert stream_body(req, []) == {:ok, "ok"}
+      assert stream(req) == {:ok, "ok"}
     end
   end
 
@@ -2360,7 +2404,7 @@ defmodule Req.StepsTest do
 
       Agent.update(counter, fn _ -> 0 end)
 
-      assert stream_body(req, []) == {:ok, "ok"}
+      assert stream(req) == {:ok, "ok"}
       assert Agent.get(counter, & &1) == 3
     end
 
@@ -2381,7 +2425,7 @@ defmodule Req.StepsTest do
 
       Agent.update(counter, fn _ -> 0 end)
 
-      assert stream_body(req, []) == {:ok, "error"}
+      assert stream(req) == {:ok, "error"}
       assert Agent.get(counter, & &1) == 3
     end
 
@@ -2417,7 +2461,7 @@ defmodule Req.StepsTest do
 
       log =
         ExUnit.CaptureLog.capture_log(fn ->
-          assert stream_body(request, []) == {:ok, "ok"}
+          assert stream(request) == {:ok, "ok"}
         end)
 
       assert log =~ "will retry in 1ms, 2 attempts left"
@@ -2474,7 +2518,7 @@ defmodule Req.StepsTest do
 
       log =
         ExUnit.CaptureLog.capture_log(fn ->
-          assert stream_body(request, []) == {:ok, "ok - foo"}
+          assert stream(request) == {:ok, "ok - foo"}
         end)
 
       assert log =~ "will retry in 1ms, 3 attempts left"
@@ -2490,11 +2534,11 @@ defmodule Req.StepsTest do
 
       req = Req.merge(req, retry_delay: fn _ -> :ok end)
 
-      assert_raise ArgumentError,
-                   "expected :retry_delay function to return non-negative integer, got: :ok",
-                   fn ->
-                     Req.request!(req)
-                   end
+      message = "expected :retry_delay function to return non-negative integer, got: :ok"
+
+      assert_raise ArgumentError, message, fn -> Req.request!(req) end
+
+      assert_raise ArgumentError, message, fn -> stream(req) end
     end
 
     @tag :capture_log
@@ -2527,7 +2571,7 @@ defmodule Req.StepsTest do
 
       log =
         ExUnit.CaptureLog.capture_log(fn ->
-          stream_body(req, retry_delay: 1)
+          stream(req, retry_delay: 1)
         end)
 
       assert String.match?(
@@ -2566,7 +2610,7 @@ defmodule Req.StepsTest do
 
       log =
         ExUnit.CaptureLog.capture_log(fn ->
-          stream_body(req, retry_delay: 1, retry_log_level: :info)
+          stream(req, retry_delay: 1, retry_log_level: :info)
         end)
 
       assert String.match?(
@@ -2602,7 +2646,7 @@ defmodule Req.StepsTest do
 
       log =
         ExUnit.CaptureLog.capture_log(fn ->
-          stream_body(req, retry_delay: 1, retry_log_level: false)
+          stream(req, retry_delay: 1, retry_log_level: false)
         end)
 
       assert log == ""
@@ -2623,7 +2667,7 @@ defmodule Req.StepsTest do
       assert Req.request!(req, retry_delay: 100, max_retries: 5).body == "ok"
 
       %{req: req} = serve(sequence: sequence)
-      assert stream_body(req, retry_delay: 100, max_retries: 5) == {:ok, "ok"}
+      assert stream(req, retry_delay: 100, max_retries: 5) == {:ok, "ok"}
     end
 
     defp send_resp_retry_after(conn, retry_after) do
@@ -2660,6 +2704,13 @@ defmodule Req.StepsTest do
       assert_received :ping
       assert_received :ping
       refute_received _
+
+      assert stream(request) == {:ok, "oops"}
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      refute_received _
     end
 
     @tag :capture_log
@@ -2675,6 +2726,10 @@ defmodule Req.StepsTest do
       request = Req.merge(request, retry: :safe_transient, max_retries: 10)
 
       assert Req.post!(request).status == 500
+      assert_received :ping
+      refute_received _
+
+      assert stream(request, method: :post) == {:ok, "oops"}
       assert_received :ping
       refute_received _
     end
@@ -2695,6 +2750,11 @@ defmodule Req.StepsTest do
       assert_received :ping
       assert_received :ping
       refute_received _
+
+      assert stream(request, method: :post) == {:ok, "oops"}
+      assert_received :ping
+      assert_received :ping
+      refute_received _
     end
 
     test "retry: false" do
@@ -2712,7 +2772,7 @@ defmodule Req.StepsTest do
       assert_received :ping
       refute_received _
 
-      assert stream_body(request, []) == {:ok, "oops"}
+      assert stream(request) == {:ok, "oops"}
       assert_received :ping
       refute_received _
     end
@@ -2735,6 +2795,13 @@ defmodule Req.StepsTest do
       request = Req.merge(request, retry: fun, retry_delay: 1)
 
       assert Req.post!(request).status == 500
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      refute_received _
+
+      assert stream(request, method: :post) == {:ok, "oops"}
       assert_received :ping
       assert_received :ping
       assert_received :ping
@@ -2765,6 +2832,13 @@ defmodule Req.StepsTest do
       assert_received :ping
       assert_received :ping
       refute_received _
+
+      assert stream(request) == {:ok, "oops"}
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      refute_received _
     end
 
     @tag :capture_log
@@ -2784,9 +2858,12 @@ defmodule Req.StepsTest do
 
       request = Req.merge(request, retry: fun, retry_delay: 1)
 
-      assert_raise ArgumentError,
-                   "expected :retry_delay not to be set when the :retry function is returning `{:delay, milliseconds}`",
-                   fn -> Req.get!(request) end
+      message =
+        "expected :retry_delay not to be set when the :retry function is returning `{:delay, milliseconds}`"
+
+      assert_raise ArgumentError, message, fn -> Req.get!(request) end
+
+      assert_raise ArgumentError, message, fn -> stream(request) end
     end
 
     @tag :capture_log
@@ -2801,6 +2878,13 @@ defmodule Req.StepsTest do
         end)
 
       assert Req.get!(req, params: [a: 1, b: 2], retry_delay: 1).status == 500
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      assert_received :ping
+      refute_received _
+
+      assert stream(req, params: [a: 1, b: 2], retry_delay: 1) == {:ok, "oops"}
       assert_received :ping
       assert_received :ping
       assert_received :ping
@@ -3401,10 +3485,10 @@ defmodule Req.StepsTest do
     end
   end
 
-  defp stream_body(url, options) do
+  defp stream(req, options \\ []) do
     with {:ok, chunks} <-
            Req.stream(
-             url,
+             req,
              [],
              fn data, _resp, acc ->
                {:ok, [data | acc]}

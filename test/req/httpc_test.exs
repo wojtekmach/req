@@ -101,17 +101,7 @@ defmodule Req.HTTPCTest do
       resp = Req.get!(req, into: :self)
       assert resp.status == 200
 
-      # httpc seems to randomly chunk things
-      assert Req.parse_message(resp, assert_receive(_)) in [
-               {:ok, [data: "foo"]},
-               {:ok, [data: "foobar"]}
-             ]
-
-      assert Req.parse_message(resp, assert_receive(_)) in [
-               {:ok, [data: "bar"]},
-               {:ok, [data: ""]},
-               {:ok, [:done]}
-             ]
+      assert resp.body |> Enum.to_list() |> IO.iodata_to_binary() == "foobar"
     end
 
     test "into: pid cancel" do

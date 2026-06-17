@@ -214,6 +214,7 @@ defmodule Req.Steps do
     request
   end
 
+  # TODO: Req.stream(url, decoders: [{format, fun}]) does not work
   def decode_body(%Req.Request{stream: fun} = request) when is_function(fun, 3) do
     warn_deprecated_decode_body(request)
     %{request | stream: &decode_stream_chunk(&1, &2, &3, fun)}
