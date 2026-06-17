@@ -7,7 +7,26 @@ defmodule Req.Case do
     end
   end
 
-  def serve(plug, options \\ []) when is_function(plug, 1) do
+  def serve(plug_or_options, options \\ [])
+
+  def serve([sequence: sequence], []) do
+    counter = :counters.new(1, [])
+
+    serve(fn conn ->
+      :counters.add(counter, 1, 1)
+      n = :counters.get(counter, 1)
+
+      case Enum.at(sequence, n - 1) do
+        nil ->
+          raise "serve(sequence: ...): unexpected request ##{n}, only #{length(sequence)} plug(s) given"
+
+        plug ->
+          plug.(conn)
+      end
+    end)
+  end
+
+  def serve(plug, options) when is_function(plug, 1) do
     plugs = [{Plug.Parsers, parsers: [:multipart], pass: ["*/*"]}, plug]
 
     case adapter() do

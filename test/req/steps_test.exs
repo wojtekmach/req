@@ -1956,20 +1956,15 @@ defmodule Req.StepsTest do
   describe "retry" do
     @tag :capture_log
     test "eventually successful - function" do
-      counter = counters_new()
-
       %{req: req} =
-        serve(fn conn ->
-          counters_add(counter, 1)
-
-          case counters_get(counter) do
-            attempt when attempt <= 3 ->
-              Plug.Conn.send_resp(conn, 500, "oops")
-
-            4 ->
-              Plug.Conn.send_resp(conn, 200, "ok")
-          end
-        end)
+        serve(
+          sequence: [
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 200, "ok")
+          ]
+        )
 
       request =
         Req.merge(req, retry_delay: &Integer.pow(2, &1))
@@ -2008,20 +2003,14 @@ defmodule Req.StepsTest do
 
     @tag :capture_log
     test "eventually successful - integer" do
-      counter = counters_new()
-
       %{req: req} =
-        serve(fn conn ->
-          counters_add(counter, 1)
-
-          case counters_get(counter) do
-            attempt when attempt <= 2 ->
-              Plug.Conn.send_resp(conn, 500, "oops")
-
-            3 ->
-              Plug.Conn.send_resp(conn, 200, "ok")
-          end
-        end)
+        serve(
+          sequence: [
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 200, "ok")
+          ]
+        )
 
       request =
         Req.merge(req, retry_delay: 1)
@@ -2043,20 +2032,13 @@ defmodule Req.StepsTest do
 
     @tag :capture_log
     test "default log_level" do
-      counter = counters_new()
-
       %{req: req} =
-        serve(fn conn ->
-          counters_add(counter, 1)
-
-          case counters_get(counter) do
-            1 ->
-              Plug.Conn.send_resp(conn, 500, "oops")
-
-            2 ->
-              Plug.Conn.send_resp(conn, 200, "ok")
-          end
-        end)
+        serve(
+          sequence: [
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 200, "ok")
+          ]
+        )
 
       request = Req.merge(req, retry_delay: 1)
       log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
@@ -2069,20 +2051,13 @@ defmodule Req.StepsTest do
 
     @tag :capture_log
     test "custom log_level" do
-      counter = counters_new()
-
       %{req: req} =
-        serve(fn conn ->
-          counters_add(counter, 1)
-
-          case counters_get(counter) do
-            1 ->
-              Plug.Conn.send_resp(conn, 500, "oops")
-
-            2 ->
-              Plug.Conn.send_resp(conn, 200, "ok")
-          end
-        end)
+        serve(
+          sequence: [
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 200, "ok")
+          ]
+        )
 
       request = Req.merge(req, retry_delay: 1, retry_log_level: :info)
 
@@ -2096,20 +2071,13 @@ defmodule Req.StepsTest do
 
     @tag :capture_log
     test "logging disabled" do
-      counter = counters_new()
-
       %{req: req} =
-        serve(fn conn ->
-          counters_add(counter, 1)
-
-          case counters_get(counter) do
-            1 ->
-              Plug.Conn.send_resp(conn, 500, "oops")
-
-            2 ->
-              Plug.Conn.send_resp(conn, 200, "ok")
-          end
-        end)
+        serve(
+          sequence: [
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 200, "ok")
+          ]
+        )
 
       request = Req.merge(req, retry_delay: 1, retry_log_level: false)
 
@@ -2120,30 +2088,19 @@ defmodule Req.StepsTest do
     @tag :capture_log
     @tag timeout: 1000
     test "retry_delay" do
-      counter = counters_new()
-
       %{req: req} =
-        serve(fn conn ->
-          counters_add(counter, 1)
-
-          case counters_get(counter) do
-            1 ->
-              conn |> retry_after(0) |> Plug.Conn.send_resp(429, "")
-
-            2 ->
-              conn |> retry_after(-1) |> Plug.Conn.send_resp(429, "")
-
-            3 ->
-              conn |> retry_after(DateTime.utc_now()) |> Plug.Conn.send_resp(503, "")
-
-            4 ->
+        serve(
+          sequence: [
+            &(&1 |> retry_after(0) |> Plug.Conn.send_resp(429, "")),
+            &(&1 |> retry_after(-1) |> Plug.Conn.send_resp(429, "")),
+            &(&1 |> retry_after(DateTime.utc_now()) |> Plug.Conn.send_resp(503, "")),
+            fn conn ->
               datetime = DateTime.add(DateTime.utc_now(), -3600)
               conn |> retry_after(datetime) |> Plug.Conn.send_resp(503, "")
-
-            5 ->
-              Plug.Conn.send_resp(conn, 200, "ok")
-          end
-        end)
+            end,
+            &Plug.Conn.send_resp(&1, 200, "ok")
+          ]
+        )
 
       assert Req.request!(req, retry_delay: 100, max_retries: 5).body == "ok"
     end
@@ -2326,20 +2283,13 @@ defmodule Req.StepsTest do
 
     @tag :capture_log
     test "does not carry `halted` status over" do
-      counter = counters_new()
-
       %{req: req} =
-        serve(fn conn ->
-          counters_add(counter, 1)
-
-          case counters_get(counter) do
-            1 ->
-              Plug.Conn.send_resp(conn, 500, "oops")
-
-            2 ->
-              Plug.Conn.send_resp(conn, 200, "ok")
-          end
-        end)
+        serve(
+          sequence: [
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 200, "ok")
+          ]
+        )
 
       response_step = fn
         {request, %Req.Response{} = response} ->
@@ -2399,31 +2349,34 @@ defmodule Req.StepsTest do
   @tag :capture_log
   test "cache + retry", c do
     pid = self()
-    counter = counters_new()
 
     %{req: request} =
-      serve(fn conn ->
-        case Plug.Conn.get_req_header(conn, "if-modified-since") do
-          [] ->
+      serve(
+        sequence: [
+          fn conn ->
             send(pid, :cache_miss)
 
             conn
             |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
             |> Req.Test.json(%{a: 1})
-
-          _ ->
+          end,
+          fn conn ->
             send(pid, :cache_hit)
-            counters_add(counter, 1)
+            Plug.Conn.send_resp(conn, 500, "")
+          end,
+          fn conn ->
+            send(pid, :cache_hit)
+            Plug.Conn.send_resp(conn, 500, "")
+          end,
+          fn conn ->
+            send(pid, :cache_hit)
 
-            if counters_get(counter) < 3 do
-              Plug.Conn.send_resp(conn, 500, "")
-            else
-              conn
-              |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
-              |> Plug.Conn.send_resp(304, "")
-            end
-        end
-      end)
+            conn
+            |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
+            |> Plug.Conn.send_resp(304, "")
+          end
+        ]
+      )
 
     request = Req.merge(request, retry_delay: 10, cache: true, cache_dir: c.tmp_dir)
 
@@ -2817,17 +2770,5 @@ defmodule Req.StepsTest do
       [] -> Plug.Conn.put_resp_header(conn, name, value)
       _ -> conn
     end
-  end
-
-  defp counters_new do
-    :counters.new(1, [])
-  end
-
-  defp counters_add(ref, incr) do
-    :counters.add(ref, 1, incr)
-  end
-
-  defp counters_get(ref) do
-    :counters.get(ref, 1)
   end
 end
