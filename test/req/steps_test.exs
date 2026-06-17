@@ -22,185 +22,6 @@ defmodule Req.StepsTest do
     end
   end
 
-  describe "redirect (streaming)" do
-    @tag :capture_log
-    test "follows redirect, discarding the redirect response body" do
-      %{url: target_url} =
-        start_http_server(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      %{url: url} =
-        start_http_server(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("location", URI.to_string(target_url))
-          |> Plug.Conn.send_resp(302, "redirecting")
-        end)
-
-      assert stream_body(url, []) == {:ok, "ok"}
-    end
-
-    @tag :capture_log
-    test "follows redirect before decompression" do
-      %{url: target_url} = start_http_server(fn conn -> send_resp_gzip(conn, "foo") end)
-
-      %{url: url} =
-        start_http_server(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("location", URI.to_string(target_url))
-          |> Plug.Conn.send_resp(302, "redirecting")
-        end)
-
-      assert stream_body(url, compressed: true) == {:ok, "foo"}
-    end
-
-    test "redirect: false passes the redirect body through" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("location", "/elsewhere")
-          |> Plug.Conn.send_resp(302, "redirecting")
-        end)
-
-      assert stream_body(url, redirect: false) == {:ok, "redirecting"}
-    end
-
-    @tag :capture_log
-    test "max redirects" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("location", "/")
-          |> Plug.Conn.send_resp(302, "")
-        end)
-
-      assert {:error, %Req.TooManyRedirectsError{max_redirects: 3}, []} =
-               Req.stream(
-                 url,
-                 [],
-                 fn data, _resp, acc ->
-                   {:ok, [data | acc]}
-                 end,
-                 max_redirects: 3
-               )
-    end
-  end
-
-  describe "expect (stream)" do
-    test "matching status" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      assert stream_body(url, expect: 200) == {:ok, "ok"}
-    end
-
-    test "unexpected status stops streaming before any chunk is delivered" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          Plug.Conn.send_resp(conn, 404, "nope")
-        end)
-
-      assert {:error, %Req.UnexpectedStatusError{expected_status: 200..299} = e, []} =
-               Req.stream(
-                 url,
-                 [],
-                 fn data, _resp, acc ->
-                   {:ok, [data | acc]}
-                 end,
-                 expect: 200..299
-               )
-
-      assert e.response.status == 404
-    end
-
-    test "unexpected status with empty body" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          Plug.Conn.send_resp(conn, 500, "")
-        end)
-
-      assert {:error, %Req.UnexpectedStatusError{} = e, []} =
-               Req.stream(
-                 url,
-                 [],
-                 fn data, _resp, acc ->
-                   {:ok, [data | acc]}
-                 end,
-                 expect: 200,
-                 retry: false
-               )
-
-      assert e.response.status == 500
-    end
-
-    @tag :capture_log
-    test "checks the final response after redirect" do
-      %{url: target_url} =
-        start_http_server(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      %{url: url} =
-        start_http_server(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("location", URI.to_string(target_url))
-          |> Plug.Conn.send_resp(302, "redirecting")
-        end)
-
-      assert stream_body(url, expect: 200) == {:ok, "ok"}
-    end
-  end
-
-  describe "retry (streaming)" do
-    @tag :capture_log
-    test "retries a retryable status, discarding its body" do
-      {:ok, counter} = Agent.start_link(fn -> 0 end)
-
-      %{url: url} =
-        start_http_server(fn conn ->
-          n = Agent.get_and_update(counter, &{&1, &1 + 1})
-
-          if n < 2 do
-            Plug.Conn.send_resp(conn, 503, "try again")
-          else
-            Plug.Conn.send_resp(conn, 200, "ok")
-          end
-        end)
-
-      assert stream_body(url, retry_delay: 1) == {:ok, "ok"}
-      assert Agent.get(counter, & &1) == 3
-    end
-
-    @tag :capture_log
-    test "stops after max_retries and delivers the last response body" do
-      {:ok, counter} = Agent.start_link(fn -> 0 end)
-
-      %{url: url} =
-        start_http_server(fn conn ->
-          Agent.update(counter, &(&1 + 1))
-          Plug.Conn.send_resp(conn, 503, "error")
-        end)
-
-      assert stream_body(url, retry_delay: 1, max_retries: 2) == {:ok, "error"}
-      assert Agent.get(counter, & &1) == 3
-    end
-
-    test "retry: false passes the response body through" do
-      {:ok, counter} = Agent.start_link(fn -> 0 end)
-
-      %{url: url} =
-        start_http_server(fn conn ->
-          Agent.update(counter, &(&1 + 1))
-          Plug.Conn.send_resp(conn, 503, "error")
-        end)
-
-      assert stream_body(url, retry: false) == {:ok, "error"}
-      assert Agent.get(counter, & &1) == 1
-    end
-  end
-
   describe "decode_body (streaming)" do
     test "is a no-op when not streaming" do
       req = Req.new() |> Req.Request.prepare()
@@ -1965,13 +1786,59 @@ defmodule Req.StepsTest do
   end
 
   describe "redirect" do
+    @tag :capture_log
+    test "follows redirect, discarding the redirect response body" do
+      %{req: req, url: url} =
+        serve(fn
+          conn when conn.request_path == "/redirect" ->
+            conn
+            |> Plug.Conn.put_resp_header("location", "/ok")
+            |> Plug.Conn.send_resp(302, "redirecting")
+
+          conn when conn.request_path == "/ok" ->
+            Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      req = Req.merge(req, url: "#{url}/redirect")
+
+      assert Req.get!(req).body == "ok"
+
+      assert stream_body(req, []) == {:ok, "ok"}
+    end
+
+    @tag :capture_log
+    test "follows redirect before decompression" do
+      %{req: req, url: url} =
+        serve(fn
+          conn when conn.request_path == "/redirect" ->
+            conn
+            |> Plug.Conn.put_resp_header("location", "/gzip")
+            |> Plug.Conn.send_resp(302, "redirecting")
+
+          conn when conn.request_path == "/gzip" ->
+            send_resp_gzip(conn, "foo")
+        end)
+
+      req = Req.merge(req, url: "#{url}/redirect", compressed: true)
+
+      assert Req.get!(req).body == "foo"
+
+      assert stream_body(req, []) == {:ok, "foo"}
+    end
+
     test "ignore when :redirect is false" do
       %{req: req, url: url} =
         serve(fn conn ->
           redirect(conn, 302, "/ok")
         end)
 
-      assert Req.get!(req, url: "#{url}/redirect", redirect: false).status == 302
+      req = Req.merge(req, url: "#{url}/redirect", redirect: false)
+
+      resp = Req.get!(req)
+      assert resp.status == 302
+      assert resp.body == "redirecting to /ok"
+
+      assert stream_body(req, []) == {:ok, "redirecting to /ok"}
     end
 
     test "absolute" do
@@ -2239,7 +2106,7 @@ defmodule Req.StepsTest do
 
       req = Req.merge(req, max_redirects: 3, redirect_log_level: false)
 
-      {req, e} = Req.Request.run_request(req)
+      {req_out, e} = Req.Request.run_request(req)
 
       assert_receive :ping
       assert_receive :ping
@@ -2247,8 +2114,16 @@ defmodule Req.StepsTest do
       assert_receive :ping
       refute_receive _
 
-      assert req.private == %{req_redirect_count: 3}
+      assert req_out.private == %{req_redirect_count: 3}
       assert Exception.message(e) == "too many redirects (3)"
+
+      assert {:error, %Req.TooManyRedirectsError{max_redirects: 3}, []} = stream_body(req, [])
+
+      assert_receive :ping
+      assert_receive :ping
+      assert_receive :ping
+      assert_receive :ping
+      refute_receive _
     end
 
     test "redirect_log_level, default to :debug" do
@@ -2329,6 +2204,12 @@ defmodule Req.StepsTest do
       assert Req.get!(req, expect: 200).body == "ok"
       assert {:error, e} = Req.get(req, expect: 201)
       assert Exception.message(e) =~ "expected status 201, got: 200"
+
+      assert stream_body(req, expect: 200) == {:ok, "ok"}
+
+      # the empty acc proves streaming stopped before any chunk was delivered
+      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream_body(req, expect: 201)
+      assert Exception.message(e) =~ "expected status 201, got: 200"
     end
 
     test "status range" do
@@ -2339,6 +2220,11 @@ defmodule Req.StepsTest do
 
       assert Req.get!(req, expect: 200..201).body == "ok"
       assert {:error, e} = Req.get(req, expect: 201..202)
+      assert Exception.message(e) =~ "expected status 201..202, got: 200"
+
+      assert stream_body(req, expect: 200..201) == {:ok, "ok"}
+
+      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream_body(req, expect: 201..202)
       assert Exception.message(e) =~ "expected status 201..202, got: 200"
     end
 
@@ -2352,8 +2238,18 @@ defmodule Req.StepsTest do
       assert {:error, e} = Req.get(req, expect: [201, 202])
       assert Exception.message(e) =~ "expected status [201, 202], got: 200"
 
+      assert stream_body(req, expect: [200, 201]) == {:ok, "ok"}
+
+      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream_body(req, expect: [201, 202])
+      assert Exception.message(e) =~ "expected status [201, 202], got: 200"
+
       assert Req.get!(req, expect: [200..201]).body == "ok"
       assert {:error, e} = Req.get(req, expect: [201..202])
+      assert Exception.message(e) =~ "expected status [201..202], got: 200"
+
+      assert stream_body(req, expect: [200..201]) == {:ok, "ok"}
+
+      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream_body(req, expect: [201..202])
       assert Exception.message(e) =~ "expected status [201..202], got: 200"
     end
 
@@ -2367,13 +2263,25 @@ defmodule Req.StepsTest do
       assert {:error, e} = Req.get(req_404, expect: :successful)
       assert Exception.message(e) =~ "expected status :successful, got: 404"
 
+      assert stream_body(req_200, expect: :successful) == {:ok, "ok"}
+      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream_body(req_404, expect: :successful)
+      assert Exception.message(e) =~ "expected status :successful, got: 404"
+
       assert Req.get!(req_301, expect: :redirection).body == "moved"
       assert {:error, e} = Req.get(req_200, expect: :redirection)
       assert Exception.message(e) =~ "expected status :redirection, got: 200"
 
+      assert stream_body(req_301, expect: :redirection) == {:ok, "moved"}
+      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream_body(req_200, expect: :redirection)
+      assert Exception.message(e) =~ "expected status :redirection, got: 200"
+
       assert Req.get!(req_404, expect: :client_error).body == "not found"
 
+      assert stream_body(req_404, expect: :client_error) == {:ok, "not found"}
+
       assert Req.get!(req_500, expect: :server_error, retry: false).body == "error"
+
+      assert stream_body(req_500, expect: :server_error, retry: false) == {:ok, "error"}
     end
 
     test "status category atom in list" do
@@ -2381,12 +2289,95 @@ defmodule Req.StepsTest do
 
       assert Req.get!(req, expect: [:successful, :redirection]).body == "ok"
       assert {:error, _} = Req.get(req, expect: [:redirection, :client_error])
+
+      assert stream_body(req, expect: [:successful, :redirection]) == {:ok, "ok"}
+      assert {:error, %Req.UnexpectedStatusError{}, []} =
+               stream_body(req, expect: [:redirection, :client_error])
+    end
+
+    test "unexpected status with empty body" do
+      %{req: req} = serve(fn conn -> Plug.Conn.send_resp(conn, 500, "") end)
+
+      req = Req.merge(req, expect: 200, retry: false)
+
+      assert {:error, %Req.UnexpectedStatusError{} = e} = Req.get(req)
+      assert e.response.status == 500
+
+      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream_body(req, [])
+      assert e.response.status == 500
+    end
+
+    @tag :capture_log
+    test "checks the final response after redirect" do
+      %{req: req, url: url} =
+        serve(fn
+          conn when conn.request_path == "/redirect" ->
+            conn
+            |> Plug.Conn.put_resp_header("location", "/ok")
+            |> Plug.Conn.send_resp(302, "redirecting")
+
+          conn when conn.request_path == "/ok" ->
+            Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      req = Req.merge(req, url: "#{url}/redirect", expect: 200)
+
+      assert Req.get!(req).body == "ok"
+
+      assert stream_body(req, []) == {:ok, "ok"}
     end
   end
 
   ## Error steps
 
   describe "retry" do
+    @tag :capture_log
+    test "retries a retryable status, discarding its body" do
+      {:ok, counter} = Agent.start_link(fn -> 0 end)
+
+      %{req: req} =
+        serve(fn conn ->
+          n = Agent.get_and_update(counter, &{&1, &1 + 1})
+
+          if n < 2 do
+            Plug.Conn.send_resp(conn, 503, "try again")
+          else
+            Plug.Conn.send_resp(conn, 200, "ok")
+          end
+        end)
+
+      req = Req.merge(req, retry_delay: 1)
+
+      assert Req.get!(req).body == "ok"
+      assert Agent.get(counter, & &1) == 3
+
+      Agent.update(counter, fn _ -> 0 end)
+
+      assert stream_body(req, []) == {:ok, "ok"}
+      assert Agent.get(counter, & &1) == 3
+    end
+
+    @tag :capture_log
+    test "stops after max_retries and delivers the last response body" do
+      {:ok, counter} = Agent.start_link(fn -> 0 end)
+
+      %{req: req} =
+        serve(fn conn ->
+          Agent.update(counter, &(&1 + 1))
+          Plug.Conn.send_resp(conn, 503, "error")
+        end)
+
+      req = Req.merge(req, retry_delay: 1, max_retries: 2)
+
+      assert Req.get!(req).body == "error"
+      assert Agent.get(counter, & &1) == 3
+
+      Agent.update(counter, fn _ -> 0 end)
+
+      assert stream_body(req, []) == {:ok, "error"}
+      assert Agent.get(counter, & &1) == 3
+    end
+
     @tag :capture_log
     test "eventually successful - function" do
       %{req: req} =
@@ -2401,17 +2392,42 @@ defmodule Req.StepsTest do
 
       request =
         Req.merge(req, retry_delay: &Integer.pow(2, &1))
+        |> Req.Request.prepend_request_steps(
+          foo: fn request ->
+            update_in(request.stream, fn stream ->
+              fn
+                :eof, resp, acc ->
+                  {:ok, resp, acc} = stream.(" - foo", resp, acc)
+                  stream.(:eof, resp, acc)
+
+                data, resp, acc ->
+                  stream.(data, resp, acc)
+              end
+            end)
+          end
+        )
         |> Req.Request.prepend_response_steps(
-          foo: fn {request, response} ->
-            {request, update_in(response.body, &(&1 <> " - updated"))}
+          bar: fn {request, response} ->
+            {request, update_in(response.body, &(&1 <> " - bar"))}
           end
         )
 
       log =
         ExUnit.CaptureLog.capture_log(fn ->
-          {request, response} = Req.Request.run_request(request)
-          assert request.private.req_retry_count == 3
-          assert response.body == "ok - updated"
+          resp = Req.get!(request)
+          assert resp.request.private.req_retry_count == 3
+          assert resp.body == "ok - foo - bar"
+        end)
+
+      assert log =~ "will retry in 1ms, 3 attempts left"
+      assert log =~ "will retry in 2ms, 2 attempts left"
+      assert log =~ "will retry in 4ms, 1 attempt left"
+
+      :counters.put(counter, 1, 0)
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert stream_body(request, []) == {:ok, "ok - foo"}
         end)
 
       assert log =~ "will retry in 1ms, 3 attempts left"
@@ -2618,6 +2634,10 @@ defmodule Req.StepsTest do
       request = Req.merge(request, retry: false)
 
       assert Req.get!(request).status == 500
+      assert_received :ping
+      refute_received _
+
+      assert stream_body(request, []) == {:ok, "oops"}
       assert_received :ping
       refute_received _
     end
