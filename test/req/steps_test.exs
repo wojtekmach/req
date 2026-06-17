@@ -2264,7 +2264,10 @@ defmodule Req.StepsTest do
       assert Exception.message(e) =~ "expected status :successful, got: 404"
 
       assert stream_body(req_200, expect: :successful) == {:ok, "ok"}
-      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream_body(req_404, expect: :successful)
+
+      assert {:error, %Req.UnexpectedStatusError{} = e, []} =
+               stream_body(req_404, expect: :successful)
+
       assert Exception.message(e) =~ "expected status :successful, got: 404"
 
       assert Req.get!(req_301, expect: :redirection).body == "moved"
@@ -2272,7 +2275,10 @@ defmodule Req.StepsTest do
       assert Exception.message(e) =~ "expected status :redirection, got: 200"
 
       assert stream_body(req_301, expect: :redirection) == {:ok, "moved"}
-      assert {:error, %Req.UnexpectedStatusError{} = e, []} = stream_body(req_200, expect: :redirection)
+
+      assert {:error, %Req.UnexpectedStatusError{} = e, []} =
+               stream_body(req_200, expect: :redirection)
+
       assert Exception.message(e) =~ "expected status :redirection, got: 200"
 
       assert Req.get!(req_404, expect: :client_error).body == "not found"
@@ -2291,6 +2297,7 @@ defmodule Req.StepsTest do
       assert {:error, _} = Req.get(req, expect: [:redirection, :client_error])
 
       assert stream_body(req, expect: [:successful, :redirection]) == {:ok, "ok"}
+
       assert {:error, %Req.UnexpectedStatusError{}, []} =
                stream_body(req, expect: [:redirection, :client_error])
     end
@@ -2379,10 +2386,52 @@ defmodule Req.StepsTest do
     end
 
     @tag :capture_log
+    test "eventually successful - integer" do
+      %{req: req} =
+        serve(
+          sequence: [
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 200, "ok"),
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 200, "ok")
+          ]
+        )
+
+      request =
+        Req.merge(req, retry_delay: 1)
+        |> Req.Request.prepend_response_steps(
+          foo: fn {request, response} ->
+            {request, update_in(response.body, &(&1 <> " - updated"))}
+          end
+        )
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          response = Req.get!(request)
+          assert response.body == "ok - updated"
+        end)
+
+      assert log =~ "will retry in 1ms, 2 attempts left"
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert stream_body(request, []) == {:ok, "ok"}
+        end)
+
+      assert log =~ "will retry in 1ms, 2 attempts left"
+    end
+
+    @tag :capture_log
     test "eventually successful - function" do
       %{req: req} =
         serve(
           sequence: [
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 200, "ok"),
             &Plug.Conn.send_resp(&1, 500, "oops"),
             &Plug.Conn.send_resp(&1, 500, "oops"),
             &Plug.Conn.send_resp(&1, 500, "oops"),
@@ -2423,8 +2472,6 @@ defmodule Req.StepsTest do
       assert log =~ "will retry in 2ms, 2 attempts left"
       assert log =~ "will retry in 4ms, 1 attempt left"
 
-      :counters.put(counter, 1, 0)
-
       log =
         ExUnit.CaptureLog.capture_log(fn ->
           assert stream_body(request, []) == {:ok, "ok - foo"}
@@ -2448,35 +2495,6 @@ defmodule Req.StepsTest do
                    fn ->
                      Req.request!(req)
                    end
-    end
-
-    @tag :capture_log
-    test "eventually successful - integer" do
-      %{req: req} =
-        serve(
-          sequence: [
-            &Plug.Conn.send_resp(&1, 500, "oops"),
-            &Plug.Conn.send_resp(&1, 500, "oops"),
-            &Plug.Conn.send_resp(&1, 200, "ok")
-          ]
-        )
-
-      request =
-        Req.merge(req, retry_delay: 1)
-        |> Req.Request.prepend_response_steps(
-          foo: fn {request, response} ->
-            {request, update_in(response.body, &(&1 <> " - updated"))}
-          end
-        )
-
-      log =
-        ExUnit.CaptureLog.capture_log(fn ->
-          response = Req.get!(request)
-          assert response.body == "ok - updated"
-        end)
-
-      assert log =~ "will retry in 1ms, 2 attempts left"
-      assert log =~ "will retry in 1ms, 2 attempts left"
     end
 
     @tag :capture_log
