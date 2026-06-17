@@ -2503,12 +2503,21 @@ defmodule Req.StepsTest do
         serve(
           sequence: [
             &Plug.Conn.send_resp(&1, 500, "oops"),
+            &Plug.Conn.send_resp(&1, 200, "ok"),
+            &Plug.Conn.send_resp(&1, 500, "oops"),
             &Plug.Conn.send_resp(&1, 200, "ok")
           ]
         )
 
       request = Req.merge(req, retry_delay: 1)
       log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
+
+      assert String.match?(
+               log,
+               ~r/\[warning\][[:blank:]]+retry: got response with status 500, will retry in 1ms, 3 attempts left/u
+             )
+
+      log = ExUnit.CaptureLog.capture_log(fn -> stream_body(request, []) end)
 
       assert String.match?(
                log,
