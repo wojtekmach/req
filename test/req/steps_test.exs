@@ -2091,13 +2091,10 @@ defmodule Req.StepsTest do
       %{req: req} =
         serve(
           sequence: [
-            &(&1 |> retry_after(0) |> Plug.Conn.send_resp(429, "")),
-            &(&1 |> retry_after(-1) |> Plug.Conn.send_resp(429, "")),
-            &(&1 |> retry_after(DateTime.utc_now()) |> Plug.Conn.send_resp(503, "")),
-            fn conn ->
-              datetime = DateTime.add(DateTime.utc_now(), -3600)
-              conn |> retry_after(datetime) |> Plug.Conn.send_resp(503, "")
-            end,
+            &send_resp_retry_after(&1, 0),
+            &send_resp_retry_after(&1, -1),
+            &send_resp_retry_after(%{&1 | status: 503}, DateTime.utc_now()),
+            &send_resp_retry_after(%{&1 | status: 503}, DateTime.add(DateTime.utc_now(), -3600)),
             &Plug.Conn.send_resp(&1, 200, "ok")
           ]
         )
@@ -2105,8 +2102,10 @@ defmodule Req.StepsTest do
       assert Req.request!(req, retry_delay: 100, max_retries: 5).body == "ok"
     end
 
-    defp retry_after(conn, value) do
-      Plug.Conn.put_resp_header(conn, "retry-after", retry_after(value))
+    defp send_resp_retry_after(conn, retry_after) do
+      conn
+      |> Plug.Conn.put_resp_header("retry-after", retry_after(retry_after))
+      |> Plug.Conn.send_resp(conn.status || 429, "")
     end
 
     defp retry_after(integer) when is_integer(integer), do: to_string(integer)
