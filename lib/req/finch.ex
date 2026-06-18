@@ -424,10 +424,10 @@ defmodule Req.Finch do
 
   defp finch_name_options(request) do
     custom_options? =
-      Map.has_key?(request.options, :connect_options)
-        or Map.has_key?(request.options, :inet6)
-        or Map.has_key?(request.options, :pool_max_idle_time)
-        or Map.has_key?(request.options, :conn_max_idle_time)
+      Map.has_key?(request.options, :connect_options) or
+        Map.has_key?(request.options, :inet6) or
+        Map.has_key?(request.options, :pool_max_idle_time) or
+        Map.has_key?(request.options, :conn_max_idle_time)
 
     case request.options[:finch] do
       nil when custom_options? ->
@@ -476,7 +476,9 @@ defmodule Req.Finch do
   def pool_options(options) when is_map(options) do
     connect_options = options[:connect_options] || []
     inet6_options = options |> Map.take([:inet6]) |> Enum.to_list()
-    pool_options = options |> Map.take([:pool_max_idle_time, :conn_max_idle_time]) |> Enum.to_list()
+
+    pool_options =
+      options |> Map.take([:pool_max_idle_time, :conn_max_idle_time]) |> Enum.to_list()
 
     Req.Request.validate_options(
       connect_options,
