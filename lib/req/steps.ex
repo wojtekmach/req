@@ -750,7 +750,8 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def compress_body(request) do
-    if request.body && request.options[:compress_body] do
+    if request.body && request.options[:compress_body] &&
+         Req.Request.get_header(request, "content-encoding") == [] do
       body =
         case request.body do
           iodata when is_binary(iodata) or is_list(iodata) ->

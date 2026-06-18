@@ -394,6 +394,20 @@ defmodule Req.StepsTest do
       assert Req.Request.get_header(req, "content-encoding") == ["gzip"]
     end
 
+    test "does not compress already encoded body" do
+      req =
+        Req.new(
+          method: :post,
+          body: "foo",
+          compress_body: true,
+          headers: [content_encoding: "br"]
+        )
+        |> Req.Request.prepare()
+
+      assert req.body == "foo"
+      assert Req.Request.get_header(req, "content-encoding") == ["br"]
+    end
+
     test "stream" do
       %{req: req} =
         serve(fn conn ->
