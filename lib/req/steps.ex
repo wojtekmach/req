@@ -623,12 +623,16 @@ defmodule Req.Steps do
     request
   end
 
-  defp put_params(request, params) do
-    encoded = URI.encode_query(params)
+  defp put_params(request, new_params) do
+    update_in(request.url.query, fn query ->
+      old_params = Enum.to_list(URI.query_decoder(query || ""))
 
-    update_in(request.url.query, fn
-      nil -> encoded
-      query -> query <> "&" <> encoded
+      new_params
+      |> Enum.reduce(old_params, fn {name, value}, acc ->
+        name = to_string(name)
+        List.keystore(acc, name, 0, {name, value})
+      end)
+      |> URI.encode_query()
     end)
   end
 

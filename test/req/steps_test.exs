@@ -340,10 +340,20 @@ defmodule Req.StepsTest do
     assert URI.to_string(req.url) == "http://foo?x=1&y=2"
 
     req = Req.new(url: "http://foo", params: [x: 1, x: 2]) |> Req.Request.prepare()
-    assert URI.to_string(req.url) == "http://foo?x=1&x=2"
+    assert URI.to_string(req.url) == "http://foo?x=2"
 
-    req = Req.new(url: "http://foo?x=1", params: [x: 1, y: 2]) |> Req.Request.prepare()
-    assert URI.to_string(req.url) == "http://foo?x=1&x=1&y=2"
+    req = Req.new(url: "http://foo?x=1", params: [x: 9, y: 2]) |> Req.Request.prepare()
+    assert URI.to_string(req.url) == "http://foo?x=9&y=2"
+
+    req = Req.new(url: "http://foo?x=1&x=2&y=1", params: [x: 9]) |> Req.Request.prepare()
+    assert URI.to_string(req.url) == "http://foo?x=9&x=2&y=1"
+  end
+
+  # TODO: support this?
+  test "put_params with list value" do
+    assert_raise ArgumentError, "encode_query/2 values cannot be lists, got: [1, 2]", fn ->
+      Req.new(url: "http://foo", params: [a: [1, 2]]) |> Req.Request.prepare()
+    end
   end
 
   test "put_path_params" do
