@@ -651,40 +651,28 @@ defmodule Req.FinchTest do
                ]
     end
 
-    test ":pool_tag is forwarded to Finch request" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      pid = self()
-
-      fun = fn req, finch_request, finch_name, finch_opts ->
-        send(pid, {:pool_tag, finch_request.pool_tag})
-        {:ok, resp} = Finch.request(finch_request, finch_name, finch_opts)
-        {req, Req.Response.new(status: resp.status, headers: resp.headers, body: resp.body)}
+    def send_pool_tag(_name, _measurements, metadata, _config) do
+      if pid = metadata.request.private[:pid] do
+        send(pid, {:pool_tag, metadata.request.pool_tag})
       end
 
-      assert Req.get!(url, finch_request: fun, finch: {Req.Finch, pool_tag: :bulk}).body == "ok"
-      assert_received {:pool_tag, :bulk}
+      :ok
     end
 
-    test ":pool_tag defaults to :default" do
+    test ":finch {name, pool_tag: tag} sets the request's pool_tag", %{test: test} do
+      on_exit(fn -> :telemetry.detach("#{test}") end)
+
+      :telemetry.attach("#{test}", [:finch, :request, :stop], &__MODULE__.send_pool_tag/4, nil)
+
       %{url: url} =
         start_http_server(fn conn ->
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
 
-      pid = self()
+      assert Req.get!(url, finch: {Req.Finch, pool_tag: :bulk}, finch_private: %{pid: self()}).body ==
+               "ok"
 
-      fun = fn req, finch_request, finch_name, finch_opts ->
-        send(pid, {:pool_tag, finch_request.pool_tag})
-        {:ok, resp} = Finch.request(finch_request, finch_name, finch_opts)
-        {req, Req.Response.new(status: resp.status, headers: resp.headers, body: resp.body)}
-      end
-
-      assert Req.get!(url, finch_request: fun).body == "ok"
-      assert_received {:pool_tag, :default}
+      assert_received {:pool_tag, :bulk}
     end
   end
 end
