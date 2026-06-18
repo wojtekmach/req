@@ -309,6 +309,18 @@ defmodule Req.StepsTest do
              ).status == 200
     end
 
+    test "form_multipart: re-running keeps content-type boundary in sync with body" do
+      req = Req.new(form_multipart: [a: 1])
+
+      # TODO: use Req.Request.prepare to test this when current_request_steps are gone
+      encoded = req |> Req.Steps.encode_body() |> Req.Steps.encode_body()
+
+      ["multipart/form-data; boundary=" <> boundary] =
+        Req.Request.get_header(encoded, "content-type")
+
+      assert IO.iodata_to_binary(encoded.body) =~ "--#{boundary}\r\n"
+    end
+
     test "GET to POST" do
       %{req: req} =
         serve(fn conn ->

@@ -504,7 +504,7 @@ defmodule Req.Steps do
         multipart = Req.Utils.encode_form_multipart(data)
 
         %{request | body: multipart.body}
-        |> Req.Request.put_new_header("content-type", multipart.content_type)
+        |> Req.Request.put_header("content-type", multipart.content_type)
         |> then(&maybe_put_content_length(&1, multipart.size))
 
       data = request.options[:json] ->
