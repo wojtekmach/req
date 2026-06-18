@@ -506,20 +506,18 @@ defmodule Req do
       iex> URI.to_string(req.url)
       "https://elixir-lang.org"
 
-  Fake adapter:
+  With a url and options:
 
-      iex> fake = fn request ->
-      ...>   {request, Req.Response.new(status: 200, body: "it works!")}
-      ...> end
-      iex>
-      iex> req = Req.new(adapter: fake)
-      iex> Req.get!(req).body
-      "it works!"
+      iex> req = Req.new("https://elixir-lang.org", method: :head)
+      iex> req.method
+      :head
 
   """
-  @spec new(options :: keyword()) :: Req.Request.t()
-  def new(options \\ []) do
-    options = Keyword.merge(default_options(), options)
+  @spec new(request :: url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Request.t()
+  def new(request \\ [], options \\ [])
+
+  def new(options1, options2) when is_list(options1) and is_list(options2) do
+    options = Keyword.merge(default_options(), options1 ++ options2)
     {plugins, options} = Keyword.pop(options, :plugins, [])
 
     @req
@@ -527,26 +525,22 @@ defmodule Req do
     |> merge(options)
   end
 
-  defp new(%Req.Request{} = request, options) when is_list(options) do
-    Req.merge(request, options)
-  end
-
-  defp new(options1, options2) when is_list(options1) and is_list(options2) do
-    new(options1 ++ options2)
-  end
-
-  defp new(url, options) when (is_binary(url) or is_struct(url, URI)) and is_list(options) do
+  def new(url, options) when (is_binary(url) or is_struct(url, URI)) and is_list(options) do
     new([url: url] ++ options)
   end
 
-  defp new(request, options) when is_list(options) do
-    raise ArgumentError,
-          "expected 1st argument to be a request, got: #{inspect(request)}"
+  def new(%Req.Request{} = request, options) when is_list(options) do
+    Req.merge(request, options)
   end
 
-  defp new(_request, options) do
+  def new(request, options) when is_list(options) do
     raise ArgumentError,
-          "expected 2nd argument to be an options keywords list, got: #{inspect(options)}"
+          "expected 1st argument to be a url, a keyword list, or a request, got: #{inspect(request)}"
+  end
+
+  def new(_request, options) do
+    raise ArgumentError,
+          "expected 2nd argument to be a keyword list, got: #{inspect(options)}"
   end
 
   @doc false
