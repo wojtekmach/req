@@ -97,20 +97,14 @@ defmodule Req.Steps do
       verify_checksum: &Req.Steps.verify_checksum/1,
       output: &Req.Steps.output/1
     )
-    # Status-based retries happen in the stream (`retry/1` as a request-step wrapper). Transport
-    # and HTTP errors surface before any stream exists, so they can only be retried on the error
-    # path.
     |> Req.Request.prepend_error_steps(retry: &Req.Steps.retry/1)
   end
 
   ## Request steps
 
-  @default_decoders [:json, :json_api, :ndjson]
+  @default_decoders [:json, :json_api, :ndjson, :event_stream]
+  @default_stream_decoders [:ndjson, :event_stream]
 
-  # event-stream (SSE) is decoded by default when streaming; ndjson and others are opt-in.
-  @default_stream_decoders @default_decoders ++ [:event_stream]
-
-  # Formats whose decoders run incrementally on streamed chunks.
   @stream_decoders %{"event-stream" => Req.EventStream, "ndjson" => Req.NDJSON}
 
   @doc """
@@ -220,8 +214,6 @@ defmodule Req.Steps do
     %{request | stream: &decode_stream_chunk(&1, &2, &3, fun)}
   end
 
-  # Decodes a fully-buffered response body. Called by `decode_stream_chunk/4` at `:eof` for
-  # non-streaming requests, once the buffer has materialized `response.body`.
   defp decode_buffered_body({request, %{body: body} = response})
        when request.async != nil or
               body == "" or
@@ -265,8 +257,6 @@ defmodule Req.Steps do
     end
   end
 
-  # Buffered (non-streaming) requests collect the raw body and decode it whole at `:eof`. This
-  # handles every format — `json`, `ndjson`, `event-stream` — via `decode_buffered_body/1`.
   defp decode_stream_chunk(:eof, %{request: %{private: %{req_buffer: true}}} = resp, acc, fun) do
     with {:ok, resp, acc} <- fun.(:eof, resp, acc) do
       case decode_buffered_body({resp.request, resp}) do
@@ -284,17 +274,15 @@ defmodule Req.Steps do
   end
 
   defp decode_stream_chunk(data_or_eof, resp, acc, fun) do
-    decoder = streaming_decoder(resp.request, resp)
-
-    case {decoder, data_or_eof} do
+    case {streaming_decoder(resp.request, resp), data_or_eof} do
       {nil, :eof} ->
         fun.(:eof, resp, acc)
 
       {nil, data} ->
         fun.(data, resp, acc)
 
-      {decoder, :eof} ->
-        case decoder.stream_finish(decoder_state(resp, decoder)) do
+      {{module, opts}, :eof} ->
+        case module.decode_finish(decoder_state(resp, module, opts)) do
           {:ok, events, _state} ->
             reduce_events(events, resp, acc, fun)
 
@@ -302,8 +290,8 @@ defmodule Req.Steps do
             {:error, resp, exception, acc}
         end
 
-      {decoder, data} ->
-        case decoder.stream_chunk(data, decoder_state(resp, decoder)) do
+      {{module, opts}, data} ->
+        case module.decode_chunk(data, decoder_state(resp, module, opts)) do
           {:ok, events, state} ->
             resp = put_in(resp.request.private[:req_stream_decoder], state)
             reduce_events(events, resp, acc, fun)
@@ -314,20 +302,42 @@ defmodule Req.Steps do
     end
   end
 
-  # Resolves the streaming decoder module for the response, but only when its format is one of
-  # the configured `:decoders`. SSE is decoded by default; ndjson and others are opt-in.
   defp streaming_decoder(request, resp) do
     format = format(request, resp)
+    decoders = request.options[:decoders] || @default_stream_decoders
 
     if MapSet.member?(enabled_formats(request, @default_stream_decoders), format) do
-      Map.get(@stream_decoders, format)
+      resolve_stream_decoder(decoders, format)
     end
   end
 
-  defp decoder_state(resp, decoder) do
+  defp resolve_stream_decoder(decoders, format) do
+    user =
+      Enum.find_value(decoders, fn
+        {fmt, {module, opts}} when is_atom(module) and is_list(opts) ->
+          if decoder_format_name(fmt) == format, do: {module, opts}
+
+        {fmt, module} when is_atom(module) ->
+          if decoder_format_name(fmt) == format and elixir_module?(module), do: {module, []}
+
+        {fmt, opts} when is_list(opts) ->
+          if decoder_format_name(fmt) == format, do: {Map.get(@stream_decoders, format), opts}
+
+        _ ->
+          nil
+      end)
+
+    user || {Map.get(@stream_decoders, format), []}
+  end
+
+  defp elixir_module?(atom) do
+    String.starts_with?(Atom.to_string(atom), "Elixir.")
+  end
+
+  defp decoder_state(resp, module, opts) do
     case resp.request.private do
       %{req_stream_decoder: state} -> state
-      _ -> decoder.stream_start(resp)
+      _ -> module.decode_init(opts)
     end
   end
 
@@ -420,8 +430,6 @@ defmodule Req.Steps do
 
   defp decompress_stream_chunk(:eof, resp, acc, fun) do
     case resp.request.private[:req_stream_decompress] do
-      # The decoder is only started once non-empty data arrives, so an empty body (e.g. a HEAD
-      # or 204 response) flows straight through without a spurious truncated-stream error.
       nil ->
         fun.(:eof, resp, acc)
 
@@ -456,16 +464,12 @@ defmodule Req.Steps do
     end
   end
 
-  # The body was decompressed, so the `content-encoding`/`content-length` headers no longer
-  # describe it.
   defp strip_content_encoding(resp, codecs) when is_list(codecs) do
     resp
     |> Req.Response.delete_header("content-encoding")
     |> Req.Response.delete_header("content-length")
   end
 
-  # Passthrough: the body is unchanged, but drop the no-op "identity" encoding (keeping any
-  # unsupported ones, which still describe the body).
   defp strip_content_encoding(resp, :identity) do
     remaining =
       resp
@@ -1636,7 +1640,6 @@ defmodule Req.Steps do
 
       case result do
         {:ok, resp, acc} ->
-          # The body is done, let the stream decoder flush any buffered data.
           case stream.(:eof, resp, acc) do
             {:ok, resp, acc} ->
               {request, put_in(resp.private[:req_stream_acc], acc)}
@@ -1739,8 +1742,6 @@ defmodule Req.Steps do
 
         case request.into do
           nil ->
-            # Hash the raw body in the stream (innermost wrapper, before `decode_body` decodes)
-            # and verify at `:eof`.
             %{
               request
               | stream: &checksum_stream_chunk(&1, &2, &3, request.stream, type, checksum)
@@ -1776,8 +1777,6 @@ defmodule Req.Steps do
   defp hash_init(:sha1), do: hash_init(:sha)
   defp hash_init(type), do: :crypto.hash_init(type)
 
-  # The running hash is kept in `resp.private` (not `resp.request.private`, which the adapter
-  # resets to the request's private on every chunk).
   defp checksum_stream_chunk(:eof, resp, acc, fun, type, expected) do
     hash = resp.private[:req_checksum_hash] || hash_init(type)
     actual = "#{type}:" <> Base.encode16(:crypto.hash_final(hash), case: :lower, padding: false)
@@ -2124,8 +2123,6 @@ defmodule Req.Steps do
     end
   end
 
-  # The set of format names (e.g. "json", "event-stream") enabled for this request, taking
-  # `:decoders` into account: `nil` falls back to `default`, `false` disables all decoding.
   defp enabled_formats(request, default) do
     decoders =
       case request.options[:decoders] do
@@ -2145,7 +2142,7 @@ defmodule Req.Steps do
 
   defp normalize_decoder(request, format) when is_atom(format) do
     if format in @builtin_decoders do
-      {format, builtin_codec(request, format)}
+      {format, builtin_codec(request, format, [])}
     else
       raise ArgumentError,
             "unknown decoder format: #{inspect(format)}. Built-in formats are: " <>
@@ -2154,24 +2151,36 @@ defmodule Req.Steps do
     end
   end
 
-  defp normalize_decoder(request, {format, codec}) when is_atom(format) do
-    {format, resolve_codec(request, codec)}
+  defp normalize_decoder(_request, {format, fun}) when is_atom(format) and is_function(fun, 1) do
+    {format, fun}
   end
 
-  defp resolve_codec(_request, codec) when is_function(codec, 1) do
-    codec
+  defp normalize_decoder(_request, {format, {module, opts}})
+       when is_atom(format) and is_atom(module) and is_list(opts) do
+    {format, module_codec(module, opts)}
   end
 
-  defp resolve_codec(request, codec) when is_atom(codec) do
+  defp normalize_decoder(request, {format, opts}) when is_atom(format) and is_list(opts) do
+    {format, builtin_codec(request, format, opts)}
+  end
+
+  defp normalize_decoder(request, {format, codec}) when is_atom(format) and is_atom(codec) do
     if codec in @builtin_decoders do
-      builtin_codec(request, codec)
+      {format, builtin_codec(request, codec, [])}
     else
-      # a module exporting decode/1
-      &codec.decode/1
+      {format, module_codec(codec, [])}
     end
   end
 
-  defp builtin_codec(request, format) when format in [:json, :json_api] do
+  defp module_codec(module, opts) do
+    if function_exported?(module, :decode, 2) do
+      fn body -> module.decode(body, opts) end
+    else
+      fn body -> module.decode(body) end
+    end
+  end
+
+  defp builtin_codec(request, format, opts) when format in [:json, :json_api] do
     case Req.Request.fetch_option(request, :decode_json) do
       {:ok, options} ->
         IO.warn(
@@ -2183,18 +2192,18 @@ defmodule Req.Steps do
         fn body -> Jason.decode(body, options) end
 
       :error ->
-        fn body -> Jason.decode(body) end
+        fn body -> Jason.decode(body, opts) end
     end
   end
 
-  defp builtin_codec(_request, :ndjson), do: &Req.NDJSON.decode/1
-  defp builtin_codec(_request, :event_stream), do: &Req.EventStream.decode/1
-  defp builtin_codec(_request, :zip), do: &Req.ZIP.decode/1
-  defp builtin_codec(_request, :tar), do: &Req.Tar.decode/1
-  defp builtin_codec(_request, :tgz), do: &Req.Tar.decode/1
-  defp builtin_codec(_request, :gz), do: fn body -> {:ok, :zlib.gunzip(body)} end
+  defp builtin_codec(_request, :ndjson, _opts), do: &Req.NDJSON.decode/1
+  defp builtin_codec(_request, :event_stream, _opts), do: &Req.EventStream.decode/1
+  defp builtin_codec(_request, :zip, _opts), do: &Req.ZIP.decode/1
+  defp builtin_codec(_request, :tar, _opts), do: &Req.Tar.decode/1
+  defp builtin_codec(_request, :tgz, _opts), do: &Req.Tar.decode/1
+  defp builtin_codec(_request, :gz, _opts), do: fn body -> {:ok, :zlib.gunzip(body)} end
 
-  defp builtin_codec(_request, :zst) do
+  defp builtin_codec(_request, :zst, _opts) do
     fn body ->
       case zstd_decompress(body) do
         {:ok, decompressed} ->
@@ -2207,8 +2216,9 @@ defmodule Req.Steps do
     end
   end
 
-  defp builtin_codec(_request, :csv) do
-    fn body -> {:ok, NimbleCSV.RFC4180.parse_string(body, skip_headers: false)} end
+  defp builtin_codec(_request, :csv, opts) do
+    opts = Keyword.put_new(opts, :skip_headers, false)
+    fn body -> {:ok, NimbleCSV.RFC4180.parse_string(body, opts)} end
   end
 
   # Decompresses zstd `body` using the built-in OTP 28+ `:zstd` module. `:zstd.decompress/1`
@@ -2304,7 +2314,6 @@ defmodule Req.Steps do
         follow_stream_redirect(resp, acc)
 
       true ->
-        # Discard the redirect response body.
         {:ok, resp, acc}
     end
   end
@@ -2321,8 +2330,6 @@ defmodule Req.Steps do
     redirect_count = Req.Request.get_private(request, :req_redirect_count, 0)
 
     if redirect_count < max_redirects do
-      # For `into: :self` the redirect's body is already streaming to the caller's mailbox; stop it
-      # before issuing the redirected request. No-op for buffered/`Req.stream` bodies.
       with %Req.Response.Async{} <- resp.body do
         Req.cancel_async_response(resp)
       end
@@ -2334,11 +2341,6 @@ defmodule Req.Steps do
         |> build_redirect_request(resp, location)
         |> Req.Request.put_private(:req_redirect_count, redirect_count + 1)
 
-      # Request steps already ran (and wrapped request.stream), so the new request goes
-      # straight to the adapter, reusing the wrapped stream chain. The :eof callback fires
-      # after the adapter returned the connection to the pool, so issuing a request here
-      # cannot deadlock the pool. The final response (after any further redirects) is threaded
-      # back so buffered requests see the redirected response, not the 3xx one.
       case Req.Request.stream_request(request, acc) do
         {:ok, resp, acc} ->
           {:ok, resp, acc}
@@ -2859,11 +2861,6 @@ defmodule Req.Steps do
     end
   end
 
-  # Streaming (`Req.stream/4`) retry. Response steps don't run for streamed responses, so this
-  # request-step wrapper intercepts a retryable response at the stream level: its body chunks are
-  # discarded and, once done, the request is re-issued via `Req.Request.stream_request/2`, the same
-  # way `redirect/1` handles streamed redirects. Only retryable *statuses* are handled here; a
-  # transport error mid-stream is not retried, since body chunks may already have been delivered.
   defp retry_stream_chunk(data_or_eof, resp, acc, fun) do
     cond do
       not retry_response?(resp) ->
@@ -2873,7 +2870,6 @@ defmodule Req.Steps do
         stream_retry(resp, acc)
 
       true ->
-        # Discard the body of a response we are going to retry.
         {:ok, resp, acc}
     end
   end
@@ -2916,8 +2912,6 @@ defmodule Req.Steps do
     Process.sleep(delay)
     request = Req.Request.put_private(request, :req_retry_count, retry_count + 1)
 
-    # For `into: :self` the body being retried is streaming to the caller's mailbox; stop it before
-    # retrying. No-op for buffered/`Req.stream` bodies.
     with %Req.Response.Async{} <- resp.body do
       Req.cancel_async_response(resp)
     end

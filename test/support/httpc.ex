@@ -258,11 +258,6 @@ defmodule Req.HTTPC do
     reason2
   end
 
-  # Start the request asynchronously with a custom receiver that translates httpc's events into one
-  # uniform mailbox sequence — `{ref, {:status, status}}`, `{ref, {:headers, headers}}`, zero or
-  # more `{ref, {:data, data}}`, optional `{ref, {:trailers, trailers}}`, then `{ref, :done}` —
-  # regardless of whether httpc streamed the body (200/206) or delivered it complete (everything
-  # else). That lets a single consumer handle every response, the same way Finch does.
   defp start_request(request, httpc_req, httpc_http_options, httpc_options, profile) do
     caller = self()
     receiver = &httpc_receiver(&1, caller)
@@ -274,7 +269,6 @@ defmodule Req.HTTPC do
     ref
   end
 
-  # `into: nil`: consume the whole response, feeding the body through `request.stream`.
   defp httpc_stream(request, httpc_req, httpc_http_options, httpc_options, profile) do
     ref = start_request(request, httpc_req, httpc_http_options, httpc_options, profile)
 
@@ -287,8 +281,6 @@ defmodule Req.HTTPC do
     end
   end
 
-  # `into: :self`: the body streams to the caller's mailbox, so drive `request.stream` once, at
-  # `:eof`, with the status/headers known. The body messages stay in the mailbox for the caller.
   defp httpc_stream_into_self(request, httpc_req, httpc_http_options, httpc_options, profile) do
     ref = start_request(request, httpc_req, httpc_http_options, httpc_options, profile)
 
@@ -422,8 +414,6 @@ defmodule Req.HTTPC do
     send(caller, {ref, {:headers, headers}})
   end
 
-  # httpc only streams 200/206 responses; everything else arrives complete. Normalize it into the
-  # same status/headers/data/done sequence so the consumer doesn't have to special-case it.
   defp httpc_receiver({ref, {{_, status, _}, headers, body}}, caller) do
     headers =
       for {name, value} <- headers do

@@ -1134,8 +1134,6 @@ defmodule Req.Request do
         {:ok, resp, resp.private[:req_stream_acc]}
 
       {req, %{__exception__: true} = exception} ->
-        # The stream error carries the request in `resp.request` so in-stream retries/redirects
-        # thread it back out; the adapter's error gives a bare request, so wrap it.
         {:error, %{Req.Response.new() | request: req}, exception, req.private[:req_stream_acc]}
     end
   end
@@ -1157,12 +1155,6 @@ defmodule Req.Request do
   @spec run_request(t()) :: {t(), Req.Response.t() | Exception.t()}
   def run_request(request)
 
-  # Adapters always drive `request.stream`. When the caller did not ask for streaming
-  # (no `Req.stream/4`, no `:into`), install a buffering stream that accumulates the body and
-  # materializes `response.body` at `:eof`. It is installed before the request steps run so that
-  # steps like `decode_body`, `decompress_body`, `redirect`, `retry`, and `expect` — which are
-  # all stream wrappers — can wrap it. The `req_buffer` marker tells `decode_body` to decode the
-  # full body at `:eof` rather than stream events to the caller.
   def run_request(%{stream: nil, into: nil} = request) do
     request =
       %{request | stream: &buffer_stream/3}
@@ -1172,11 +1164,6 @@ defmodule Req.Request do
     drop_stream_private(run_request(request))
   end
 
-  # `into:` a collectable streams the 200 response body into it; non-200 responses ignore the
-  # collectable and are buffered (and decoded) like a normal response. Like the buffering stream,
-  # it is installed before the request steps so `checksum` and friends wrap it like any stream.
-  # `req_buffer` lets `decode_body` decode the buffered non-200 body; collected bodies are not
-  # binaries, so its `not is_binary(body)` guard already leaves them alone.
   def run_request(%{stream: nil, into: into} = request)
       when into != :self and not is_function(into, 2) do
     request =
@@ -1213,8 +1200,6 @@ defmodule Req.Request do
     request = put_into_stream(request)
 
     case run_step(request.adapter, request) do
-      # `into: fun` returning `{:halt, _}` stops the stream via the `:req_halt` sentinel; the
-      # accumulator holds the response to finish with.
       {request, :req_halt} ->
         {request, response} = finish_into_stream(request, nil)
         run_response(request, response)
@@ -1222,12 +1207,6 @@ defmodule Req.Request do
       {request, %Req.Response{} = response} ->
         {request, response} = finish_into_stream(request, response)
 
-        # The adapter threads request-body-fun mutations onto `request` (e.g. a halted body's
-        # `put_private`), while in-stream retries/redirects thread their state (`req_retry_count`,
-        # the redirected URL, ...) onto `response.request`. Neither alone is complete, so return
-        # `response.request` merged with anything only `request` saw — the response's later view
-        # wins on conflict. `into: fun` already restored its threaded request via
-        # `finish_into_stream/2`; `into: :self` builds a response with no request.
         request =
           cond do
             request.private[:req_into_fun] ->
@@ -1252,12 +1231,26 @@ defmodule Req.Request do
   end
 
   defp drop_stream_private({request, response_or_exception}) do
-    request = update_in(request.private, &Map.drop(&1, [:req_buffer, :req_stream_acc]))
+    keys = [:req_buffer, :req_stream_acc, :req_stream_decoder]
+    request = update_in(request.private, &Map.drop(&1, keys))
+
+    response_or_exception =
+      case response_or_exception do
+        %Req.Response{} = response ->
+          response = update_in(response.private, &Map.drop(&1, keys))
+
+          case response.request do
+            %Req.Request{} -> update_in(response.request.private, &Map.drop(&1, keys))
+            _ -> response
+          end
+
+        other ->
+          other
+      end
+
     {request, response_or_exception}
   end
 
-  # The innermost `request.stream` for non-streaming requests: accumulate chunks as iodata and
-  # materialize `response.body` on `:eof`.
   defp buffer_stream(:eof, resp, acc) do
     {:ok, %{resp | body: IO.iodata_to_binary(acc)}, acc}
   end
@@ -1305,18 +1298,12 @@ defmodule Req.Request do
     {:ok, resp, {:buffer, [iodata | data]}}
   end
 
-  # Bridges the deprecated `into: fun` option onto `request.stream`, so streaming goes through a
-  # single code path across all adapters. Runs after the request steps (so steps like `checksum`
-  # have wrapped `into`) and before the adapter. The chunks are passed through raw (no decoding),
-  # preserving the `into: fun` contract.
   defp put_into_stream(%{into: into} = request) when is_function(into, 2) do
     request =
       %{request | into: nil, stream: into_stream(into)}
       |> update_in_options(:decoders, false)
       |> put_private(:req_into_fun, true)
 
-    # The callback threads `{req, resp}`, so the accumulator carries both; steps like `checksum`
-    # accumulate state in the request's private during streaming and read it back afterwards.
     put_private(request, :req_stream_acc, {request, Req.Response.new()})
   end
 
@@ -1324,9 +1311,6 @@ defmodule Req.Request do
     request
   end
 
-  # After the adapter, restore the request threaded through the stream (carrying e.g. the running
-  # checksum). On a normal finish the accumulator is on the response; on `:req_halt` it is on the
-  # request (and also holds the response to finish with).
   defp finish_into_stream(request, response) do
     case request.private do
       %{req_into_fun: true} ->
@@ -1340,11 +1324,6 @@ defmodule Req.Request do
     end
   end
 
-  # Adapts the 2-arity `into: fun` callback to the 3-arity `request.stream` contract. Status,
-  # headers and trailers come from the wire (`adapter_resp`); the body is whatever the callback
-  # accumulates into the response it threads. The accumulator is the threaded `{req, resp}`.
-  # `{:halt, _}` stops via the `{:error, resp, :req_halt, acc}` sentinel, reusing the adapters'
-  # error path; `run_request/1` turns it back into a successful response built from the accumulator.
   defp into_stream(into) do
     fn
       :eof, adapter_resp, {req, user_resp} ->

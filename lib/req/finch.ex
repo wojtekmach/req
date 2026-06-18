@@ -132,8 +132,6 @@ defmodule Req.Finch do
     stream = req.stream
     acc = req.private[:req_stream_acc]
 
-    # `status: nil` so that if the response is never read (e.g. a halted request body) the
-    # response reflects that, rather than the `Req.Response` struct default of 200.
     resp = %{Req.Response.new() | request: req, status: nil}
 
     stream_fun = fn
@@ -166,7 +164,6 @@ defmodule Req.Finch do
       {:ok, request, {resp, acc}} ->
         case request.private[:req_stream_error] do
           nil ->
-            # The body is done, let the stream decoder flush any buffered data.
             case stream.(:eof, resp, acc) do
               {:ok, resp, acc} ->
                 {request, put_in(resp.private[:req_stream_acc], acc)}

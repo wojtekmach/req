@@ -1,14 +1,12 @@
 defmodule Req.EventStream do
-  # Decodes `text/event-stream` using the :server_sent_events package.
   @moduledoc false
 
   @behaviour Req.StreamDecoder
 
-  # Buffered decoding, so the module can also be used as a `:decoders` codec.
   @impl true
-  def decode(binary) when is_binary(binary) do
-    {:ok, events, parser} = stream_chunk(binary, stream_start(nil))
-    {:ok, rest, _parser} = stream_finish(parser)
+  def decode(binary, _opts \\ []) when is_binary(binary) do
+    {:ok, events, parser} = decode_chunk(binary, decode_init([]))
+    {:ok, rest, _parser} = decode_finish(parser)
     {:ok, events ++ rest}
   end
 
@@ -16,13 +14,13 @@ defmodule Req.EventStream do
   def stream(binary) when is_binary(binary) do
     Stream.transform(
       [binary],
-      fn -> stream_start(nil) end,
+      fn -> decode_init([]) end,
       fn data, state ->
-        {:ok, events, state} = stream_chunk(data, state)
+        {:ok, events, state} = decode_chunk(data, state)
         {events, state}
       end,
       fn state ->
-        {:ok, events, state} = stream_finish(state)
+        {:ok, events, state} = decode_finish(state)
         {events, state}
       end,
       fn _state -> :ok end
@@ -30,19 +28,19 @@ defmodule Req.EventStream do
   end
 
   @impl true
-  def stream_start(_resp) do
+  def decode_init(_opts) do
     ServerSentEvents.Parser.new()
   end
 
   @impl true
-  def stream_chunk(data, parser) do
+  def decode_chunk(data, parser) do
     {events, parser} = ServerSentEvents.Parser.parse(parser, data)
     {:ok, events, parser}
   end
 
   # Per the SSE spec, an incomplete event at the end of the stream is discarded.
   @impl true
-  def stream_finish(parser) do
+  def decode_finish(parser) do
     {:ok, [], parser}
   end
 end

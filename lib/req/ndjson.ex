@@ -1,5 +1,4 @@
 defmodule Req.NDJSON.DecodeError do
-  # The exception raised on invalid NDJSON, mirroring `JSON.DecodeError`.
   @moduledoc false
   defexception [:message, :offset, :data]
 end
@@ -17,9 +16,9 @@ defmodule Req.NDJSON do
   end
 
   @impl true
-  def decode(binary) when is_binary(binary) do
-    with {:ok, events, state} <- stream_chunk(binary, stream_start(nil)),
-         {:ok, rest, _state} <- stream_finish(state) do
+  def decode(binary, _opts \\ []) when is_binary(binary) do
+    with {:ok, events, state} <- decode_chunk(binary, decode_init([])),
+         {:ok, rest, _state} <- decode_finish(state) do
       {:ok, events ++ rest}
     else
       {:error, exception, _state} -> {:error, exception}
@@ -30,15 +29,15 @@ defmodule Req.NDJSON do
   def stream(binary) when is_binary(binary) do
     Stream.transform(
       [binary],
-      fn -> stream_start(nil) end,
+      fn -> decode_init([]) end,
       fn data, state ->
-        case stream_chunk(data, state) do
+        case decode_chunk(data, state) do
           {:ok, events, state} -> {events, state}
           {:error, exception, _state} -> raise exception
         end
       end,
       fn state ->
-        case stream_finish(state) do
+        case decode_finish(state) do
           {:ok, events, state} -> {events, state}
           {:error, exception, _state} -> raise exception
         end
@@ -48,12 +47,12 @@ defmodule Req.NDJSON do
   end
 
   @impl true
-  def stream_start(_resp) do
+  def decode_init(_opts) do
     :buffering
   end
 
   @impl true
-  def stream_chunk(data, state) do
+  def decode_chunk(data, state) do
     case state do
       :buffering ->
         start(data, [])
@@ -86,7 +85,7 @@ defmodule Req.NDJSON do
   end
 
   @impl true
-  def stream_finish(state) do
+  def decode_finish(state) do
     case state do
       :buffering ->
         {:ok, [], :buffering}

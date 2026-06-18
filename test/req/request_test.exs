@@ -15,7 +15,10 @@ defmodule Req.RequestTest do
     end)
 
     request = new(url: c.url <> "/ok")
-    assert {:ok, %{status: 200, body: "ok"}} = Req.Request.run(request)
+    assert {:ok, %{status: 200, body: "ok"} = resp} = Req.Request.run(request)
+
+    assert resp.private == %{}
+    assert resp.request.private == %{}
   end
 
   test "merge_options/2: deprecated options" do

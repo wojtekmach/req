@@ -3,9 +3,6 @@ defmodule Req.DecompressStream do
 
   require Logger
 
-  @behaviour Req.StreamDecoder
-
-  @impl true
   def stream_start(resp) do
     accepted =
       resp.request
@@ -25,7 +22,6 @@ defmodule Req.DecompressStream do
         "x-gzip" -> "gzip"
         codec -> codec
       end)
-      # "identity" is a no-op encoding; it carries no data transformation.
       |> Enum.reject(&(&1 == "identity"))
 
     for codec <- codecs, not supported?(codec) do
@@ -61,7 +57,6 @@ defmodule Req.DecompressStream do
     {:zstd, ctx}
   end
 
-  @impl true
   def stream_chunk(data, :identity) do
     {:ok, [data], :identity}
   end
@@ -73,7 +68,6 @@ defmodule Req.DecompressStream do
     end
   end
 
-  @impl true
   def stream_finish(:identity) do
     {:ok, [], :identity}
   end
@@ -100,8 +94,6 @@ defmodule Req.DecompressStream do
     end
   end
 
-  # Finishing a codec can flush remaining data, which still needs to be
-  # decompressed by the rest of the chain.
   defp finish_chain([], datas) do
     {:ok, datas, :identity}
   end

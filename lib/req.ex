@@ -1592,7 +1592,6 @@ defmodule Req do
 
   def stream(req, acc, fun, options) when is_function(fun, 3) and is_list(options) do
     stream = fn
-      # `:eof` drives the stream decoders (flush/finish); the caller's function never sees it.
       :eof, resp, acc ->
         {:ok, resp, acc}
 

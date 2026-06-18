@@ -5,17 +5,15 @@ defmodule Req.StreamDecoder do
 
   @typep element() :: any()
 
-  # Decodes a buffered body. Not used by decoders that only ever run on streamed
-  # bodies, e.g. Req.DecompressStream, whose buffered counterpart lives in Req.Steps.
-  @callback decode(binary()) :: {:ok, [element()]} | {:error, Exception.t()}
+  @callback decode(binary(), opts :: keyword()) :: {:ok, [element()]} | {:error, Exception.t()}
 
-  @optional_callbacks decode: 1
+  @callback decode_init(opts :: keyword()) :: state()
 
-  @callback stream_start(Req.Response.t()) :: state()
-
-  @callback stream_chunk(binary(), state()) ::
+  @callback decode_chunk(binary(), state()) ::
               {:ok, [element()], state()} | {:error, Exception.t(), state()}
 
-  @callback stream_finish(state()) ::
+  @callback decode_finish(state()) ::
               {:ok, [element()], state()} | {:error, Exception.t(), state()}
+
+  @optional_callbacks decode_init: 1, decode_chunk: 2, decode_finish: 1
 end
