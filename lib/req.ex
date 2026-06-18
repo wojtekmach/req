@@ -301,17 +301,24 @@ defmodule Req do
 
   Response body options:
 
-    * `:compressed` - if set to `true`, asks the server to return compressed response.
-      (via [`compressed`](`Req.Steps.compressed/1`) step.) Defaults to `true`.
+    * `:compressed` - if set to `true`, asks the server to return a compressed response and
+      decompresses it (via the [`compressed`](`Req.Steps.compressed/1`) and
+      [`decompress_body`](`Req.Steps.decompress_body/1`) steps.) Defaults to `false`.
 
-    * `:raw` - if set to `true`, disables automatic body decompression
-      ([`decompress_body`](`Req.Steps.decompress_body/1`) step) and decoding
+    * `:raw` - if set to `true`, disables body decompression
+      ([`decompress_body`](`Req.Steps.decompress_body/1`) step) and automatic decoding
       ([`decode_body`](`Req.Steps.decode_body/1`) step.) Defaults to `false`.
 
     * `:decode_body` - if set to `false`, disables automatic response body decoding.
       Defaults to `true`.
 
-    * `:decode_json` - options to pass to `Jason.decode!/2`, defaults to `[]`.
+    * `:decoders` - the list of decoders to use for automatic response body decoding.
+      Defaults to `[:json, :json_api]`. See [`decode_body`](`Req.Steps.decode_body/1`) for
+      the supported formats and how to add custom decoders.
+
+    * `:decode_json` - (deprecated) options to pass to `Jason.decode/2`. Deprecated in favour
+      of passing a custom JSON decoder via the `:decoders` option, e.g.
+      `decoders: [json: &Jason.decode(&1, keys: :atoms)]`.
 
     * `:into` - where to send the response body. It can be one of:
 
@@ -441,6 +448,17 @@ defmodule Req do
   Finch options ([`run_finch`](`Req.Steps.run_finch/1`) step), see `Finch.start_link/1` for options:
 
     * `:finch` - the Finch pool to use. Defaults to pool automatically started by `Req`.
+      Can be either a pool name (atom) or a `{name, opts}` tuple where `opts` can include:
+
+        * `:pool_tag` - (requires Finch v0.22+) the tag to use when selecting which Finch pool to
+          use for a request. Defaults to `:default`. This allows routing requests to different
+          pools for the same host. See `Finch.Pool.new/2` for more information on configuring
+          tagged pools.
+
+      Examples:
+
+          Req.get!("https://api.example.com/data", finch: MyFinch)
+          Req.get!("https://api.example.com/data", finch: {MyFinch, pool_tag: :bulk})
 
     * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
       the given connection options (see `Mint.HTTP.connect/4` for options):
@@ -588,7 +606,7 @@ defmodule Req do
 
     {request_options, options} = Keyword.split(options, request_option_names)
 
-    if options[:output] && unquote(!System.get_env("REQ_NOWARN_OUTPUT")) do
+    if options[:output] do
       IO.warn("setting `output: path` is deprecated in favour of `into: File.stream!(path)`")
     end
 
@@ -603,7 +621,14 @@ defmodule Req do
     request =
       Enum.reduce(request_options, request, fn
         {:url, url}, acc ->
-          put_in(acc.url, URI.parse(url))
+          case URI.parse(url) do
+            uri when is_binary(uri.userinfo) ->
+              acc = put_in(acc.url, %{uri | userinfo: nil})
+              update_in(acc.options, &Map.put_new(&1, :auth, {:basic, uri.userinfo}))
+
+            uri ->
+              put_in(acc.url, uri)
+          end
 
         {:headers, new_headers}, acc ->
           update_in(acc.headers, &Req.Fields.merge(&1, new_headers))

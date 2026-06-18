@@ -6,11 +6,7 @@ defmodule Req.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      {Finch,
-       name: Req.Finch,
-       pools: %{
-         default: Req.Finch.pool_options(%{})
-       }},
+      {Req.Finch, name: Req.Finch},
       {DynamicSupervisor, strategy: :one_for_one, name: Req.FinchSupervisor},
       {Req.Test.Ownership, name: Req.Test.Ownership}
     ]

@@ -1,6 +1,8 @@
+# Finch-specific tests. See test/req/adapter_test.exs for tests that all adapters should pass.
 defmodule Req.FinchTest do
-  use ExUnit.Case, async: true
-  import TestHelper, only: [start_http_server: 1, start_tcp_server: 1]
+  use Req.Case, async: true
+
+  @moduletag :adapter_finch
 
   describe "run" do
     test ":finch_request" do
@@ -52,73 +54,6 @@ defmodule Req.FinchTest do
       end
     end
 
-    test ":receive_timeout" do
-      pid = self()
-
-      %{url: url} =
-        start_tcp_server(fn socket ->
-          assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
-          send(pid, :ping)
-          body = "ok"
-
-          Process.sleep(1000)
-
-          data = """
-          HTTP/1.1 200 OK
-          content-length: #{byte_size(body)}
-
-          #{body}
-          """
-
-          :ok = :gen_tcp.send(socket, data)
-        end)
-
-      req = Req.new(url: url, receive_timeout: 50, retry: false)
-      assert {:error, %Req.TransportError{reason: :timeout}} = Req.request(req)
-      assert_received :ping
-    end
-
-    test ":request_timeout" do
-      pid = self()
-
-      %{url: url} =
-        start_tcp_server(fn socket ->
-          assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
-          send(pid, :ping)
-          body = "ok"
-          resp_header = "HTTP/1.1 200 OK\r\ncontent-length: #{byte_size(body)}\r\n\r\n"
-          :ok = :gen_tcp.send(socket, resp_header)
-          Process.sleep(100)
-          :ok = :gen_tcp.send(socket, body)
-        end)
-
-      req = Req.new(url: url, request_timeout: 0, retry: false)
-      assert {:error, %Req.TransportError{reason: :timeout}} = Req.request(req)
-      assert_received :ping
-    end
-
-    test "Req.HTTPError" do
-      %{url: url} =
-        start_tcp_server(fn socket ->
-          assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
-          :ok = :gen_tcp.send(socket, "bad\r\n")
-        end)
-
-      req = Req.new(url: url, retry: false)
-      {:error, %Req.HTTPError{protocol: :http1, reason: :invalid_status_line}} = Req.request(req)
-    end
-
-    test ":connect_options :protocol" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          assert Plug.Conn.get_http_protocol(conn) == :"HTTP/2"
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      req = Req.new(url: url, connect_options: [protocols: [:http2]], retry: false)
-      assert Req.request!(req).body == "ok"
-    end
-
     test ":connect_options :proxy" do
       %{url: url} =
         start_http_server(fn conn ->
@@ -144,60 +79,12 @@ defmodule Req.FinchTest do
       assert Req.request!(req).body == "ok"
     end
 
-    test ":connect_options :transport_opts" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      req = Req.new(connect_options: [transport_opts: [cacertfile: "bad.pem"]])
-
-      assert_raise File.Error, ~r/could not read file "bad.pem"/, fn ->
-        Req.request!(req, url: %{url | scheme: "https"})
-      end
-    end
-
     defmodule ExamplePlug do
       def init(options), do: options
 
       def call(conn, []) do
         Plug.Conn.send_resp(conn, 200, "ok")
       end
-    end
-
-    test ":inet6" do
-      start_supervised!(
-        {Plug.Cowboy, scheme: :http, plug: ExamplePlug, ref: ExamplePlug.IPv4, port: 0}
-      )
-
-      start_supervised!(
-        {Plug.Cowboy,
-         scheme: :http,
-         plug: ExamplePlug,
-         ref: ExamplePlug.IPv6,
-         port: 0,
-         net: :inet6,
-         ipv6_v6only: true}
-      )
-
-      ipv4_port = :ranch.get_port(ExamplePlug.IPv4)
-      ipv6_port = :ranch.get_port(ExamplePlug.IPv6)
-
-      req = Req.new(url: "http://localhost:#{ipv4_port}")
-      assert Req.request!(req).body == "ok"
-
-      req = Req.new(url: "http://localhost:#{ipv4_port}", inet6: true)
-      assert Req.request!(req).body == "ok"
-
-      req = Req.new(url: "http://localhost:#{ipv6_port}", inet6: true)
-      assert Req.request!(req).body == "ok"
-
-      req = Req.new(url: "http://[::1]:#{ipv6_port}")
-      assert Req.request!(req).body == "ok"
-
-      # TODO:
-      # req = Req.new(url: "http://[::1]:#{ipv6_port}", inet6: true)
-      # assert Req.request!(req).body == "ok"
     end
 
     test ":connect_options bad option" do
@@ -280,219 +167,6 @@ defmodule Req.FinchTest do
       assert_received :telemetry_private
     end
 
-    test "body: req_body_fun succeeded" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          assert {:ok, "foobar", conn} = Plug.Conn.read_body(conn)
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      req_body_fun = fn
-        %Req.Request{private: %{phase: :bar}} = request ->
-          request = Req.Request.put_private(request, :phase, :done)
-          {:data, "bar", request}
-
-        %Req.Request{private: %{phase: :done}} = request ->
-          {:done, request}
-
-        %Req.Request{} = request ->
-          request = Req.Request.put_private(request, :phase, :bar)
-          {:data, "foo", request}
-      end
-
-      {req, resp} = Req.run!(method: :post, url: url, body: req_body_fun)
-      assert req.private[:phase] == :done
-      assert resp.status == 200
-      assert resp.body == "ok"
-    end
-
-    test "body: req_body_fun halted" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          assert {:ok, "", conn} = Plug.Conn.read_body(conn)
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      req_body_fun = fn
-        %Req.Request{} = request ->
-          request = Req.Request.put_private(request, :phase, :halted)
-          {:halt, request}
-      end
-
-      {req, resp} = Req.run!(method: :post, url: url, body: req_body_fun)
-      assert req.private[:phase] == :halted
-      assert resp.status == nil
-      assert resp.body == ""
-    end
-
-    test "body: req_body_fun errored" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      req_body_fun = fn %Req.Request{} -> :oops end
-
-      assert_raise RuntimeError,
-                   "expected req_body_fun to return {:data, chunk, request}, {:done, request}, or {:halt, request}, got: :oops",
-                   fn ->
-                     Req.post!(url: url, body: req_body_fun)
-                   end
-    end
-
-    test "into: fun" do
-      %{url: url} =
-        start_tcp_server(fn socket ->
-          {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
-
-          data = """
-          HTTP/1.1 200 OK
-          transfer-encoding: chunked
-          trailer: x-foo, x-bar
-
-          6\r
-          chunk1\r
-          6\r
-          chunk2\r
-          0\r
-          x-foo: foo\r
-          x-bar: bar\r
-          \r
-          """
-
-          :ok = :gen_tcp.send(socket, data)
-        end)
-
-      pid = self()
-
-      resp =
-        Req.get!(
-          url: url,
-          into: fn {:data, data}, acc ->
-            send(pid, {:data, data})
-            {:cont, acc}
-          end
-        )
-
-      assert resp.status == 200
-      assert resp.headers["transfer-encoding"] == ["chunked"]
-      assert resp.headers["trailer"] == ["x-foo, x-bar"]
-
-      assert resp.trailers["x-foo"] == ["foo"]
-      assert resp.trailers["x-bar"] == ["bar"]
-
-      assert_receive {:data, "chunk1"}
-      assert_receive {:data, "chunk2"}
-      refute_receive _
-    end
-
-    test "into: fun with halt" do
-      # try fixing `** (exit) shutdown` on CI by starting custom server
-      defmodule StreamPlug do
-        def init(options), do: options
-
-        def call(conn, []) do
-          conn = Plug.Conn.send_chunked(conn, 200)
-          {:ok, conn} = Plug.Conn.chunk(conn, "foo")
-          {:ok, conn} = Plug.Conn.chunk(conn, "bar")
-          conn
-        end
-      end
-
-      start_supervised!({Plug.Cowboy, plug: StreamPlug, scheme: :http, port: 0})
-      url = "http://localhost:#{:ranch.get_port(StreamPlug.HTTP)}"
-
-      resp =
-        Req.get!(
-          url: url,
-          into: fn {:data, data}, {req, resp} ->
-            resp = update_in(resp.body, &(&1 <> data))
-            {:halt, {req, resp}}
-          end
-        )
-
-      assert resp.status == 200
-      assert resp.body == "foo"
-    end
-
-    test "into: fun handle error" do
-      assert {:error, %Req.TransportError{reason: :econnrefused}} =
-               Req.get(
-                 url: "http://localhost:9999",
-                 retry: false,
-                 into: fn {:data, data}, {req, resp} ->
-                   resp = update_in(resp.body, &(&1 <> data))
-                   {:halt, {req, resp}}
-                 end
-               )
-    end
-
-    test "into: collectable" do
-      %{url: url} =
-        start_tcp_server(fn socket ->
-          {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
-
-          data = """
-          HTTP/1.1 200 OK
-          transfer-encoding: chunked
-          trailer: x-foo, x-bar
-
-          6\r
-          chunk1\r
-          6\r
-          chunk2\r
-          0\r
-          x-foo: foo\r
-          x-bar: bar\r
-          \r
-          """
-
-          :ok = :gen_tcp.send(socket, data)
-        end)
-
-      resp =
-        Req.get!(
-          url: url,
-          into: []
-        )
-
-      assert resp.status == 200
-      assert resp.headers["transfer-encoding"] == ["chunked"]
-      assert resp.headers["trailer"] == ["x-foo, x-bar"]
-
-      assert resp.trailers["x-foo"] == ["foo"]
-      assert resp.trailers["x-bar"] == ["bar"]
-
-      assert resp.body == ["chunk1", "chunk2"]
-    end
-
-    test "into: collectable non-200" do
-      # Ignores the collectable and returns body as usual
-
-      %{url: url} =
-        start_http_server(fn conn ->
-          Req.Test.json(%{conn | status: 404}, %{error: "not found"})
-        end)
-
-      resp =
-        Req.get!(
-          url: url,
-          into: :not_a_collectable
-        )
-
-      assert resp.status == 404
-      assert resp.body == %{"error" => "not found"}
-    end
-
-    test "into: collectable handle error" do
-      assert {:error, %Req.TransportError{reason: :econnrefused}} =
-               Req.get(
-                 url: "http://localhost:9999",
-                 retry: false,
-                 into: IO.stream()
-               )
-    end
-
     # TODO
     @tag :skip
     test "into: fun with content-encoding" do
@@ -513,84 +187,6 @@ defmodule Req.FinchTest do
       assert Req.get!(url: url, into: fun).body == ""
       assert_received {:data, "foo"}
       refute_receive _
-    end
-
-    test "into: :self" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          conn = Plug.Conn.send_chunked(conn, 200)
-          {:ok, conn} = Plug.Conn.chunk(conn, "foo")
-          {:ok, conn} = Plug.Conn.chunk(conn, "bar")
-          conn
-        end)
-
-      resp = Req.get!(url: url, into: :self)
-      assert resp.status == 200
-      assert {:ok, [data: "foo"]} = Req.parse_message(resp, assert_receive(_))
-      assert {:ok, [data: "bar"]} = Req.parse_message(resp, assert_receive(_))
-      assert {:ok, [:done]} = Req.parse_message(resp, assert_receive(_))
-      assert :unknown = Req.parse_message(resp, :other)
-      refute_receive _
-    end
-
-    test "into: :self cancel" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          conn = Plug.Conn.send_chunked(conn, 200)
-          {:ok, conn} = Plug.Conn.chunk(conn, "foo")
-          {:ok, conn} = Plug.Conn.chunk(conn, "bar")
-          conn
-        end)
-
-      resp = Req.get!(url: url, into: :self)
-      assert resp.status == 200
-      assert :ok = Req.cancel_async_response(resp)
-    end
-
-    @tag :capture_log
-    test "into: :self with redirect" do
-      %{url: url} =
-        TestHelper.start_http_server(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      %{url: url} =
-        TestHelper.start_http_server(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("location", to_string(url))
-          |> Plug.Conn.send_resp(307, "redirecting to #{url}")
-        end)
-
-      req =
-        Req.new(
-          url: url,
-          into: :self
-        )
-
-      assert Req.get!(req).body |> Enum.to_list() == ["ok"]
-    end
-
-    test "into: :self enumerable with unrelated message" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      send(self(), :other)
-      resp = Req.get!(url: url, into: :self)
-      assert Enum.to_list(resp.body) == ["ok"]
-      assert_received :other
-    end
-
-    test "into: :self with :receive_timeout" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          Process.sleep(100)
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      assert Req.get(url: url, into: :self, receive_timeout: 0, retry: false) ==
-               {:error, %Req.TransportError{reason: :timeout}}
     end
   end
 
@@ -642,6 +238,30 @@ defmodule Req.FinchTest do
                  protocols: [:http1],
                  conn_opts: [transport_opts: [timeout: 0, inet6: true, cacerts: []]]
                ]
+    end
+
+    def send_pool_tag(_name, _measurements, metadata, _config) do
+      if pid = metadata.request.private[:pid] do
+        send(pid, {:pool_tag, metadata.request.pool_tag})
+      end
+
+      :ok
+    end
+
+    test ":finch {name, pool_tag: tag} sets the request's pool_tag", %{test: test} do
+      on_exit(fn -> :telemetry.detach("#{test}") end)
+
+      :telemetry.attach("#{test}", [:finch, :request, :stop], &__MODULE__.send_pool_tag/4, nil)
+
+      %{url: url} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      assert Req.get!(url, finch: {Req.Finch, pool_tag: :bulk}, finch_private: %{pid: self()}).body ==
+               "ok"
+
+      assert_received {:pool_tag, :bulk}
     end
   end
 end

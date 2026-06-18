@@ -1,5 +1,5 @@
 defmodule Req.Test.AdapterTest do
-  use ExUnit.Case, async: true
+  use Req.Case, async: true
 
   test "reading request body" do
     plug = fn conn ->

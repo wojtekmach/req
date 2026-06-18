@@ -1,16 +1,72 @@
-defmodule TestHelper do
-  def start_http_server(plug) when is_function(plug, 1) do
-    options = [
-      scheme: :http,
-      port: 0,
-      plug: fn conn, _ -> plug.(conn) end,
-      startup_log: false,
-      http_options: [compress: false]
-    ]
+defmodule Req.Case do
+  use ExUnit.CaseTemplate
+
+  using do
+    quote do
+      import Req.Case
+    end
+  end
+
+  def serve(plug_or_options, options \\ [])
+
+  def serve([sequence: sequence], []) do
+    counter = :counters.new(1, [])
+
+    serve(fn conn ->
+      :counters.add(counter, 1, 1)
+      n = :counters.get(counter, 1)
+
+      case Enum.at(sequence, n - 1) do
+        nil ->
+          raise "serve(sequence: ...): unexpected request ##{n}, only #{length(sequence)} plug(s) given"
+
+        plug ->
+          plug.(conn)
+      end
+    end)
+  end
+
+  def serve(plug, options) when is_function(plug, 1) do
+    plugs = [{Plug.Parsers, parsers: [:multipart], pass: ["*/*"]}, plug]
+
+    case adapter() do
+      :plug ->
+        url = URI.new!("http://localhost:8000")
+        %{req: Req.new(url: url, plug: plug), url: url}
+
+      :finch ->
+        %{url: url} = start_http_server(plugs, options)
+        %{req: Req.new(url: url), url: url}
+
+      :httpc ->
+        %{url: url} = start_http_server(plugs, options)
+        %{req: Req.new(url: url, adapter: &Req.HTTPC.run/1), url: url}
+
+      :mint ->
+        %{url: url} = start_http_server(plugs, options)
+        %{req: Req.new(url: url, adapter: &Req.Mint.run/1), url: url}
+    end
+  end
+
+  def start_http_server(plug_or_plugs, options \\ [])
+
+  def start_http_server(plugs, options) when is_list(plugs) do
+    start_http_server(&Plug.run(&1, plugs), options)
+  end
+
+  def start_http_server(plug, options) when is_function(plug, 1) do
+    options =
+      [
+        scheme: :http,
+        port: 0,
+        plug: fn conn, _ -> plug.(conn) end,
+        startup_log: false,
+        http_options: [compress: false]
+      ] ++ options
 
     pid = ExUnit.Callbacks.start_supervised!({Bandit, options})
-    {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)
-    %{pid: pid, url: URI.new!("http://localhost:#{port}")}
+    {:ok, {ip, port}} = ThousandIsland.listener_info(pid)
+    %{pid: pid, ip: ip, port: port, url: URI.new!("http://localhost:#{port}")}
   end
 
   def start_https_server(plug) when is_function(plug, 1) do
@@ -48,24 +104,58 @@ defmodule TestHelper do
 
     accept(listen_socket, fun)
   end
-end
 
-defmodule EzstdFilter do
-  # Filter out:
-  # 17:56:39.116 [debug] Loading library: ~c"/path/to/req/_build/test/lib/ezstd/priv/ezstd_nif"
-  def filter(log_event, _opts) do
-    case log_event.msg do
-      {"Loading library" <> _, [path]} ->
-        ^path = to_charlist(Application.app_dir(:ezstd, "priv/ezstd_nif"))
-        :stop
+  def adapter_fun do
+    case adapter() do
+      :finch ->
+        &Req.Steps.run_finch/1
 
-      _ ->
-        :ignore
+      :httpc ->
+        &Req.HTTPC.run/1
+
+      :mint ->
+        &Req.Mint.run/1
+    end
+  end
+
+  def adapter do
+    case System.get_env("REQ_ADAPTER", "finch") do
+      "finch" ->
+        :finch
+
+      "httpc" ->
+        :httpc
+
+      "mint" ->
+        :mint
+
+      "plug" ->
+        :plug
+
+      adapter ->
+        raise "unknown REQ_ADAPTER=#{inspect(adapter)}"
     end
   end
 end
 
-:logger.add_primary_filter(:ezstd_filter, {&EzstdFilter.filter/2, []})
+exclude =
+  case Req.Case.adapter() do
+    :finch ->
+      [:integration]
 
-ExUnit.configure(exclude: :integration)
+    :httpc ->
+      [:integration, :http2]
+
+    :mint ->
+      [:integration]
+
+    :plug ->
+      [:integration, :http2, :transport, :adapter_finch, :adapter_httpc]
+  end
+
+if adapter = System.get_env("REQ_ADAPTER") do
+  IO.puts("\nRunning with REQ_ADAPTER=#{adapter}\n")
+end
+
+ExUnit.configure(exclude: exclude)
 ExUnit.start()

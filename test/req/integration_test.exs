@@ -1,5 +1,5 @@
 defmodule Req.IntegrationTest do
-  use ExUnit.Case, async: true
+  use Req.Case, async: true
 
   @moduletag :integration
 
@@ -32,6 +32,12 @@ defmodule Req.IntegrationTest do
       delete!: 2,
       run: 2,
       run!: 2
+    ]
+
+  doctest Req.Request,
+    only: [
+      new: 1,
+      run_request: 1
     ]
 
   doctest Req.Steps,
