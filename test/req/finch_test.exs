@@ -239,5 +239,29 @@ defmodule Req.FinchTest do
                  conn_opts: [transport_opts: [timeout: 0, inet6: true, cacerts: []]]
                ]
     end
+
+    def send_pool_tag(_name, _measurements, metadata, _config) do
+      if pid = metadata.request.private[:pid] do
+        send(pid, {:pool_tag, metadata.request.pool_tag})
+      end
+
+      :ok
+    end
+
+    test ":finch {name, pool_tag: tag} sets the request's pool_tag", %{test: test} do
+      on_exit(fn -> :telemetry.detach("#{test}") end)
+
+      :telemetry.attach("#{test}", [:finch, :request, :stop], &__MODULE__.send_pool_tag/4, nil)
+
+      %{url: url} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      assert Req.get!(url, finch: {Req.Finch, pool_tag: :bulk}, finch_private: %{pid: self()}).body ==
+               "ok"
+
+      assert_received {:pool_tag, :bulk}
+    end
   end
 end

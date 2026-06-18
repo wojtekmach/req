@@ -24,7 +24,7 @@ defmodule Req.Finch do
         request
       end
 
-    finch_name = finch_name(request)
+    {finch_name, options} = finch_name_options(request)
 
     # TODO: Remove when :finch_request is removed
     if match?(
@@ -81,9 +81,15 @@ defmodule Req.Finch do
           {:stream, enumerable}
       end
 
+    options =
+      if unix_socket = request.options[:unix_socket] do
+        Keyword.put(options, :unix_socket, unix_socket)
+      else
+        options
+      end
+
     finch_request =
-      Finch.build(request.method, request.url, request_headers, body)
-      |> Map.replace!(:unix_socket, request.options[:unix_socket])
+      Finch.build(request.method, request.url, request_headers, body, options)
       |> add_private_options(request.options[:finch_private])
 
     finch_options =
@@ -416,19 +422,12 @@ defmodule Req.Finch do
     end
   end
 
-  defp finch_name(request) do
+  defp finch_name_options(request) do
     custom_options? =
       Map.has_key?(request.options, :connect_options) or Map.has_key?(request.options, :inet6)
 
-    cond do
-      name = request.options[:finch] ->
-        if Map.has_key?(request.options, :connect_options) do
-          raise ArgumentError, "cannot set both :finch and :connect_options"
-        else
-          name
-        end
-
-      custom_options? ->
+    case request.options[:finch] do
+      nil when custom_options? ->
         pool_options = pool_options(request.options)
         name = pool_name(pool_options)
 
@@ -437,14 +436,23 @@ defmodule Req.Finch do
                {Finch, name: name, pools: %{default: pool_options}}
              ) do
           {:ok, _} ->
-            name
+            {name, []}
 
           {:error, {:already_started, _}} ->
-            name
+            {name, []}
         end
 
-      true ->
-        Req.Finch
+      nil ->
+        {Req.Finch, []}
+
+      _ when is_map_key(request.options, :connect_options) ->
+        raise ArgumentError, "cannot set both :finch and :connect_options"
+
+      name when is_atom(name) ->
+        {name, []}
+
+      {name, options} when is_atom(name) ->
+        {name, Keyword.validate!(options, [:pool_tag])}
     end
   end
 
