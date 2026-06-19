@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.6.2 (2026-06-19)
+
+  * Use finch ~> 0.21.
+
 ## v0.6.1 (2026-06-08)
 
   * [`compressed`], [`decompress_body`]: Disable automatic decompression
