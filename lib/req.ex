@@ -513,7 +513,8 @@ defmodule Req do
       :head
 
   """
-  @spec new(request :: url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Request.t()
+  @spec new(request :: url() | keyword() | Req.Request.t(), options :: keyword()) ::
+          Req.Request.t()
   def new(request \\ [], options \\ [])
 
   def new(options1, options2) when is_list(options1) and is_list(options2) do
