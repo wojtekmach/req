@@ -3,6 +3,9 @@
 defmodule Req.Finch do
   @moduledoc false
 
+  @finch_build_options [:pool_tag, :unix_socket]
+  @finch_request_options [:pool_timeout, :receive_timeout, :request_timeout, :pool_strategy]
+
   def child_spec(options) do
     {name, options} = Keyword.pop!(options, :name)
     Finch.child_spec(name: name, pools: %{default: pool_options(options)})
@@ -24,7 +27,7 @@ defmodule Req.Finch do
         request
       end
 
-    {finch_name, options} = finch_name_options(request)
+    {finch_name, build_options, request_options} = finch_name_options(request)
 
     # TODO: Remove when :finch_request is removed
     if match?(
@@ -81,21 +84,22 @@ defmodule Req.Finch do
           {:stream, enumerable}
       end
 
-    options =
+    build_options =
       if unix_socket = request.options[:unix_socket] do
-        Keyword.put(options, :unix_socket, unix_socket)
+        Keyword.put_new(build_options, :unix_socket, unix_socket)
       else
-        options
+        build_options
       end
 
     finch_request =
-      Finch.build(request.method, request.url, request_headers, body, options)
+      Finch.build(request.method, request.url, request_headers, body, build_options)
       |> add_private_options(request.options[:finch_private])
 
     finch_options =
       request.options
       |> Map.take([:receive_timeout, :pool_timeout, :request_timeout])
       |> Enum.to_list()
+      |> Keyword.merge(request_options)
 
     run(request, finch_request, finch_name, finch_options)
   end
@@ -423,36 +427,61 @@ defmodule Req.Finch do
   end
 
   defp finch_name_options(request) do
-    custom_options? =
-      Map.has_key?(request.options, :connect_options) or Map.has_key?(request.options, :inet6)
+    if request.options[:finch] && Map.has_key?(request.options, :connect_options) do
+      raise ArgumentError, "cannot set both :finch and :connect_options"
+    end
 
-    case request.options[:finch] do
-      nil when custom_options? ->
-        pool_options = pool_options(request.options)
+    custom_options? =
+      Map.has_key?(request.options, :connect_options) or
+        Map.has_key?(request.options, :inet6) or
+        Map.has_key?(request.options, :pool_max_idle_time)
+
+    {name, build_options, request_options, pool_options} =
+      case request.options[:finch] do
+        nil ->
+          {nil, [], [], []}
+
+        name when is_atom(name) ->
+          IO.warn(
+            "setting `:finch` to a Finch pool name is deprecated, use `finch: [name: name]` instead"
+          )
+
+          {name, [], [], []}
+
+        options when is_list(options) ->
+          {name, options} = Keyword.pop(options, :name)
+          {build_options, options} = Keyword.split(options, @finch_build_options)
+          {request_options, pool_options} = Keyword.split(options, @finch_request_options)
+          {name, build_options, request_options, pool_options}
+
+        other ->
+          raise ArgumentError, "expected `finch: options`, got: #{inspect(other)}"
+      end
+
+    cond do
+      name ->
+        if pool_options != [] do
+          raise ArgumentError,
+                "cannot set Finch pool options together with :name in :finch, " <>
+                  "configure the pool when starting #{inspect(name)} instead"
+        end
+
+        {name, build_options, request_options}
+
+      pool_options != [] or custom_options? ->
+        pool_options = Keyword.merge(pool_options(request.options), pool_options)
         name = pool_name(pool_options)
 
         case DynamicSupervisor.start_child(
                Req.FinchSupervisor,
                {Finch, name: name, pools: %{default: pool_options}}
              ) do
-          {:ok, _} ->
-            {name, []}
-
-          {:error, {:already_started, _}} ->
-            {name, []}
+          {:ok, _} -> {name, build_options, request_options}
+          {:error, {:already_started, _}} -> {name, build_options, request_options}
         end
 
-      nil ->
-        {Req.Finch, []}
-
-      _ when is_map_key(request.options, :connect_options) ->
-        raise ArgumentError, "cannot set both :finch and :connect_options"
-
-      name when is_atom(name) ->
-        {name, []}
-
-      {name, options} when is_atom(name) ->
-        {name, Keyword.validate!(options, [:pool_tag])}
+      true ->
+        {Req.Finch, build_options, request_options}
     end
   end
 

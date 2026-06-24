@@ -447,18 +447,24 @@ defmodule Req do
 
   Finch options ([`run_finch`](`Req.Steps.run_finch/1`) step), see `Finch.start_link/1` for options:
 
-    * `:finch` - the Finch pool to use. Defaults to pool automatically started by `Req`.
-      Can be either a pool name (atom) or a `{name, opts}` tuple where `opts` can include:
+    * `:finch` - options for the Finch adapter. Defaults to a pool automatically started by
+      Req. Can include:
 
-        * `:pool_tag` - (requires Finch v0.22+) the tag to use when selecting which Finch pool to
-          use for a request. Defaults to `:default`. This allows routing requests to different
-          pools for the same host. See `Finch.Pool.new/2` for more information on configuring
-          tagged pools.
+        * `:name` - the name of the Finch pool.
+
+        * Finch request options, e.g. `:pool_tag`, `:pool_timeout`, `:receive_timeout`. See
+          `t:Finch.Request.build_opt/0` and `t:Finch.request_opt/0` for more information.
+
+        * Finch pool options, e.g.: `:conn_max_idle_time`, `:pool_max_idle_time`, `:conn_opts`.
+          See `Finch.start_link/1` for more information.
+
+          Finch pool options cannot be mixed with `:name` option.
 
       Examples:
 
-          Req.get!("https://api.example.com/data", finch: MyFinch)
-          Req.get!("https://api.example.com/data", finch: {MyFinch, pool_tag: :bulk})
+          Req.get!("https://httpbin.org/json", finch: [name: MyFinch])
+          Req.get!("https://httpbin.org/json", finch: [name: MyFinch, pool_tag: :bulk])
+          Req.get!("https://httpbin.org/json", finch: [conn_max_idle_time: 10_000])
 
     * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
       the given connection options (see `Mint.HTTP.connect/4` for options):
@@ -480,17 +486,12 @@ defmodule Req do
 
     * `:inet6` - if set to true, uses IPv6. Defaults to `false`.
 
-    * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
-
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
     * `:request_timeout` - response timeout in milliseconds, defaults to `:infinity`.
       See `Finch.request/3`.
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket.
-
-    * `:pool_max_idle_time` - the maximum number of milliseconds that a pool can be
-      idle before being terminated, used only by HTTP1 pools. Defaults to `:infinity`.
 
     * `:finch_private` - a map or keyword list of private metadata to add to the Finch request. May be useful
       for adding custom data when handling telemetry with `Finch.Telemetry`.
@@ -591,6 +592,16 @@ defmodule Req do
     # TODO: Remove on Req 1.0
     if Keyword.has_key?(options, :redact_auth) do
       IO.warn("Setting :redact_auth is deprecated and has no effect")
+    end
+
+    if Keyword.has_key?(options, :pool_timeout) do
+      IO.warn("setting `pool_timeout` is deprecated in favour of `finch: [pool_timeout: ...]`")
+    end
+
+    if Keyword.has_key?(options, :pool_max_idle_time) do
+      IO.warn(
+        "setting `pool_max_idle_time` is deprecated in favour of `finch: [pool_max_idle_time: ...]`"
+      )
     end
 
     request_option_names = [:method, :url, :headers, :body, :adapter, :into, :assigns]

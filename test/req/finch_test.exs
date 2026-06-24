@@ -47,7 +47,7 @@ defmodule Req.FinchTest do
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
 
-      options = [pool_timeout: 0]
+      options = [finch: [pool_timeout: 0]]
 
       assert_raise RuntimeError, ~r/unable to provide a connection within the timeout/, fn ->
         Req.get!(url, options)
@@ -95,13 +95,13 @@ defmodule Req.FinchTest do
 
     test ":finch option" do
       assert_raise ArgumentError, "unknown registry: MyFinch", fn ->
-        Req.get!("http://localhost", finch: MyFinch)
+        Req.get!("http://localhost", finch: [name: MyFinch])
       end
     end
 
     test ":finch and :connect_options" do
       assert_raise ArgumentError, "cannot set both :finch and :connect_options", fn ->
-        Req.request!(finch: MyFinch, connect_options: [timeout: 0])
+        Req.request!(finch: [name: MyFinch], connect_options: [timeout: 0])
       end
     end
 
@@ -132,10 +132,10 @@ defmodule Req.FinchTest do
       )
 
       # :inet6 can be auto-set for IPv6 URLs; it should not conflict with :finch
-      req = Req.new(url: "http://[::1]:#{ipv6_port}", finch: finch_name)
+      req = Req.new(url: "http://[::1]:#{ipv6_port}", finch: [name: finch_name])
       assert Req.request!(req).body == "ok"
 
-      assert Req.request!("http://localhost:#{ipv6_port}", finch: finch_name, inet6: true).body ==
+      assert Req.request!("http://localhost:#{ipv6_port}", finch: [name: finch_name], inet6: true).body ==
                "ok"
     end
 
@@ -258,10 +258,28 @@ defmodule Req.FinchTest do
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
 
-      assert Req.get!(url, finch: {Req.Finch, pool_tag: :bulk}, finch_private: %{pid: self()}).body ==
+      assert Req.get!(url,
+               finch: [name: Req.Finch, pool_tag: :bulk],
+               finch_private: %{pid: self()}
+             ).body ==
                "ok"
 
       assert_received {:pool_tag, :bulk}
+    end
+
+    test "finch: pool options start a pool" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      assert Req.get!(url, finch: [conn_max_idle_time: 10_000]).body == "ok"
+    end
+
+    test "finch: pool options cannot be set together with :name" do
+      assert_raise ArgumentError, ~r/cannot set Finch pool options together with :name/, fn ->
+        Req.request!(finch: [name: Req.Finch, conn_max_idle_time: 10_000])
+      end
     end
   end
 end

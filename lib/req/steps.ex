@@ -806,7 +806,7 @@ defmodule Req.Steps do
           }
         )
 
-      Req.get!("https://httpbin.org/json", finch: MyFinch)
+      Req.get!("https://httpbin.org/json", finch: [name: MyFinch])
 
   More commonly you'd add the custom Finch pool as part of your supervision tree in your
   `application.ex`:
@@ -820,7 +820,7 @@ defmodule Req.Steps do
       ]
 
   That way you can also configure a bigger pool size for the HTTP pool. You just mustn't forget to
-  pass along `finch: MyFinch` as discussed above. You could use `Req.default_options/1` to make it
+  pass along `finch: [name: MyFinch]` as discussed above. You could use `Req.default_options/1` to make it
   a global default but it's generally discouraged.
 
   For documentation about the possible pool options and their meaning, please check out the
@@ -828,18 +828,24 @@ defmodule Req.Steps do
 
   ## Request Options
 
-    * `:finch` - the name of the Finch pool. Defaults to a pool automatically started by Req.
-      Can be either a pool name (atom) or a `{name, opts}` tuple where `opts` can include:
+    * `:finch` - options for the Finch adapter. Defaults to a pool automatically started by
+      Req. Can include:
 
-        * `:pool_tag` - (requires Finch v0.22+) the tag to use when selecting which Finch pool to
-          use for a request. Defaults to `:default`. This allows routing requests to different
-          pools for the same host. See `Finch.Pool.new/2` for more information on configuring
-          tagged pools.
+        * `:name` - the name of the Finch pool.
+
+        * Finch request options, e.g. `:pool_tag`, `:pool_timeout`, `:receive_timeout`. See
+          `t:Finch.Request.build_opt/0` and `t:Finch.request_opt/0` for more information.
+
+        * Finch pool options, e.g.: `:conn_max_idle_time`, `:pool_max_idle_time`, `:conn_opts`.
+          See `Finch.start_link/1` for more information.
+
+          Finch pool options cannot be mixed with `:name` option.
 
       Examples:
 
-          Req.get!("https://api.example.com/data", finch: MyFinch)
-          Req.get!("https://api.example.com/data", finch: {MyFinch, pool_tag: :bulk})
+          Req.get!("https://httpbin.org/json", finch: [name: MyFinch])
+          Req.get!("https://httpbin.org/json", finch: [name: MyFinch, pool_tag: :bulk])
+          Req.get!("https://httpbin.org/json", finch: [conn_max_idle_time: 10_000])
 
     * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
       the given connection options:
@@ -868,17 +874,12 @@ defmodule Req.Steps do
       and otherwise defaults to `false`.
       This is a shortcut for setting `connect_options: [transport_opts: [inet6: true]]`.
 
-    * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
-
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
     * `:request_timeout` - response timeout in milliseconds, defaults to `:infinity`.
       See `Finch.request/3`.
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket.
-
-    * `:pool_max_idle_time` - the maximum number of milliseconds that a pool can be
-      idle before being terminated, used only by HTTP1 pools. Default to `:infinity`.
 
     * `:finch_private` - a map or keyword list of private metadata to add to the Finch request.
       May be useful for adding custom data when handling telemetry with `Finch.Telemetry`.

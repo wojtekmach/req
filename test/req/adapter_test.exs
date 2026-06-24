@@ -73,7 +73,7 @@ defmodule Req.AdapterTest do
         if @adapter == :finch do
           # Finch H2 pool re-connects forever so start custom pool under test supervisor.
           start_supervised!({Req.Finch, name: test, connect_options: [protocols: [:http2]]})
-          Req.new(adapter: adapter_fun(), url: url, finch: test, retry_delay: 100)
+          Req.new(adapter: adapter_fun(), url: url, finch: [name: test], retry_delay: 100)
         else
           Req.new(
             adapter: adapter_fun(),
