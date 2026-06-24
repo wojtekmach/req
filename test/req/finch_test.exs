@@ -101,7 +101,7 @@ defmodule Req.FinchTest do
 
     test ":finch and :connect_options" do
       assert_raise ArgumentError, "cannot set both :finch and :connect_options", fn ->
-        Req.request!(finch: [name: MyFinch], connect_options: [timeout: 0])
+        Req.request!(finch: [name: MyFinch], connect_options: [protocols: [:http1]])
       end
     end
 
@@ -213,8 +213,8 @@ defmodule Req.FinchTest do
                ]
     end
 
-    test "connect_options timeout" do
-      assert Req.Finch.pool_options(connect_options: [timeout: 0]) ==
+    test "connect_timeout" do
+      assert Req.Finch.pool_options(connect_timeout: 0) ==
                [
                  protocols: [:http1],
                  conn_opts: [transport_opts: [timeout: 0]]
@@ -229,9 +229,10 @@ defmodule Req.FinchTest do
                ]
     end
 
-    test "connect_options transport_opts + timeout + ipv6" do
+    test "connect_options transport_opts + connect_timeout + ipv6" do
       assert Req.Finch.pool_options(
-               connect_options: [timeout: 0, transport_opts: [cacerts: []]],
+               connect_timeout: 0,
+               connect_options: [transport_opts: [cacerts: []]],
                inet6: true
              ) ==
                [

@@ -25,9 +25,16 @@ defmodule Req.Mint do
   defp connect(request) do
     connect_options = request.options[:connect_options] || []
 
+    connect_timeout_options =
+      if timeout = request.options[:connect_timeout] || connect_options[:timeout] do
+        [timeout: timeout]
+      else
+        []
+      end
+
     transport_opts =
       Keyword.merge(
-        Keyword.take(connect_options, [:timeout]),
+        connect_timeout_options,
         Keyword.get(connect_options, :transport_opts, [])
       )
 

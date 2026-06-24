@@ -434,6 +434,7 @@ defmodule Req.Finch do
     custom_options? =
       Map.has_key?(request.options, :connect_options) or
         Map.has_key?(request.options, :inet6) or
+        Map.has_key?(request.options, :connect_timeout) or
         Map.has_key?(request.options, :pool_max_idle_time)
 
     {name, build_options, request_options, pool_options} =
@@ -507,6 +508,7 @@ defmodule Req.Finch do
     Req.Request.validate_options(
       connect_options,
       MapSet.new([
+        # TODO: Remove on Req 1.0
         :timeout,
         :protocols,
         :transport_opts,
@@ -520,9 +522,16 @@ defmodule Req.Finch do
       ])
     )
 
+    connect_timeout_options =
+      if timeout = options[:connect_timeout] || connect_options[:timeout] do
+        [timeout: timeout]
+      else
+        []
+      end
+
     transport_opts =
       Keyword.merge(
-        Keyword.take(connect_options, [:timeout]) ++ inet6_options,
+        connect_timeout_options ++ inet6_options,
         Keyword.get(connect_options, :transport_opts, [])
       )
 

@@ -146,6 +146,7 @@ defmodule Req.HTTPC do
   defp prepare_request(request) do
     httpc_http_options = [
       autoredirect: false,
+      autoretry: 0,
       ssl: [
         verify: :verify_peer,
         cacerts: :public_key.cacerts_get(),
@@ -209,13 +210,9 @@ defmodule Req.HTTPC do
     {profile, request, httpc_http_options, httpc_options}
   end
 
-  defp httpc_connect_options(_request, [], httpc_http_options, httpc_options) do
-    {httpc_http_options, httpc_options}
-  end
-
   defp httpc_connect_options(request, connect_options, httpc_http_options, httpc_options) do
     httpc_http_options =
-      if timeout = connect_options[:timeout] do
+      if timeout = request.options[:connect_timeout] || connect_options[:timeout] do
         Keyword.put(httpc_http_options, :connect_timeout, timeout)
       else
         httpc_http_options

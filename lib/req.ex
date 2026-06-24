@@ -42,7 +42,7 @@ defmodule Req do
 
   Set connection timeout:
 
-      iex> resp = Req.get!("https://httpbin.org", connect_options: [timeout: 100])
+      iex> resp = Req.get!("https://httpbin.org", connect_timeout: 100)
       iex> resp.status
       200
 
@@ -469,8 +469,6 @@ defmodule Req do
     * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
       the given connection options (see `Mint.HTTP.connect/4` for options):
 
-        * `:timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
-
         * `:protocols` - the HTTP protocols to use, defaults to
           `#{inspect(Keyword.fetch!(@default_finch_options, :protocols))}`.
 
@@ -485,6 +483,8 @@ defmodule Req do
         * `:client_settings` - Mint HTTP/2 client settings.
 
     * `:inet6` - if set to true, uses IPv6. Defaults to `false`.
+
+    * `:connect_timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
 
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
@@ -601,6 +601,12 @@ defmodule Req do
     if Keyword.has_key?(options, :pool_max_idle_time) do
       IO.warn(
         "setting `pool_max_idle_time` is deprecated in favour of `finch: [pool_max_idle_time: ...]`"
+      )
+    end
+
+    if Keyword.has_key?(options[:connect_options] || [], :timeout) do
+      IO.warn(
+        "setting `connect_options: [timeout: ...]` is deprecated in favour of `connect_timeout: ...`"
       )
     end
 

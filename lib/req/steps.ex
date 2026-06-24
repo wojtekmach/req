@@ -59,6 +59,7 @@ defmodule Req.Steps do
       :finch_private,
       :connect_options,
       :inet6,
+      :connect_timeout,
       :request_timeout,
       :receive_timeout,
       :pool_timeout,
@@ -850,8 +851,6 @@ defmodule Req.Steps do
     * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
       the given connection options:
 
-        * `:timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
-
         * `:protocols` - the HTTP protocols to use, defaults to
           `#{inspect(Keyword.fetch!(@default_finch_options, :protocols))}`.
 
@@ -873,6 +872,8 @@ defmodule Req.Steps do
       If the request URL looks like IPv6 address, i.e., say, `[::1]`, it defaults to `true`
       and otherwise defaults to `false`.
       This is a shortcut for setting `connect_options: [transport_opts: [inet6: true]]`.
+
+    * `:connect_timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
 
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
@@ -901,8 +902,9 @@ defmodule Req.Steps do
 
   ## Examples
 
-  Custom `:receive_timeout`:
+  Custom timeouts:
 
+      iex> Req.get!(url, connect_timeout: 5000)
       iex> Req.get!(url, receive_timeout: 1000)
 
   Connecting through UNIX socket:
@@ -911,8 +913,6 @@ defmodule Req.Steps do
       "OK"
 
   Custom connection options:
-
-      iex> Req.get!(url, connect_options: [timeout: 5000])
 
       iex> Req.get!(url, connect_options: [protocols: [:http2]])
 

@@ -49,14 +49,30 @@ defmodule Req.AdapterTest do
     end
 
     @tag :transport
-    test "connect_options[:timeout]" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
+    test ":connect_timeout" do
+      parent = self()
 
-      assert Req.request!(adapter: adapter_fun(), url: url, connect_options: [timeout: 5000]).body ==
-               "ok"
+      %{url: url} =
+        start_tcp_server(fn _socket -> :ok end,
+          listen_options: [backlog: 1],
+          before_accept: fn listen_socket ->
+            {:ok, port} = :inet.port(listen_socket)
+            {:ok, _socket} = :gen_tcp.connect(~c"127.0.0.1", port, [:binary, active: false])
+            send(parent, :accept_queue_filled)
+            Process.sleep(:infinity)
+          end
+        )
+
+      req =
+        Req.new(
+          adapter: adapter_fun(),
+          url: %{url | host: "127.0.0.1"},
+          connect_timeout: 50,
+          retry: false
+        )
+
+      assert_receive :accept_queue_filled
+      assert {:error, %Req.TransportError{reason: :timeout}} = Req.request(req)
     end
 
     @tag :capture_log
