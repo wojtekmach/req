@@ -59,6 +59,7 @@ defmodule Req.Steps do
       :finch_private,
       :connect_options,
       :inet6,
+      :protocols,
       :connect_timeout,
       :request_timeout,
       :receive_timeout,
@@ -851,9 +852,6 @@ defmodule Req.Steps do
     * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
       the given connection options:
 
-        * `:protocols` - the HTTP protocols to use, defaults to
-          `#{inspect(Keyword.fetch!(@default_finch_options, :protocols))}`.
-
         * `:hostname` - Mint explicit hostname, see `Mint.HTTP.connect/4` for more information.
 
         * `:transport_opts` - Mint transport options, see `Mint.HTTP.connect/4` for more
@@ -872,6 +870,9 @@ defmodule Req.Steps do
       If the request URL looks like IPv6 address, i.e., say, `[::1]`, it defaults to `true`
       and otherwise defaults to `false`.
       This is a shortcut for setting `connect_options: [transport_opts: [inet6: true]]`.
+
+    * `:protocols` - the HTTP protocols to use, defaults to
+      `#{inspect(Keyword.fetch!(@default_finch_options, :protocols))}`.
 
     * `:connect_timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
 
@@ -914,7 +915,7 @@ defmodule Req.Steps do
 
   Custom connection options:
 
-      iex> Req.get!(url, connect_options: [protocols: [:http2]])
+      iex> Req.get!(url, protocols: [:http2])
 
   Connecting without certificate check (useful in development, not recommended in production):
 

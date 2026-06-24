@@ -211,6 +211,10 @@ defmodule Req.HTTPC do
   end
 
   defp httpc_connect_options(request, connect_options, httpc_http_options, httpc_options) do
+    if :http2 in (request.options[:protocols] || connect_options[:protocols] || []) do
+      raise ArgumentError, "httpc adapter does not support HTTP/2"
+    end
+
     httpc_http_options =
       if timeout = request.options[:connect_timeout] || connect_options[:timeout] do
         Keyword.put(httpc_http_options, :connect_timeout, timeout)

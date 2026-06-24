@@ -161,13 +161,13 @@ exclude =
       [:integration]
 
     :httpc ->
-      [:integration, :http2]
+      [:integration]
 
     :mint ->
       [:integration]
 
     :plug ->
-      [:integration, :http2, :transport, :adapter_finch, :adapter_httpc]
+      [:integration, :transport, :adapter_finch, :adapter_httpc]
   end
 
 if adapter = System.get_env("REQ_ADAPTER") do

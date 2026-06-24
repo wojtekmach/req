@@ -70,7 +70,7 @@ defmodule Req.Mint do
     options =
       [
         mode: :passive,
-        protocols: connect_options[:protocols] || [:http1],
+        protocols: request.options[:protocols] || connect_options[:protocols] || [:http1],
         transport_opts: transport_opts
       ] ++ address_options
 

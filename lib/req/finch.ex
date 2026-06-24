@@ -434,6 +434,7 @@ defmodule Req.Finch do
     custom_options? =
       Map.has_key?(request.options, :connect_options) or
         Map.has_key?(request.options, :inet6) or
+        Map.has_key?(request.options, :protocols) or
         Map.has_key?(request.options, :connect_timeout) or
         Map.has_key?(request.options, :pool_max_idle_time)
 
@@ -545,6 +546,9 @@ defmodule Req.Finch do
 
     protocols =
       cond do
+        protocols = options[:protocols] ->
+          protocols
+
         protocols = connect_options[:protocols] ->
           protocols
 

@@ -469,9 +469,6 @@ defmodule Req do
     * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
       the given connection options (see `Mint.HTTP.connect/4` for options):
 
-        * `:protocols` - the HTTP protocols to use, defaults to
-          `#{inspect(Keyword.fetch!(@default_finch_options, :protocols))}`.
-
         * `:hostname` - Mint explicit hostname.
 
         * `:transport_opts` - Mint transport options.
@@ -483,6 +480,9 @@ defmodule Req do
         * `:client_settings` - Mint HTTP/2 client settings.
 
     * `:inet6` - if set to true, uses IPv6. Defaults to `false`.
+
+    * `:protocols` - the HTTP protocols to use, defaults to
+      `#{inspect(Keyword.fetch!(@default_finch_options, :protocols))}`.
 
     * `:connect_timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
 
@@ -607,6 +607,12 @@ defmodule Req do
     if Keyword.has_key?(options[:connect_options] || [], :timeout) do
       IO.warn(
         "setting `connect_options: [timeout: ...]` is deprecated in favour of `connect_timeout: ...`"
+      )
+    end
+
+    if Keyword.has_key?(options[:connect_options] || [], :protocols) do
+      IO.warn(
+        "setting `connect_options: [protocols: ...]` is deprecated in favour of `protocols: ...`"
       )
     end
 

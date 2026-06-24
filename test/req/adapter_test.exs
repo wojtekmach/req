@@ -76,9 +76,8 @@ defmodule Req.AdapterTest do
     end
 
     @tag :capture_log
-    @tag :http2
     @tag :transport
-    test "connect_options[:protocols]", %{test: test} do
+    test ":protocols", %{test: test} do
       %{url: url} =
         start_http_server(fn conn ->
           assert Plug.Conn.get_http_protocol(conn) == :"HTTP/2"
@@ -88,18 +87,24 @@ defmodule Req.AdapterTest do
       req =
         if @adapter == :finch do
           # Finch H2 pool re-connects forever so start custom pool under test supervisor.
-          start_supervised!({Req.Finch, name: test, connect_options: [protocols: [:http2]]})
+          start_supervised!({Req.Finch, name: test, protocols: [:http2]})
           Req.new(adapter: adapter_fun(), url: url, finch: [name: test], retry_delay: 100)
         else
           Req.new(
             adapter: adapter_fun(),
             url: url,
-            connect_options: [protocols: [:http2]],
+            protocols: [:http2],
             retry_delay: 100
           )
         end
 
-      assert Req.request!(req).body == "ok"
+      if @adapter == :httpc do
+        assert_raise ArgumentError, "httpc adapter does not support HTTP/2", fn ->
+          Req.request!(req)
+        end
+      else
+        assert Req.request!(req).body == "ok"
+      end
     end
 
     @tag :transport

@@ -149,7 +149,6 @@ defmodule ReqTest do
     assert Req.put!(echo, body: resp.body).body == "foobarbaz"
   end
 
-  @tag :http2
   test "http1 + http2" do
     %{url: url} =
       start_https_server(fn conn ->
@@ -159,9 +158,9 @@ defmodule ReqTest do
 
     assert Req.get!(
              url,
+             protocols: [:http1, :http2],
              connect_options: [
-               transport_opts: [cacertfile: "#{__DIR__}/support/ca.pem"],
-               protocols: [:http1, :http2]
+               transport_opts: [cacertfile: "#{__DIR__}/support/ca.pem"]
              ],
              retry: false
            ).body == "ok"
