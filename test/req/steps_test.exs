@@ -1116,29 +1116,22 @@ defmodule Req.StepsTest do
       assert resp.body == "foo"
     end
 
-    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
-    @tag skip: System.otp_release() < "28"
-    @tag :transport
+    # TODO: Remove the OTP check when requiring OTP 28 (Elixir 1.21/22?).
+    @tag skip: System.otp_release() < "28" or Req.Case.adapter() == :httpc
     test "multiple codecs with multiple headers" do
-      %{url: url} =
-        start_tcp_server(fn socket ->
-          assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
+      %{req: req} =
+        serve(fn conn ->
+          body = "foo" |> :zlib.gzip() |> :zstd.compress()
 
-          body = "foo" |> :zlib.gzip() |> :zstd.compress() |> IO.iodata_to_binary()
-
-          data = """
-          HTTP/1.1 200 OK
-          content-encoding: gzip
-          content-encoding: zstd
-          content-length: #{byte_size(body)}
-
-          #{body}
-          """
-
-          :ok = :gen_tcp.send(socket, data)
+          conn
+          |> Plug.Conn.prepend_resp_headers([
+            {"content-encoding", "gzip"},
+            {"content-encoding", "zstd"}
+          ])
+          |> Plug.Conn.send_resp(200, body)
         end)
 
-      resp = Req.get!(url, compressed: true)
+      resp = Req.get!(req, compressed: true)
       assert Req.Response.get_header(resp, "content-encoding") == []
       assert Req.Response.get_header(resp, "content-length") == []
       assert resp.body == "foo"

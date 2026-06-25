@@ -149,7 +149,7 @@ defmodule ReqTest do
     assert Req.put!(echo, body: resp.body).body == "foobarbaz"
   end
 
-  @tag :http2
+  @tag :transport
   test "http1 + http2" do
     %{url: url} =
       start_https_server(fn conn ->
@@ -157,13 +157,23 @@ defmodule ReqTest do
         Plug.Conn.send_resp(conn, 200, "ok")
       end)
 
-    assert Req.get!(
-             url,
-             connect_options: [
-               transport_opts: [cacertfile: "#{__DIR__}/support/ca.pem"],
-               protocols: [:http1, :http2]
-             ],
-             retry: false
-           ).body == "ok"
+    req =
+      Req.new(
+        adapter: adapter_fun(),
+        url: url,
+        connect_options: [
+          transport_opts: [cacertfile: "#{__DIR__}/support/ca.pem"],
+          protocols: [:http1, :http2]
+        ],
+        retry: false
+      )
+
+    if Req.Case.adapter() == :httpc do
+      assert_raise ArgumentError, "httpc adapter does not support HTTP/2", fn ->
+        Req.request!(req)
+      end
+    else
+      assert Req.request!(req).body == "ok"
+    end
   end
 end

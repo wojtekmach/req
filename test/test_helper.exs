@@ -85,10 +85,27 @@ defmodule Req.Case do
     %{pid: pid, url: URI.new!("https://localhost:#{port}")}
   end
 
-  def start_tcp_server(fun) do
-    {:ok, listen_socket} = :gen_tcp.listen(0, mode: :binary, active: false)
+  def start_tcp_server(fun, options \\ []) do
+    options =
+      Keyword.validate!(options,
+        before_accept: fn _listen_socket -> :ok end,
+        listen_options: []
+      )
+
+    {:ok, listen_socket} =
+      :gen_tcp.listen(0, [mode: :binary, active: false] ++ options[:listen_options])
+
     {:ok, port} = :inet.port(listen_socket)
-    pid = ExUnit.Callbacks.start_supervised!({Task, fn -> accept(listen_socket, fun) end})
+
+    pid =
+      ExUnit.Callbacks.start_supervised!(
+        {Task,
+         fn ->
+           options[:before_accept].(listen_socket)
+           accept(listen_socket, fun)
+         end}
+      )
+
     %{pid: pid, url: URI.new!("http://localhost:#{port}")}
   end
 
@@ -144,13 +161,13 @@ exclude =
       [:integration]
 
     :httpc ->
-      [:integration, :http2]
+      [:integration]
 
     :mint ->
       [:integration]
 
     :plug ->
-      [:integration, :http2, :transport, :adapter_finch, :adapter_httpc]
+      [:integration, :transport, :adapter_finch, :adapter_httpc]
   end
 
 if adapter = System.get_env("REQ_ADAPTER") do

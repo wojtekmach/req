@@ -146,6 +146,7 @@ defmodule Req.HTTPC do
   defp prepare_request(request) do
     httpc_http_options = [
       autoredirect: false,
+      autoretry: 0,
       ssl: [
         verify: :verify_peer,
         cacerts: :public_key.cacerts_get(),
@@ -214,6 +215,10 @@ defmodule Req.HTTPC do
   end
 
   defp httpc_connect_options(request, connect_options, httpc_http_options, httpc_options) do
+    if :http2 in (connect_options[:protocols] || []) do
+      raise ArgumentError, "httpc adapter does not support HTTP/2"
+    end
+
     httpc_http_options =
       if timeout = connect_options[:timeout] do
         Keyword.put(httpc_http_options, :connect_timeout, timeout)
