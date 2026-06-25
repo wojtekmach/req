@@ -1557,7 +1557,7 @@ defmodule Req.StepsTest do
       end)
 
     assert resp.body |> :zlib.uncompress() |> Jason.decode!() == %{"a" => 1}
-    assert log =~ ~s|algorithm \"deflate\" is not supported|
+    assert log == ~s|[debug] algorithm "deflate" is not supported\n|
   end
 
   describe "redirect" do
@@ -1582,7 +1582,7 @@ defmodule Req.StepsTest do
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(req, url: "#{url}/redirect", retry: false).status == 200
-             end) =~ "[debug] redirecting to #{url}/ok"
+             end) == "[debug] redirecting to #{url}/ok\n"
     end
 
     test "relative" do
@@ -1605,13 +1605,13 @@ defmodule Req.StepsTest do
                response = Req.get!(req, url: "#{url}/redirect")
                assert response.status == 200
                assert response.body == ""
-             end) =~ "[debug] redirecting to /ok"
+             end) == "[debug] redirecting to /ok\n"
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                response = Req.get!(req, url: "#{url}/redirect?a=1")
                assert response.status == 200
                assert response.body == "a=1"
-             end) =~ "[debug] redirecting to /ok?a=1"
+             end) == "[debug] redirecting to /ok?a=1\n"
     end
 
     test "change POST to GET to get on 301..303" do
@@ -1627,7 +1627,7 @@ defmodule Req.StepsTest do
 
         assert ExUnit.CaptureLog.capture_log(fn ->
                  assert Req.post!(req, url: "#{url}/redirect", body: "body").status == 200
-               end) =~ "[debug] redirecting to #{url}/ok"
+               end) == "[debug] redirecting to #{url}/ok\n"
       end
     end
 
@@ -1644,7 +1644,7 @@ defmodule Req.StepsTest do
 
         assert ExUnit.CaptureLog.capture_log(fn ->
                  assert Req.post!(req, url: "#{url}/redirect", body: "body").status == 200
-               end) =~ "[debug] redirecting to #{url}/ok"
+               end) == "[debug] redirecting to #{url}/ok\n"
       end
     end
 
@@ -1661,7 +1661,7 @@ defmodule Req.StepsTest do
 
         assert ExUnit.CaptureLog.capture_log(fn ->
                  assert Req.head!(req, url: "#{url}/redirect").status == 200
-               end) =~ "[debug] redirecting to #{url}/ok"
+               end) == "[debug] redirecting to #{url}/ok\n"
       end
     end
 
@@ -1691,11 +1691,11 @@ defmodule Req.StepsTest do
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(req, url: "#{url}/redirect", auth: {:basic, "foo:bar"}).status ==
                         200
-             end) =~ "[debug] redirecting to #{url}/auth"
+             end) == "[debug] redirecting to #{url}/auth\n"
     end
 
     test "auth location trusted" do
-      %{req: req} =
+      %{req: req, url: url} =
         serve(fn
           conn when conn.host == "localhost" ->
             assert [_] = Plug.Conn.get_req_header(conn, "authorization")
@@ -1711,11 +1711,11 @@ defmodule Req.StepsTest do
                         auth: {:basic, "authorization:credentials"},
                         redirect_trusted: true
                       ).status == 200
-             end) =~ "[debug] redirecting to http://127.0.0.1"
+             end) == "[debug] redirecting to http://127.0.0.1:#{url.port}/ok\n"
     end
 
     test "auth different host" do
-      %{req: req} =
+      %{req: req, url: url} =
         serve(fn
           conn when conn.host == "localhost" ->
             assert [_] = Plug.Conn.get_req_header(conn, "authorization")
@@ -1728,7 +1728,7 @@ defmodule Req.StepsTest do
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(req, auth: {:basic, "foo:bar"}).status == 200
-             end) =~ "[debug] redirecting to http://127.0.0.1"
+             end) == "[debug] redirecting to http://127.0.0.1:#{url.port}/ok\n"
     end
 
     @tag :transport
@@ -1749,7 +1749,7 @@ defmodule Req.StepsTest do
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(req, auth: {:basic, "foo:bar"}).status == 200
-             end) =~ "[debug] redirecting to #{untrusted_url}/ok"
+             end) == "[debug] redirecting to #{untrusted_url}/ok\n"
     end
 
     @tag :transport
@@ -1775,11 +1775,11 @@ defmodule Req.StepsTest do
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(req, auth: {:basic, "authorization:credentials"}).status == 200
-             end) =~ "[debug] redirecting to #{untrusted_url}/ok"
+             end) == "[debug] redirecting to #{untrusted_url}/ok\n"
     end
 
     test "userinfo in absolute location is stripped and warned about" do
-      %{req: req} =
+      %{req: req, url: url} =
         serve(fn
           conn when conn.host == "localhost" ->
             location =
@@ -1803,9 +1803,10 @@ defmodule Req.StepsTest do
           assert Req.get!(req).status == 200
         end)
 
-      assert log =~ "[warning] stripping userinfo from redirect location"
-      assert log =~ "[debug] redirecting to http://127.0.0.1"
-      refute log =~ "foo:bar"
+      assert log == """
+             [warning] stripping userinfo from redirect location
+             [debug] redirecting to http://127.0.0.1:#{url.port}/path
+             """
     end
 
     test "skip params" do
@@ -1821,7 +1822,7 @@ defmodule Req.StepsTest do
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(req, url: "#{url}/redirect", params: [a: 1]).status == 200
-             end) =~ "[debug] redirecting to #{url}/ok"
+             end) == "[debug] redirecting to #{url}/ok\n"
     end
 
     test "max redirects" do
@@ -1859,7 +1860,7 @@ defmodule Req.StepsTest do
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(req, url: "#{url}/redirect").status == 200
-             end) =~ "[debug] redirecting to /ok"
+             end) == "[debug] redirecting to /ok\n"
     end
 
     test "redirect_log_level, set to :error" do
@@ -1875,7 +1876,7 @@ defmodule Req.StepsTest do
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(req, url: "#{url}/redirect", redirect_log_level: :error).status ==
                         200
-             end) =~ "[error] redirecting to /ok"
+             end) == "[error] redirecting to /ok\n"
     end
 
     test "redirect_log_level, disabled" do
@@ -1905,7 +1906,7 @@ defmodule Req.StepsTest do
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(req, url: "#{url}/redirect").status == 200
-             end) =~ "[debug] redirecting to #{no_scheme}/ok"
+             end) == "[debug] redirecting to #{no_scheme}/ok\n"
     end
   end
 
@@ -2010,9 +2011,11 @@ defmodule Req.StepsTest do
           assert response.body == "ok - updated"
         end)
 
-      assert log =~ "will retry in 1ms, 3 attempts left"
-      assert log =~ "will retry in 2ms, 2 attempts left"
-      assert log =~ "will retry in 4ms, 1 attempt left"
+      assert log == """
+             [warning] retry: got response with status 500, will retry in 1ms, 3 attempts left
+             [warning] retry: got response with status 500, will retry in 2ms, 2 attempts left
+             [warning] retry: got response with status 500, will retry in 4ms, 1 attempt left
+             """
     end
 
     test "invalid :retry_delay" do
@@ -2055,8 +2058,10 @@ defmodule Req.StepsTest do
           assert response.body == "ok - updated"
         end)
 
-      assert log =~ "will retry in 1ms, 2 attempts left"
-      assert log =~ "will retry in 1ms, 2 attempts left"
+      assert log == """
+             [warning] retry: got response with status 500, will retry in 1ms, 3 attempts left
+             [warning] retry: got response with status 500, will retry in 1ms, 2 attempts left
+             """
     end
 
     @tag :capture_log
@@ -2072,10 +2077,8 @@ defmodule Req.StepsTest do
       request = Req.merge(req, retry_delay: 1)
       log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
 
-      assert String.match?(
-               log,
-               ~r/\[warning\][[:blank:]]+retry: got response with status 500, will retry in 1ms, 3 attempts left/u
-             )
+      assert log ==
+               "[warning] retry: got response with status 500, will retry in 1ms, 3 attempts left\n"
     end
 
     @tag :capture_log
@@ -2092,10 +2095,8 @@ defmodule Req.StepsTest do
 
       log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
 
-      assert String.match?(
-               log,
-               ~r/\[info\][[:blank:]]+retry: got response with status 500, will retry in 1ms, 3 attempts left/u
-             )
+      assert log ==
+               "[info] retry: got response with status 500, will retry in 1ms, 3 attempts left\n"
     end
 
     @tag :capture_log
