@@ -2115,8 +2115,23 @@ defmodule Req.StepsTest do
     end
 
     @tag :capture_log
-    @tag timeout: 1000
-    test "retry_delay" do
+    test "retry-after" do
+      %{req: req} =
+        serve(
+          sequence: [
+            &send_resp_retry_after(&1, 0),
+            &send_resp_retry_after(%{&1 | status: 503}, DateTime.add(DateTime.utc_now(), 2)),
+            &Plug.Conn.send_resp(&1, 200, "ok")
+          ]
+        )
+
+      assert Req.request!(req, max_retries: 5).body == "ok"
+    end
+
+    @tag :capture_log
+    test ":retry_delay" do
+      pid = self()
+
       %{req: req} =
         serve(
           sequence: [
@@ -2128,45 +2143,17 @@ defmodule Req.StepsTest do
           ]
         )
 
-      assert Req.request!(req, retry_delay: 100, max_retries: 5).body == "ok"
-    end
-
-    defp send_resp_retry_after(conn, retry_after) do
-      conn
-      |> Plug.Conn.put_resp_header("retry-after", retry_after(retry_after))
-      |> Plug.Conn.send_resp(conn.status || 429, "")
-    end
-
-    test "configured :retry_delay takes precedence over Retry-After" do
-      pid = self()
-
-      adapter = fn request ->
-        request = Req.Request.update_private(request, :attempt, 0, &(&1 + 1))
-
-        response =
-          case request.private.attempt do
-            0 ->
-              Req.Response.new(status: 429) |> retry_after(0)
-
-            1 ->
-              Req.Response.new(status: 200, body: "ok")
-          end
-
-        {request, response}
-      end
-
       retry_delay = fn retry_count ->
         send(pid, {:retry_delay, retry_count})
         0
       end
 
-      assert Req.request!(adapter: adapter, retry_delay: retry_delay, max_retries: 1).body == "ok"
+      assert Req.request!(req, retry_delay: retry_delay, max_retries: 5).body == "ok"
       assert_received {:retry_delay, 0}
+      assert_received {:retry_delay, 1}
+      assert_received {:retry_delay, 2}
+      assert_received {:retry_delay, 3}
     end
-
-    defp retry_after(r, value), do: Req.Response.put_header(r, "retry-after", retry_after(value))
-    defp retry_after(integer) when is_integer(integer), do: to_string(integer)
-    defp retry_after(%DateTime{} = dt), do: Req.Utils.format_http_date(dt)
 
     @tag :capture_log
     test "always failing" do
@@ -2820,6 +2807,15 @@ defmodule Req.StepsTest do
     |> put_new_resp_header("content-type", "text/csv")
     |> Plug.Conn.send_resp(200, NimbleCSV.RFC4180.dump_to_iodata(rows))
   end
+
+  defp send_resp_retry_after(conn, retry_after) do
+    conn
+    |> Plug.Conn.put_resp_header("retry-after", retry_after(retry_after))
+    |> Plug.Conn.send_resp(conn.status || 429, "")
+  end
+
+  defp retry_after(integer) when is_integer(integer), do: to_string(integer)
+  defp retry_after(%DateTime{} = dt), do: Req.Utils.format_http_date(dt)
 
   defp put_new_resp_header(conn, name, value) do
     case Plug.Conn.get_resp_header(conn, name) do
