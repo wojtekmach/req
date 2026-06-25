@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+  * [`Req`]: Treat URL userinfo as Basic Authentication.
+
+  * [`compress_body`]: Do nothing when request content-encoding is already set.
+
+  * [`compress_body`]: Update multipart boundary when re-running the step.
+
   * [`decode_body`]: Deprecate `:decode_json` in favour of setting a custom JSON
     decoder via `:decoders`:
 
@@ -11,11 +17,23 @@
         # after:
         Req.get!(url, decoders: [json: &Jason.decode(&1, keys: :atoms)])
 
+  * [`put_params`]: (**BREAKING CHANGE**) Overwrite existing query params instead of appending.
+
   * [`redirect`]: Strip userinfo from redirect locations and log a warning.
 
     Previously, redirecting to a URL with userinfo (e.g. `http://user:pass@host`)
     kept the userinfo in the request URL (without converting it to auth). It is
     now dropped so credentials supplied by the redirecting server aren't sent.
+
+  * [`retry`]: Honor configured `:retry_delay` over `Retry-After`.
+
+  * [`run_finch`]: Support `finch: options`.
+
+  * [`run_finch`]: Deprecate `finch: name` in favour of `finch: [name: name]`.
+
+  * [`run_finch`]: Deprecate `pool_timeout: value` in favour of `finch: [pool_timeout: value]`.
+
+  * [`run_finch`]: Deprecate `pool_max_idle_time: value` in favour of `finch: [pool_max_idle_time: value]`.
 
 ## v0.6.2 (2026-06-19)
 
