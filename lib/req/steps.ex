@@ -14,6 +14,7 @@ defmodule Req.Steps do
   """
 
   require Logger
+  require Req.Utils
 
   @doc false
   def attach(req) do
@@ -400,18 +401,10 @@ defmodule Req.Steps do
     request
   end
 
-  defmacrop brotli_loaded? do
-    Code.ensure_loaded?(:brotli)
-  end
-
-  defp zstd_available? do
-    System.otp_release() >= "28"
-  end
-
   defp supported_accept_encoding do
     value = "gzip"
-    value = if brotli_loaded?(), do: "br, " <> value, else: value
-    if zstd_available?(), do: "zstd, " <> value, else: value
+    value = if Req.Utils.brotli_loaded?(), do: "br, " <> value, else: value
+    if Req.Utils.zstd_available?(), do: "zstd, " <> value, else: value
   end
 
   @doc """
@@ -1046,271 +1039,8 @@ defmodule Req.Steps do
       end
   """
   @doc step: :request
-  def run_plug(request)
-
-  if Code.ensure_loaded?(Plug.Test) do
-    def run_plug(request) do
-      result =
-        case request.body do
-          iodata when is_binary(iodata) or is_list(iodata) ->
-            {:ok, IO.iodata_to_binary(iodata), request}
-
-          nil ->
-            {:ok, "", request}
-
-          req_body_fun when is_function(req_body_fun, 1) ->
-            drain_req_body_fun(req_body_fun, request, [])
-
-          enumerable ->
-            {:ok, enumerable |> Enum.to_list() |> IO.iodata_to_binary(), request}
-        end
-
-      case result do
-        {:ok, req_body, request} ->
-          run_plug(request, req_body)
-
-        # Halting req_body_fun closes the connection without reading the
-        # response, so the plug is never called.
-        {:halt, request} ->
-          {request, Req.Response.new(status: nil)}
-      end
-    end
-
-    defp run_plug(request, req_body) do
-      plug = request.options.plug
-
-      {req_body, request} =
-        case Req.Request.get_header(request, "content-encoding") do
-          [] ->
-            {req_body, request}
-
-          encoding_headers ->
-            case decompress_with_encoding(encoding_headers, req_body) do
-              %Req.DecompressError{} = error ->
-                raise error
-
-              {decompressed_body, _unknown_codecs} ->
-                {decompressed_body, Req.Request.delete_header(request, "content-encoding")}
-            end
-        end
-
-      req_headers =
-        if unquote(Req.MixProject.legacy_headers_as_lists?()) do
-          request.headers
-        else
-          for {name, values} <- request.headers,
-              value <- values do
-            {name, value}
-          end
-        end
-
-      parser_opts =
-        Plug.Parsers.init(
-          parsers: [:urlencoded, :multipart, :json],
-          pass: ["*/*"],
-          json_decoder: Jason
-        )
-
-      conn =
-        Req.Test.Adapter.conn(%Plug.Conn{}, request.method, request.url, req_body)
-        |> Map.replace!(:req_headers, req_headers)
-        |> Plug.Conn.fetch_query_params(validate_utf8: false)
-        |> Plug.Conn.put_private(:req_private, request.private)
-        |> Plug.Parsers.call(parser_opts)
-
-      # Handle cases where the body isn't read with Plug.Parsers
-      {mod, state} = conn.adapter
-      state = %{state | body_read: true}
-      conn = %{conn | adapter: {mod, state}}
-      conn = call_plug(conn, plug)
-
-      unless match?(%Plug.Conn{}, conn) do
-        raise ArgumentError, "expected to return %Plug.Conn{}, got: #{inspect(conn)}"
-      end
-
-      if exception = conn.private[:req_test_exception] do
-        {request, exception}
-      else
-        handle_plug_result(conn, request)
-      end
-    end
-
-    defp drain_req_body_fun(req_body_fun, request, chunks) do
-      case req_body_fun.(request) do
-        {:data, chunk, request} ->
-          drain_req_body_fun(req_body_fun, request, [chunk | chunks])
-
-        {:done, request} ->
-          {:ok, chunks |> Enum.reverse() |> IO.iodata_to_binary(), request}
-
-        {:halt, request} ->
-          {:halt, request}
-
-        other ->
-          raise "expected req_body_fun to return {:data, chunk, request}, {:done, request}, or {:halt, request}, got: #{inspect(other)}"
-      end
-    end
-
-    defp handle_plug_result(conn, request) do
-      # consume messages sent by Plug.Test adapter
-      {Req.Test.Adapter, %{ref: ref, chunks: chunks}} = conn.adapter
-
-      if conn.state == :unset do
-        raise """
-        expected connection to have a response but no response was set/sent.
-
-        Please verify that you are using Plug.Conn.send_resp/3 in your plug:
-
-            Req.Test.stub(MyStub, fn conn ->
-              Plug.Conn.send_resp(conn, 200, "Hello, World!")
-            end)
-        """
-      end
-
-      receive do
-        {^ref, {_status, _headers, _body}} -> :ok
-      after
-        0 -> :ok
-      end
-
-      receive do
-        {:plug_conn, :sent} -> :ok
-      after
-        0 -> :ok
-      end
-
-      case request.into do
-        nil ->
-          response =
-            Req.Response.new(
-              status: conn.status,
-              headers: conn.resp_headers,
-              body: conn.resp_body
-            )
-
-          {request, response}
-
-        fun when is_function(fun, 2) ->
-          response =
-            Req.Response.new(
-              status: conn.status,
-              headers: conn.resp_headers
-            )
-
-          Enum.reduce_while(
-            chunks || [conn.resp_body],
-            {request, response},
-            fn chunk, acc ->
-              case fun.({:data, chunk}, acc) do
-                {:cont, acc} ->
-                  {:cont, acc}
-
-                {:halt, acc} ->
-                  {:halt, acc}
-
-                other ->
-                  raise ArgumentError,
-                        "expected {:cont, acc} or {:halt, acc}, got: #{inspect(other)}"
-              end
-            end
-          )
-
-        :self ->
-          async = %Req.Response.Async{
-            pid: self(),
-            ref: make_ref(),
-            stream_fun: &plug_parse_message/2,
-            cancel_fun: &plug_cancel/1
-          }
-
-          resp = Req.Response.new(status: conn.status, headers: conn.resp_headers, body: async)
-
-          for chunk <- chunks || [conn.resp_body] do
-            send(self(), {async.ref, {:data, chunk}})
-          end
-
-          send(self(), {async.ref, :done})
-          {request, resp}
-
-        collectable ->
-          response =
-            Req.Response.new(
-              status: conn.status,
-              headers: conn.resp_headers
-            )
-
-          if conn.status == 200 do
-            {acc, collector} = Collectable.into(collectable)
-
-            acc =
-              Enum.reduce(
-                chunks || [conn.resp_body],
-                acc,
-                fn chunk, acc ->
-                  collector.(acc, {:cont, chunk})
-                end
-              )
-
-            acc = collector.(acc, :done)
-            {request, %{response | body: acc}}
-          else
-            {request, put_in(response.body, conn.resp_body)}
-          end
-      end
-    end
-
-    defp plug_parse_message(ref, {ref, {:data, data}}) do
-      {:ok, [data: data]}
-    end
-
-    defp plug_parse_message(ref, {ref, :done}) do
-      {:ok, [:done]}
-    end
-
-    defp plug_parse_message(_, _) do
-      :unknown
-    end
-
-    defp plug_cancel(ref) do
-      plug_clean_responses(ref)
-      :ok
-    end
-
-    defp plug_clean_responses(ref) do
-      receive do
-        {^ref, _} -> plug_clean_responses(ref)
-      after
-        0 -> :ok
-      end
-    end
-
-    defp call_plug(conn, plug) when is_atom(plug) do
-      plug.call(conn, [])
-    end
-
-    defp call_plug(conn, {plug, options}) when is_atom(plug) do
-      plug.call(conn, plug.init(options))
-    end
-
-    defp call_plug(conn, plug) when is_function(plug, 1) do
-      plug.(conn)
-    end
-
-    defp call_plug(conn, plug) when is_function(plug, 2) do
-      plug.(conn, [])
-    end
-  else
-    def run_plug(_request) do
-      Logger.error("""
-      Could not find plug dependency.
-
-      Please add :plug to your dependencies:
-
-          {:plug, "~> 1.0"}
-      """)
-
-      raise "missing plug dependency"
-    end
+  def run_plug(request) do
+    Req.Plug.run(request)
   end
 
   @doc """
@@ -1702,7 +1432,7 @@ defmodule Req.Steps do
     else
       encoding_headers = Req.Response.get_header(response, "content-encoding")
 
-      case decompress_with_encoding(encoding_headers, response.body) do
+      case Req.Utils.decompress_with_encoding(encoding_headers, response.body) do
         %Req.DecompressError{} = exception ->
           {request, exception}
 
@@ -1725,83 +1455,6 @@ defmodule Req.Steps do
           {request, response}
       end
     end
-  end
-
-  defp decompress_with_encoding([], body), do: {body, []}
-
-  defp decompress_with_encoding(encoding_headers, body) do
-    codecs = compression_algorithms(encoding_headers)
-    decompress_body(codecs, body, [])
-  end
-
-  defp decompress_body([gzip | rest], body, acc) when gzip in ["gzip", "x-gzip"] do
-    try do
-      decompress_body(rest, :zlib.gunzip(body), acc)
-    rescue
-      e in ErlangError ->
-        if e.original == :data_error do
-          %Req.DecompressError{format: :gzip, data: body}
-        else
-          reraise e, __STACKTRACE__
-        end
-    end
-  end
-
-  defp decompress_body(["br" | rest], body, acc) do
-    if brotli_loaded?() do
-      case :brotli.decode(body) do
-        {:ok, decompressed} ->
-          decompress_body(rest, decompressed, acc)
-
-        :error ->
-          %Req.DecompressError{format: :br, data: body}
-      end
-    else
-      Logger.debug(":brotli library not loaded, skipping brotli decompression")
-      decompress_body(rest, body, ["br" | acc])
-    end
-  end
-
-  defp decompress_body(["zstd" | rest], body, acc) do
-    if zstd_available?() do
-      case zstd_decompress(body) do
-        {:ok, decompressed} ->
-          decompress_body(rest, decompressed, acc)
-
-        {:error, reason} ->
-          %Req.DecompressError{format: :zstd, data: body, reason: reason}
-      end
-    else
-      Logger.debug(
-        ":zstd module not available (requires Erlang/OTP 28+), skipping zstd decompression"
-      )
-
-      decompress_body(rest, body, ["zstd" | acc])
-    end
-  end
-
-  defp decompress_body(["identity" | rest], body, acc) do
-    decompress_body(rest, body, acc)
-  end
-
-  defp decompress_body([codec | rest], body, acc) do
-    Logger.debug("algorithm #{inspect(codec)} is not supported")
-    decompress_body(rest, body, [codec | acc])
-  end
-
-  defp decompress_body([], body, acc) do
-    {body, acc}
-  end
-
-  defp compression_algorithms(values) do
-    values
-    |> Enum.flat_map(fn value ->
-      value
-      |> String.downcase()
-      |> String.split(",", trim: true)
-      |> Enum.map(&String.trim/1)
-    end)
-    |> Enum.reverse()
   end
 
   @doc false
@@ -2008,7 +1661,7 @@ defmodule Req.Steps do
 
   defp builtin_codec(_request, :zst) do
     fn body ->
-      case zstd_decompress(body) do
+      case Req.Utils.zstd_decompress(body) do
         {:ok, decompressed} ->
           {:ok, decompressed}
 
@@ -2021,18 +1674,6 @@ defmodule Req.Steps do
 
   defp builtin_codec(_request, :csv) do
     fn body -> {:ok, NimbleCSV.RFC4180.parse_string(body, skip_headers: false)} end
-  end
-
-  # Decompresses zstd `body` using the built-in OTP 28+ `:zstd` module. `:zstd.decompress/1`
-  # returns iodata and raises `{:zstd_error, reason}` on invalid input.
-  defp zstd_decompress(body) do
-    {:ok, IO.iodata_to_binary(:zstd.decompress(body))}
-  rescue
-    e in ErlangError ->
-      case e.original do
-        {:zstd_error, reason} -> {:error, reason}
-        _ -> reraise(e, __STACKTRACE__)
-      end
   end
 
   defp run_decoder(request, response, codec) do

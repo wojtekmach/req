@@ -1,4 +1,4 @@
-defmodule Req.Test.AdapterTest do
+defmodule Req.PlugTest do
   use Req.Case, async: true
 
   test "reading request body" do
