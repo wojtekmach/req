@@ -455,7 +455,6 @@ defmodule Req.Request do
             error_steps: [],
             private: %{},
             registered_options: MapSet.new(),
-            current_request_steps: [],
             into: nil,
             async: nil
 
@@ -761,11 +760,7 @@ defmodule Req.Request do
   """
   @spec append_request_steps(t(), keyword(request_step())) :: t()
   def append_request_steps(request, steps) do
-    %{
-      request
-      | request_steps: request.request_steps ++ steps,
-        current_request_steps: request.current_request_steps ++ Keyword.keys(steps)
-    }
+    update_in(request.request_steps, &(&1 ++ steps))
   end
 
   @doc """
@@ -783,11 +778,7 @@ defmodule Req.Request do
   """
   @spec prepend_request_steps(t(), keyword(request_step())) :: t()
   def prepend_request_steps(request, steps) do
-    %{
-      request
-      | request_steps: steps ++ request.request_steps,
-        current_request_steps: Keyword.keys(steps) ++ request.current_request_steps
-    }
+    update_in(request.request_steps, &(steps ++ &1))
   end
 
   @doc """
@@ -1121,14 +1112,14 @@ defmodule Req.Request do
       200
   """
   @spec run_request(t()) :: {t(), Req.Response.t() | Exception.t()}
-  def run_request(request)
+  def run_request(request) do
+    run_request(request, request.request_steps)
+  end
 
-  def run_request(%{current_request_steps: [step | rest]} = request) do
-    step = Keyword.fetch!(request.request_steps, step)
-
+  defp run_request(request, [{_name, step} | rest]) do
     case run_step(step, request) do
       %Req.Request{} = request ->
-        run_request(%{request | current_request_steps: rest})
+        run_request(request, rest)
 
       {%Req.Request{halted: true} = request, response_or_exception} ->
         {request, response_or_exception}
@@ -1141,7 +1132,7 @@ defmodule Req.Request do
     end
   end
 
-  def run_request(%{current_request_steps: []} = request) do
+  defp run_request(request, []) do
     case run_step(request.adapter, request) do
       {request, %Req.Response{} = response} ->
         run_response(request, response)

@@ -568,8 +568,11 @@ defmodule Req.Steps do
   end
 
   defp put_path_params(request, params) do
+    template = Req.Request.get_private(request, :path_params_template, request.url.path)
+
     request
-    |> Req.Request.put_private(:path_params_template, request.url.path)
+    |> Req.Request.put_private(:path_params_template, template)
+    |> then(&put_in(&1.url.path, template))
     |> apply_path_params(params)
   end
 
@@ -1845,7 +1848,7 @@ defmodule Req.Steps do
     # assume put_params step already run so remove :params option so it's not applied again
     |> Req.Request.delete_option(:params)
     |> remove_credentials_if_untrusted(redirect_trusted, location_url)
-    |> put_redirect_method(response.status)
+    |> change_post_to_get(response.status)
     |> Map.replace!(:url, location_url)
   end
 
@@ -1879,11 +1882,15 @@ defmodule Req.Steps do
   #
   # And my understanding is essentially same applies for 303.
   # Also see https://everything.curl.dev/http/redirects
-  defp put_redirect_method(%{method: :post} = request, status) when status in 301..303 do
-    %{request | method: :get}
+  defp change_post_to_get(%{method: :post} = request, status) when status in 301..303 do
+    request
+    |> Map.merge(%{method: :get, body: nil})
+    |> Req.Request.drop_options([:json, :form, :form_multipart])
+    |> Req.Request.delete_header("content-type")
+    |> Req.Request.delete_header("content-length")
   end
 
-  defp put_redirect_method(request, _status) do
+  defp change_post_to_get(request, _status) do
     request
   end
 
