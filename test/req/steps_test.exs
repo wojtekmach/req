@@ -309,16 +309,24 @@ defmodule Req.StepsTest do
              ).status == 200
     end
 
-    test "form_multipart: re-running keeps content-type boundary in sync with body" do
-      req = Req.new(form_multipart: [a: 1])
+    @tag :capture_log
+    test "form_multipart: content-type boundary stays in sync with body on retry" do
+      %{req: req} =
+        serve(
+          sequence: [
+            fn conn ->
+              assert conn.body_params == %{"a" => "1"}
+              Plug.Conn.send_resp(conn, 500, "")
+            end,
+            fn conn ->
+              assert conn.body_params == %{"a" => "1"}
+              Plug.Conn.send_resp(conn, 200, "")
+            end
+          ]
+        )
 
-      # TODO: use Req.Request.prepare to test this when current_request_steps are gone
-      encoded = req |> Req.Steps.encode_body() |> Req.Steps.encode_body()
-
-      ["multipart/form-data; boundary=" <> boundary] =
-        Req.Request.get_header(encoded, "content-type")
-
-      assert IO.iodata_to_binary(encoded.body) =~ "--#{boundary}\r\n"
+      assert Req.post!(req, form_multipart: [a: 1], retry: :transient, retry_delay: 1).status ==
+               200
     end
 
     test "GET to POST" do
@@ -381,6 +389,19 @@ defmodule Req.StepsTest do
       Req.new(url: "http://foo/bar") |> Req.Request.prepare()
 
     refute Req.Request.get_private(req, :path_params_template)
+  end
+
+  @tag :capture_log
+  test "put_path_params is idempotent" do
+    %{req: req, url: url} =
+      serve(fn conn -> Plug.Conn.send_resp(conn, 500, "") end)
+
+    {req, resp} =
+      Req.run!(req, url: "#{url}/users/:id", path_params: [id: 123], retry_delay: 1)
+
+    assert resp.status == 500
+    assert req.url.path == "/users/123"
+    assert Req.Request.get_private(req, :path_params_template) == "/users/:id"
   end
 
   test "put_path_params properly escapes reserved characters" do
@@ -1585,6 +1606,36 @@ defmodule Req.StepsTest do
              end) == "[debug] redirecting to #{url}/ok\n"
     end
 
+    test "re-runs request steps on each hop" do
+      pid = self()
+
+      %{req: req, url: url} =
+        serve(fn
+          conn when conn.request_path == "/redirect" ->
+            redirect(conn, 302, "/ok")
+
+          conn when conn.request_path == "/ok" ->
+            Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      req =
+        Req.Request.append_request_steps(req,
+          count: fn request ->
+            send(pid, :step_ran)
+            request
+          end
+        )
+
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert Req.get!(req, url: "#{url}/redirect").status == 200
+             end) == "[debug] redirecting to /ok\n"
+
+      # 1 initial request + 1 redirect hop
+      assert_received :step_ran
+      assert_received :step_ran
+      refute_received _
+    end
+
     test "relative" do
       %{req: req, url: url} =
         serve(fn
@@ -1629,6 +1680,23 @@ defmodule Req.StepsTest do
                  assert Req.post!(req, url: "#{url}/redirect", body: "body").status == 200
                end) == "[debug] redirecting to #{url}/ok\n"
       end
+    end
+
+    @tag :capture_log
+    test "change POST to GET drops the request body" do
+      %{req: req, url: url} =
+        serve(fn
+          conn when conn.request_path == "/redirect" and conn.method == "POST" ->
+            redirect(conn, 303, "http://#{conn.host}:#{conn.port}/ok")
+
+          conn when conn.request_path == "/ok" and conn.method == "GET" ->
+            {:ok, body, conn} = Plug.Conn.read_body(conn)
+            assert body == ""
+            assert Plug.Conn.get_req_header(conn, "content-type") == []
+            Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      assert Req.post!(req, url: "#{url}/redirect", json: %{a: 1}).status == 200
     end
 
     test "do not change method on 307 and 308" do
@@ -2322,6 +2390,33 @@ defmodule Req.StepsTest do
       assert_received :ping
       assert_received :ping
       assert_received :ping
+      refute_received _
+    end
+
+    @tag :capture_log
+    test "re-runs request steps on each attempt" do
+      pid = self()
+
+      %{req: req} =
+        serve(fn conn ->
+          Plug.Conn.send_resp(conn, 500, "oops")
+        end)
+
+      req =
+        Req.Request.append_request_steps(req,
+          count: fn request ->
+            send(pid, :step_ran)
+            request
+          end
+        )
+
+      assert Req.get!(req, retry_delay: 1, max_retries: 3).status == 500
+
+      # 1 initial attempt + 3 retries
+      assert_received :step_ran
+      assert_received :step_ran
+      assert_received :step_ran
+      assert_received :step_ran
       refute_received _
     end
 
