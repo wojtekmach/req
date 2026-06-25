@@ -18,7 +18,7 @@ Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
 #=> "Req is a batteries-included HTTP client for Elixir."
 ```
 
-we get automatic response body decompression & decoding, following redirects, retrying on errors,
+we get automatic response body decoding, following redirects, retrying on errors,
 and much more. Virtually all of the features are broken down into individual functions called
 _steps_. You can easily re-use and re-arrange built-in steps (see [`Req.Steps`] module) and
 write new ones.
@@ -31,7 +31,7 @@ write new ones.
 
   * Request body compression (via [`compress_body`] step)
 
-  * Automatic response body decompression (via [`compressed`] and [`decompress_body`] steps). Supports gzip, brotli, and zstd.
+  * Opt-in response body decompression (via [`compressed`] and [`decompress_body`] steps). Supports gzip, brotli, and zstd.
 
   * Request body encoding. Supports urlencoded and multipart forms, and JSON. See [`encode_body`].
 
@@ -39,7 +39,7 @@ write new ones.
 
   * Encode params as query string (via [`put_params`] step.)
 
-  * Setting base URL (via [`put_base_url`] step.)
+  * Setting base URL (via [`put_base_url`] step.
 
   * Templated request paths (via [`put_path_params`] step.)
 
@@ -223,8 +223,8 @@ There are many packages that extend the Req library. To get yours listed here, s
 
 ## Presentations
 
-  * [Req: A batteries-included HTTP client for Elixir - ElixirConf 2023, 2023-09-08](https://www.youtube.com/watch?v=owz2QacFuoQ "ElixirConf 2023 - Wojtek Mach - Req - a batteries-included HTTP client for Elixir")
-  * [Req: A batteries included HTTP client for Elixir - Elixir Kenya, 2022-08-26](https://www.youtube.com/watch?v=NxWgvHRN6mI "Req: A batteries included HTTP client for Elixir")
+  * [Building API Clients with Req -- ElixirConf EU 2024](https://www.youtube.com/watch?v=AexE5JKpNvA)
+  * [Req: A batteries-included HTTP client for Elixir -- ElixirConf 2023](https://www.youtube.com/watch?v=owz2QacFuoQ)
 
 ## Development
 

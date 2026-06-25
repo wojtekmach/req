@@ -14,6 +14,7 @@ defmodule Req.Steps do
   """
 
   require Logger
+  require Req.Utils
 
   @doc false
   def attach(req) do
@@ -39,6 +40,7 @@ defmodule Req.Steps do
       :raw,
       :http_errors,
       :decode_body,
+      :decoders,
       :decode_json,
       :expect,
       :redirect,
@@ -325,60 +327,68 @@ defmodule Req.Steps do
   @doc """
   Asks the server to return compressed response.
 
+  This step also enables the [`decompress_body`](`Req.Steps.decompress_body/1`) step, which
+  decompresses the response body. Both steps are off by default; set `compressed: true` to opt in.
+
   Supported formats:
 
     * `gzip`
 
     * `br` (if [brotli] is installed)
 
-    * `zstd` (if [ezstd] is installed)
+    * `zstd` (requires Erlang/OTP 28+)
+
+  > #### Only enable compression for trusted servers {: .info}
+  >
+  > The `decompress_body/1` step decompresses the whole response body into memory with no size
+  > limit, so a small response can expand into many gigabytes. A malicious or compromised server
+  > can exploit this to exhaust memory and crash the client (a decompression bomb / denial of
+  > service). For this reason compression is off by default; only set `compressed: true` for
+  > endpoints you trust.
 
   ## Request Options
 
     * `:compressed` - if set to `true`, sets the `accept-encoding` header with compression
-      algorithms that Req supports. Defaults to `true`.
+      algorithms that Req supports and decompresses the response body. Defaults to `false`.
 
-      When streaming response body (`into: fun | collectable`), `compressed` defaults to `false`.
+      This option has no effect when streaming the response body (`into: fun | collectable`).
 
   ## Examples
 
-  Req automatically decompresses response body (`decompress_body/1` step) so let's disable that by
-  passing `raw: true`.
+  By default, Req does not ask for a compressed response. Pass `compressed: true` to request one
+  and have Req decompress the body, so we get back the decompressed content:
 
-  By default, we ask the server to send compressed response. Let's look at the headers and the raw
-  body. Notice the body starts with `<<31, 139>>` (`<<0x1F, 0x8B>>`), the "magic bytes" for gzip:
+      iex> response = Req.get!("https://elixir-lang.org", compressed: true)
+      iex> response.body |> binary_part(0, 15)
+      "<!DOCTYPE html>"
 
-      iex> response = Req.get!("https://elixir-lang.org", raw: true)
+  To inspect the raw compressed bytes the server sent, additionally pass `raw: true`, which
+  disables decompression. Notice the body now starts with `<<31, 139>>`, the "magic bytes"
+  for gzip:
+
+      iex> response = Req.get!("https://elixir-lang.org", compressed: true, raw: true)
       iex> Req.Response.get_header(response, "content-encoding")
       ["gzip"]
       iex> response.body |> binary_part(0, 2)
       <<31, 139>>
 
-  Now, let's pass `compressed: false` and notice the raw body was not compressed:
-
-      iex> response = Req.get!("https://elixir-lang.org", raw: true, compressed: false)
-      iex> response.body |> binary_part(0, 15)
-      "<!DOCTYPE html>"
-
-  The Brotli and Zstandard compression algorithms are also supported if the optional
-  packages are installed:
+  Zstandard is supported out of the box on Erlang/OTP 28+ (via the built-in `:zstd` module).
+  Brotli is supported if the optional [brotli] package is installed:
 
       Mix.install([
         :req,
-        {:brotli, "~> 0.3.0"},
-        {:ezstd, "~> 1.0"}
+        {:brotli, "~> 0.3.0"}
       ])
 
-      response = Req.get!("https://httpbin.org/anything")
+      response = Req.get!("https://httpbin.org/anything", compressed: true)
       response.body["headers"]["Accept-Encoding"]
       #=> "zstd, br, gzip"
 
   [brotli]: https://hex.pm/packages/brotli
-  [ezstd]: https://hex.pm/packages/ezstd
   """
   @doc step: :request
   def compressed(%Req.Request{into: nil} = request) do
-    case Req.Request.get_option(request, :compressed, true) do
+    case Req.Request.get_option(request, :compressed, false) do
       true ->
         Req.Request.put_new_header(request, "accept-encoding", supported_accept_encoding())
 
@@ -391,18 +401,10 @@ defmodule Req.Steps do
     request
   end
 
-  defmacrop brotli_loaded? do
-    Code.ensure_loaded?(:brotli)
-  end
-
-  defmacrop ezstd_loaded? do
-    Code.ensure_loaded?(:ezstd)
-  end
-
   defp supported_accept_encoding do
     value = "gzip"
-    value = if brotli_loaded?(), do: "br, " <> value, else: value
-    if ezstd_loaded?(), do: "zstd, " <> value, else: value
+    value = if Req.Utils.brotli_loaded?(), do: "br, " <> value, else: value
+    if Req.Utils.zstd_available?(), do: "zstd, " <> value, else: value
   end
 
   @doc """
@@ -495,7 +497,7 @@ defmodule Req.Steps do
         multipart = Req.Utils.encode_form_multipart(data)
 
         %{request | body: multipart.body}
-        |> Req.Request.put_new_header("content-type", multipart.content_type)
+        |> Req.Request.put_header("content-type", multipart.content_type)
         |> then(&maybe_put_content_length(&1, multipart.size))
 
       data = request.options[:json] ->
@@ -614,12 +616,16 @@ defmodule Req.Steps do
     request
   end
 
-  defp put_params(request, params) do
-    encoded = URI.encode_query(params)
+  defp put_params(request, new_params) do
+    update_in(request.url.query, fn query ->
+      old_params = Enum.to_list(URI.query_decoder(query || ""))
 
-    update_in(request.url.query, fn
-      nil -> encoded
-      query -> query <> "&" <> encoded
+      new_params
+      |> Enum.reduce(old_params, fn {name, value}, acc ->
+        name = to_string(name)
+        List.keystore(acc, name, 0, {name, value})
+      end)
+      |> URI.encode_query()
     end)
   end
 
@@ -741,7 +747,8 @@ defmodule Req.Steps do
   """
   @doc step: :request
   def compress_body(request) do
-    if request.body && request.options[:compress_body] do
+    if request.body && request.options[:compress_body] &&
+         Req.Request.get_header(request, "content-encoding") == [] do
       body =
         case request.body do
           iodata when is_binary(iodata) or is_list(iodata) ->
@@ -792,7 +799,7 @@ defmodule Req.Steps do
           }
         )
 
-      Req.get!("https://httpbin.org/json", finch: MyFinch)
+      Req.get!("https://httpbin.org/json", finch: [name: MyFinch])
 
   More commonly you'd add the custom Finch pool as part of your supervision tree in your
   `application.ex`:
@@ -806,7 +813,7 @@ defmodule Req.Steps do
       ]
 
   That way you can also configure a bigger pool size for the HTTP pool. You just mustn't forget to
-  pass along `finch: MyFinch` as discussed above. You could use `Req.default_options/1` to make it
+  pass along `finch: [name: MyFinch]` as discussed above. You could use `Req.default_options/1` to make it
   a global default but it's generally discouraged.
 
   For documentation about the possible pool options and their meaning, please check out the
@@ -814,7 +821,24 @@ defmodule Req.Steps do
 
   ## Request Options
 
-    * `:finch` - the name of the Finch pool. Defaults to a pool automatically started by Req.
+    * `:finch` - options for the Finch adapter. Defaults to a pool automatically started by
+      Req. Can include:
+
+        * `:name` - the name of the Finch pool.
+
+        * Finch request options, e.g. `:pool_tag`, `:pool_timeout`, `:receive_timeout`. See
+          `t:Finch.Request.build_opt/0` and `t:Finch.request_opt/0` for more information.
+
+        * Finch pool options, e.g.: `:conn_max_idle_time`, `:pool_max_idle_time`, `:conn_opts`.
+          See `Finch.start_link/1` for more information.
+
+          Finch pool options cannot be mixed with `:name` option.
+
+      Examples:
+
+          Req.get!("https://httpbin.org/json", finch: [name: MyFinch])
+          Req.get!("https://httpbin.org/json", finch: [name: MyFinch, pool_tag: :bulk])
+          Req.get!("https://httpbin.org/json", finch: [conn_max_idle_time: 10_000])
 
     * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
       the given connection options:
@@ -843,17 +867,12 @@ defmodule Req.Steps do
       and otherwise defaults to `false`.
       This is a shortcut for setting `connect_options: [transport_opts: [inet6: true]]`.
 
-    * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
-
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
 
     * `:request_timeout` - response timeout in milliseconds, defaults to `:infinity`.
       See `Finch.request/3`.
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket.
-
-    * `:pool_max_idle_time` - the maximum number of milliseconds that a pool can be
-      idle before being terminated, used only by HTTP1 pools. Default to `:infinity`.
 
     * `:finch_private` - a map or keyword list of private metadata to add to the Finch request.
       May be useful for adding custom data when handling telemetry with `Finch.Telemetry`.
@@ -1020,259 +1039,8 @@ defmodule Req.Steps do
       end
   """
   @doc step: :request
-  def run_plug(request)
-
-  if Code.ensure_loaded?(Plug.Test) do
-    def run_plug(request) do
-      plug = request.options.plug
-
-      {req_body, request} =
-        case request.body do
-          iodata when is_binary(iodata) or is_list(iodata) ->
-            {IO.iodata_to_binary(iodata), request}
-
-          nil ->
-            {"", request}
-
-          req_body_fun when is_function(req_body_fun, 1) ->
-            drain_req_body_fun(req_body_fun, request, [])
-
-          enumerable ->
-            {enumerable |> Enum.to_list() |> IO.iodata_to_binary(), request}
-        end
-
-      {req_body, request} =
-        case Req.Request.get_header(request, "content-encoding") do
-          [] ->
-            {req_body, request}
-
-          encoding_headers ->
-            case decompress_with_encoding(encoding_headers, req_body) do
-              %Req.DecompressError{} = error ->
-                raise error
-
-              {decompressed_body, _unknown_codecs} ->
-                {decompressed_body, Req.Request.delete_header(request, "content-encoding")}
-            end
-        end
-
-      req_headers =
-        if unquote(Req.MixProject.legacy_headers_as_lists?()) do
-          request.headers
-        else
-          for {name, values} <- request.headers,
-              value <- values do
-            {name, value}
-          end
-        end
-
-      parser_opts =
-        Plug.Parsers.init(
-          parsers: [:urlencoded, :multipart, :json],
-          pass: ["*/*"],
-          json_decoder: Jason
-        )
-
-      conn =
-        Req.Test.Adapter.conn(%Plug.Conn{}, request.method, request.url, req_body)
-        |> Map.replace!(:req_headers, req_headers)
-        |> Plug.Conn.fetch_query_params(validate_utf8: false)
-        |> Plug.Conn.put_private(:req_private, request.private)
-        |> Plug.Parsers.call(parser_opts)
-
-      # Handle cases where the body isn't read with Plug.Parsers
-      {mod, state} = conn.adapter
-      state = %{state | body_read: true}
-      conn = %{conn | adapter: {mod, state}}
-      conn = call_plug(conn, plug)
-
-      unless match?(%Plug.Conn{}, conn) do
-        raise ArgumentError, "expected to return %Plug.Conn{}, got: #{inspect(conn)}"
-      end
-
-      if exception = conn.private[:req_test_exception] do
-        {request, exception}
-      else
-        handle_plug_result(conn, request)
-      end
-    end
-
-    defp drain_req_body_fun(req_body_fun, request, chunks) do
-      case req_body_fun.(request) do
-        {:data, chunk, request} ->
-          drain_req_body_fun(req_body_fun, request, [chunk | chunks])
-
-        {:done, request} ->
-          {chunks |> Enum.reverse() |> IO.iodata_to_binary(), request}
-
-        {:halt, request} ->
-          {chunks |> Enum.reverse() |> IO.iodata_to_binary(), request}
-
-        other ->
-          raise "expected req_body_fun to return {:data, chunk, request}, {:done, request}, or {:halt, request}, got: #{inspect(other)}"
-      end
-    end
-
-    defp handle_plug_result(conn, request) do
-      # consume messages sent by Plug.Test adapter
-      {Req.Test.Adapter, %{ref: ref, chunks: chunks}} = conn.adapter
-
-      if conn.state == :unset do
-        raise """
-        expected connection to have a response but no response was set/sent.
-
-        Please verify that you are using Plug.Conn.send_resp/3 in your plug:
-
-            Req.Test.stub(MyStub, fn conn ->
-              Plug.Conn.send_resp(conn, 200, "Hello, World!")
-            end)
-        """
-      end
-
-      receive do
-        {^ref, {_status, _headers, _body}} -> :ok
-      after
-        0 -> :ok
-      end
-
-      receive do
-        {:plug_conn, :sent} -> :ok
-      after
-        0 -> :ok
-      end
-
-      case request.into do
-        nil ->
-          response =
-            Req.Response.new(
-              status: conn.status,
-              headers: conn.resp_headers,
-              body: conn.resp_body
-            )
-
-          {request, response}
-
-        fun when is_function(fun, 2) ->
-          response =
-            Req.Response.new(
-              status: conn.status,
-              headers: conn.resp_headers
-            )
-
-          Enum.reduce_while(
-            chunks || [conn.resp_body],
-            {request, response},
-            fn chunk, acc ->
-              case fun.({:data, chunk}, acc) do
-                {:cont, acc} ->
-                  {:cont, acc}
-
-                {:halt, acc} ->
-                  {:halt, acc}
-
-                other ->
-                  raise ArgumentError,
-                        "expected {:cont, acc} or {:halt, acc}, got: #{inspect(other)}"
-              end
-            end
-          )
-
-        :self ->
-          async = %Req.Response.Async{
-            pid: self(),
-            ref: make_ref(),
-            stream_fun: &plug_parse_message/2,
-            cancel_fun: &plug_cancel/1
-          }
-
-          resp = Req.Response.new(status: conn.status, headers: conn.resp_headers, body: async)
-
-          for chunk <- chunks || [conn.resp_body] do
-            send(self(), {async.ref, {:data, chunk}})
-          end
-
-          send(self(), {async.ref, :done})
-          {request, resp}
-
-        collectable ->
-          response =
-            Req.Response.new(
-              status: conn.status,
-              headers: conn.resp_headers
-            )
-
-          if conn.status == 200 do
-            {acc, collector} = Collectable.into(collectable)
-
-            acc =
-              Enum.reduce(
-                chunks || [conn.resp_body],
-                acc,
-                fn chunk, acc ->
-                  collector.(acc, {:cont, chunk})
-                end
-              )
-
-            acc = collector.(acc, :done)
-            {request, %{response | body: acc}}
-          else
-            {request, put_in(response.body, conn.resp_body)}
-          end
-      end
-    end
-
-    defp plug_parse_message(ref, {ref, {:data, data}}) do
-      {:ok, [data: data]}
-    end
-
-    defp plug_parse_message(ref, {ref, :done}) do
-      {:ok, [:done]}
-    end
-
-    defp plug_parse_message(_, _) do
-      :unknown
-    end
-
-    defp plug_cancel(ref) do
-      plug_clean_responses(ref)
-      :ok
-    end
-
-    defp plug_clean_responses(ref) do
-      receive do
-        {^ref, _} -> plug_clean_responses(ref)
-      after
-        0 -> :ok
-      end
-    end
-
-    defp call_plug(conn, plug) when is_atom(plug) do
-      plug.call(conn, [])
-    end
-
-    defp call_plug(conn, {plug, options}) when is_atom(plug) do
-      plug.call(conn, plug.init(options))
-    end
-
-    defp call_plug(conn, plug) when is_function(plug, 1) do
-      plug.(conn)
-    end
-
-    defp call_plug(conn, plug) when is_function(plug, 2) do
-      plug.(conn, [])
-    end
-  else
-    def run_plug(_request) do
-      Logger.error("""
-      Could not find plug dependency.
-
-      Please add :plug to your dependencies:
-
-          {:plug, "~> 1.0"}
-      """)
-
-      raise "missing plug dependency"
-    end
+  def run_plug(request) do
+    Req.Plug.run(request)
   end
 
   @doc """
@@ -1356,6 +1124,27 @@ defmodule Req.Steps do
 
   defp hash_init(:sha1), do: hash_init(:sha)
   defp hash_init(type), do: :crypto.hash_init(type)
+
+  @aws_sigv4_excluded_headers [
+    # Services like R2 can rewrite this header when
+    # encodings it doesn't support are included, i.e. zstd
+    "accept-encoding",
+    # Trace ID can be rewritten by AWS infrastructure
+    "x-amzn-trace-id",
+    # Authorization is set by SigV4 itself / not part of canonical request
+    "authorization",
+    # RFC 2616 Section 13.5.1 "hop-by-hop" headers
+    # (list is historical; RFC 7230/9110 use Connection header as the
+    # authoritative mechanism, but this enumeration remains the practical baseline)
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailer",
+    "transfer-encoding",
+    "upgrade"
+  ]
 
   @doc """
   Signs request with AWS Signature Version 4.
@@ -1456,8 +1245,7 @@ defmodule Req.Steps do
         end
 
       request = Req.Request.put_new_header(request, "host", request.url.host)
-
-      headers = for {name, values} <- request.headers, value <- values, do: {name, value}
+      headers = Req.Fields.drop(request.headers, @aws_sigv4_excluded_headers)
 
       headers =
         Req.Utils.aws_sigv4_headers(
@@ -1574,6 +1362,10 @@ defmodule Req.Steps do
   @doc """
   Decompresses the response body based on the `content-encoding` header.
 
+  This step only runs when the `:compressed` option is set to `true` (see the `compressed/1`
+  step); otherwise the body is left as is. This guards against decompression bombs, where a
+  small compressed response expands into a much larger body in memory.
+
   This step is disabled on response body streaming. If response body is not a binary, in other
   words it has been transformed by another step, it is left as is.
 
@@ -1583,7 +1375,7 @@ defmodule Req.Steps do
   | ------------- | ----------------------------------------------- |
   | gzip, x-gzip  | `:zlib.gunzip/1`                                |
   | br            | `:brotli.decode/1` (if [brotli] is installed)   |
-  | zstd          | `:ezstd.decompress/1` (if [ezstd] is installed) |
+  | zstd          | `:zstd.decompress/1` (requires Erlang/OTP 28+)  |
   | _other_       | Returns data as is                              |
 
   This step updates the following headers to reflect the changes:
@@ -1593,13 +1385,16 @@ defmodule Req.Steps do
 
   ## Options
 
+    * `:compressed` - if set to `true`, decompresses the response body. Defaults to `false`.
+      See also the `compressed/1` step.
+
     * `:raw` - if set to `true`, disables response body decompression. Defaults to `false`.
 
       Note: setting `raw: true` also disables response body decoding in the `decode_body/1` step.
 
   ## Examples
 
-      iex> response = Req.get!("https://httpbin.org/gzip")
+      iex> response = Req.get!("https://httpbin.org/gzip", compressed: true)
       iex> response.body["gzipped"]
       true
 
@@ -1610,14 +1405,13 @@ defmodule Req.Steps do
         {:brotli, "~> 0.3.0"}
       ])
 
-      response = Req.get!("https://httpbin.org/brotli")
+      response = Req.get!("https://httpbin.org/brotli", compressed: true)
       Req.Response.get_header(response, "content-encoding")
       #=> ["br"]
       response.body["brotli"]
       #=> true
 
   [brotli]: https://hex.pm/packages/brotli
-  [ezstd]: https://hex.pm/packages/ezstd
   """
   @doc step: :response
   def decompress_body(request_response)
@@ -1630,12 +1424,15 @@ defmodule Req.Steps do
   end
 
   def decompress_body({request, response}) do
-    if request.options[:raw] do
+    compressed? = Req.Request.get_option(request, :compressed, false) == true
+    raw? = request.options[:raw] == true
+
+    if not compressed? or raw? do
       {request, response}
     else
       encoding_headers = Req.Response.get_header(response, "content-encoding")
 
-      case decompress_with_encoding(encoding_headers, response.body) do
+      case Req.Utils.decompress_with_encoding(encoding_headers, response.body) do
         %Req.DecompressError{} = exception ->
           {request, exception}
 
@@ -1658,84 +1455,6 @@ defmodule Req.Steps do
           {request, response}
       end
     end
-  end
-
-  defp decompress_with_encoding([], body), do: {body, []}
-
-  defp decompress_with_encoding(encoding_headers, body) do
-    codecs = compression_algorithms(encoding_headers)
-    decompress_body(codecs, body, [])
-  end
-
-  defp decompress_body([gzip | rest], body, acc) when gzip in ["gzip", "x-gzip"] do
-    try do
-      decompress_body(rest, :zlib.gunzip(body), acc)
-    rescue
-      e in ErlangError ->
-        if e.original == :data_error do
-          %Req.DecompressError{format: :gzip, data: body}
-        else
-          reraise e, __STACKTRACE__
-        end
-    end
-  end
-
-  defp decompress_body(["br" | rest], body, acc) do
-    if brotli_loaded?() do
-      case :brotli.decode(body) do
-        {:ok, decompressed} ->
-          decompress_body(rest, decompressed, acc)
-
-        :error ->
-          %Req.DecompressError{format: :br, data: body}
-      end
-    else
-      Logger.debug(":brotli library not loaded, skipping brotli decompression")
-      decompress_body(rest, body, ["br" | acc])
-    end
-  end
-
-  defp decompress_body(["zstd" | rest], body, acc) do
-    if ezstd_loaded?() do
-      case :ezstd.decompress(body) do
-        decompressed when is_binary(decompressed) ->
-          decompress_body(rest, decompressed, acc)
-
-        {:error, reason} ->
-          %Req.DecompressError{format: :zstd, data: body, reason: reason}
-      end
-    else
-      Logger.debug(":ezstd library not loaded, skipping zstd decompression")
-      decompress_body(rest, body, ["zstd" | acc])
-    end
-  end
-
-  defp decompress_body(["identity" | rest], body, acc) do
-    decompress_body(rest, body, acc)
-  end
-
-  defp decompress_body([codec | rest], body, acc) do
-    Logger.debug("algorithm #{inspect(codec)} is not supported")
-    decompress_body(rest, body, [codec | acc])
-  end
-
-  defp decompress_body([], body, acc) do
-    {body, acc}
-  end
-
-  defp compression_algorithms(values) do
-    values
-    |> Enum.flat_map(fn value ->
-      value
-      |> String.downcase()
-      |> String.split(",", trim: true)
-      |> Enum.map(&String.trim/1)
-    end)
-    |> Enum.reverse()
-  end
-
-  defmacrop nimble_csv_loaded? do
-    Code.ensure_loaded?(NimbleCSV)
   end
 
   @doc false
@@ -1767,32 +1486,65 @@ defmodule Req.Steps do
   @doc """
   Decodes response body based on the detected format.
 
-  Supported formats:
+  By default, only JSON responses are decoded. To decode other formats, or to add support for
+  custom ones, use the `:decoders` option.
 
-  | Format       | Decoder                                                           |
-  | ------------ | ----------------------------------------------------------------- |
-  | `json`       | `Jason.decode/2`                                                  |
-  | `tar`, `tgz` | `:erl_tar.extract/2`                                              |
-  | `zip`        | `:zip.unzip/2`                                                    |
-  | `gzip`       | `:zlib.gunzip/1`                                                  |
-  | `zst`        | `:ezstd.decompress/1` (if [ezstd] is installed)                   |
-  | `csv`        | `NimbleCSV.RFC4180.parse_string/2` (if [nimble_csv] is installed) |
+  ## Built-in decoders
 
-  The format is determined based on the `content-type` header of the response. For example,
-  if the `content-type` is `application/json`, the response body is decoded as JSON. The built-in
-  decoders also understand format extensions, such as decoding as JSON for a content-type of
-  `application/vnd.api+json`. To do this, Req falls back to `MIME.extensions/1`; check the
-  documentation for that function for more information.
+  | Format               | Decoder                                                     |
+  | -------------------- | ----------------------------------------------------------- |
+  | `:json`, `:json_api` | `Jason.decode(term)` (enabled by default)                   |
+  | `:zip`               | `Req.ZIP.decode(term)`                                      |
+  | `:tar`, `:tgz`       | `Req.Tar.decode(term)`                                      |
+  | `:gz`                | `:zlib.gunzip(term)`                                        |
+  | `:zst`               | `:zstd.decompress(term)` (requires Erlang/OTP 28+)          |
+  | `:csv`               | `NimbleCSV.RFC4180.parse_string(term)` ([nimble_csv] must be installed to use this format) |
+
+  The format is determined by the response `content-type` header. See `MIME` for registering
+  content-type/format mapping.
 
   This step is disabled on response body streaming. If response body is not a binary, in other
   words it has been transformed by another step, it is left as is.
 
+  > #### Decompression Bombs {: .warning}
+  >
+  > The archive and compression decoders (`:zip`, `:tar`, `:tgz`, `:gz`, and `:zst`) decompress
+  > the whole response body into memory with no size limit, so a small response can expand to
+  > many gigabytes. For this reason they are **not** enabled by default; only opt into them via
+  > the `:decoders` option for endpoints you trust.
+
   ## Request Options
+
+    * `:decoders` - the list of decoders to use. Defaults to `[:json, :json_api]`.
+
+      Each element is either:
+
+        * a format (atom) handled by a [built-in decoder](#decode_body/1-built-in-decoders),
+          e.g. `:json` or `:zip`;
+
+        * a `{format, codec}` tuple, where `format` is an atom and `codec` is one of:
+
+            * another format (atom), to reuse a built-in decoder, e.g. `{:json5, :json}`;
+
+            * a module exporting `decode/1` that returns `{:ok, term}` or `{:error, exception}`;
+
+            * a 1-arity function that returns `{:ok, term}` or `{:error, exception}`.
+
+      Setting `:decoders` replaces the default, so include `:json` if you still want JSON decoded:
+
+          # handles json, zip, and tar:
+          Req.new(decoders: [:json, :zip, :tar])
+
+      Set `:decoders` to `false` to disable all decoding, including JSON. A custom decoder:
+
+          Req.get!(url, decoders: [ics: &{:ok, ICal.from_ics(&1)}])
 
     * `:decode_body` - if set to `false`, disables automatic response body decoding.
       Defaults to `true`.
 
-    * `:decode_json` - options to pass to `Jason.decode/2`, defaults to `[]`.
+    * `:decode_json` - (deprecated) options to pass to `Jason.decode/2`. Deprecated in favour
+      of passing a custom JSON decoder via the `:decoders` option, e.g.
+      `decoders: [json: &Jason.decode(&1, keys: :atoms)]`.
 
     * `:raw` - if set to `true`, disables response body decoding. Defaults to `false`.
 
@@ -1807,14 +1559,13 @@ defmodule Req.Steps do
       ...> response.body["slideshow"]["title"]
       "Sample Slide Show"
 
-  Decode gzip:
+  Decode a ZIP archive (opt-in):
 
-      iex> response = Req.get!("https://httpbin.org/gzip")
-      ...> response.body["gzipped"]
-      true
+      iex> response = Req.get!("https://example.com/archive.zip", decoders: [:zip])
+      ...> response.body["file.txt"]
+      "contents"
 
   [nimble_csv]: https://hex.pm/packages/nimble_csv
-  [ezstd]: https://hex.pm/packages/ezstd
   """
   @doc step: :response
   def decode_body(request_response)
@@ -1832,86 +1583,110 @@ defmodule Req.Steps do
 
     if request.options[:raw] == true or
          request.options[:decode_body] == false or
+         request.options[:decoders] == false or
          output? or
          Req.Response.get_header(response, "content-encoding") != [] do
       {request, response}
     else
-      decode_body({request, response}, format(request, response))
+      decoders = build_decoders(request, request.options[:decoders] || [:json, :json_api])
+
+      case decoders[format(request, response)] do
+        nil ->
+          {request, response}
+
+        codec ->
+          run_decoder(request, response, codec)
+      end
     end
   end
 
-  defp decode_body({request, response}, format) when format in ~w(json json-api) do
-    options = Req.Request.get_option(request, :decode_json, [])
+  @builtin_decoders [:json, :json_api, :zip, :tar, :tgz, :gz, :zst, :csv]
 
-    case Jason.decode(response.body, options) do
+  # Build a map of MIME extension (e.g. "json", "json-api") to codec function, so it can be
+  # looked up by the extension detected from the response content-type.
+  defp build_decoders(request, decoders) do
+    for decoder <- decoders, into: %{} do
+      {format, codec} = normalize_decoder(request, decoder)
+      {format |> Atom.to_string() |> String.replace("_", "-"), codec}
+    end
+  end
+
+  defp normalize_decoder(request, format) when is_atom(format) do
+    if format in @builtin_decoders do
+      {format, builtin_codec(request, format)}
+    else
+      raise ArgumentError,
+            "unknown decoder format: #{inspect(format)}. Built-in formats are: " <>
+              Enum.map_join(@builtin_decoders, ", ", &inspect/1) <>
+              ". To use a custom format, pass a {format, codec} tuple."
+    end
+  end
+
+  defp normalize_decoder(request, {format, codec}) when is_atom(format) do
+    {format, resolve_codec(request, codec)}
+  end
+
+  defp resolve_codec(_request, codec) when is_function(codec, 1) do
+    codec
+  end
+
+  defp resolve_codec(request, codec) when is_atom(codec) do
+    if codec in @builtin_decoders do
+      builtin_codec(request, codec)
+    else
+      # a module exporting decode/1
+      &codec.decode/1
+    end
+  end
+
+  defp builtin_codec(request, format) when format in [:json, :json_api] do
+    case Req.Request.fetch_option(request, :decode_json) do
+      {:ok, options} ->
+        IO.warn(
+          "setting `decode_json: options` is deprecated in favour of " <>
+            "`decoders: [json: &Jason.decode(&1, options)]`"
+        )
+
+        fn body -> Jason.decode(body, options) end
+
+      :error ->
+        fn body -> Jason.decode(body) end
+    end
+  end
+
+  defp builtin_codec(_request, :zip), do: &Req.ZIP.decode/1
+  defp builtin_codec(_request, :tar), do: &Req.Tar.decode/1
+  defp builtin_codec(_request, :tgz), do: &Req.Tar.decode/1
+  defp builtin_codec(_request, :gz), do: fn body -> {:ok, :zlib.gunzip(body)} end
+
+  defp builtin_codec(_request, :zst) do
+    fn body ->
+      case Req.Utils.zstd_decompress(body) do
+        {:ok, decompressed} ->
+          {:ok, decompressed}
+
+        {:error, reason} ->
+          {:error,
+           %RuntimeError{message: "Could not decompress Zstandard data: #{inspect(reason)}"}}
+      end
+    end
+  end
+
+  defp builtin_codec(_request, :csv) do
+    fn body -> {:ok, NimbleCSV.RFC4180.parse_string(body, skip_headers: false)} end
+  end
+
+  defp run_decoder(request, response, codec) do
+    case codec.(response.body) do
       {:ok, decoded} ->
         {request, put_in(response.body, decoded)}
 
-      {:error, e} ->
-        {request, e}
-    end
-  end
-
-  defp decode_body({request, response}, "tar") do
-    case :erl_tar.extract({:binary, response.body}, [:memory]) do
-      {:ok, files} ->
-        {request, put_in(response.body, files)}
+      {:error, %{__exception__: true} = exception} ->
+        {request, exception}
 
       {:error, reason} ->
-        {request, %Req.ArchiveError{format: :tar, data: response.body, reason: reason}}
+        {request, %RuntimeError{message: "decoding response body failed: #{inspect(reason)}"}}
     end
-  end
-
-  defp decode_body({request, response}, "tgz") do
-    case :erl_tar.extract({:binary, response.body}, [:memory, :compressed]) do
-      {:ok, files} ->
-        {request, put_in(response.body, files)}
-
-      {:error, reason} ->
-        {request, %Req.ArchiveError{format: :tar, data: response.body, reason: reason}}
-    end
-  end
-
-  defp decode_body({request, response}, "zip") do
-    case :zip.extract(response.body, [:memory]) do
-      {:ok, files} ->
-        {request, put_in(response.body, files)}
-
-      {:error, _} ->
-        {request, %Req.ArchiveError{format: :zip, data: response.body}}
-    end
-  end
-
-  defp decode_body({request, response}, "gz") do
-    {request, update_in(response.body, &:zlib.gunzip/1)}
-  end
-
-  defp decode_body({request, response}, "zst") do
-    if ezstd_loaded?() do
-      case :ezstd.decompress(response.body) do
-        decompressed when is_binary(decompressed) ->
-          {request, put_in(response.body, decompressed)}
-
-        {:error, reason} ->
-          err = %RuntimeError{message: "Could not decompress Zstandard data: #{inspect(reason)}"}
-          {request, err}
-      end
-    else
-      {request, response}
-    end
-  end
-
-  defp decode_body({request, response}, "csv") do
-    if nimble_csv_loaded?() do
-      options = [skip_headers: false]
-      {request, update_in(response.body, &NimbleCSV.RFC4180.parse_string(&1, options))}
-    else
-      {request, response}
-    end
-  end
-
-  defp decode_body({request, response}, _format) do
-    {request, response}
   end
 
   defp format(request, response) do
@@ -2048,6 +1823,7 @@ defmodule Req.Steps do
 
   defp build_redirect_request(request, response, location) do
     log_level = Req.Request.get_option(request, :redirect_log_level, :debug)
+    location = strip_redirect_userinfo(location)
     log_redirect(log_level, location)
 
     redirect_trusted =
@@ -2071,6 +1847,19 @@ defmodule Req.Steps do
     |> remove_credentials_if_untrusted(redirect_trusted, location_url)
     |> put_redirect_method(response.status)
     |> Map.replace!(:url, location_url)
+  end
+
+  # Userinfo in a redirect location is dropped (and never converted to auth) to avoid silently
+  # sending credentials supplied by the redirecting server. Done before logging so it isn't leaked.
+  defp strip_redirect_userinfo(location) do
+    case URI.parse(location) do
+      %URI{userinfo: nil} ->
+        location
+
+      %URI{} = uri ->
+        Logger.warning("stripping userinfo from redirect location")
+        URI.to_string(%{uri | userinfo: nil})
+    end
   end
 
   defp log_redirect(false, _location), do: :ok
@@ -2310,7 +2099,7 @@ defmodule Req.Steps do
 
             * `Req.TransportError` with `reason: :timeout | :econnrefused | :closed`
 
-            * `Req.HTTPError` with `protocol: :http2, reason: :unprocessed`
+            * `Req.HTTPError` with `protocol: :http2, reason: :unprocessed | :pool_not_available`
 
         * `:transient` - same as `:safe_transient` except retries all HTTP methods (POST, DELETE, etc.)
 
@@ -2420,7 +2209,8 @@ defmodule Req.Steps do
     true
   end
 
-  defp transient?(%Req.HTTPError{protocol: :http2, reason: :unprocessed}) do
+  defp transient?(%Req.HTTPError{protocol: :http2, reason: reason})
+       when reason in [:unprocessed, :pool_not_available] do
     true
   end
 

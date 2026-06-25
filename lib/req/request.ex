@@ -1058,7 +1058,7 @@ defmodule Req.Request do
   end
 
   @doc """
-  Registers options to be used by a custom steps.
+  Registers options to be used by custom steps.
 
   Req ensures that all used options were previously registered which helps
   finding accidentally mistyped option names. If you're adding custom steps

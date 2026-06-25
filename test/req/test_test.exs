@@ -1,5 +1,5 @@
 defmodule Req.TestTest do
-  use ExUnit.Case, async: true
+  use Req.Case, async: true
   doctest Req.Test, except: [expect: 3, redirect: 2]
 
   describe "__fetch_plug__/1" do

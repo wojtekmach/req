@@ -1,5 +1,5 @@
 defmodule Req.DefaultOptionsTest do
-  use ExUnit.Case
+  use Req.Case
 
   setup do
     bypass = Bypass.open()

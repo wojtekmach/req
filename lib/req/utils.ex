@@ -1,6 +1,8 @@
 defmodule Req.Utils do
   @moduledoc false
 
+  require Logger
+
   defmacrop iodata({:<<>>, _, parts}) do
     Enum.map(parts, &to_iodata/1)
   end
@@ -534,7 +536,7 @@ defmodule Req.Utils do
     {Stream.concat(parts1, parts2), add_sizes(size1, size2)}
   end
 
-  defp encode_form_part({name, {value, options}}, boundary) do
+  defp encode_form_part({name, {value, options}}, boundary) when is_atom(name) do
     options = Keyword.validate!(options, [:filename, :content_type, :size])
 
     {parts, parts_size, options} =
@@ -549,9 +551,8 @@ defmodule Req.Utils do
         stream = %File.Stream{} ->
           filename = Path.basename(stream.path)
 
-          # TODO: Simplify when we require Elixir v1.15
           size =
-            if not Map.has_key?(stream, :node) or stream.node == node() do
+            if stream.node == node() do
               File.stat!(stream.path).size
             else
               :erpc.call(stream.node, fn -> File.stat!(stream.path).size end)
@@ -574,18 +575,19 @@ defmodule Req.Utils do
 
     params =
       if filename = options[:filename] do
-        ["; filename=\"", filename, "\""]
+        ["; filename=\"", escape_form_param(filename), "\""]
       else
         []
       end
 
     headers =
       if content_type = options[:content_type] do
-        ["content-type: ", content_type, @crlf]
+        ["content-type: ", escape_form_param(content_type), @crlf]
       else
         []
       end
 
+    name = escape_form_param(Atom.to_string(name))
     headers = ["content-disposition: form-data; name=\"#{name}\"", params, @crlf, headers]
     header = [["--", boundary, @crlf, headers, @crlf]]
 
@@ -594,8 +596,13 @@ defmodule Req.Utils do
     |> add_form_parts({[@crlf], 2})
   end
 
-  defp encode_form_part({name, value}, boundary) do
+  defp encode_form_part({name, value}, boundary) when is_atom(name) do
     encode_form_part({name, {value, []}}, boundary)
+  end
+
+  # Per RFC 7578 / WHATWG form-data behavior, escape `"`, CR, and LF.
+  defp escape_form_param(value) when is_binary(value) do
+    URI.encode(value, &(&1 not in [?", ?\r, ?\n]))
   end
 
   @doc """
@@ -839,5 +846,102 @@ defmodule Req.Utils do
 
   defp encode_digest_header_part({key, value}) do
     "#{key}=#{quote_digest_value(value)}"
+  end
+
+  defmacro brotli_loaded? do
+    Code.ensure_loaded?(:brotli)
+  end
+
+  def zstd_available? do
+    System.otp_release() >= "28"
+  end
+
+  # Decompresses zstd `body` using the built-in OTP 28+ `:zstd` module. `:zstd.decompress/1`
+  # returns iodata and raises `{:zstd_error, reason}` on invalid input.
+  def zstd_decompress(body) do
+    {:ok, IO.iodata_to_binary(:zstd.decompress(body))}
+  rescue
+    e in ErlangError ->
+      case e.original do
+        {:zstd_error, reason} -> {:error, reason}
+        _ -> reraise(e, __STACKTRACE__)
+      end
+  end
+
+  def decompress_with_encoding([], body), do: {body, []}
+
+  def decompress_with_encoding(encoding_headers, body) do
+    codecs = compression_algorithms(encoding_headers)
+    decompress_body(codecs, body, [])
+  end
+
+  defp decompress_body([gzip | rest], body, acc) when gzip in ["gzip", "x-gzip"] do
+    try do
+      decompress_body(rest, :zlib.gunzip(body), acc)
+    rescue
+      e in ErlangError ->
+        if e.original == :data_error do
+          %Req.DecompressError{format: :gzip, data: body}
+        else
+          reraise e, __STACKTRACE__
+        end
+    end
+  end
+
+  defp decompress_body(["br" | rest], body, acc) do
+    if brotli_loaded?() do
+      case :brotli.decode(body) do
+        {:ok, decompressed} ->
+          decompress_body(rest, decompressed, acc)
+
+        :error ->
+          %Req.DecompressError{format: :br, data: body}
+      end
+    else
+      Logger.debug(":brotli library not loaded, skipping brotli decompression")
+      decompress_body(rest, body, ["br" | acc])
+    end
+  end
+
+  defp decompress_body(["zstd" | rest], body, acc) do
+    if zstd_available?() do
+      case zstd_decompress(body) do
+        {:ok, decompressed} ->
+          decompress_body(rest, decompressed, acc)
+
+        {:error, reason} ->
+          %Req.DecompressError{format: :zstd, data: body, reason: reason}
+      end
+    else
+      Logger.debug(
+        ":zstd module not available (requires Erlang/OTP 28+), skipping zstd decompression"
+      )
+
+      decompress_body(rest, body, ["zstd" | acc])
+    end
+  end
+
+  defp decompress_body(["identity" | rest], body, acc) do
+    decompress_body(rest, body, acc)
+  end
+
+  defp decompress_body([codec | rest], body, acc) do
+    Logger.debug("algorithm #{inspect(codec)} is not supported")
+    decompress_body(rest, body, [codec | acc])
+  end
+
+  defp decompress_body([], body, acc) do
+    {body, acc}
+  end
+
+  defp compression_algorithms(values) do
+    values
+    |> Enum.flat_map(fn value ->
+      value
+      |> String.downcase()
+      |> String.split(",", trim: true)
+      |> Enum.map(&String.trim/1)
+    end)
+    |> Enum.reverse()
   end
 end

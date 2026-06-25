@@ -1,6 +1,8 @@
 defmodule Req.RequestTest do
-  use ExUnit.Case, async: true
-  doctest Req.Request, except: [delete_header: 2]
+  use Req.Case, async: true
+  # new/1 and run_request/1 doctests hit api.github.com, they run as part of
+  # integration tests instead.
+  doctest Req.Request, except: [delete_header: 2, new: 1, run_request: 1]
 
   setup do
     bypass = Bypass.open()
@@ -251,9 +253,17 @@ defmodule Req.RequestTest do
     assert {:ok, %{status: 200, body: "ok"}} = Req.Request.run(request)
   end
 
+  # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+  @tag skip: System.otp_release() < "28"
   test "prepare/1" do
     request =
-      Req.new(method: :get, base_url: "http://foo", url: "/bar", auth: {:basic, "foo:bar"})
+      Req.new(
+        method: :get,
+        base_url: "http://foo",
+        url: "/bar",
+        auth: {:basic, "foo:bar"},
+        compressed: true
+      )
       |> Req.Request.prepare()
 
     assert request.url == URI.parse("http://foo/bar")
@@ -262,7 +272,7 @@ defmodule Req.RequestTest do
 
     if Req.MixProject.legacy_headers_as_lists?() do
       assert [
-               {"user-agent", "req/0.3.11"},
+               {"user-agent", "req/" <> _},
                {"accept-encoding", "zstd, br, gzip"},
                {"authorization", ^authorization}
              ] = request.headers

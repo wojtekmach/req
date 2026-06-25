@@ -3,6 +3,14 @@
 defmodule Req.Finch do
   @moduledoc false
 
+  @finch_build_options [:pool_tag, :unix_socket]
+  @finch_request_options [:pool_timeout, :receive_timeout, :request_timeout, :pool_strategy]
+
+  def child_spec(options) do
+    {name, options} = Keyword.pop!(options, :name)
+    Finch.child_spec(name: name, pools: %{default: pool_options(options)})
+  end
+
   @doc """
   Runs the request using `Finch`.
   """
@@ -19,7 +27,7 @@ defmodule Req.Finch do
         request
       end
 
-    finch_name = finch_name(request)
+    {finch_name, build_options, request_options} = finch_name_options(request)
 
     # TODO: Remove when :finch_request is removed
     if match?(
@@ -76,15 +84,22 @@ defmodule Req.Finch do
           {:stream, enumerable}
       end
 
+    build_options =
+      if unix_socket = request.options[:unix_socket] do
+        Keyword.put_new(build_options, :unix_socket, unix_socket)
+      else
+        build_options
+      end
+
     finch_request =
-      Finch.build(request.method, request.url, request_headers, body)
-      |> Map.replace!(:unix_socket, request.options[:unix_socket])
+      Finch.build(request.method, request.url, request_headers, body, build_options)
       |> add_private_options(request.options[:finch_private])
 
     finch_options =
       request.options
       |> Map.take([:receive_timeout, :pool_timeout, :request_timeout])
       |> Enum.to_list()
+      |> Keyword.merge(request_options)
 
     run(request, finch_request, finch_name, finch_options)
   end
@@ -213,6 +228,20 @@ defmodule Req.Finch do
 
   defp normalize_error(%Finch.Error{reason: reason}) do
     %Req.HTTPError{protocol: :http2, reason: reason}
+  end
+
+  # TODO: When using finch ~> 0.22.0, convert to pattern matching
+  # and revisit explicitly handling Mint errors.
+  #
+  # Finch >= 0.22 wraps Mint errors in its own structs. Use `is_struct/2` so
+  # this still compiles against older Finch versions where these modules don't exist.
+  defp normalize_error(error) when is_struct(error, Finch.TransportError) do
+    %Req.TransportError{reason: error.reason}
+  end
+
+  defp normalize_error(error) when is_struct(error, Finch.HTTPError) do
+    protocol = if error.module == Mint.HTTP2, do: :http2, else: :http1
+    %Req.HTTPError{protocol: protocol, reason: error.reason}
   end
 
   defp normalize_error(error) do
@@ -397,43 +426,74 @@ defmodule Req.Finch do
     end
   end
 
-  defp finch_name(request) do
+  defp finch_name_options(request) do
+    if request.options[:finch] && Map.has_key?(request.options, :connect_options) do
+      raise ArgumentError, "cannot set both :finch and :connect_options"
+    end
+
     custom_options? =
-      Map.has_key?(request.options, :connect_options) or Map.has_key?(request.options, :inet6)
+      Map.has_key?(request.options, :connect_options) or
+        Map.has_key?(request.options, :inet6) or
+        Map.has_key?(request.options, :pool_max_idle_time)
+
+    {name, build_options, request_options, pool_options} =
+      case request.options[:finch] do
+        nil ->
+          {nil, [], [], []}
+
+        name when is_atom(name) ->
+          IO.warn(
+            "setting `:finch` to a Finch pool name is deprecated, use `finch: [name: name]` instead"
+          )
+
+          {name, [], [], []}
+
+        options when is_list(options) ->
+          {name, options} = Keyword.pop(options, :name)
+          {build_options, options} = Keyword.split(options, @finch_build_options)
+          {request_options, pool_options} = Keyword.split(options, @finch_request_options)
+          {name, build_options, request_options, pool_options}
+
+        other ->
+          raise ArgumentError, "expected `finch: options`, got: #{inspect(other)}"
+      end
 
     cond do
-      name = request.options[:finch] ->
-        if custom_options? do
-          raise ArgumentError, "cannot set both :finch and :connect_options"
-        else
-          name
+      name ->
+        if pool_options != [] do
+          raise ArgumentError,
+                "cannot set Finch pool options together with :name in :finch, " <>
+                  "configure the pool when starting #{inspect(name)} instead"
         end
 
-      custom_options? ->
-        pool_options = pool_options(request.options)
+        {name, build_options, request_options}
 
-        name =
-          pool_options
-          |> :erlang.term_to_binary()
-          |> :erlang.md5()
-          |> Base.url_encode64(padding: false)
-
-        name = Module.concat(Req.FinchSupervisor, "Pool_#{name}")
+      pool_options != [] or custom_options? ->
+        pool_options = Keyword.merge(pool_options(request.options), pool_options)
+        name = pool_name(pool_options)
 
         case DynamicSupervisor.start_child(
                Req.FinchSupervisor,
                {Finch, name: name, pools: %{default: pool_options}}
              ) do
-          {:ok, _} ->
-            name
-
-          {:error, {:already_started, _}} ->
-            name
+          {:ok, _} -> {name, build_options, request_options}
+          {:error, {:already_started, _}} -> {name, build_options, request_options}
         end
 
       true ->
-        Req.Finch
+        {Req.Finch, build_options, request_options}
     end
+  end
+
+  @doc false
+  def pool_name(pool_options) do
+    hash =
+      pool_options
+      |> :erlang.term_to_binary()
+      |> :erlang.md5()
+      |> Base.encode32(padding: false)
+
+    Module.concat(Req.FinchSupervisor, "Pool_#{hash}")
   end
 
   @doc """
