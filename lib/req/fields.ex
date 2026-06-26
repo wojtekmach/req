@@ -153,6 +153,28 @@ defmodule Req.Fields do
   end
 
   @doc """
+  Prepends `new_fields` before `fields`, keeping any existing values.
+
+  ## Examples
+
+      iex> Req.Fields.prepend(%{"a" => ["1"]}, [{"a", "2"}, {"b", "3"}])
+      %{"a" => ["2", "1"], "b" => ["3"]}
+  """
+  def prepend(fields, new_fields)
+
+  if @legacy? do
+    def prepend(fields, new_fields) do
+      new(new_fields) ++ fields
+    end
+  else
+    def prepend(fields, new_fields) do
+      Map.merge(new(new_fields), fields, fn _name, new_values, old_values ->
+        new_values ++ old_values
+      end)
+    end
+  end
+
+  @doc """
   Adds a new field `name` with the given `value` if not present,
   otherwise replaces previous value with `value`.
   """
