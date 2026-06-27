@@ -600,10 +600,6 @@ defmodule Req do
 
     {request_options, options} = Keyword.split(options, request_option_names)
 
-    if options[:output] do
-      IO.warn("setting `output: path` is deprecated in favour of `into: File.stream!(path)`")
-    end
-
     registered =
       MapSet.union(
         request.registered_options,

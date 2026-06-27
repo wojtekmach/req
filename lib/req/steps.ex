@@ -67,7 +67,6 @@ defmodule Req.Steps do
       :pool_max_idle_time,
 
       # TODO: Remove on Req 1.0
-      :output,
       :follow_redirects,
       :location_trusted,
       :redact_auth
@@ -94,8 +93,7 @@ defmodule Req.Steps do
       decompress_body: &Req.Steps.decompress_body/1,
       verify_checksum: &Req.Steps.verify_checksum/1,
       decode_body: &Req.Steps.decode_body/1,
-      expect: &Req.Steps.expect/1,
-      output: &Req.Steps.output/1
+      expect: &Req.Steps.expect/1
     )
     |> Req.Request.prepend_error_steps(retry: &Req.Steps.retry/1)
   end
@@ -1459,32 +1457,6 @@ defmodule Req.Steps do
     end
   end
 
-  @doc false
-  def output(request_response)
-
-  def output({request, response}) do
-    output({request, response}, request.options[:output])
-  end
-
-  defp output(request_response, nil) do
-    request_response
-  end
-
-  defp output({request, response}, :remote_name) do
-    path = Path.basename(request.url.path || "")
-    output({request, response}, path)
-  end
-
-  defp output(_request_response, "") do
-    raise "cannot write to file \"\""
-  end
-
-  defp output({request, response}, path) do
-    File.write!(path, response.body)
-    response = %{response | body: ""}
-    {request, response}
-  end
-
   @doc """
   Decodes response body based on the detected format.
 
@@ -1580,13 +1552,9 @@ defmodule Req.Steps do
   end
 
   def decode_body({request, response}) do
-    # TODO: remove on Req 1.0
-    output? = request.options[:output] not in [nil, false]
-
     if request.options[:raw] == true or
          request.options[:decode_body] == false or
          request.options[:decoders] == false or
-         output? or
          Req.Response.get_header(response, "content-encoding") != [] do
       {request, response}
     else
