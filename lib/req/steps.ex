@@ -89,7 +89,6 @@ defmodule Req.Steps do
     )
     |> Req.Request.prepend_response_steps(
       retry: &Req.Steps.retry/1,
-      handle_http_errors: &Req.Steps.handle_http_errors/1,
       redirect: &Req.Steps.redirect/1,
       http_digest: &Req.Steps.handle_http_digest/1,
       decompress_body: &Req.Steps.decompress_body/1,
@@ -1908,47 +1907,6 @@ defmodule Req.Steps do
   end
 
   @doc """
-  Handles HTTP 4xx/5xx error responses.
-
-  ## Request Options
-
-    * `:http_errors` - how to handle HTTP 4xx/5xx error responses. Can be one of the following:
-
-      * `:return` (default) - return the response
-
-      * `:raise` - raise an error
-
-  ## Examples
-
-      iex> Req.get!("https://httpbin.org/status/404").status
-      404
-
-      iex> Req.get!("https://httpbin.org/status/404", http_errors: :raise)
-      ** (RuntimeError) The requested URL returned error: 404
-      Response body: ""
-  """
-  @doc step: :response
-  def handle_http_errors(request_response)
-
-  # TODO: deprecate
-  def handle_http_errors({request, response}) when response.status >= 400 do
-    case Map.get(request.options, :http_errors, :return) do
-      :return ->
-        {request, response}
-
-      :raise ->
-        raise """
-        The requested URL returned error: #{response.status}
-        Response body: #{inspect(response.body)}\
-        """
-    end
-  end
-
-  def handle_http_errors({request, response}) do
-    {request, response}
-  end
-
-  @doc """
   Handles HTTP Digest authentication.
 
   This step is invoked when setting `:auth` option with `{:digest, ...}`. When response is HTTP 401 with `www-authenticate` header, this step will calculate `authorization: Digest ...` header and make another request.
@@ -2044,15 +2002,26 @@ defmodule Req.Steps do
   def expect(request_response)
 
   def expect({request, response}) do
-    if expect = request.options[:expect] do
-      if expect_success?(response.status, expect) do
-        {request, response}
+    if Req.Request.get_option(request, :http_errors) do
+      IO.warn("the `:http_errors` option is deprecated in favour of `:expect`")
+    end
+
+    expect =
+      if request.options[:http_errors] == :raise do
+        request.options[:expect] || 100..399
       else
-        {request,
-         Req.UnexpectedStatusError.exception(expected_status: expect, response: response)}
+        request.options[:expect]
       end
-    else
-      {request, response}
+
+    cond do
+      is_nil(expect) ->
+        {request, response}
+
+      expect_success?(response.status, expect) ->
+        {request, response}
+
+      true ->
+        {request, Req.UnexpectedStatusError.exception(expected_status: expect, response: response)}
     end
   end
 

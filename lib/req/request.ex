@@ -886,12 +886,12 @@ defmodule Req.Request do
 
   ## Examples
 
-      iex> req = Req.new(auth: {:basic, "alice:secret"}, http_errors: :raise)
+      iex> req = Req.new(auth: {:basic, "alice:secret"}, retry: false)
       iex> req = Req.Request.merge_options(req, auth: {:bearer, "abcd"}, base_url: "https://example.com")
       iex> req.options[:auth]
       {:bearer, "abcd"}
-      iex> req.options[:http_errors]
-      :raise
+      iex> req.options[:retry]
+      false
       iex> req.options[:base_url]
       "https://example.com"
   """
