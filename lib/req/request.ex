@@ -1136,55 +1136,90 @@ defmodule Req.Request do
     import Inspect.Algebra
 
     def inspect(request, opts) do
-      open = color("%Req.Request{", :map, opts)
-      sep = color(",", :map, opts)
-      close = color("}", :map, opts)
+      sep = concat(color(",", :map, opts), line())
 
-      headers =
-        Req.Fields.map(request.headers, fn name, value ->
-          if Req.Fields.ensure_name_downcase(name) == "authorization" do
-            [scheme, value] = String.split(value, " ", parts: 2)
-            scheme <> " " <> redact(value)
-          else
-            value
-          end
-        end)
+      pairs =
+        [
+          method: request.method,
+          headers: redact_headers(request.headers),
+          body: request.body
+        ] ++
+          adapter_arg(request.adapter) ++
+          [private: request.private] ++
+          halted_arg(request.halted)
 
-      list = [
-        method: request.method,
-        url: request.url,
-        headers: headers,
-        body: request.body,
-        options:
-          Map.new(request.options, fn {name, value} ->
-            {name, redact_option(name, value)}
-          end),
-        halted: request.halted,
-        adapter: request.adapter,
-        request_steps: request.request_steps,
-        response_steps: request.response_steps,
-        error_steps: request.error_steps,
-        private: request.private
-      ]
+      url_doc =
+        if request.url == nil or URI.to_string(request.url) == "" do
+          keyword_doc({:url, nil}, opts)
+        else
+          color("\"" <> URI.to_string(request.url) <> "\"", :string, opts)
+        end
 
-      fun = fn
-        {:url, value}, opts ->
-          key = color("url:", :atom, opts)
+      field_docs = [url_doc | Enum.map(pairs, &keyword_doc(&1, opts))]
 
-          doc =
+      body =
+        case request.options do
+          options when map_size(options) == 0 ->
+            join_docs(field_docs, sep)
+
+          options ->
+            option_docs =
+              Enum.map(options, fn {name, value} ->
+                keyword_doc({name, redact_option(name, value)}, opts)
+              end)
+
             concat([
-              "URI.parse(",
-              color("\"" <> URI.to_string(value) <> "\"", :string, opts),
-              ")"
+              join_docs(field_docs, sep),
+              color(",", :map, opts),
+              nest(line(), :reset),
+              line(),
+              "# options",
+              line(),
+              join_docs(option_docs, sep)
             ])
+        end
 
-          concat(key, concat(" ", doc))
+      force_unfit(concat(["Req.new(", nest(concat(line(), body), 2), line(), ")"]))
+    end
 
-        {key, value}, opts ->
-          Inspect.List.keyword({key, value}, opts)
+    defp halted_arg(true), do: [halted: true]
+    defp halted_arg(false), do: []
+
+    defp adapter_arg(adapter) do
+      if adapter == Req.Finch do
+        []
+      else
+        [adapter: adapter]
       end
+    end
 
-      container_doc(open, list, close, opts, fun, separator: sep, break: :strict)
+    defp keyword_doc({key, value}, opts) do
+      concat([color("#{key}:", :atom, opts), " ", to_doc(value, opts)])
+    end
+
+    defp join_docs([], _sep), do: empty()
+    defp join_docs([doc], _sep), do: doc
+    defp join_docs([doc | rest], sep), do: concat(doc, concat(sep, join_docs(rest, sep)))
+
+    defp redact_headers(headers) do
+      list = Req.Fields.get_list(headers)
+
+      for {name, value} <- list do
+        if Req.Fields.ensure_name_downcase(name) == "authorization" do
+          value =
+            case String.split(value, " ", parts: 2) do
+              [scheme, credentials] ->
+                scheme <> " " <> redact(credentials)
+
+              [_scheme_or_secret] ->
+                redact(value)
+            end
+
+          {name, value}
+        else
+          {name, value}
+        end
+      end
     end
 
     defp redact_option(:auth, {:bearer, bearer}) do
@@ -1231,6 +1266,28 @@ defmodule Req.Request do
       else
         String.slice(string, 0, 3) <> String.duplicate("*", len - 3)
       end
+    end
+  end
+
+  defimpl IEx.Info do
+    def info(request) do
+      [
+        {"Data type", "Req.Request"},
+        {"Description", "The request struct."},
+        {"Raw representation", raw_inspect(request)},
+        {"Reference modules", "Req.Request, Req"}
+      ]
+    end
+
+    defp raw_inspect(value) do
+      value
+      |> Inspect.Any.inspect(%Inspect.Opts{})
+      |> case do
+        {doc, %Inspect.Opts{}} -> doc
+        doc -> doc
+      end
+      |> Inspect.Algebra.format(:infinity)
+      |> IO.iodata_to_binary()
     end
   end
 end

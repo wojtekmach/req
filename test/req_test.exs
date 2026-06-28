@@ -92,10 +92,76 @@ defmodule ReqTest do
     assert req.private == %{a: 1, b: 2}
   end
 
-  test "redact" do
-    assert inspect(Req.new(auth: {:bearer, "foo"})) =~ ~s|auth: {:bearer, "***"}|
+  test "inspect" do
+    assert inspect(Req.new(), pretty: true) == """
+           Req.new(
+             url: nil,
+             method: :get,
+             headers: [],
+             body: nil,
+             private: %{}
+           )\
+           """
 
-    assert inspect(Req.new(auth: {:basic, "foo:bar"})) =~ ~s|auth: {:basic, "foo****"}|
+    assert inspect(Req.new("https://elixir-lang.org"), pretty: true) == """
+           Req.new(
+             "https://elixir-lang.org",
+             method: :get,
+             headers: [],
+             body: nil,
+             private: %{}
+           )\
+           """
+
+    assert inspect(Req.new(adapter: MyAdapter), pretty: true) == """
+           Req.new(
+             url: nil,
+             method: :get,
+             headers: [],
+             body: nil,
+             adapter: MyAdapter,
+             private: %{}
+           )\
+           """
+
+    assert inspect(put_in(Req.new().halted, true), pretty: true) == """
+           Req.new(
+             url: nil,
+             method: :get,
+             headers: [],
+             body: nil,
+             private: %{},
+             halted: true
+           )\
+           """
+  end
+
+  test "redact" do
+    assert inspect(Req.new(auth: {:bearer, "foo"}), pretty: true) == """
+           Req.new(
+             url: nil,
+             method: :get,
+             headers: [],
+             body: nil,
+             private: %{},
+
+             # options
+             auth: {:bearer, "***"}
+           )\
+           """
+
+    assert inspect(Req.new(auth: {:basic, "foo:bar"}), pretty: true) == """
+           Req.new(
+             url: nil,
+             method: :get,
+             headers: [],
+             body: nil,
+             private: %{},
+
+             # options
+             auth: {:basic, "foo****"}
+           )\
+           """
 
     assert inspect(Req.new(auth: {:digest, "alice:secret"})) =~
              ~s|auth: {:digest, "ali*********"}|
@@ -120,15 +186,32 @@ defmodule ReqTest do
       def generate, do: {:bearer, "some-value"}
     end
 
-    assert inspect(Req.new(auth: {AuthToken, :generate, []})) =~
-             ~s|auth: {ReqTest.AuthToken, :generate, []}|
+    assert inspect(Req.new(auth: {AuthToken, :generate, []}), pretty: true) == """
+           Req.new(
+             url: nil,
+             method: :get,
+             headers: [],
+             body: nil,
+             private: %{},
+
+             # options
+             auth: {ReqTest.AuthToken, :generate, []}
+           )\
+           """
 
     if Req.MixProject.legacy_headers_as_lists?() do
       assert inspect(Req.new(headers: [authorization: "bearer foobar"])) =~
                ~s|{"authorization", "bearer foo***"}|
     else
-      assert inspect(Req.new(headers: [authorization: "bearer foobar"])) =~
-               ~s|"authorization" => ["bearer foo***"]|
+      assert inspect(Req.new(headers: [authorization: "bearer foobar"]), pretty: true) == """
+             Req.new(
+               url: nil,
+               method: :get,
+               headers: [{"authorization", "bearer foo***"}],
+               body: nil,
+               private: %{}
+             )\
+             """
     end
   end
 
