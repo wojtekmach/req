@@ -277,7 +277,24 @@ defmodule Req.RequestTest do
     assert resp.body == "ok"
   end
 
+  test "IEx.Info" do
+    info = IEx.Info.info(Req.new(url: "https://elixir-lang.org"))
+
+    assert get_key(info, "Data type") == "Req.Request"
+    assert get_key(info, "Description") == "The request struct."
+
+    assert get_key(info, "Raw representation") =~
+             ~r/^%Req.Request\{.*request_steps: \[.*\].*\}$/s
+
+    assert get_key(info, "Reference modules") == "Req.Request, Req"
+  end
+
   ## Helpers
+
+  defp get_key(info, key) do
+    {^key, value} = List.keyfind(info, key, 0)
+    value
+  end
 
   defp new(options) do
     options = Keyword.update(options, :url, nil, &URI.parse/1)
