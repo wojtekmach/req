@@ -1,5 +1,7 @@
 import Config
 
-config :logger, :default_formatter,
-  format: "[$level] $message\n",
-  colors: [enabled: false]
+if config_env() == :test do
+  config :logger, :default_formatter,
+    format: "[$level] $message\n",
+    colors: [enabled: false]
+end
