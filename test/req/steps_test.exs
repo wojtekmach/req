@@ -25,9 +25,7 @@ defmodule Req.StepsTest do
   describe "put_base_url" do
     test "it works" do
       %{req: req, url: url} =
-        serve(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
+        serve("GET /": &Plug.Conn.send_resp(&1, 200, "ok"))
 
       assert Req.get!(req, base_url: url, url: "/").body == "ok"
       assert Req.get!(req, base_url: url, url: "").body == "ok"
@@ -39,19 +37,14 @@ defmodule Req.StepsTest do
 
     test "with absolute url" do
       %{req: req, url: url} =
-        serve(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
+        serve("GET /": &Plug.Conn.send_resp(&1, 200, "ok"))
 
       assert Req.get!(req, base_url: "ignored", url: url).body == "ok"
     end
 
     test "with base path" do
       %{req: req, url: url} =
-        serve(fn conn ->
-          assert conn.request_path == "/api/v2/foo"
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
+        serve("GET /api/v2/foo": &Plug.Conn.send_resp(&1, 200, "ok"))
 
       assert Req.get!(req, base_url: "#{url}/api/v2", url: "/foo", retry: false).body == "ok"
       assert Req.get!(req, base_url: "#{url}/api/v2", url: "foo").body == "ok"
@@ -61,14 +54,18 @@ defmodule Req.StepsTest do
     end
 
     test "function" do
-      plug = fn conn ->
-        Plug.Conn.send_resp(conn, 200, conn.request_path)
-      end
+      %{req: req, url: url} =
+        serve_sequence(
+          "GET /api/v1": &Plug.Conn.send_resp(&1, 200, "ok"),
+          "GET /api/v1/foo": &Plug.Conn.send_resp(&1, 200, "ok"),
+          "GET /api/v1": &Plug.Conn.send_resp(&1, 200, "ok"),
+          "GET /api/v1": &Plug.Conn.send_resp(&1, 200, "ok")
+        )
 
-      assert Req.get!(plug: plug, base_url: fn -> "/api/v1" end).body == "/api/v1"
-      assert Req.get!(plug: plug, base_url: fn -> "/api/v1" end, url: "foo").body == "/api/v1/foo"
-      assert Req.get!(plug: plug, base_url: fn -> URI.new!("/api/v1") end).body == "/api/v1"
-      assert Req.get!(plug: plug, base_url: {URI, :new!, ["/api/v1"]}).body == "/api/v1"
+      assert Req.get!(req, base_url: fn -> "#{url}/api/v1" end, url: "").body == "ok"
+      assert Req.get!(req, base_url: fn -> "#{url}/api/v1" end, url: "foo").body == "ok"
+      assert Req.get!(req, base_url: fn -> URI.new!("#{url}/api/v1") end, url: "").body == "ok"
+      assert Req.get!(req, base_url: {URI, :new!, ["#{url}/api/v1"]}, url: "").body == "ok"
     end
   end
 
@@ -111,17 +108,19 @@ defmodule Req.StepsTest do
     @tag :tmp_dir
     test ":netrc", c do
       %{req: req} =
-        serve(fn conn ->
-          expected = "Basic " <> Base.encode64("foo:bar")
+        serve(
+          "GET /": fn conn ->
+            expected = "Basic " <> Base.encode64("foo:bar")
 
-          case Plug.Conn.get_req_header(conn, "authorization") do
-            [^expected] ->
-              Plug.Conn.send_resp(conn, 200, "ok")
+            case Plug.Conn.get_req_header(conn, "authorization") do
+              [^expected] ->
+                Plug.Conn.send_resp(conn, 200, "ok")
 
-            _ ->
-              Plug.Conn.send_resp(conn, 401, "unauthorized")
+              _ ->
+                Plug.Conn.send_resp(conn, 401, "unauthorized")
+            end
           end
-        end)
+        )
 
       old_netrc = System.get_env("NETRC")
 
@@ -162,17 +161,19 @@ defmodule Req.StepsTest do
     @tag :tmp_dir
     test "{:netrc, path}", c do
       %{req: req} =
-        serve(fn conn ->
-          expected = "Basic " <> Base.encode64("foo:bar")
+        serve(
+          "GET /": fn conn ->
+            expected = "Basic " <> Base.encode64("foo:bar")
 
-          case Plug.Conn.get_req_header(conn, "authorization") do
-            [^expected] ->
-              Plug.Conn.send_resp(conn, 200, "ok")
+            case Plug.Conn.get_req_header(conn, "authorization") do
+              [^expected] ->
+                Plug.Conn.send_resp(conn, 200, "ok")
 
-            _ ->
-              Plug.Conn.send_resp(conn, 401, "unauthorized")
+              _ ->
+                Plug.Conn.send_resp(conn, 401, "unauthorized")
+            end
           end
-        end)
+        )
 
       assert_raise RuntimeError, "error reading .netrc file: no such file or directory", fn ->
         Req.get!(req, auth: {:netrc, "non_existent_file"})
@@ -215,33 +216,39 @@ defmodule Req.StepsTest do
     # here for locality
     test "body" do
       %{req: req} =
-        serve(fn conn ->
-          {:ok, body, conn} = Plug.Conn.read_body(conn)
-          Plug.Conn.send_resp(conn, 200, body)
-        end)
+        serve(
+          "POST /": fn conn ->
+            {:ok, body, conn} = Plug.Conn.read_body(conn)
+            Plug.Conn.send_resp(conn, 200, body)
+          end
+        )
 
       assert Req.post!(req, body: "foo").body == "foo"
     end
 
     test "body stream" do
       %{req: req} =
-        serve(fn conn ->
-          {:ok, body, conn} = Plug.Conn.read_body(conn)
-          Plug.Conn.send_resp(conn, 200, body)
-        end)
+        serve(
+          "POST /": fn conn ->
+            {:ok, body, conn} = Plug.Conn.read_body(conn)
+            Plug.Conn.send_resp(conn, 200, body)
+          end
+        )
 
       assert Req.post!(req, body: Stream.take(~w[foo foo foo], 2)).body == "foofoo"
     end
 
     test "json" do
       %{req: req} =
-        serve(fn conn ->
-          assert {:ok, ~s|{"a":1}|, conn} = Plug.Conn.read_body(conn)
-          assert ["application/json"] = Plug.Conn.get_req_header(conn, "accept")
-          assert ["application/json"] = Plug.Conn.get_req_header(conn, "content-type")
+        serve(
+          "POST /": fn conn ->
+            assert {:ok, ~s|{"a":1}|, conn} = Plug.Conn.read_body(conn)
+            assert ["application/json"] = Plug.Conn.get_req_header(conn, "accept")
+            assert ["application/json"] = Plug.Conn.get_req_header(conn, "content-type")
 
-          Plug.Conn.send_resp(conn, 200, "")
-        end)
+            Plug.Conn.send_resp(conn, 200, "")
+          end
+        )
 
       Req.post!(req, json: %{a: 1})
     end
@@ -260,20 +267,22 @@ defmodule Req.StepsTest do
       File.write!("#{tmp_dir}/c", "ccc")
 
       %{req: req} =
-        serve(fn conn ->
-          assert Plug.Conn.get_req_header(conn, "content-length") == ["391"]
-          assert %{"a" => "1", "b" => b, "c" => c} = conn.body_params
+        serve(
+          "POST /": fn conn ->
+            assert Plug.Conn.get_req_header(conn, "content-length") == ["391"]
+            assert %{"a" => "1", "b" => b, "c" => c} = conn.body_params
 
-          assert b.filename == "b.txt"
-          assert b.content_type == "text/plain"
-          assert File.read!(b.path) == "bbb"
+            assert b.filename == "b.txt"
+            assert b.content_type == "text/plain"
+            assert File.read!(b.path) == "bbb"
 
-          assert c.filename == "ccc"
-          assert c.content_type == "application/octet-stream"
-          assert File.read!(c.path) == "ccc"
+            assert c.filename == "ccc"
+            assert c.content_type == "application/octet-stream"
+            assert File.read!(c.path) == "ccc"
 
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
+            Plug.Conn.send_resp(conn, 200, "ok")
+          end
+        )
 
       assert Req.post!(
                req,
@@ -287,16 +296,18 @@ defmodule Req.StepsTest do
 
     test "form_multipart enum without size" do
       %{req: req} =
-        serve(fn conn ->
-          assert Plug.Conn.get_req_header(conn, "content-length") == []
-          assert %{"a" => "1", "b" => b} = conn.body_params
+        serve(
+          "POST /": fn conn ->
+            assert Plug.Conn.get_req_header(conn, "content-length") == []
+            assert %{"a" => "1", "b" => b} = conn.body_params
 
-          assert b.filename == "cycle"
-          assert b.content_type == "application/text"
-          assert File.read!(b.path) == "abcabc"
+            assert b.filename == "cycle"
+            assert b.content_type == "application/text"
+            assert File.read!(b.path) == "abcabc"
 
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
+            Plug.Conn.send_resp(conn, 200, "ok")
+          end
+        )
 
       assert Req.post!(
                req,
@@ -312,17 +323,15 @@ defmodule Req.StepsTest do
     @tag :capture_log
     test "form_multipart: content-type boundary stays in sync with body on retry" do
       %{req: req} =
-        serve(
-          sequence: [
-            fn conn ->
-              assert conn.body_params == %{"a" => "1"}
-              Plug.Conn.send_resp(conn, 500, "")
-            end,
-            fn conn ->
-              assert conn.body_params == %{"a" => "1"}
-              Plug.Conn.send_resp(conn, 200, "")
-            end
-          ]
+        serve_sequence(
+          "POST /": fn conn ->
+            assert conn.body_params == %{"a" => "1"}
+            Plug.Conn.send_resp(conn, 500, "")
+          end,
+          "POST /": fn conn ->
+            assert conn.body_params == %{"a" => "1"}
+            Plug.Conn.send_resp(conn, 200, "")
+          end
         )
 
       assert Req.post!(req, form_multipart: [a: 1], retry: :transient, retry_delay: 1).status ==
@@ -331,9 +340,11 @@ defmodule Req.StepsTest do
 
     test "GET to POST" do
       %{req: req} =
-        serve(fn conn ->
-          Plug.Conn.send_resp(conn, 200, conn.method)
-        end)
+        serve(
+          "GET /": &Plug.Conn.send_resp(&1, 200, &1.method),
+          "POST /": &Plug.Conn.send_resp(&1, 200, &1.method),
+          "PUT /": &Plug.Conn.send_resp(&1, 200, &1.method)
+        )
 
       assert Req.request!(req).body == "GET"
       assert Req.request!(req, body: "").body == "POST"
@@ -394,7 +405,7 @@ defmodule Req.StepsTest do
   @tag :capture_log
   test "put_path_params is idempotent" do
     %{req: req, url: url} =
-      serve(fn conn -> Plug.Conn.send_resp(conn, 500, "") end)
+      serve("GET /users/123": &Plug.Conn.send_resp(&1, 500, ""))
 
     {req, resp} =
       Req.run!(req, url: "#{url}/users/:id", path_params: [id: 123], retry_delay: 1)
@@ -453,21 +464,23 @@ defmodule Req.StepsTest do
 
     test "stream" do
       %{req: req} =
-        serve(fn conn ->
-          assert {:ok, body, conn} = Plug.Conn.read_body(conn)
+        serve(
+          "POST /": fn conn ->
+            assert {:ok, body, conn} = Plug.Conn.read_body(conn)
 
-          # run_plug decompresses the request body and strips content-encoding
-          body =
-            case Plug.Conn.get_req_header(conn, "content-encoding") do
-              ["gzip"] ->
-                :zlib.gunzip(body)
+            # run_plug decompresses the request body and strips content-encoding
+            body =
+              case Plug.Conn.get_req_header(conn, "content-encoding") do
+                ["gzip"] ->
+                  :zlib.gunzip(body)
 
-              [] ->
-                body
-            end
+                [] ->
+                  body
+              end
 
-          Plug.Conn.send_resp(conn, 200, body)
-        end)
+            Plug.Conn.send_resp(conn, 200, body)
+          end
+        )
 
       assert Req.post!(req, body: Stream.take(~w[foo foo foo], 2), compress_body: true).body ==
                "foofoo"
@@ -493,10 +506,12 @@ defmodule Req.StepsTest do
 
     test "nil body" do
       %{req: req} =
-        serve(fn conn ->
-          assert Plug.Conn.get_req_header(conn, "content-encoding") == []
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
+        serve(
+          "GET /": fn conn ->
+            assert Plug.Conn.get_req_header(conn, "content-encoding") == []
+            Plug.Conn.send_resp(conn, 200, "ok")
+          end
+        )
 
       assert Req.get!(req, compress_body: true).body == "ok"
     end
@@ -509,9 +524,7 @@ defmodule Req.StepsTest do
 
     test "into: binary" do
       %{req: req} =
-        serve(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "foo")
-        end)
+        serve("GET /": &Plug.Conn.send_resp(&1, 200, "foo"))
 
       resp = Req.get!(req, checksum: @foo_md5)
       assert resp.body == "foo"
@@ -537,13 +550,15 @@ defmodule Req.StepsTest do
     @tag skip: System.otp_release() < "28"
     test "into: binary with gzip" do
       %{req: req} =
-        serve(fn conn ->
-          ["zstd, br, gzip"] = Plug.Conn.get_req_header(conn, "accept-encoding")
+        serve(
+          "GET /": fn conn ->
+            ["zstd, br, gzip"] = Plug.Conn.get_req_header(conn, "accept-encoding")
 
-          conn
-          |> Plug.Conn.put_resp_header("content-encoding", "gzip")
-          |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
-        end)
+            conn
+            |> Plug.Conn.put_resp_header("content-encoding", "gzip")
+            |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
+          end
+        )
 
       req = Req.merge(req, compressed: true)
 
@@ -563,9 +578,7 @@ defmodule Req.StepsTest do
 
     test "into: fun" do
       %{req: req} =
-        serve(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "foo")
-        end)
+        serve("GET /": &Plug.Conn.send_resp(&1, 200, "foo"))
 
       req =
         req
@@ -594,9 +607,7 @@ defmodule Req.StepsTest do
 
     test "into: collectable" do
       %{req: req} =
-        serve(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "foo")
-        end)
+        serve("GET /": &Plug.Conn.send_resp(&1, 200, "foo"))
 
       req = Req.merge(req, into: [])
 
@@ -619,9 +630,7 @@ defmodule Req.StepsTest do
 
     test "into: :self" do
       %{req: req} =
-        serve(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "foo")
-        end)
+        serve("GET /": &Plug.Conn.send_resp(&1, 200, "foo"))
 
       req = Req.merge(req, into: :self)
 
@@ -634,32 +643,34 @@ defmodule Req.StepsTest do
   describe "http_digest" do
     test "md5 challenge" do
       %{req: req} =
-        serve(fn conn ->
-          case Plug.Conn.get_req_header(conn, "authorization") do
-            [] ->
-              conn
-              |> Plug.Conn.put_resp_header(
-                "www-authenticate",
-                ~s|Digest realm="test", nonce="1234567890"|
-              )
-              |> Plug.Conn.send_resp(401, "Unauthorized")
+        serve(
+          "GET /": fn conn ->
+            case Plug.Conn.get_req_header(conn, "authorization") do
+              [] ->
+                conn
+                |> Plug.Conn.put_resp_header(
+                  "www-authenticate",
+                  ~s|Digest realm="test", nonce="1234567890"|
+                )
+                |> Plug.Conn.send_resp(401, "Unauthorized")
 
-            [authorization | _] ->
-              has_expected_header? =
-                String.starts_with?(authorization, "Digest ") and
-                  authorization =~ ~r/username="foo"/ and
-                  authorization =~ ~r/realm="test"/ and
-                  authorization =~ ~r/nonce="1234567890"/ and
-                  authorization =~ ~r/uri="\/"/ and
-                  authorization =~ ~r/response="402359218de50d24c1c39d8c3c41a0c4"/
+              [authorization | _] ->
+                has_expected_header? =
+                  String.starts_with?(authorization, "Digest ") and
+                    authorization =~ ~r/username="foo"/ and
+                    authorization =~ ~r/realm="test"/ and
+                    authorization =~ ~r/nonce="1234567890"/ and
+                    authorization =~ ~r/uri="\/"/ and
+                    authorization =~ ~r/response="402359218de50d24c1c39d8c3c41a0c4"/
 
-              if has_expected_header? do
-                Plug.Conn.send_resp(conn, 200, "OK")
-              else
-                Plug.Conn.send_resp(conn, 401, "Unauthorized")
-              end
+                if has_expected_header? do
+                  Plug.Conn.send_resp(conn, 200, "OK")
+                else
+                  Plug.Conn.send_resp(conn, 401, "Unauthorized")
+                end
+            end
           end
-        end)
+        )
 
       resp = Req.get!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 200
@@ -667,33 +678,35 @@ defmodule Req.StepsTest do
 
     test "sha-256 challenge" do
       %{req: req} =
-        serve(fn conn ->
-          case Plug.Conn.get_req_header(conn, "authorization") do
-            [] ->
-              conn
-              |> Plug.Conn.put_resp_header(
-                "www-authenticate",
-                ~s|Digest realm="test", nonce="1234567890", algorithm=SHA-256|
-              )
-              |> Plug.Conn.send_resp(401, "Unauthorized")
+        serve(
+          "GET /": fn conn ->
+            case Plug.Conn.get_req_header(conn, "authorization") do
+              [] ->
+                conn
+                |> Plug.Conn.put_resp_header(
+                  "www-authenticate",
+                  ~s|Digest realm="test", nonce="1234567890", algorithm=SHA-256|
+                )
+                |> Plug.Conn.send_resp(401, "Unauthorized")
 
-            [authorization | _] ->
-              has_expected_header? =
-                String.starts_with?(authorization, "Digest ") and
-                  authorization =~ ~r/username="foo"/ and
-                  authorization =~ ~r/realm="test"/ and
-                  authorization =~ ~r/nonce="1234567890"/ and
-                  authorization =~ ~r/uri="\/"/ and
-                  authorization =~
-                    ~r/response="79fbcaf8e746ff152ab381f928ee1f5875ef3dab475937cd7a6f2a34c0941021\"/
+              [authorization | _] ->
+                has_expected_header? =
+                  String.starts_with?(authorization, "Digest ") and
+                    authorization =~ ~r/username="foo"/ and
+                    authorization =~ ~r/realm="test"/ and
+                    authorization =~ ~r/nonce="1234567890"/ and
+                    authorization =~ ~r/uri="\/"/ and
+                    authorization =~
+                      ~r/response="79fbcaf8e746ff152ab381f928ee1f5875ef3dab475937cd7a6f2a34c0941021\"/
 
-              if has_expected_header? do
-                Plug.Conn.send_resp(conn, 200, "OK")
-              else
-                Plug.Conn.send_resp(conn, 401, "Unauthorized")
-              end
+                if has_expected_header? do
+                  Plug.Conn.send_resp(conn, 200, "OK")
+                else
+                  Plug.Conn.send_resp(conn, 401, "Unauthorized")
+                end
+            end
           end
-        end)
+        )
 
       resp = Req.get!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 200
@@ -701,9 +714,11 @@ defmodule Req.StepsTest do
 
     test "no challenge" do
       %{req: req} =
-        serve(fn conn ->
-          Plug.Conn.send_resp(conn, 401, "Unauthorized")
-        end)
+        serve(
+          "GET /": fn conn ->
+            Plug.Conn.send_resp(conn, 401, "Unauthorized")
+          end
+        )
 
       resp = Req.get!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 401
@@ -712,14 +727,16 @@ defmodule Req.StepsTest do
     @tag :capture_log
     test "unsupported digest algorithm" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header(
-            "www-authenticate",
-            ~s|Digest realm="test", nonce="1234567890", algorithm=UNSUPPORTED|
-          )
-          |> Plug.Conn.send_resp(401, "Unauthorized")
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_header(
+              "www-authenticate",
+              ~s|Digest realm="test", nonce="1234567890", algorithm=UNSUPPORTED|
+            )
+            |> Plug.Conn.send_resp(401, "Unauthorized")
+          end
+        )
 
       resp = Req.get!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 401
@@ -731,14 +748,16 @@ defmodule Req.StepsTest do
 
     test "unauthorized after challenge" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header(
-            "www-authenticate",
-            ~s|Digest realm="test", nonce="1234567890", algorithm=MD5|
-          )
-          |> Plug.Conn.send_resp(401, "Unauthorized")
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_header(
+              "www-authenticate",
+              ~s|Digest realm="test", nonce="1234567890", algorithm=MD5|
+            )
+            |> Plug.Conn.send_resp(401, "Unauthorized")
+          end
+        )
 
       resp = Req.get!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 401
@@ -746,32 +765,34 @@ defmodule Req.StepsTest do
 
     test "quoted values and paths" do
       %{req: req, url: url} =
-        serve(fn conn ->
-          case Plug.Conn.get_req_header(conn, "authorization") do
-            [] ->
-              conn
-              |> Plug.Conn.put_resp_header(
-                "www-authenticate",
-                ~s|Digest realm="test \\"realm\\"", nonce="1234567890"|
-              )
-              |> Plug.Conn.send_resp(401, "Unauthorized")
+        serve(
+          "GET /some/path": fn conn ->
+            case Plug.Conn.get_req_header(conn, "authorization") do
+              [] ->
+                conn
+                |> Plug.Conn.put_resp_header(
+                  "www-authenticate",
+                  ~s|Digest realm="test \\"realm\\"", nonce="1234567890"|
+                )
+                |> Plug.Conn.send_resp(401, "Unauthorized")
 
-            [authorization | _] ->
-              has_expected_header? =
-                String.starts_with?(authorization, "Digest ") and
-                  authorization =~ ~r/username="foo \\"bar\\""/ and
-                  authorization =~ ~r/realm="test \\"realm\\""/ and
-                  authorization =~ ~r/nonce="1234567890"/ and
-                  authorization =~ ~r/uri="\/some\/path"/ and
-                  authorization =~ ~r/response="872e1593ea4d45f4d0a099614a6b9632\"/
+              [authorization | _] ->
+                has_expected_header? =
+                  String.starts_with?(authorization, "Digest ") and
+                    authorization =~ ~r/username="foo \\"bar\\""/ and
+                    authorization =~ ~r/realm="test \\"realm\\""/ and
+                    authorization =~ ~r/nonce="1234567890"/ and
+                    authorization =~ ~r/uri="\/some\/path"/ and
+                    authorization =~ ~r/response="872e1593ea4d45f4d0a099614a6b9632\"/
 
-              if has_expected_header? do
-                Plug.Conn.send_resp(conn, 200, "OK")
-              else
-                Plug.Conn.send_resp(conn, 401, "Unauthorized")
-              end
+                if has_expected_header? do
+                  Plug.Conn.send_resp(conn, 200, "OK")
+                else
+                  Plug.Conn.send_resp(conn, 401, "Unauthorized")
+                end
+            end
           end
-        end)
+        )
 
       resp = Req.get!(req, url: "#{url}/some/path", auth: {:digest, "foo \"bar\":bar"})
       assert resp.status == 200
@@ -779,49 +800,51 @@ defmodule Req.StepsTest do
 
     test "with qop" do
       %{req: req} =
-        serve(fn conn ->
-          case Plug.Conn.get_req_header(conn, "authorization") do
-            [] ->
-              conn
-              |> Plug.Conn.put_resp_header(
-                "www-authenticate",
-                ~s|Digest realm="test", nonce="1234567890", qop="auth"|
-              )
-              |> Plug.Conn.send_resp(401, "Unauthorized")
-
-            [authorization | _] ->
-              # Calculate expected response using cnonce
-              cnonce = ~r/cnonce="([a-f0-9]+)"/ |> Regex.run(authorization) |> Enum.at(1)
-
-              ha1 = :crypto.hash(:md5, "foo:test:bar") |> Base.encode16(case: :lower)
-              ha2 = :crypto.hash(:md5, "GET:/") |> Base.encode16(case: :lower)
-
-              expected_response =
-                :crypto.hash(
-                  :md5,
-                  # Response is calculated by hash_func(ha1:nonce:nc:cnonce:qop:ha2)
-                  "#{ha1}:1234567890:00000001:#{cnonce}:auth:#{ha2}"
+        serve(
+          "GET /": fn conn ->
+            case Plug.Conn.get_req_header(conn, "authorization") do
+              [] ->
+                conn
+                |> Plug.Conn.put_resp_header(
+                  "www-authenticate",
+                  ~s|Digest realm="test", nonce="1234567890", qop="auth"|
                 )
-                |> Base.encode16(case: :lower)
+                |> Plug.Conn.send_resp(401, "Unauthorized")
 
-              has_expected_header? =
-                String.starts_with?(authorization, "Digest ") and
-                  authorization =~ ~r/username="foo"/ and
-                  authorization =~ ~r/realm="test"/ and
-                  authorization =~ ~r/nonce="1234567890"/ and
-                  authorization =~ ~r/uri="\/"/ and
-                  authorization =~ ~r/response="#{expected_response}"/ and
-                  authorization =~ ~r/qop=auth/ and
-                  authorization =~ ~r/nc=00000001/ and
-                  authorization =~ ~r/cnonce="#{cnonce}"/
+              [authorization | _] ->
+                # Calculate expected response using cnonce
+                cnonce = ~r/cnonce="([a-f0-9]+)"/ |> Regex.run(authorization) |> Enum.at(1)
 
-              if has_expected_header? do
-                Plug.Conn.send_resp(conn, 200, "OK")
-              else
-                Plug.Conn.send_resp(conn, 401, "Unauthorized")
-              end
+                ha1 = :crypto.hash(:md5, "foo:test:bar") |> Base.encode16(case: :lower)
+                ha2 = :crypto.hash(:md5, "GET:/") |> Base.encode16(case: :lower)
+
+                expected_response =
+                  :crypto.hash(
+                    :md5,
+                    # Response is calculated by hash_func(ha1:nonce:nc:cnonce:qop:ha2)
+                    "#{ha1}:1234567890:00000001:#{cnonce}:auth:#{ha2}"
+                  )
+                  |> Base.encode16(case: :lower)
+
+                has_expected_header? =
+                  String.starts_with?(authorization, "Digest ") and
+                    authorization =~ ~r/username="foo"/ and
+                    authorization =~ ~r/realm="test"/ and
+                    authorization =~ ~r/nonce="1234567890"/ and
+                    authorization =~ ~r/uri="\/"/ and
+                    authorization =~ ~r/response="#{expected_response}"/ and
+                    authorization =~ ~r/qop=auth/ and
+                    authorization =~ ~r/nc=00000001/ and
+                    authorization =~ ~r/cnonce="#{cnonce}"/
+
+                if has_expected_header? do
+                  Plug.Conn.send_resp(conn, 200, "OK")
+                else
+                  Plug.Conn.send_resp(conn, 401, "Unauthorized")
+                end
+            end
           end
-        end)
+        )
 
       resp = Req.get!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 200
@@ -829,49 +852,51 @@ defmodule Req.StepsTest do
 
     test "with session" do
       %{req: req} =
-        serve(fn conn ->
-          case Plug.Conn.get_req_header(conn, "authorization") do
-            [] ->
-              conn
-              |> Plug.Conn.put_resp_header(
-                "www-authenticate",
-                ~s|Digest realm="test", nonce="1234567890", algorithm=MD5-SESS|
-              )
-              |> Plug.Conn.send_resp(401, "Unauthorized")
-
-            [authorization | _] ->
-              # Calculate expected response using cnonce
-              cnonce = ~r/cnonce="([a-f0-9]+)"/ |> Regex.run(authorization) |> Enum.at(1)
-              ha1 = :crypto.hash(:md5, "foo:test:bar") |> Base.encode16(case: :lower)
-
-              ha1 =
-                :crypto.hash(:md5, "#{ha1}:1234567890:#{cnonce}") |> Base.encode16(case: :lower)
-
-              ha2 = :crypto.hash(:md5, "GET:/") |> Base.encode16(case: :lower)
-
-              expected_response =
-                :crypto.hash(
-                  :md5,
-                  "#{ha1}:1234567890:#{ha2}"
+        serve(
+          "GET /": fn conn ->
+            case Plug.Conn.get_req_header(conn, "authorization") do
+              [] ->
+                conn
+                |> Plug.Conn.put_resp_header(
+                  "www-authenticate",
+                  ~s|Digest realm="test", nonce="1234567890", algorithm=MD5-SESS|
                 )
-                |> Base.encode16(case: :lower)
+                |> Plug.Conn.send_resp(401, "Unauthorized")
 
-              has_expected_header? =
-                String.starts_with?(authorization, "Digest ") and
-                  authorization =~ ~r/username="foo"/ and
-                  authorization =~ ~r/realm="test"/ and
-                  authorization =~ ~r/nonce="1234567890"/ and
-                  authorization =~ ~r/uri="\/"/ and
-                  authorization =~ ~r/response="#{expected_response}"/ and
-                  authorization =~ ~r/cnonce="#{cnonce}"/
+              [authorization | _] ->
+                # Calculate expected response using cnonce
+                cnonce = ~r/cnonce="([a-f0-9]+)"/ |> Regex.run(authorization) |> Enum.at(1)
+                ha1 = :crypto.hash(:md5, "foo:test:bar") |> Base.encode16(case: :lower)
 
-              if has_expected_header? do
-                Plug.Conn.send_resp(conn, 200, "OK")
-              else
-                Plug.Conn.send_resp(conn, 401, "Unauthorized")
-              end
+                ha1 =
+                  :crypto.hash(:md5, "#{ha1}:1234567890:#{cnonce}") |> Base.encode16(case: :lower)
+
+                ha2 = :crypto.hash(:md5, "GET:/") |> Base.encode16(case: :lower)
+
+                expected_response =
+                  :crypto.hash(
+                    :md5,
+                    "#{ha1}:1234567890:#{ha2}"
+                  )
+                  |> Base.encode16(case: :lower)
+
+                has_expected_header? =
+                  String.starts_with?(authorization, "Digest ") and
+                    authorization =~ ~r/username="foo"/ and
+                    authorization =~ ~r/realm="test"/ and
+                    authorization =~ ~r/nonce="1234567890"/ and
+                    authorization =~ ~r/uri="\/"/ and
+                    authorization =~ ~r/response="#{expected_response}"/ and
+                    authorization =~ ~r/cnonce="#{cnonce}"/
+
+                if has_expected_header? do
+                  Plug.Conn.send_resp(conn, 200, "OK")
+                else
+                  Plug.Conn.send_resp(conn, 401, "Unauthorized")
+                end
+            end
           end
-        end)
+        )
 
       resp = Req.get!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 200
@@ -1030,7 +1055,7 @@ defmodule Req.StepsTest do
 
   describe "decompress_body" do
     test "is disabled by default" do
-      %{req: req} = serve(fn conn -> send_resp_gzip(conn, "foo") end)
+      %{req: req} = serve("GET /": &send_resp_gzip(&1, "foo"))
 
       resp = Req.get!(req)
       assert Req.Response.get_header(resp, "content-encoding") == ["gzip"]
@@ -1039,11 +1064,13 @@ defmodule Req.StepsTest do
 
     test "gzip success" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
-          |> send_resp_gzip("foo")
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
+            |> send_resp_gzip("foo")
+          end
+        )
 
       resp = Req.get!(req, compressed: true)
       assert Req.Response.get_header(resp, "content-encoding") == []
@@ -1052,11 +1079,13 @@ defmodule Req.StepsTest do
 
     test "gzip error" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
-          |> Plug.Conn.send_resp(200, "bad")
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
+            |> Plug.Conn.send_resp(200, "bad")
+          end
+        )
 
       assert_raise Req.DecompressError, "gzip decompression failed", fn ->
         Req.get!(req, compressed: true)
@@ -1065,11 +1094,13 @@ defmodule Req.StepsTest do
 
     test "identity" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("content-encoding", "identity")
-          |> Plug.Conn.send_resp(200, "foo")
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_header("content-encoding", "identity")
+            |> Plug.Conn.send_resp(200, "foo")
+          end
+        )
 
       resp = Req.get!(req, compressed: true)
       assert Req.Response.get_header(resp, "content-encoding") == []
@@ -1077,7 +1108,8 @@ defmodule Req.StepsTest do
     end
 
     test "brotli success" do
-      %{req: req} = serve(fn conn -> send_resp_br(conn, "foo") end)
+      %{req: req} =
+        serve("GET /": &send_resp_br(&1, "foo"))
 
       resp = Req.get!(req, compressed: true)
       assert resp.body == "foo"
@@ -1085,11 +1117,13 @@ defmodule Req.StepsTest do
 
     test "brotli error" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("content-encoding", "br")
-          |> Plug.Conn.send_resp(200, "bad")
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_header("content-encoding", "br")
+            |> Plug.Conn.send_resp(200, "bad")
+          end
+        )
 
       assert_raise Req.DecompressError, "br decompression failed", fn ->
         Req.get!(req, compressed: true)
@@ -1099,7 +1133,8 @@ defmodule Req.StepsTest do
     # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
     @tag skip: System.otp_release() < "28"
     test "zstd success" do
-      %{req: req} = serve(fn conn -> send_resp_zstd(conn, "foo") end)
+      %{req: req} =
+        serve("GET /": &send_resp_zstd(&1, "foo"))
 
       resp = Req.get!(req, compressed: true)
       assert resp.body == "foo"
@@ -1109,11 +1144,13 @@ defmodule Req.StepsTest do
     @tag skip: System.otp_release() < "28"
     test "zstd error" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("content-encoding", "zstd")
-          |> Plug.Conn.send_resp(200, "bad")
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_header("content-encoding", "zstd")
+            |> Plug.Conn.send_resp(200, "bad")
+          end
+        )
 
       assert_raise Req.DecompressError,
                    ~S[zstd decompression failed, reason: "Unknown frame descriptor"],
@@ -1126,11 +1163,13 @@ defmodule Req.StepsTest do
     @tag skip: System.otp_release() < "28"
     test "multiple codecs" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("content-encoding", "gzip, zstd")
-          |> Plug.Conn.send_resp(200, "foo" |> :zlib.gzip() |> :zstd.compress())
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_header("content-encoding", "gzip, zstd")
+            |> Plug.Conn.send_resp(200, "foo" |> :zlib.gzip() |> :zstd.compress())
+          end
+        )
 
       resp = Req.get!(req, compressed: true)
       assert Req.Response.get_header(resp, "content-encoding") == []
@@ -1141,16 +1180,18 @@ defmodule Req.StepsTest do
     @tag skip: System.otp_release() < "28" or Req.Case.adapter() == :httpc
     test "multiple codecs with multiple headers" do
       %{req: req} =
-        serve(fn conn ->
-          body = "foo" |> :zlib.gzip() |> :zstd.compress()
+        serve(
+          "GET /": fn conn ->
+            body = "foo" |> :zlib.gzip() |> :zstd.compress()
 
-          conn
-          |> Plug.Conn.prepend_resp_headers([
-            {"content-encoding", "gzip"},
-            {"content-encoding", "zstd"}
-          ])
-          |> Plug.Conn.send_resp(200, body)
-        end)
+            conn
+            |> Plug.Conn.prepend_resp_headers([
+              {"content-encoding", "gzip"},
+              {"content-encoding", "zstd"}
+            ])
+            |> Plug.Conn.send_resp(200, body)
+          end
+        )
 
       resp = Req.get!(req, compressed: true)
       assert Req.Response.get_header(resp, "content-encoding") == []
@@ -1161,11 +1202,13 @@ defmodule Req.StepsTest do
     @tag :capture_log
     test "unknown codecs" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("content-encoding", "unknown1, unknown2")
-          |> Plug.Conn.send_resp(200, <<1, 2, 3>>)
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_header("content-encoding", "unknown1, unknown2")
+            |> Plug.Conn.send_resp(200, <<1, 2, 3>>)
+          end
+        )
 
       resp = Req.get!(req, compressed: true)
       assert Req.Response.get_header(resp, "content-encoding") == ["unknown1, unknown2"]
@@ -1173,7 +1216,8 @@ defmodule Req.StepsTest do
     end
 
     test "HEAD request" do
-      %{req: req} = serve(fn conn -> send_resp_gzip(conn, "") end)
+      %{req: req} =
+        serve("HEAD /": &send_resp_gzip(&1, ""))
 
       assert Req.head!(req, compressed: true).body == ""
     end
@@ -1182,43 +1226,54 @@ defmodule Req.StepsTest do
   describe "decode_body" do
     test "multiple types" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.prepend_resp_headers([
-            {"content-type", "text/plain"},
-            {"content-type", "text/plain; charset=utf-8"}
-          ])
-          |> Plug.Conn.send_resp(200, "ok")
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.prepend_resp_headers([
+              {"content-type", "text/plain"},
+              {"content-type", "text/plain; charset=utf-8"}
+            ])
+            |> Plug.Conn.send_resp(200, "ok")
+          end
+        )
 
       assert Req.get!(req).body == "ok"
     end
 
     test "json" do
       %{req: req} =
-        serve(fn conn ->
-          Req.Test.json(conn, %{a: 1})
-        end)
+        serve(
+          "GET /": fn conn ->
+            Req.Test.json(conn, %{a: 1})
+          end
+        )
 
       assert Req.get!(req).body == %{"a" => 1}
     end
 
     test "json-api" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header("content-type", "application/vnd.api+json; charset=utf-8")
-          |> Req.Test.json(%{a: 1})
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_header(
+              "content-type",
+              "application/vnd.api+json; charset=utf-8"
+            )
+            |> Req.Test.json(%{a: 1})
+          end
+        )
 
       assert Req.get!(req).body == %{"a" => 1}
     end
 
     test "json with custom options" do
       %{req: req} =
-        serve(fn conn ->
-          Req.Test.json(conn, %{a: 1})
-        end)
+        serve(
+          "GET /": fn conn ->
+            Req.Test.json(conn, %{a: 1})
+          end
+        )
 
       assert Req.get!(req, decoders: [json: &Jason.decode(&1, keys: :atoms)]).body == %{
                a: 1
@@ -1227,9 +1282,11 @@ defmodule Req.StepsTest do
 
     test "deprecated :decode_json option" do
       %{req: req} =
-        serve(fn conn ->
-          Req.Test.json(conn, %{a: 1})
-        end)
+        serve(
+          "GET /": fn conn ->
+            Req.Test.json(conn, %{a: 1})
+          end
+        )
 
       assert ExUnit.CaptureIO.capture_io(:stderr, fn ->
                assert Req.get!(req, decode_json: [keys: :atoms]).body == %{a: 1}
@@ -1238,18 +1295,20 @@ defmodule Req.StepsTest do
 
     test "json invalid" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/json")
-          |> Plug.Conn.send_resp(200, "bad")
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/json")
+            |> Plug.Conn.send_resp(200, "bad")
+          end
+        )
 
       assert {:error, %Jason.DecodeError{}} = Req.get(req)
     end
 
     test "archives are not decoded by default" do
-      files = [{~c"foo.txt", "bar"}]
-      %{req: req} = serve(fn conn -> send_resp_zip(conn, files) end)
+      %{req: req} =
+        serve("GET /": &send_resp_zip(&1, [{~c"foo.txt", "bar"}]))
 
       body = Req.get!(req).body
       assert is_binary(body)
@@ -1257,9 +1316,11 @@ defmodule Req.StepsTest do
 
     test "decoders: false disables JSON decoding" do
       %{req: req} =
-        serve(fn conn ->
-          Req.Test.json(conn, %{a: 1})
-        end)
+        serve(
+          "GET /": fn conn ->
+            Req.Test.json(conn, %{a: 1})
+          end
+        )
 
       assert Req.get!(req, decoders: false).body == ~s|{"a":1}|
     end
@@ -1270,12 +1331,14 @@ defmodule Req.StepsTest do
     end
 
     test "setting :decoders replaces the default, so JSON is not decoded unless included" do
-      %{req: req} = serve(fn conn -> Req.Test.json(conn, %{a: 1}) end)
+      %{req: req} =
+        serve("GET /": &Req.Test.json(&1, %{a: 1}))
+
       assert Req.get!(req, decoders: [:zip]).body == ~s|{"a":1}|
     end
 
     test "unknown decoder format raises" do
-      %{req: req} = serve(fn conn -> Req.Test.json(conn, %{}) end)
+      %{req: req} = serve("GET /": &Req.Test.json(&1, %{}))
 
       assert_raise ArgumentError, ~r/unknown decoder format: :bogus/, fn ->
         Req.get!(req, decoders: [:bogus])
@@ -1284,11 +1347,13 @@ defmodule Req.StepsTest do
 
     test "custom decoder (function)" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("text/calendar")
-          |> Plug.Conn.send_resp(200, "raw-ics")
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("text/calendar")
+            |> Plug.Conn.send_resp(200, "raw-ics")
+          end
+        )
 
       resp = Req.get!(req, decoders: [ics: &{:ok, String.upcase(&1)}])
       assert resp.body == "RAW-ICS"
@@ -1299,24 +1364,28 @@ defmodule Req.StepsTest do
       files = [{~c"mimetype", "application/epub+zip"}]
 
       %{req: req} =
-        serve(fn conn ->
-          {:ok, {_name, zip}} = :zip.create(~c"a.zip", files, [:memory])
+        serve(
+          "GET /": fn conn ->
+            {:ok, {_name, zip}} = :zip.create(~c"a.zip", files, [:memory])
 
-          conn
-          |> Plug.Conn.put_resp_content_type("application/epub+zip", nil)
-          |> Plug.Conn.send_resp(200, zip)
-        end)
+            conn
+            |> Plug.Conn.put_resp_content_type("application/epub+zip", nil)
+            |> Plug.Conn.send_resp(200, zip)
+          end
+        )
 
       assert Req.get!(req, decoders: [epub: Req.ZIP]).body == files
     end
 
     test "custom decoder error" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("text/calendar")
-          |> Plug.Conn.send_resp(200, "raw-ics")
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("text/calendar")
+            |> Plug.Conn.send_resp(200, "raw-ics")
+          end
+        )
 
       assert {:error, %RuntimeError{} = e} =
                Req.get(req, decoders: [ics: fn _ -> {:error, :nope} end])
@@ -1326,18 +1395,20 @@ defmodule Req.StepsTest do
 
     test "{format, format} reuses a built-in decoder" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("text/calendar")
-          |> Plug.Conn.send_resp(200, ~s|{"a":1}|)
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("text/calendar")
+            |> Plug.Conn.send_resp(200, ~s|{"a":1}|)
+          end
+        )
 
       assert Req.get!(req, decoders: [ics: :json]).body == %{"a" => 1}
     end
 
     test "tar (content-type)" do
       files = [{~c"foo.txt", "bar"}]
-      %{req: req} = serve(fn conn -> send_resp_tar(conn, files) end)
+      %{req: req} = serve("GET /": &send_resp_tar(&1, files))
 
       assert Req.get!(req, decoders: [:tar]).body == files
     end
@@ -1346,11 +1417,13 @@ defmodule Req.StepsTest do
       files = [{~c"foo.txt", "bar"}]
 
       %{req: req, url: url} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
-          |> send_resp_tar(files)
-        end)
+        serve(
+          "GET /foo.tar": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+            |> send_resp_tar(files)
+          end
+        )
 
       assert Req.get!(req, url: "#{url}/foo.tar", decoders: [:tar]).body == files
     end
@@ -1359,11 +1432,13 @@ defmodule Req.StepsTest do
       files = [{~c"foo.txt", "bar"}]
 
       %{req: req, url: url} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/octet-stream")
-          |> send_resp_tar(files)
-        end)
+        serve(
+          "GET /foo.tar": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/octet-stream")
+            |> send_resp_tar(files)
+          end
+        )
 
       resp = Req.get!(req, url: "#{url}/foo.tar", decoders: [:tar])
       assert resp.headers["content-type"] == ["application/octet-stream; charset=utf-8"]
@@ -1374,9 +1449,11 @@ defmodule Req.StepsTest do
       files = [{~c"foo.txt", "bar"}]
 
       %{req: req, url: url} =
-        serve(fn conn ->
-          Plug.Conn.send_resp(conn, 200, create_tar(files))
-        end)
+        serve(
+          "GET /foo.tar.gz": fn conn ->
+            Plug.Conn.send_resp(conn, 200, create_tar(files))
+          end
+        )
 
       assert Req.get!(req, url: "#{url}/foo.tar.gz", decoders: [:tgz]).body == files
     end
@@ -1385,22 +1462,26 @@ defmodule Req.StepsTest do
       files = [{~c"foo.txt", "bar"}]
 
       %{req: req, url: url} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
-          |> Plug.Conn.send_resp(200, create_tar(files, compressed: true))
-        end)
+        serve(
+          "GET /foo.tar.gz": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+            |> Plug.Conn.send_resp(200, create_tar(files, compressed: true))
+          end
+        )
 
       assert Req.get!(req, url: "#{url}/foo.tar.gz", decoders: [:tgz]).body == files
     end
 
     test "tar invalid" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/x-tar", nil)
-          |> Plug.Conn.send_resp(200, "invalid")
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/x-tar", nil)
+            |> Plug.Conn.send_resp(200, "invalid")
+          end
+        )
 
       assert {:error, e} = Req.get(req, decoders: [:tar])
       assert e == %Req.ArchiveError{format: :tar, reason: :eof, data: "invalid"}
@@ -1409,7 +1490,7 @@ defmodule Req.StepsTest do
 
     test "zip (content-type)" do
       files = [{~c"foo.txt", "bar"}]
-      %{req: req} = serve(fn conn -> send_resp_zip(conn, files) end)
+      %{req: req} = serve("GET /": &send_resp_zip(&1, files))
 
       assert Req.get!(req, decoders: [:zip]).body == files
     end
@@ -1418,22 +1499,26 @@ defmodule Req.StepsTest do
       files = [{~c"foo.txt", "bar"}]
 
       %{req: req, url: url} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
-          |> send_resp_zip(files)
-        end)
+        serve(
+          "GET /foo.zip": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+            |> send_resp_zip(files)
+          end
+        )
 
       assert Req.get!(req, url: "#{url}/foo.zip", decoders: [:zip]).body == files
     end
 
     test "zip invalid" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/zip", nil)
-          |> Plug.Conn.send_resp(200, "invalid")
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/zip", nil)
+            |> Plug.Conn.send_resp(200, "invalid")
+          end
+        )
 
       assert {:error, e} = Req.get(req, decoders: [:zip])
       assert e == %Req.ArchiveError{format: :zip, reason: nil, data: "invalid"}
@@ -1442,22 +1527,26 @@ defmodule Req.StepsTest do
 
     test "gzip (content-type)" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/x-gzip", nil)
-          |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/x-gzip", nil)
+            |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
+          end
+        )
 
       assert Req.get!(req, decoders: [:gz]).body == "foo"
     end
 
     test "gzip invalid" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/x-gzip", nil)
-          |> Plug.Conn.send_resp(200, "bad")
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/x-gzip", nil)
+            |> Plug.Conn.send_resp(200, "bad")
+          end
+        )
 
       assert_raise ErlangError, "Erlang error: :data_error", fn ->
         Req.get(req, decoders: [:gz])
@@ -1468,11 +1557,13 @@ defmodule Req.StepsTest do
     @tag skip: System.otp_release() < "28"
     test "zstd (content-type)" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/zstd", nil)
-          |> Plug.Conn.send_resp(200, :zstd.compress("foo"))
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/zstd", nil)
+            |> Plug.Conn.send_resp(200, :zstd.compress("foo"))
+          end
+        )
 
       assert Req.get!(req, decoders: [:zst]).body == "foo"
     end
@@ -1481,11 +1572,13 @@ defmodule Req.StepsTest do
     @tag skip: System.otp_release() < "28"
     test "zstd (path)" do
       %{req: req, url: url} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
-          |> Plug.Conn.send_resp(200, :zstd.compress("foo"))
-        end)
+        serve(
+          "GET /foo.zst": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+            |> Plug.Conn.send_resp(200, :zstd.compress("foo"))
+          end
+        )
 
       assert Req.get!(req, url: "#{url}/foo.zst", decoders: [:zst]).body == "foo"
     end
@@ -1494,11 +1587,13 @@ defmodule Req.StepsTest do
     @tag skip: System.otp_release() < "28"
     test "zstd invalid" do
       %{req: req} =
-        serve(fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/zstd", nil)
-          |> Plug.Conn.send_resp(200, "bad")
-        end)
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/zstd", nil)
+            |> Plug.Conn.send_resp(200, "bad")
+          end
+        )
 
       assert {:error, e} = Req.get(req, decoders: [:zst])
       assert %RuntimeError{} = e
@@ -1514,7 +1609,7 @@ defmodule Req.StepsTest do
         ["3", "4"]
       ]
 
-      %{req: req} = serve(fn conn -> send_resp_csv(conn, csv) end)
+      %{req: req} = serve("GET /": &send_resp_csv(&1, csv))
 
       assert Req.get!(req, decoders: [:csv]).body == csv
     end
@@ -1522,34 +1617,38 @@ defmodule Req.StepsTest do
 
   test "decompress and decode" do
     %{req: req} =
-      serve(fn conn ->
-        body =
-          %{a: 1}
-          |> Jason.encode_to_iodata!()
-          |> :zlib.gzip()
+      serve(
+        "GET /": fn conn ->
+          body =
+            %{a: 1}
+            |> Jason.encode_to_iodata!()
+            |> :zlib.gzip()
 
-        conn
-        |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
-        |> Plug.Conn.put_resp_content_type("application/json")
-        |> Plug.Conn.send_resp(200, body)
-      end)
+          conn
+          |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
+          |> Plug.Conn.put_resp_content_type("application/json")
+          |> Plug.Conn.send_resp(200, body)
+        end
+      )
 
     assert Req.get!(req, compressed: true).body == %{"a" => 1}
   end
 
   test "decompress and decode in raw mode" do
     %{req: req} =
-      serve(fn conn ->
-        body =
-          %{a: 1}
-          |> Jason.encode_to_iodata!()
-          |> :zlib.gzip()
+      serve(
+        "GET /": fn conn ->
+          body =
+            %{a: 1}
+            |> Jason.encode_to_iodata!()
+            |> :zlib.gzip()
 
-        conn
-        |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
-        |> Plug.Conn.put_resp_content_type("application/json")
-        |> Plug.Conn.send_resp(200, body)
-      end)
+          conn
+          |> Plug.Conn.put_resp_header("content-encoding", "x-gzip")
+          |> Plug.Conn.put_resp_content_type("application/json")
+          |> Plug.Conn.send_resp(200, body)
+        end
+      )
 
     assert Req.get!(req, compressed: true, raw: true).body
            |> :zlib.gunzip()
@@ -1560,17 +1659,19 @@ defmodule Req.StepsTest do
 
   test "decode with unknown compression codec" do
     %{req: req} =
-      serve(fn conn ->
-        body =
-          %{a: 1}
-          |> Jason.encode_to_iodata!()
-          |> :zlib.compress()
+      serve(
+        "GET /": fn conn ->
+          body =
+            %{a: 1}
+            |> Jason.encode_to_iodata!()
+            |> :zlib.compress()
 
-        conn
-        |> Plug.Conn.put_resp_header("content-encoding", "deflate")
-        |> Plug.Conn.put_resp_content_type("application/json")
-        |> Plug.Conn.send_resp(200, body)
-      end)
+          conn
+          |> Plug.Conn.put_resp_header("content-encoding", "deflate")
+          |> Plug.Conn.put_resp_content_type("application/json")
+          |> Plug.Conn.send_resp(200, body)
+        end
+      )
 
     {resp, log} =
       ExUnit.CaptureLog.with_log(fn ->
@@ -1584,22 +1685,21 @@ defmodule Req.StepsTest do
   describe "redirect" do
     test "ignore when :redirect is false" do
       %{req: req, url: url} =
-        serve(fn conn ->
-          redirect(conn, 302, "/ok")
-        end)
+        serve("GET /redirect": &redirect(&1, 302, "/ok"))
 
       assert Req.get!(req, url: "#{url}/redirect", redirect: false).status == 302
     end
 
     test "absolute" do
       %{req: req, url: url} =
-        serve(fn
-          conn when conn.request_path == "/redirect" ->
+        serve(
+          "GET /redirect": fn conn ->
             redirect(conn, 302, "http://#{conn.host}:#{conn.port}/ok")
-
-          conn when conn.request_path == "/ok" ->
+          end,
+          "GET /ok": fn conn ->
             redirect(conn, 200, "/ok")
-        end)
+          end
+        )
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(req, url: "#{url}/redirect", retry: false).status == 200
@@ -1610,13 +1710,10 @@ defmodule Req.StepsTest do
       pid = self()
 
       %{req: req, url: url} =
-        serve(fn
-          conn when conn.request_path == "/redirect" ->
-            redirect(conn, 302, "/ok")
-
-          conn when conn.request_path == "/ok" ->
-            Plug.Conn.send_resp(conn, 200, "ok")
-        end)
+        serve(
+          "GET /redirect": &redirect(&1, 302, "/ok"),
+          "GET /ok": &Plug.Conn.send_resp(&1, 200, "ok")
+        )
 
       req =
         Req.Request.append_request_steps(req,
@@ -1638,8 +1735,8 @@ defmodule Req.StepsTest do
 
     test "relative" do
       %{req: req, url: url} =
-        serve(fn
-          conn when conn.request_path == "/redirect" ->
+        serve(
+          "GET /redirect": fn conn ->
             location =
               case conn.query_string do
                 "" -> "/ok"
@@ -1647,10 +1744,9 @@ defmodule Req.StepsTest do
               end
 
             redirect(conn, 302, location)
-
-          conn when conn.request_path == "/ok" ->
-            Plug.Conn.send_resp(conn, 200, conn.query_string)
-        end)
+          end,
+          "GET /ok": &Plug.Conn.send_resp(&1, 200, &1.query_string)
+        )
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                response = Req.get!(req, url: "#{url}/redirect")
@@ -1668,13 +1764,12 @@ defmodule Req.StepsTest do
     test "change POST to GET to get on 301..303" do
       for status <- 301..303 do
         %{req: req, url: url} =
-          serve(fn
-            conn when conn.request_path == "/redirect" and conn.method == "POST" ->
+          serve(
+            "POST /redirect": fn conn ->
               redirect(conn, status, "http://#{conn.host}:#{conn.port}/ok")
-
-            conn when conn.request_path == "/ok" and conn.method == "GET" ->
-              Plug.Conn.send_resp(conn, 200, "ok")
-          end)
+            end,
+            "GET /ok": &Plug.Conn.send_resp(&1, 200, "ok")
+          )
 
         assert ExUnit.CaptureLog.capture_log(fn ->
                  assert Req.post!(req, url: "#{url}/redirect", body: "body").status == 200
@@ -1685,16 +1780,17 @@ defmodule Req.StepsTest do
     @tag :capture_log
     test "change POST to GET drops the request body" do
       %{req: req, url: url} =
-        serve(fn
-          conn when conn.request_path == "/redirect" and conn.method == "POST" ->
+        serve(
+          "POST /redirect": fn conn ->
             redirect(conn, 303, "http://#{conn.host}:#{conn.port}/ok")
-
-          conn when conn.request_path == "/ok" and conn.method == "GET" ->
+          end,
+          "GET /ok": fn conn ->
             {:ok, body, conn} = Plug.Conn.read_body(conn)
             assert body == ""
             assert Plug.Conn.get_req_header(conn, "content-type") == []
             Plug.Conn.send_resp(conn, 200, "ok")
-        end)
+          end
+        )
 
       assert Req.post!(req, url: "#{url}/redirect", json: %{a: 1}).status == 200
     end
@@ -1702,13 +1798,12 @@ defmodule Req.StepsTest do
     test "do not change method on 307 and 308" do
       for status <- [307, 308] do
         %{req: req, url: url} =
-          serve(fn
-            conn when conn.request_path == "/redirect" and conn.method == "POST" ->
+          serve(
+            "POST /redirect": fn conn ->
               redirect(conn, status, "http://#{conn.host}:#{conn.port}/ok")
-
-            conn when conn.request_path == "/ok" and conn.method == "POST" ->
-              Plug.Conn.send_resp(conn, 200, "ok")
-          end)
+            end,
+            "POST /ok": &Plug.Conn.send_resp(&1, 200, "ok")
+          )
 
         assert ExUnit.CaptureLog.capture_log(fn ->
                  assert Req.post!(req, url: "#{url}/redirect", body: "body").status == 200
@@ -1719,13 +1814,12 @@ defmodule Req.StepsTest do
     test "never change HEAD requests" do
       for status <- [301, 302, 303, 307, 307] do
         %{req: req, url: url} =
-          serve(fn
-            conn when conn.request_path == "/redirect" and conn.method == "HEAD" ->
+          serve(
+            "HEAD /redirect": fn conn ->
               redirect(conn, status, "http://#{conn.host}:#{conn.port}/ok")
-
-            conn when conn.request_path == "/ok" and conn.method == "HEAD" ->
-              Plug.Conn.send_resp(conn, 200, "")
-          end)
+            end,
+            "HEAD /ok": &Plug.Conn.send_resp(&1, 200, "")
+          )
 
         assert ExUnit.CaptureLog.capture_log(fn ->
                  assert Req.head!(req, url: "#{url}/redirect").status == 200
@@ -1735,9 +1829,11 @@ defmodule Req.StepsTest do
 
     test "without location" do
       %{req: req, url: url} =
-        serve(fn conn ->
-          Plug.Conn.send_resp(conn, 303, "")
-        end)
+        serve(
+          "POST /redirect": fn conn ->
+            Plug.Conn.send_resp(conn, 303, "")
+          end
+        )
 
       assert Req.post!(req, url: "#{url}/redirect").status == 303
     end
@@ -1879,14 +1975,15 @@ defmodule Req.StepsTest do
 
     test "skip params" do
       %{req: req, url: url} =
-        serve(fn
-          conn when conn.request_path == "/redirect" ->
+        serve(
+          "GET /redirect": fn conn ->
             redirect(conn, 302, "http://#{conn.host}:#{conn.port}/ok")
-
-          conn when conn.request_path == "/ok" ->
+          end,
+          "GET /ok": fn conn ->
             assert conn.query_string == ""
             Plug.Conn.send_resp(conn, 200, "ok")
-        end)
+          end
+        )
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(req, url: "#{url}/redirect", params: [a: 1]).status == 200
@@ -1897,10 +1994,12 @@ defmodule Req.StepsTest do
       pid = self()
 
       %{req: req} =
-        serve(fn conn ->
-          send(pid, :ping)
-          redirect(conn, 302, "http://#{conn.host}:#{conn.port}/")
-        end)
+        serve(
+          "GET /": fn conn ->
+            send(pid, :ping)
+            redirect(conn, 302, "http://#{conn.host}:#{conn.port}/")
+          end
+        )
 
       req = Req.merge(req, max_redirects: 3, redirect_log_level: false)
 
@@ -1918,13 +2017,10 @@ defmodule Req.StepsTest do
 
     test "redirect_log_level, default to :debug" do
       %{req: req, url: url} =
-        serve(fn
-          conn when conn.request_path == "/redirect" ->
-            redirect(conn, 302, "/ok")
-
-          conn when conn.request_path == "/ok" ->
-            Plug.Conn.send_resp(conn, 200, "ok")
-        end)
+        serve(
+          "GET /redirect": &redirect(&1, 302, "/ok"),
+          "GET /ok": &Plug.Conn.send_resp(&1, 200, "ok")
+        )
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(req, url: "#{url}/redirect").status == 200
@@ -1933,13 +2029,10 @@ defmodule Req.StepsTest do
 
     test "redirect_log_level, set to :error" do
       %{req: req, url: url} =
-        serve(fn
-          conn when conn.request_path == "/redirect" ->
-            redirect(conn, 302, "/ok")
-
-          conn when conn.request_path == "/ok" ->
-            Plug.Conn.send_resp(conn, 200, "ok")
-        end)
+        serve(
+          "GET /redirect": &redirect(&1, 302, "/ok"),
+          "GET /ok": &Plug.Conn.send_resp(&1, 200, "ok")
+        )
 
       assert ExUnit.CaptureLog.capture_log(fn ->
                assert Req.get!(req, url: "#{url}/redirect", redirect_log_level: :error).status ==
@@ -1949,26 +2042,22 @@ defmodule Req.StepsTest do
 
     test "redirect_log_level, disabled" do
       %{req: req, url: url} =
-        serve(fn
-          conn when conn.request_path == "/redirect" ->
-            redirect(conn, 302, "/ok")
-
-          conn when conn.request_path == "/ok" ->
-            Plug.Conn.send_resp(conn, 200, "ok")
-        end)
+        serve(
+          "GET /redirect": &redirect(&1, 302, "/ok"),
+          "GET /ok": &Plug.Conn.send_resp(&1, 200, "ok")
+        )
 
       assert Req.get!(req, url: "#{url}/redirect", redirect_log_level: false).status == 200
     end
 
     test "inherit scheme" do
       %{req: req, url: url} =
-        serve(fn
-          conn when conn.request_path == "/redirect" ->
+        serve(
+          "GET /redirect": fn conn ->
             redirect(conn, 302, "//#{conn.host}:#{conn.port}/ok")
-
-          conn when conn.request_path == "/ok" ->
-            Plug.Conn.send_resp(conn, 200, "ok")
-        end)
+          end,
+          "GET /ok": &Plug.Conn.send_resp(&1, 200, "ok")
+        )
 
       "http:" <> no_scheme = "#{url}"
 
@@ -1987,9 +2076,7 @@ defmodule Req.StepsTest do
   describe "expect" do
     test "status integer" do
       %{req: req} =
-        serve(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
+        serve("GET /": &Plug.Conn.send_resp(&1, 200, "ok"))
 
       assert Req.get!(req, expect: 200).body == "ok"
       assert {:error, e} = Req.get(req, expect: 201)
@@ -1998,9 +2085,7 @@ defmodule Req.StepsTest do
 
     test "status range" do
       %{req: req} =
-        serve(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
+        serve("GET /": &Plug.Conn.send_resp(&1, 200, "ok"))
 
       assert Req.get!(req, expect: 200..201).body == "ok"
       assert {:error, e} = Req.get(req, expect: 201..202)
@@ -2009,9 +2094,7 @@ defmodule Req.StepsTest do
 
     test "status list" do
       %{req: req} =
-        serve(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
+        serve("GET /": &Plug.Conn.send_resp(&1, 200, "ok"))
 
       assert Req.get!(req, expect: [200, 201]).body == "ok"
       assert {:error, e} = Req.get(req, expect: [201, 202])
@@ -2023,26 +2106,29 @@ defmodule Req.StepsTest do
     end
 
     test "status category atom" do
-      %{req: req_200} = serve(fn conn -> Plug.Conn.send_resp(conn, 200, "ok") end)
-      %{req: req_301} = serve(fn conn -> Plug.Conn.send_resp(conn, 301, "moved") end)
-      %{req: req_404} = serve(fn conn -> Plug.Conn.send_resp(conn, 404, "not found") end)
-      %{req: req_500} = serve(fn conn -> Plug.Conn.send_resp(conn, 500, "error") end)
+      %{req: req, url: url} =
+        serve(
+          "GET /200": &Plug.Conn.send_resp(&1, 200, "ok"),
+          "GET /301": &Plug.Conn.send_resp(&1, 301, "moved"),
+          "GET /404": &Plug.Conn.send_resp(&1, 404, "not found"),
+          "GET /500": &Plug.Conn.send_resp(&1, 500, "error")
+        )
 
-      assert Req.get!(req_200, expect: :successful).body == "ok"
-      assert {:error, e} = Req.get(req_404, expect: :successful)
+      assert Req.get!(req, url: "#{url}/200", expect: :successful).body == "ok"
+      assert {:error, e} = Req.get(req, url: "#{url}/404", expect: :successful)
       assert Exception.message(e) =~ "expected status :successful, got: 404"
 
-      assert Req.get!(req_301, expect: :redirection).body == "moved"
-      assert {:error, e} = Req.get(req_200, expect: :redirection)
+      assert Req.get!(req, url: "#{url}/301", expect: :redirection).body == "moved"
+      assert {:error, e} = Req.get(req, url: "#{url}/200", expect: :redirection)
       assert Exception.message(e) =~ "expected status :redirection, got: 200"
 
-      assert Req.get!(req_404, expect: :client_error).body == "not found"
+      assert Req.get!(req, url: "#{url}/404", expect: :client_error).body == "not found"
 
-      assert Req.get!(req_500, expect: :server_error, retry: false).body == "error"
+      assert Req.get!(req, url: "#{url}/500", expect: :server_error, retry: false).body == "error"
     end
 
     test "status category atom in list" do
-      %{req: req} = serve(fn conn -> Plug.Conn.send_resp(conn, 200, "ok") end)
+      %{req: req} = serve("GET /": &Plug.Conn.send_resp(&1, 200, "ok"))
 
       assert Req.get!(req, expect: [:successful, :redirection]).body == "ok"
       assert {:error, _} = Req.get(req, expect: [:redirection, :client_error])
@@ -2055,13 +2141,11 @@ defmodule Req.StepsTest do
     @tag :capture_log
     test "eventually successful - function" do
       %{req: req} =
-        serve(
-          sequence: [
-            &Plug.Conn.send_resp(&1, 500, "oops"),
-            &Plug.Conn.send_resp(&1, 500, "oops"),
-            &Plug.Conn.send_resp(&1, 500, "oops"),
-            &Plug.Conn.send_resp(&1, 200, "ok")
-          ]
+        serve_sequence(
+          "GET /": &Plug.Conn.send_resp(&1, 500, "oops"),
+          "GET /": &Plug.Conn.send_resp(&1, 500, "oops"),
+          "GET /": &Plug.Conn.send_resp(&1, 500, "oops"),
+          "GET /": &Plug.Conn.send_resp(&1, 200, "ok")
         )
 
       request =
@@ -2088,9 +2172,11 @@ defmodule Req.StepsTest do
 
     test "invalid :retry_delay" do
       %{req: req} =
-        serve(fn conn ->
-          Plug.Conn.send_resp(conn, 500, "")
-        end)
+        serve(
+          "GET /": fn conn ->
+            Plug.Conn.send_resp(conn, 500, "")
+          end
+        )
 
       req = Req.merge(req, retry_delay: fn _ -> :ok end)
 
@@ -2104,12 +2190,10 @@ defmodule Req.StepsTest do
     @tag :capture_log
     test "eventually successful - integer" do
       %{req: req} =
-        serve(
-          sequence: [
-            &Plug.Conn.send_resp(&1, 500, "oops"),
-            &Plug.Conn.send_resp(&1, 500, "oops"),
-            &Plug.Conn.send_resp(&1, 200, "ok")
-          ]
+        serve_sequence(
+          "GET /": &Plug.Conn.send_resp(&1, 500, "oops"),
+          "GET /": &Plug.Conn.send_resp(&1, 500, "oops"),
+          "GET /": &Plug.Conn.send_resp(&1, 200, "ok")
         )
 
       request =
@@ -2135,11 +2219,9 @@ defmodule Req.StepsTest do
     @tag :capture_log
     test "default log_level" do
       %{req: req} =
-        serve(
-          sequence: [
-            &Plug.Conn.send_resp(&1, 500, "oops"),
-            &Plug.Conn.send_resp(&1, 200, "ok")
-          ]
+        serve_sequence(
+          "GET /": &Plug.Conn.send_resp(&1, 500, "oops"),
+          "GET /": &Plug.Conn.send_resp(&1, 200, "ok")
         )
 
       request = Req.merge(req, retry_delay: 1)
@@ -2152,11 +2234,9 @@ defmodule Req.StepsTest do
     @tag :capture_log
     test "custom log_level" do
       %{req: req} =
-        serve(
-          sequence: [
-            &Plug.Conn.send_resp(&1, 500, "oops"),
-            &Plug.Conn.send_resp(&1, 200, "ok")
-          ]
+        serve_sequence(
+          "GET /": &Plug.Conn.send_resp(&1, 500, "oops"),
+          "GET /": &Plug.Conn.send_resp(&1, 200, "ok")
         )
 
       request = Req.merge(req, retry_delay: 1, retry_log_level: :info)
@@ -2170,11 +2250,9 @@ defmodule Req.StepsTest do
     @tag :capture_log
     test "logging disabled" do
       %{req: req} =
-        serve(
-          sequence: [
-            &Plug.Conn.send_resp(&1, 500, "oops"),
-            &Plug.Conn.send_resp(&1, 200, "ok")
-          ]
+        serve_sequence(
+          "GET /": &Plug.Conn.send_resp(&1, 500, "oops"),
+          "GET /": &Plug.Conn.send_resp(&1, 200, "ok")
         )
 
       request = Req.merge(req, retry_delay: 1, retry_log_level: false)
@@ -2186,12 +2264,11 @@ defmodule Req.StepsTest do
     @tag :capture_log
     test "retry-after" do
       %{req: req} =
-        serve(
-          sequence: [
-            &send_resp_retry_after(&1, 0),
+        serve_sequence(
+          "GET /": &send_resp_retry_after(&1, 0),
+          "GET /":
             &send_resp_retry_after(%{&1 | status: 503}, DateTime.add(DateTime.utc_now(), 2)),
-            &Plug.Conn.send_resp(&1, 200, "ok")
-          ]
+          "GET /": &Plug.Conn.send_resp(&1, 200, "ok")
         )
 
       assert Req.request!(req, max_retries: 5).body == "ok"
@@ -2202,14 +2279,13 @@ defmodule Req.StepsTest do
       pid = self()
 
       %{req: req} =
-        serve(
-          sequence: [
-            &send_resp_retry_after(&1, 0),
-            &send_resp_retry_after(&1, -1),
-            &send_resp_retry_after(%{&1 | status: 503}, DateTime.utc_now()),
+        serve_sequence(
+          "GET /": &send_resp_retry_after(&1, 0),
+          "GET /": &send_resp_retry_after(&1, -1),
+          "GET /": &send_resp_retry_after(%{&1 | status: 503}, DateTime.utc_now()),
+          "GET /":
             &send_resp_retry_after(%{&1 | status: 503}, DateTime.add(DateTime.utc_now(), -3600)),
-            &Plug.Conn.send_resp(&1, 200, "ok")
-          ]
+          "GET /": &Plug.Conn.send_resp(&1, 200, "ok")
         )
 
       retry_delay = fn retry_count ->
@@ -2229,10 +2305,12 @@ defmodule Req.StepsTest do
       pid = self()
 
       %{req: request} =
-        serve(fn conn ->
-          send(pid, :ping)
-          Plug.Conn.send_resp(conn, 500, "oops")
-        end)
+        serve(
+          "GET /": fn conn ->
+            send(pid, :ping)
+            Plug.Conn.send_resp(conn, 500, "oops")
+          end
+        )
 
       request =
         request
@@ -2256,10 +2334,12 @@ defmodule Req.StepsTest do
       pid = self()
 
       %{req: request} =
-        serve(fn conn ->
-          send(pid, :ping)
-          Plug.Conn.send_resp(conn, 500, "oops")
-        end)
+        serve(
+          "POST /": fn conn ->
+            send(pid, :ping)
+            Plug.Conn.send_resp(conn, 500, "oops")
+          end
+        )
 
       request = Req.merge(request, retry: :safe_transient, max_retries: 10)
 
@@ -2273,10 +2353,12 @@ defmodule Req.StepsTest do
       pid = self()
 
       %{req: request} =
-        serve(fn conn ->
-          send(pid, :ping)
-          Plug.Conn.send_resp(conn, 500, "oops")
-        end)
+        serve(
+          "POST /": fn conn ->
+            send(pid, :ping)
+            Plug.Conn.send_resp(conn, 500, "oops")
+          end
+        )
 
       request = Req.merge(request, retry: :transient, retry_delay: 1, max_retries: 1)
 
@@ -2290,10 +2372,12 @@ defmodule Req.StepsTest do
       pid = self()
 
       %{req: request} =
-        serve(fn conn ->
-          send(pid, :ping)
-          Plug.Conn.send_resp(conn, 500, "oops")
-        end)
+        serve(
+          "GET /": fn conn ->
+            send(pid, :ping)
+            Plug.Conn.send_resp(conn, 500, "oops")
+          end
+        )
 
       request = Req.merge(request, retry: false)
 
@@ -2312,10 +2396,12 @@ defmodule Req.StepsTest do
       end
 
       %{req: request} =
-        serve(fn conn ->
-          send(pid, :ping)
-          Plug.Conn.send_resp(conn, 500, "oops")
-        end)
+        serve(
+          "POST /": fn conn ->
+            send(pid, :ping)
+            Plug.Conn.send_resp(conn, 500, "oops")
+          end
+        )
 
       request = Req.merge(request, retry: fun, retry_delay: 1)
 
@@ -2337,10 +2423,12 @@ defmodule Req.StepsTest do
       end
 
       %{req: request} =
-        serve(fn conn ->
-          send(pid, :ping)
-          Plug.Conn.send_resp(conn, 500, "oops")
-        end)
+        serve(
+          "GET /": fn conn ->
+            send(pid, :ping)
+            Plug.Conn.send_resp(conn, 500, "oops")
+          end
+        )
 
       request = Req.merge(request, retry: fun)
 
@@ -2362,10 +2450,12 @@ defmodule Req.StepsTest do
       end
 
       %{req: request} =
-        serve(fn conn ->
-          send(pid, :ping)
-          Plug.Conn.send_resp(conn, 500, "oops")
-        end)
+        serve(
+          "GET /": fn conn ->
+            send(pid, :ping)
+            Plug.Conn.send_resp(conn, 500, "oops")
+          end
+        )
 
       request = Req.merge(request, retry: fun, retry_delay: 1)
 
@@ -2379,11 +2469,13 @@ defmodule Req.StepsTest do
       pid = self()
 
       %{req: req} =
-        serve(fn conn ->
-          assert conn.query_string == "a=1&b=2"
-          send(pid, :ping)
-          Plug.Conn.send_resp(conn, 500, "oops")
-        end)
+        serve(
+          "GET /": fn conn ->
+            assert conn.query_string == "a=1&b=2"
+            send(pid, :ping)
+            Plug.Conn.send_resp(conn, 500, "oops")
+          end
+        )
 
       assert Req.get!(req, params: [a: 1, b: 2], retry_delay: 1).status == 500
       assert_received :ping
@@ -2398,9 +2490,7 @@ defmodule Req.StepsTest do
       pid = self()
 
       %{req: req} =
-        serve(fn conn ->
-          Plug.Conn.send_resp(conn, 500, "oops")
-        end)
+        serve("GET /": &Plug.Conn.send_resp(&1, 500, "oops"))
 
       req =
         Req.Request.append_request_steps(req,
@@ -2423,11 +2513,9 @@ defmodule Req.StepsTest do
     @tag :capture_log
     test "does not carry `halted` status over" do
       %{req: req} =
-        serve(
-          sequence: [
-            &Plug.Conn.send_resp(&1, 500, "oops"),
-            &Plug.Conn.send_resp(&1, 200, "ok")
-          ]
+        serve_sequence(
+          "GET /": &Plug.Conn.send_resp(&1, 500, "oops"),
+          "GET /": &Plug.Conn.send_resp(&1, 200, "ok")
         )
 
       response_step = fn
@@ -2453,23 +2541,25 @@ defmodule Req.StepsTest do
     pid = self()
 
     %{req: request} =
-      serve(fn conn ->
-        case Plug.Conn.get_req_header(conn, "if-modified-since") do
-          [] ->
-            send(pid, :cache_miss)
+      serve(
+        "GET /": fn conn ->
+          case Plug.Conn.get_req_header(conn, "if-modified-since") do
+            [] ->
+              send(pid, :cache_miss)
 
-            conn
-            |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
-            |> Plug.Conn.send_resp(200, "ok")
+              conn
+              |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
+              |> Plug.Conn.send_resp(200, "ok")
 
-          _ ->
-            send(pid, :cache_hit)
+            _ ->
+              send(pid, :cache_hit)
 
-            conn
-            |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
-            |> Plug.Conn.send_resp(304, "")
+              conn
+              |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
+              |> Plug.Conn.send_resp(304, "")
+          end
         end
-      end)
+      )
 
     request = Req.merge(request, cache: true, cache_dir: c.tmp_dir)
 
@@ -2490,31 +2580,29 @@ defmodule Req.StepsTest do
     pid = self()
 
     %{req: request} =
-      serve(
-        sequence: [
-          fn conn ->
-            send(pid, :cache_miss)
+      serve_sequence(
+        "GET /": fn conn ->
+          send(pid, :cache_miss)
 
-            conn
-            |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
-            |> Req.Test.json(%{a: 1})
-          end,
-          fn conn ->
-            send(pid, :cache_hit)
-            Plug.Conn.send_resp(conn, 500, "")
-          end,
-          fn conn ->
-            send(pid, :cache_hit)
-            Plug.Conn.send_resp(conn, 500, "")
-          end,
-          fn conn ->
-            send(pid, :cache_hit)
+          conn
+          |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
+          |> Req.Test.json(%{a: 1})
+        end,
+        "GET /": fn conn ->
+          send(pid, :cache_hit)
+          Plug.Conn.send_resp(conn, 500, "")
+        end,
+        "GET /": fn conn ->
+          send(pid, :cache_hit)
+          Plug.Conn.send_resp(conn, 500, "")
+        end,
+        "GET /": fn conn ->
+          send(pid, :cache_hit)
 
-            conn
-            |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
-            |> Plug.Conn.send_resp(304, "")
-          end
-        ]
+          conn
+          |> Plug.Conn.put_resp_header("last-modified", "Wed, 21 Oct 2015 07:28:00 GMT")
+          |> Plug.Conn.send_resp(304, "")
+        end
       )
 
     request = Req.merge(request, retry_delay: 10, cache: true, cache_dir: c.tmp_dir)

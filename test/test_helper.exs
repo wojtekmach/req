@@ -7,26 +7,44 @@ defmodule Req.Case do
     end
   end
 
-  def serve(plug_or_options, options \\ [])
+  def serve(plug_or_routes, options \\ [])
 
-  def serve([sequence: sequence], []) do
+  def serve(plug, options) when is_function(plug, 1) do
+    serve([*: plug], options)
+  end
+
+  def serve(routes, options) when is_list(routes) do
+    plug = fn conn ->
+      path = if conn.request_path in [nil, ""], do: "/", else: conn.request_path
+      request = "#{conn.method} #{path}"
+
+      case Enum.find(routes, fn {route, _} -> route == :* or Atom.to_string(route) == request end) do
+        {_route, plug} -> Plug.run(conn, [plug])
+        nil -> flunk("serve: no route matches #{request}")
+      end
+    end
+
+    serve_plug(plug, options)
+  end
+
+  def serve_sequence(routes, options \\ []) when is_list(routes) do
     counter = :counters.new(1, [])
 
-    serve(fn conn ->
+    plug = fn conn ->
       :counters.add(counter, 1, 1)
       n = :counters.get(counter, 1)
 
-      case Enum.at(sequence, n - 1) do
-        nil ->
-          raise "serve(sequence: ...): unexpected request ##{n}, only #{length(sequence)} plug(s) given"
-
-        plug ->
-          plug.(conn)
+      if route = Enum.at(routes, n - 1) do
+        dispatch(conn, route)
+      else
+        flunk("serve: unexpected request ##{n}, only #{length(routes)} route(s) expected")
       end
-    end)
+    end
+
+    serve_plug(plug, options)
   end
 
-  def serve(plug, options) when is_function(plug, 1) do
+  defp serve_plug(plug, options) do
     plugs = [{Plug.Parsers, parsers: [:multipart], pass: ["*/*"]}, plug]
 
     case adapter() do
@@ -46,6 +64,12 @@ defmodule Req.Case do
         %{url: url} = start_http_server(plugs, options)
         %{req: Req.new(url: url, adapter: &Req.Mint.run/1), url: url}
     end
+  end
+
+  defp dispatch(conn, {route, plug}) do
+    path = if conn.request_path in [nil, ""], do: "/", else: conn.request_path
+    assert "#{conn.method} #{path}" == Atom.to_string(route)
+    Plug.run(conn, [plug])
   end
 
   def start_http_server(plug_or_plugs, options \\ [])

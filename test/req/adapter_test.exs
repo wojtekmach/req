@@ -472,17 +472,14 @@ defmodule Req.AdapterTest do
     @tag :capture_log
     test "into: :self with redirect" do
       %{req: req, url: url} =
-        serve(fn conn ->
-          case conn.request_path do
-            "/redirect" ->
-              conn
-              |> Plug.Conn.put_resp_header("location", "/")
-              |> Plug.Conn.send_resp(307, "redirecting to /")
-
-            "/" ->
-              Plug.Conn.send_resp(conn, 200, "ok")
-          end
-        end)
+        serve_sequence(
+          "GET /redirect": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_header("location", "/")
+            |> Plug.Conn.send_resp(307, "redirecting to /")
+          end,
+          "GET /": &Plug.Conn.send_resp(&1, 200, "ok")
+        )
 
       req = Req.merge(req, url: %{url | path: "/redirect"}, into: :self)
 

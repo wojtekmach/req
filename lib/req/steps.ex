@@ -1989,7 +1989,8 @@ defmodule Req.Steps do
         {request, response}
 
       true ->
-        {request, Req.UnexpectedStatusError.exception(expected_status: expect, response: response)}
+        {request,
+         Req.UnexpectedStatusError.exception(expected_status: expect, response: response)}
     end
   end
 

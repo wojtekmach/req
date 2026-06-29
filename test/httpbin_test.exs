@@ -5,7 +5,7 @@ defmodule HTTPBinTest do
   @json Jason
 
   setup do
-    serve(fn conn -> HTTPBin.call(conn, []) end)
+    serve(*: {HTTPBin, []})
   end
 
   test "/json", %{req: req, url: url} do
