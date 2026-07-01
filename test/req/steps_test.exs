@@ -1060,11 +1060,20 @@ defmodule Req.StepsTest do
                "http://www.xn--n8jaaaaai5bhf7as8fsfk3jnknefdde3fg11amb5gzdb4wi9bya3kc6lra.w3.mag.keio.ac.jp/"
     end
 
-    test "raises on invalid host" do
+    test "raises on incorrectly encoded host" do
       assert_raise ArgumentError, ~r/invalid URL host: "localhos%ZZ"/, fn ->
         Req.get!(
           plug: &Plug.Conn.send_resp(&1, 200, Plug.Conn.request_url(&1)),
           url: "http://localhos%ZZ/"
+        )
+      end
+    end
+
+    test "raises on invalid host" do
+      assert_raise ArgumentError, ~r/invalid URL host: "elixir-lang,org"/, fn ->
+        Req.get!(
+          plug: &Plug.Conn.send_resp(&1, 200, Plug.Conn.request_url(&1)),
+          url: "http://elixir-lang,org/"
         )
       end
     end

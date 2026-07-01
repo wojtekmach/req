@@ -1351,8 +1351,15 @@ defmodule Req.Steps do
           end
 
           case request.url.scheme do
-            "http+unix" -> host
-            _ -> :idna.encode(host) |> List.to_string()
+            "http+unix" ->
+              host
+
+            _ ->
+              try do
+                :idna.encode(host) |> List.to_string()
+              catch
+                :exit, _ -> raise ArgumentError, "invalid URL host: #{inspect(host)}"
+              end
           end
       end
 
