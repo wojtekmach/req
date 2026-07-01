@@ -1026,6 +1026,104 @@ defmodule Req.StepsTest do
     end
   end
 
+  describe "escape_url" do
+    test "can be disabled" do
+      resp =
+        Req.get!(
+          escape_url: false,
+          plug: &Plug.Conn.send_resp(&1, 200, Plug.Conn.request_url(&1)),
+          url: "http://lüthje.com/with space"
+        )
+
+      assert resp.body == "http://lüthje.com/with space"
+    end
+
+    test "escapes host" do
+      resp =
+        Req.get!(
+          plug: &Plug.Conn.send_resp(&1, 200, Plug.Conn.request_url(&1)),
+          url: "http://lüthje.com/"
+        )
+
+      assert resp.body == "http://xn--lthje-kva.com/"
+    end
+
+    test "escapes percent encoded host" do
+      resp =
+        Req.get!(
+          plug: &Plug.Conn.send_resp(&1, 200, Plug.Conn.request_url(&1)),
+          url:
+            "http://www.%E3%81%BB%E3%82%93%E3%81%A8%E3%81%86%E3%81%AB%E3%81%AA%E3%81%8C%E3%81%84%E3%82%8F%E3%81%91%E3%81%AE%E3%82%8F%E3%81%8B%E3%82%89%E3%81%AA%E3%81%84%E3%81%A9%E3%82%81%E3%81%84%E3%82%93%E3%82%81%E3%81%84%E3%81%AE%E3%82%89%E3%81%B9%E3%82%8B%E3%81%BE%E3%81%A0%E3%81%AA%E3%81%8C%E3%81%8F%E3%81%97%E3%81%AA%E3%81%84%E3%81%A8%E3%81%9F%E3%82%8A%E3%81%AA%E3%81%84.w3.mag.keio.ac.jp/"
+        )
+
+      assert resp.body ==
+               "http://www.xn--n8jaaaaai5bhf7as8fsfk3jnknefdde3fg11amb5gzdb4wi9bya3kc6lra.w3.mag.keio.ac.jp/"
+    end
+
+    test "raises on incorrectly encoded host" do
+      assert_raise ArgumentError, ~r/invalid URL host: "localhos%ZZ"/, fn ->
+        Req.get!(
+          plug: &Plug.Conn.send_resp(&1, 200, Plug.Conn.request_url(&1)),
+          url: "http://localhos%ZZ/"
+        )
+      end
+    end
+
+    test "raises on invalid host" do
+      assert_raise ArgumentError, ~r/invalid URL host: "elixir-lang,org"/, fn ->
+        Req.get!(
+          plug: &Plug.Conn.send_resp(&1, 200, Plug.Conn.request_url(&1)),
+          url: "http://elixir-lang,org/"
+        )
+      end
+    end
+
+    test "raises on non-IP host that decodes to an IP" do
+      assert_raise ArgumentError, ~r/invalid URL host: "127.0.0.1"/, fn ->
+        Req.get!(
+          plug: &Plug.Conn.send_resp(&1, 200, Plug.Conn.request_url(&1)),
+          url: "http://%31%32%37%2E%30%2E%30%2E%31/"
+        )
+      end
+    end
+
+    test "escapes path" do
+      %{req: req, url: url} = serve(&Plug.Conn.send_resp(&1, 200, Plug.Conn.request_url(&1)))
+      resp = Req.get!(req, url: "#{url}/with space")
+      assert resp.body == "#{url}/with%20space"
+    end
+
+    test "escapes unescaped path with %" do
+      %{req: req, url: url} = serve(&Plug.Conn.send_resp(&1, 200, Plug.Conn.request_url(&1)))
+      resp = Req.get!(req, url: "#{url}/with%2percent")
+      assert resp.body == "#{url}/with%252percent"
+    end
+
+    test "keeps escaped path untouched" do
+      %{req: req, url: url} = serve(&Plug.Conn.send_resp(&1, 200, Plug.Conn.request_url(&1)))
+      resp = Req.get!(req, url: "#{url}/with%20space")
+      assert resp.body == "#{url}/with%20space"
+    end
+
+    test "escapes query" do
+      %{req: req, url: url} = serve(&Plug.Conn.send_resp(&1, 200, Plug.Conn.request_url(&1)))
+      resp = Req.get!(req, url: "#{url}/?with space")
+      assert resp.body == "#{url}/?with%20space"
+    end
+
+    test "escapes unescaped query with %" do
+      %{req: req, url: url} = serve(&Plug.Conn.send_resp(&1, 200, Plug.Conn.request_url(&1)))
+      resp = Req.get!(req, url: "#{url}/?with%2percent")
+      assert resp.body == "#{url}/?with%252percent"
+    end
+
+    test "keeps escaped query untouched" do
+      %{req: req, url: url} = serve(&Plug.Conn.send_resp(&1, 200, Plug.Conn.request_url(&1)))
+      resp = Req.get!(req, url: "#{url}/?with%20space")
+      assert resp.body == "#{url}/?with%20space"
+    end
+  end
+
   ## Response steps
 
   describe "decompress_body" do
@@ -1731,6 +1829,32 @@ defmodule Req.StepsTest do
                  assert Req.head!(req, url: "#{url}/redirect").status == 200
                end) == "[debug] redirecting to #{url}/ok\n"
       end
+    end
+
+    @tag :capture_log
+    test "escapes location" do
+      %{req: req, url: url} =
+        serve(fn
+          conn when conn.request_path == "/redirect" ->
+            location =
+              case conn.query_string do
+                "" -> "/oh hai?param=with spaces"
+                string -> "/oh hai?" <> string
+              end
+
+            redirect(conn, 302, location)
+
+          conn ->
+            Plug.Conn.send_resp(conn, 200, Plug.Conn.request_url(conn))
+        end)
+
+      response = Req.get!(req, url: "#{url}/redirect")
+      assert response.status == 200
+      assert response.body == "#{url}/oh%20hai?param=with%20spaces"
+
+      response = Req.get!(req, url: "#{url}/redirect?a=already%20encoded")
+      assert response.status == 200
+      assert response.body == "#{url}/oh%20hai?a=already%20encoded"
     end
 
     test "without location" do
