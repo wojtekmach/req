@@ -119,6 +119,7 @@ defmodule Req.RequestTest do
     {:ok, resp} = Req.Request.run(request)
     assert resp.status == 200
     assert resp.body == "from cache"
+    assert resp.request.halted == true
   end
 
   test "request step halts with exception", c do

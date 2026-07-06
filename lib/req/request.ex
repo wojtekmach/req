@@ -1021,11 +1021,14 @@ defmodule Req.Request do
       %Req.Request{} = request ->
         run_request(request, rest)
 
-      {%Req.Request{halted: true} = request, response_or_exception} ->
-        {request, response_or_exception}
+      {%Req.Request{halted: true} = request, %Req.Response{} = response} ->
+        {request, %{response | request: request}}
+
+      {%Req.Request{halted: true} = request, %{__exception__: true} = exception} ->
+        {request, exception}
 
       {request, %Req.Response{} = response} ->
-        run_response(request, response)
+        run_response(request, %{response | request: request})
 
       {request, %{__exception__: true} = exception} ->
         run_error(request, exception)
@@ -1035,7 +1038,7 @@ defmodule Req.Request do
   defp run_request(request, []) do
     case run_step(adapter(request.adapter), request) do
       {request, %Req.Response{} = response} ->
-        run_response(request, response)
+        run_response(request, %{response | request: request})
 
       {request, %{__exception__: true} = exception} ->
         run_error(request, exception)

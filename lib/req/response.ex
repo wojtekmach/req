@@ -16,6 +16,8 @@ defmodule Req.Response do
     * `:private` - a map reserved for libraries and frameworks to use.
       Prefix the keys with the name of your project to avoid any future
       conflicts. Only accepts `t:atom/0` keys.
+
+    * `:request` - the request that produced this response.
   """
 
   @type t() :: %__MODULE__{
@@ -23,14 +25,16 @@ defmodule Req.Response do
           headers: %{optional(binary()) => [binary()]},
           body: binary() | %Req.Response.Async{} | term(),
           trailers: %{optional(binary()) => [binary()]},
-          private: map()
+          private: map(),
+          request: Req.Request.t() | nil
         }
 
   defstruct status: 200,
             headers: Req.Fields.new([]),
             body: "",
             trailers: Req.Fields.new([]),
-            private: %{}
+            private: %{},
+            request: nil
 
   @doc """
   Returns a new response.
@@ -52,7 +56,7 @@ defmodule Req.Response do
 
   def new(%{} = options) do
     options =
-      Map.take(options, [:status, :headers, :body, :trailers])
+      Map.take(options, [:status, :headers, :body, :trailers, :private, :request])
       |> Map.update(
         :headers,
         Req.Fields.new([]),
@@ -63,12 +67,16 @@ defmodule Req.Response do
         Req.Fields.new([]),
         &Req.Fields.new_without_normalize_with_duplicates/1
       )
+      |> Map.update(:private, %{}, &Map.new/1)
 
     struct!(__MODULE__, options)
   end
 
   def new(options) when is_list(options) do
-    new(Map.new(options))
+    options
+    |> Keyword.validate!([:status, :headers, :body, :trailers, :private, :request])
+    |> Map.new()
+    |> new()
   end
 
   @doc """
