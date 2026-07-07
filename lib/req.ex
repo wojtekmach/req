@@ -185,6 +185,8 @@ defmodule Req do
 
         * `enumerable` - stream request body chunks emitted by the given `Enumerable`.
 
+    * `:private` - a map reserved for libraries and frameworks to use. The keys must be atoms.
+
   Additional URL options:
 
     * `:base_url` - if set, the request URL is prepended with this base URL (via
@@ -542,7 +544,7 @@ defmodule Req do
       )
     end
 
-    request_option_names = [:method, :url, :headers, :body, :adapter, :into]
+    request_option_names = [:method, :url, :headers, :body, :adapter, :into, :private]
 
     {request_options, options} = Keyword.split(options, request_option_names)
 
@@ -568,6 +570,9 @@ defmodule Req do
 
         {:headers, new_headers}, acc ->
           update_in(acc.headers, &Req.Fields.merge(&1, new_headers))
+
+        {:private, private}, acc ->
+          update_in(acc.private, &Enum.into(private, &1))
 
         {name, value}, acc ->
           %{acc | name => value}

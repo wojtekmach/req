@@ -84,6 +84,14 @@ defmodule ReqTest do
     assert inspect(req2) =~ "#{url}"
   end
 
+  test "private" do
+    req = Req.new(private: %{a: 1})
+    assert req.private == %{a: 1}
+
+    req = Req.merge(req, private: [b: 2])
+    assert req.private == %{a: 1, b: 2}
+  end
+
   test "redact" do
     assert inspect(Req.new(auth: {:bearer, "foo"})) =~ ~s|auth: {:bearer, "***"}|
 
