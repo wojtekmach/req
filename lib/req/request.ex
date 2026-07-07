@@ -781,22 +781,6 @@ defmodule Req.Request do
     }
   end
 
-  @doc false
-  def prepare(%{request_steps: [{_name, step} | steps]} = request) do
-    case run_step(step, request) do
-      %Req.Request{} = request ->
-        request = %{request | request_steps: steps}
-        prepare(request)
-
-      {_request, %{__exception__: true} = exception} ->
-        raise exception
-    end
-  end
-
-  def prepare(%Req.Request{request_steps: []} = request) do
-    request
-  end
-
   @doc """
   Merges given options into the request.
 
