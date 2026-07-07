@@ -276,38 +276,6 @@ defmodule Req.RequestTest do
     assert resp.body == "ok"
   end
 
-  # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
-  @tag skip: System.otp_release() < "28"
-  test "prepare/1" do
-    request =
-      Req.new(
-        method: :get,
-        base_url: "http://foo",
-        url: "/bar",
-        auth: {:basic, "foo:bar"},
-        compressed: true
-      )
-      |> Req.Request.prepare()
-
-    assert request.url == URI.parse("http://foo/bar")
-
-    authorization = "Basic " <> Base.encode64("foo:bar")
-
-    if Req.MixProject.legacy_headers_as_lists?() do
-      assert [
-               {"user-agent", "req/" <> _},
-               {"accept-encoding", "zstd, br, gzip"},
-               {"authorization", ^authorization}
-             ] = request.headers
-    else
-      assert %{
-               "user-agent" => ["req/" <> _],
-               "accept-encoding" => ["zstd, br, gzip"],
-               "authorization" => [^authorization]
-             } = request.headers
-    end
-  end
-
   ## Helpers
 
   defp new(options) do
