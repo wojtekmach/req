@@ -7,18 +7,59 @@ defmodule Req.StepsTest do
     # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
     @tag skip: System.otp_release() < "28"
     test "sets accept-encoding when compressed: true" do
-      req = Req.new(compressed: true) |> Req.Request.prepare()
-      assert req.headers["accept-encoding"] == ["zstd, br, gzip"]
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            assert Plug.Conn.get_req_header(conn, "accept-encoding") == ["zstd, br, gzip"]
+            Plug.Conn.send_resp(conn, 200, "")
+          end
+        )
+
+      Req.get!(req, compressed: true)
     end
 
     test "does not set accept-encoding by default" do
-      req = Req.new() |> Req.Request.prepare()
-      refute req.headers["accept-encoding"]
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            assert Plug.Conn.get_req_header(conn, "accept-encoding") == []
+            Plug.Conn.send_resp(conn, 200, "")
+          end
+        )
+
+      Req.get!(req)
     end
 
     test "does not set accept-encoding when streaming response body" do
-      req = Req.new(compressed: true, into: []) |> Req.Request.prepare()
-      refute req.headers["accept-encoding"]
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            assert Plug.Conn.get_req_header(conn, "accept-encoding") == []
+            Plug.Conn.send_resp(conn, 200, "")
+          end
+        )
+
+      Req.get!(req, compressed: true, into: [])
+    end
+
+    test "does not set accept-encoding when streaming response body with into: fun" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            assert Plug.Conn.get_req_header(conn, "accept-encoding") == []
+            Plug.Conn.send_resp(conn, 200, "foo")
+          end
+        )
+
+      resp =
+        Req.get!(req,
+          compressed: true,
+          into: fn {:data, data}, {req, resp} ->
+            {:cont, {req, update_in(resp.body, &(&1 <> data))}}
+          end
+        )
+
+      assert resp.body == "foo"
     end
   end
 
@@ -71,28 +112,53 @@ defmodule Req.StepsTest do
 
   describe "auth" do
     test "string" do
-      req = Req.new(auth: "foo") |> Req.Request.prepare()
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            assert Plug.Conn.get_req_header(conn, "authorization") == ["foo"]
+            Plug.Conn.send_resp(conn, 200, "")
+          end
+        )
 
-      assert Req.Request.get_header(req, "authorization") == ["foo"]
+      Req.get!(req, auth: "foo")
     end
 
     test "basic" do
-      req = Req.new(auth: {:basic, "foo:bar"}) |> Req.Request.prepare()
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            expected = "Basic " <> Base.encode64("foo:bar")
+            assert Plug.Conn.get_req_header(conn, "authorization") == [expected]
+            Plug.Conn.send_resp(conn, 200, "")
+          end
+        )
 
-      assert Req.Request.get_header(req, "authorization") == ["Basic #{Base.encode64("foo:bar")}"]
+      Req.get!(req, auth: {:basic, "foo:bar"})
     end
 
     test "bearer" do
-      req = Req.new(auth: {:bearer, "abcd"}) |> Req.Request.prepare()
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            assert Plug.Conn.get_req_header(conn, "authorization") == ["Bearer abcd"]
+            Plug.Conn.send_resp(conn, 200, "")
+          end
+        )
 
-      assert Req.Request.get_header(req, "authorization") == ["Bearer abcd"]
+      Req.get!(req, auth: {:bearer, "abcd"})
     end
 
     test "digest" do
-      req = Req.new(auth: {:digest, "foo:bar"}) |> Req.Request.prepare()
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            # Does not apply authorization header until after the pre-authorized request is made
+            assert Plug.Conn.get_req_header(conn, "authorization") == []
+            Plug.Conn.send_resp(conn, 200, "")
+          end
+        )
 
-      # Does not apply authorization header until after the pre-authorized request is made
-      assert Req.Request.get_header(req, "authorization") == []
+      Req.get!(req, auth: {:digest, "foo:bar"})
     end
 
     test "mfa" do
@@ -100,9 +166,15 @@ defmodule Req.StepsTest do
         def generate, do: {:bearer, "abcd"}
       end
 
-      req = Req.new(auth: {AuthToken, :generate, []}) |> Req.Request.prepare()
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            assert Plug.Conn.get_req_header(conn, "authorization") == ["Bearer abcd"]
+            Plug.Conn.send_resp(conn, 200, "")
+          end
+        )
 
-      assert Req.Request.get_header(req, "authorization") == ["Bearer abcd"]
+      Req.get!(req, auth: {AuthToken, :generate, []})
     end
 
     @tag :tmp_dir
@@ -254,11 +326,16 @@ defmodule Req.StepsTest do
     end
 
     test "form" do
-      req = Req.new(form: [a: 1]) |> Req.Request.prepare()
-      assert req.body == "a=1"
+      %{req: req} =
+        serve(
+          "POST /": fn conn ->
+            assert {:ok, "a=1", conn} = Plug.Conn.read_body(conn)
+            Plug.Conn.send_resp(conn, 200, "")
+          end
+        )
 
-      req = Req.new(form: %{a: 1}) |> Req.Request.prepare()
-      assert req.body == "a=1"
+      Req.post!(req, form: [a: 1])
+      Req.post!(req, form: %{a: 1})
     end
 
     @tag :tmp_dir
@@ -355,51 +432,62 @@ defmodule Req.StepsTest do
   end
 
   test "put_params" do
-    req = Req.new(url: "http://foo", params: [x: 1, y: 2]) |> Req.Request.prepare()
-    assert URI.to_string(req.url) == "http://foo?x=1&y=2"
+    %{req: req, url: url} =
+      serve(
+        "GET /": fn conn ->
+          Plug.Conn.send_resp(conn, 200, conn.query_string)
+        end
+      )
 
-    req = Req.new(url: "http://foo", params: [x: 1, x: 2]) |> Req.Request.prepare()
-    assert URI.to_string(req.url) == "http://foo?x=2"
-
-    req = Req.new(url: "http://foo?x=1", params: [x: 9, y: 2]) |> Req.Request.prepare()
-    assert URI.to_string(req.url) == "http://foo?x=9&y=2"
-
-    req = Req.new(url: "http://foo?x=1&x=2&y=1", params: [x: 9]) |> Req.Request.prepare()
-    assert URI.to_string(req.url) == "http://foo?x=9&x=2&y=1"
+    assert Req.get!(req, params: [x: 1, y: 2]).body == "x=1&y=2"
+    assert Req.get!(req, params: [x: 1, x: 2]).body == "x=2"
+    assert Req.get!(req, url: "#{url}?x=1", params: [x: 9, y: 2]).body == "x=9&y=2"
+    assert Req.get!(req, url: "#{url}?x=1&x=2&y=1", params: [x: 9]).body == "x=9&x=2&y=1"
   end
 
   # TODO: support this?
   test "put_params with list value" do
+    %{req: req} =
+      serve("GET /": &Plug.Conn.send_resp(&1, 200, ""))
+
     assert_raise ArgumentError, "encode_query/2 values cannot be lists, got: [1, 2]", fn ->
-      Req.new(url: "http://foo", params: [a: [1, 2]]) |> Req.Request.prepare()
+      Req.get!(req, params: [a: [1, 2]])
     end
   end
 
   test "put_path_params" do
-    req =
-      Req.new(url: "http://foo/:id{ola}", path_params: [id: "abc|def"]) |> Req.Request.prepare()
+    %{req: req, url: url} =
+      serve(&Plug.Conn.send_resp(&1, 200, &1.request_path))
 
-    assert URI.to_string(req.url) == "http://foo/abc%7Cdef{ola}"
+    assert Req.get!(req, url: "#{url}/:id/ola", path_params: [id: "abc|def"]).body ==
+             "/abc%7Cdef/ola"
 
     # With :curly style.
 
-    req =
-      Req.new(url: "http://foo/{id}:bar", path_params: [id: "abc|def"], path_params_style: :curly)
-      |> Req.Request.prepare()
+    assert Req.get!(req,
+             url: "#{url}/{id}:bar",
+             path_params: [id: "abc|def"],
+             path_params_style: :curly
+           ).body == "/abc%7Cdef:bar"
+  end
 
-    assert URI.to_string(req.url) == "http://foo/abc%7Cdef:bar"
+  @tag skip: Req.Case.adapter() in [:httpc, :plug]
+  test "put_path_params does not expand curly segments in :colon style" do
+    %{req: req, url: url} = serve("GET /": &Plug.Conn.send_resp(&1, 200, ""))
+
+    assert {:error, %Req.HTTPError{reason: {:invalid_request_target, "/abc{ola}"}}} =
+             Req.request(req, url: "#{url}/:id{ola}", path_params: [id: "abc"], retry: false)
   end
 
   test "put_path_params when path_params are empty still sets the template" do
-    req =
-      Req.new(url: "http://foo/bar", path_params: []) |> Req.Request.prepare()
+    %{req: req, url: url} =
+      serve("GET /bar": &Plug.Conn.send_resp(&1, 200, ""))
 
-    assert Req.Request.get_private(req, :path_params_template)
+    {sent, _resp} = Req.run!(req, url: "#{url}/bar", path_params: [])
+    assert Req.Request.get_private(sent, :path_params_template)
 
-    req =
-      Req.new(url: "http://foo/bar") |> Req.Request.prepare()
-
-    refute Req.Request.get_private(req, :path_params_template)
+    {sent, _resp} = Req.run!(req, url: "#{url}/bar")
+    refute Req.Request.get_private(sent, :path_params_template)
   end
 
   @tag :capture_log
@@ -416,50 +504,69 @@ defmodule Req.StepsTest do
   end
 
   test "put_path_params properly escapes reserved characters" do
-    req =
-      Req.new(url: "http://foo/:id{ola}", path_params: [id: "abc#def"]) |> Req.Request.prepare()
+    %{req: req, url: url} =
+      serve(&Plug.Conn.send_resp(&1, 200, &1.request_path))
 
-    assert URI.to_string(req.url) == "http://foo/abc%23def{ola}"
+    assert Req.get!(req, url: "#{url}/:id/ola", path_params: [id: "abc#def"]).body ==
+             "/abc%23def/ola"
 
     # With :curly style.
 
-    req =
-      Req.new(url: "http://foo/{id}:bar", path_params: [id: "abc#def"], path_params_style: :curly)
-      |> Req.Request.prepare()
-
-    assert URI.to_string(req.url) == "http://foo/abc%23def:bar"
+    assert Req.get!(req,
+             url: "#{url}/{id}:bar",
+             path_params: [id: "abc#def"],
+             path_params_style: :curly
+           ).body == "/abc%23def:bar"
   end
 
   test "put_range" do
-    req = Req.new(range: "bytes=0-10") |> Req.Request.prepare()
-    assert Req.Request.get_header(req, "range") == ["bytes=0-10"]
+    %{req: req} =
+      serve(
+        "GET /": fn conn ->
+          [range] = Plug.Conn.get_req_header(conn, "range")
+          Plug.Conn.send_resp(conn, 200, range)
+        end
+      )
 
-    req = Req.new(range: 0..20) |> Req.Request.prepare()
-    assert Req.Request.get_header(req, "range") == ["bytes=0-20"]
+    assert Req.get!(req, range: "bytes=0-10").body == "bytes=0-10"
+    assert Req.get!(req, range: 0..20).body == "bytes=0-20"
   end
 
   describe "compress_body" do
+    @tag :transport
     test "request" do
-      req = Req.new(method: :post, json: %{a: 1}) |> Req.Request.prepare()
-      assert Jason.decode!(req.body) == %{"a" => 1}
+      %{req: req} =
+        serve_sequence(
+          "POST /": fn conn ->
+            assert Plug.Conn.get_req_header(conn, "content-encoding") == []
+            assert {:ok, body, conn} = Plug.Conn.read_body(conn)
+            assert Jason.decode!(body) == %{"a" => 1}
+            Plug.Conn.send_resp(conn, 200, "")
+          end,
+          "POST /": fn conn ->
+            assert Plug.Conn.get_req_header(conn, "content-encoding") == ["gzip"]
+            assert {:ok, body, conn} = Plug.Conn.read_body(conn)
+            assert body |> :zlib.gunzip() |> Jason.decode!() == %{"a" => 1}
+            Plug.Conn.send_resp(conn, 200, "")
+          end
+        )
 
-      req = Req.new(method: :post, json: %{a: 1}, compress_body: true) |> Req.Request.prepare()
-      assert :zlib.gunzip(req.body) |> Jason.decode!() == %{"a" => 1}
-      assert Req.Request.get_header(req, "content-encoding") == ["gzip"]
+      Req.post!(req, json: %{a: 1})
+      Req.post!(req, json: %{a: 1}, compress_body: true)
     end
 
+    @tag :transport
     test "does not compress already encoded body" do
-      req =
-        Req.new(
-          method: :post,
-          body: "foo",
-          compress_body: true,
-          headers: [content_encoding: "br"]
+      %{req: req} =
+        serve(
+          "POST /": fn conn ->
+            assert Plug.Conn.get_req_header(conn, "content-encoding") == ["br"]
+            assert {:ok, "foo", conn} = Plug.Conn.read_body(conn)
+            Plug.Conn.send_resp(conn, 200, "")
+          end
         )
-        |> Req.Request.prepare()
 
-      assert req.body == "foo"
-      assert Req.Request.get_header(req, "content-encoding") == ["br"]
+      Req.post!(req, body: "foo", compress_body: true, headers: [content_encoding: "br"])
     end
 
     test "stream" do
@@ -496,11 +603,12 @@ defmodule Req.StepsTest do
           {:data, "foo", request}
       end
 
+      %{req: req} = serve("POST /": &Plug.Conn.send_resp(&1, 200, ""))
+
       assert_raise ArgumentError,
                    "compress_body does not support req_body_fun",
                    fn ->
-                     Req.new(method: :post, body: req_body_fun, compress_body: true)
-                     |> Req.Request.prepare()
+                     Req.post!(req, body: req_body_fun, compress_body: true)
                    end
     end
 
