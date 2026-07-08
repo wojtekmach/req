@@ -1201,9 +1201,7 @@ defmodule Req.Steps do
   def decode_body(request_response)
 
   def decode_body({request, %{body: body} = response})
-      when request.async != nil or
-             body == "" or
-             not is_binary(body) do
+      when body == "" or not is_binary(body) do
     {request, response}
   end
 

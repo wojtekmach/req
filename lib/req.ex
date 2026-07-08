@@ -134,21 +134,6 @@ defmodule Req do
   > `Req.get_headers_list/1`.
   """
 
-  # Response streaming to caller:
-  #
-  #     iex> {req, resp} = Req.async_request!("http://httpbin.org/stream/2")
-  #     iex> resp.status
-  #     200
-  #     iex> resp.body
-  #     ""
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [:done]
-  #     ""
-
   @type url() :: URI.t() | String.t()
 
   @req Req.Request.new()
@@ -1265,24 +1250,6 @@ defmodule Req do
     end
   end
 
-  @doc false
-  @deprecated "use Req.request(into: self()) instead"
-  def async_request(request, options \\ []) do
-    Req.Request.run_request(%{new(request, options) | into: :legacy_self})
-  end
-
-  @deprecated "use Req.request!(into: self()) instead"
-  @doc false
-  def async_request!(request, options \\ []) do
-    case async_request(request, options) do
-      {request, %Req.Response{} = response} ->
-        {request, response}
-
-      {_request, exception} ->
-        raise exception
-    end
-  end
-
   @doc """
   Parses asynchronous response body message.
 
@@ -1319,14 +1286,6 @@ defmodule Req do
     fun.(ref, message)
   end
 
-  def parse_message(%Req.Request{} = request, message) do
-    IO.warn(
-      "passing %Req.Request{} to parse_message/2 is deprecated. Pass %Req.Response{} instead"
-    )
-
-    request.async.stream_fun.(request.async.ref, message)
-  end
-
   @doc """
   Cancels an asynchronous response.
 
@@ -1342,12 +1301,6 @@ defmodule Req do
   @doc type: :async
   def cancel_async_response(%Req.Response{body: %Req.Response.Async{cancel_fun: fun, ref: ref}}) do
     fun.(ref)
-  end
-
-  @deprecated "use Req.cancel_async_response(resp)) instead"
-  @doc false
-  def cancel_async_request(%Req.Request{} = request) do
-    request.async.cancel_fun.(request.async.ref)
   end
 
   @doc """

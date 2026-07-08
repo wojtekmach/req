@@ -375,8 +375,7 @@ defmodule Req.Request do
             error_steps: [],
             private: %{},
             registered_options: MapSet.new(),
-            into: nil,
-            async: nil
+            into: nil
 
   @doc """
   Returns a new request struct.
