@@ -183,7 +183,7 @@ defmodule Req.Finch do
       raise ArgumentError, ":finch_request does not support body set to req_body_fun"
     end
 
-    if is_function(request.body, 1) and request.options[:into] in [:self, :legacy_self] do
+    if is_function(request.body, 1) and request.options[:into] == :self do
       raise ArgumentError, "into: :self does not support body set to req_body_fun"
     end
 
@@ -266,9 +266,6 @@ defmodule Req.Finch do
 
           fun when is_function(fun, 2) ->
             finch_stream_into_fun(req, finch_req, finch_name, finch_options, fun)
-
-          :legacy_self ->
-            finch_stream_into_legacy_self(req, finch_req, finch_name, finch_options)
 
           :self ->
             finch_stream_into_self(req, finch_req, finch_name, finch_options)
@@ -378,33 +375,6 @@ defmodule Req.Finch do
 
   defp normalize_error(error) do
     error
-  end
-
-  defp finch_stream_into_legacy_self(req, finch_req, finch_name, finch_options) do
-    ref = Finch.async_request(finch_req, finch_name, finch_options)
-
-    {:status, status} =
-      receive do
-        {^ref, message} ->
-          message
-      end
-
-    headers =
-      receive do
-        {^ref, {:headers, headers}} ->
-          headers
-      end
-
-    async = %Req.Response.Async{
-      pid: self(),
-      ref: ref,
-      stream_fun: &parse_message/2,
-      cancel_fun: &cancel/1
-    }
-
-    req = put_in(req.async, async)
-    resp = Req.Response.new(status: status, headers: headers)
-    {req, resp}
   end
 
   defp finch_stream_into_self(req, finch_req, finch_name, finch_options) do
