@@ -1841,6 +1841,25 @@ defmodule Req.StepsTest do
       refute_received _
     end
 
+    test "follows redirect with malformed compressed body" do
+      %{req: req, url: url} =
+        serve(
+          "GET /redirect": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_header("content-encoding", "gzip")
+            |> Plug.Conn.put_resp_header("location", "/ok")
+            |> Plug.Conn.send_resp(302, "bad gzip")
+          end,
+          "GET /ok": &Plug.Conn.send_resp(&1, 200, "ok")
+        )
+
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               response = Req.get!(req, url: "#{url}/redirect", compressed: true)
+               assert response.status == 200
+               assert response.body == "ok"
+             end) == "[debug] redirecting to /ok\n"
+    end
+
     test "relative" do
       %{req: req, url: url} =
         serve(
@@ -2367,6 +2386,23 @@ defmodule Req.StepsTest do
 
       log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
       assert log == ""
+    end
+
+    @tag :capture_log
+    test "retries response with malformed compressed body" do
+      %{req: req} =
+        serve_sequence(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_header("content-encoding", "gzip")
+            |> Plug.Conn.send_resp(500, "bad gzip")
+          end,
+          "GET /": &Plug.Conn.send_resp(&1, 200, "ok")
+        )
+
+      response = Req.get!(req, compressed: true, retry_delay: 1)
+      assert response.status == 200
+      assert response.body == "ok"
     end
 
     @tag :capture_log
