@@ -9,10 +9,7 @@ defmodule Req.Finch do
     Finch.child_spec(name: name, pools: %{default: pool_options(options)})
   end
 
-  @doc """
-  Runs the request using `Finch`.
-  """
-  def run(request) do
+  defp build(request) do
     # URI.parse removes `[` and `]` so we can't check for these. The host
     # should not have `:` so it should be safe to check for it.
     request =
@@ -99,7 +96,15 @@ defmodule Req.Finch do
       |> Enum.to_list()
       |> Keyword.merge(request_options)
 
-    run(request, finch_request, finch_name, finch_options)
+    {request, finch_name, finch_request, finch_options}
+  end
+
+  @doc """
+  Runs the request using `Finch`.
+  """
+  def run(req) do
+    {req, finch_name, finch_req, finch_options} = build(req)
+    run(req, finch_req, finch_name, finch_options)
   end
 
   defp run(req, finch_req, finch_name, finch_options) do
