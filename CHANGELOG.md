@@ -35,6 +35,10 @@
 
   * [`run_finch`]: Deprecate `pool_max_idle_time: value` in favour of `finch: [pool_max_idle_time: value]`.
 
+## v0.6.3 (2026-07-16)
+
+  * [`Req.Test`]: Fix race condition
+
 ## v0.6.2 (2026-06-19)
 
   * Use finch ~> 0.21.
