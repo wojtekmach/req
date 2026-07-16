@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.6.3 (2026-07-16)
+
+  * Fix bug when `Req.Test.__fetch_plug__/1` called after mode set to shared
+
 ## v0.6.2 (2026-06-19)
 
   * Use finch ~> 0.21.
