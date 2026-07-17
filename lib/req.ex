@@ -225,9 +225,6 @@ defmodule Req do
             * `{:done, request}` - request body streaming is done.
 
             * `{:halt, request}` - cancel request. On HTTP/1, this closes the connection.
-
-          `req_body_fun` requires Finch main.
-
     * `:assigns` - shared user data as a map.
 
   Additional URL options:
