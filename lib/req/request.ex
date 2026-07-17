@@ -1286,6 +1286,14 @@ defmodule Req.Request do
       {:basic, redact(userinfo)}
     end
 
+    defp redact_option(:auth, {:digest, userinfo}) do
+      {:digest, redact(userinfo)}
+    end
+
+    defp redact_option(:auth, authorization) when is_binary(authorization) do
+      redact(authorization)
+    end
+
     # TODO: remove on 1.0/1.1?
     defp redact_option(:auth, {username, password})
          when is_binary(username) and is_binary(password) do
@@ -1294,7 +1302,7 @@ defmodule Req.Request do
 
     defp redact_option(:aws_sigv4, options) do
       Enum.map(options, fn {name, value} ->
-        if name in [:access_key_id, :secret_access_key] do
+        if name in [:access_key_id, :secret_access_key, :token] do
           {name, redact(value)}
         else
           {name, value}

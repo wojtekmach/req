@@ -102,6 +102,23 @@ defmodule ReqTest do
 
     assert inspect(Req.new(auth: {:basic, "foo:bar"})) =~ ~s|auth: {:basic, "foo****"}|
 
+    assert inspect(Req.new(auth: {:digest, "alice:secret"})) =~
+             ~s|auth: {:digest, "ali*********"}|
+
+    assert inspect(Req.new(auth: "standalone-secret")) =~
+             ~s|auth: "sta**************"|
+
+    assert inspect(
+             Req.new(
+               aws_sigv4: [
+                 access_key_id: "access",
+                 secret_access_key: "secret",
+                 token: "session-secret"
+               ]
+             )
+           ) =~
+             ~s|aws_sigv4: [access_key_id: "acc***", secret_access_key: "sec***", token: "ses***********"]|
+
     assert inspect(Req.new(auth: fn -> {:basic, "foo:bar"} end)) =~ ~s|auth: #Function|
 
     defmodule AuthToken do
