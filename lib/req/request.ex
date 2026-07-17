@@ -247,7 +247,7 @@ defmodule Req.Request do
 
         defp print_request_headers(request) do
           if request.options[:print_headers] do
-            print_headers("> ", request.headers)
+            print_headers("> ", request)
           end
 
           request
@@ -255,14 +255,14 @@ defmodule Req.Request do
 
         defp print_response_headers({request, response}) do
           if request.options[:print_headers] do
-            print_headers("< ", response.headers)
+            print_headers("< ", response)
           end
 
           {request, response}
         end
 
-        defp print_headers(prefix, headers) do
-          for {name, value} <- headers do
+        defp print_headers(prefix, request_or_response) do
+          for {name, value} <- Req.get_headers_list(request_or_response) do
             IO.puts([prefix, name, ": ", value])
           end
         end
@@ -338,7 +338,7 @@ defmodule Req.Request do
 
       resp = Req.request!(url: "http://example", adapter: adapter)
       resp.headers
-      #=> [{"content-type", "application/json"}]
+      #=> %{"content-type" => ["application/json"]}
       resp.body
       #=> %{"hello" => 42}
 
@@ -354,7 +354,7 @@ defmodule Req.Request do
              ) do
           {:ok, status, headers, body} ->
             headers = for {name, value} <- headers, do: {String.downcase(name, :ascii), value}
-            response = %Req.Response{status: status, headers: headers, body: body}
+            response = Req.Response.new(status: status, headers: headers, body: body)
             {request, response}
 
           {:error, reason} ->
@@ -1231,26 +1231,14 @@ defmodule Req.Request do
       close = color("}", :map, opts)
 
       headers =
-        if unquote(Req.MixProject.legacy_headers_as_lists?()) do
-          for {name, value} <- request.headers do
-            if Req.Fields.ensure_name_downcase(name) == "authorization" do
-              [scheme, value] = String.split(value, " ", parts: 2)
-              {name, scheme <> " " <> redact(value)}
-            else
-              {name, value}
-            end
+        Req.Fields.map(request.headers, fn name, value ->
+          if Req.Fields.ensure_name_downcase(name) == "authorization" do
+            [scheme, value] = String.split(value, " ", parts: 2)
+            scheme <> " " <> redact(value)
+          else
+            value
           end
-        else
-          for {name, values} <- request.headers, into: %{} do
-            if Req.Fields.ensure_name_downcase(name) == "authorization" do
-              [value] = values
-              [scheme, value] = String.split(value, " ", parts: 2)
-              {name, [scheme <> " " <> redact(value)]}
-            else
-              {name, values}
-            end
-          end
-        end
+        end)
 
       list = [
         method: request.method,

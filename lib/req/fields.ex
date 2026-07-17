@@ -153,6 +153,30 @@ defmodule Req.Fields do
   end
 
   @doc """
+  Maps field values using `fun`, preserving field names.
+
+  ## Examples
+
+      iex> Req.Fields.map(%{"a" => ["1", "2"]}, fn _name, value -> value <> "0" end)
+      %{"a" => ["10", "20"]}
+  """
+  def map(fields, fun)
+
+  if @legacy? do
+    def map(fields, fun) do
+      for {name, value} <- fields do
+        {name, fun.(name, value)}
+      end
+    end
+  else
+    def map(fields, fun) do
+      Map.new(fields, fn {name, values} ->
+        {name, Enum.map(values, &fun.(name, &1))}
+      end)
+    end
+  end
+
+  @doc """
   Prepends `new_fields` before `fields`, keeping any existing values.
 
   ## Examples
@@ -237,6 +261,12 @@ defmodule Req.Fields do
 
   @doc """
   Drops the given `names`.
+
+  ## Examples
+
+      iex> fields = Req.Fields.new(a: 1, b: 2)
+      iex> Req.Fields.drop(fields, ["A"]) == Req.Fields.new(b: 2)
+      true
   """
   if @legacy? do
     def drop(fields, names) when is_list(names) do
@@ -250,11 +280,7 @@ defmodule Req.Fields do
   else
     def drop(fields, names) when is_list(names) do
       names_to_drop = Enum.map(names, &ensure_name_downcase/1)
-
-      for {name, values} <- fields,
-          name not in names_to_drop do
-        {name, values}
-      end
+      Map.drop(fields, names_to_drop)
     end
   end
 

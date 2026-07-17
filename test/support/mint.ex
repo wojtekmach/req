@@ -79,12 +79,7 @@ defmodule Req.Mint do
   defp send_request(request, conn) do
     method = request.method |> Atom.to_string() |> String.upcase()
 
-    headers =
-      for {name, values} <- request.headers,
-          # TODO: remove List.wrap on Req 1.0
-          value <- List.wrap(values) do
-        {name, value}
-      end
+    headers = Req.Fields.get_list(request.headers)
 
     {body, stream_body} =
       case request.body do
@@ -233,7 +228,7 @@ defmodule Req.Mint do
             status: acc.status,
             headers: acc.headers,
             body: IO.iodata_to_binary(acc.body),
-            trailers: fields_to_map(acc.trailers)
+            trailers: acc.trailers
           )
 
         {request, response}
@@ -249,18 +244,14 @@ defmodule Req.Mint do
         {:cont, {request, %{resp | status: status}}}
 
       {:headers, fields}, {request, resp} ->
-        resp =
-          Enum.reduce(fields, resp, fn {name, value}, resp ->
-            Req.Response.put_header(resp, name, value)
-          end)
-
+        resp = put_in(resp.headers, Req.Fields.new_without_normalize_with_duplicates(fields))
         {:cont, {request, resp}}
 
       {:data, data}, acc ->
         fun.({:data, data}, acc)
 
       {:trailers, fields}, {request, resp} ->
-        resp = update_in(resp.trailers, &Map.merge(&1, fields_to_map(fields)))
+        resp = put_in(resp.trailers, Req.Fields.new_without_normalize_with_duplicates(fields))
         {:cont, {request, resp}}
     end
 
@@ -284,11 +275,7 @@ defmodule Req.Mint do
         {:cont, {request, {{acc, collector}, %{resp | status: status}}}}
 
       {:headers, fields}, {request, {collector_acc, resp}} ->
-        resp =
-          Enum.reduce(fields, resp, fn {name, value}, resp ->
-            Req.Response.put_header(resp, name, value)
-          end)
-
+        resp = put_in(resp.headers, Req.Fields.new_without_normalize_with_duplicates(fields))
         {:cont, {request, {collector_acc, resp}}}
 
       {:data, data}, {request, {{acc, collector}, resp}} ->
@@ -296,7 +283,7 @@ defmodule Req.Mint do
         {:cont, {request, {{acc, collector}, resp}}}
 
       {:trailers, fields}, {request, {collector_acc, resp}} ->
-        resp = update_in(resp.trailers, &Map.merge(&1, fields_to_map(fields)))
+        resp = put_in(resp.trailers, Req.Fields.new_without_normalize_with_duplicates(fields))
         {:cont, {request, {collector_acc, resp}}}
     end
 
@@ -399,8 +386,7 @@ defmodule Req.Mint do
           cancel_fun: start_owner(conn, ref, rest, timeouts)
         }
 
-        response =
-          Req.Response.new(status: status, headers: fields_to_map(headers), body: async)
+        response = Req.Response.new(status: status, headers: headers, body: async)
 
         {request, response}
 
@@ -516,7 +502,7 @@ defmodule Req.Mint do
         forward_entries(rest, ref, caller)
 
       {:headers, ^ref, fields} ->
-        send(caller, {ref, {:trailers, fields_to_map(fields)}})
+        send(caller, {ref, {:trailers, fields}})
         forward_entries(rest, ref, caller)
 
       {:done, ^ref} ->
@@ -573,12 +559,6 @@ defmodule Req.Mint do
 
   defp recv_timeout(%{receive_timeout: receive_timeout, deadline: deadline}) do
     min(receive_timeout, max(deadline - System.monotonic_time(:millisecond), 0))
-  end
-
-  defp fields_to_map(fields) do
-    Enum.reduce(fields, %{}, fn {name, value}, acc ->
-      Map.update(acc, name, [value], &(&1 ++ [value]))
-    end)
   end
 
   defp normalize_error(%Mint.TransportError{reason: reason}) do

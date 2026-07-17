@@ -37,15 +37,7 @@ defmodule Req.Finch do
       raise ArgumentError, "into: :self does not support body set to req_body_fun"
     end
 
-    request_headers =
-      if unquote(Req.MixProject.legacy_headers_as_lists?()) do
-        request.headers
-      else
-        for {name, values} <- request.headers,
-            value <- values do
-          {name, value}
-        end
-      end
+    request_headers = Req.Fields.get_list(request.headers)
 
     body =
       case request.body do
@@ -181,11 +173,7 @@ defmodule Req.Finch do
         {:cont, {request, {{acc, collector}, %{resp | status: status}}}}
 
       {:headers, fields}, {request, {collector_acc, resp}} ->
-        resp =
-          Enum.reduce(fields, resp, fn {name, value}, resp ->
-            Req.Response.put_header(resp, name, value)
-          end)
-
+        resp = put_in(resp.headers, Req.Fields.new_without_normalize_with_duplicates(fields))
         {:cont, {request, {collector_acc, resp}}}
 
       {:data, data}, {request, {{acc, collector}, resp}} ->
@@ -193,8 +181,7 @@ defmodule Req.Finch do
         {:cont, {request, {{acc, collector}, resp}}}
 
       {:trailers, fields}, {request, {collector_acc, resp}} ->
-        fields = finch_fields_to_map(fields)
-        resp = update_in(resp.trailers, &Map.merge(&1, fields))
+        resp = put_in(resp.trailers, Req.Fields.new_without_normalize_with_duplicates(fields))
         {:cont, {request, {collector_acc, resp}}}
     end
 
@@ -257,10 +244,8 @@ defmodule Req.Finch do
 
     headers =
       receive do
-        {^ref, message} ->
-          {:headers, headers} = message
-
-          handle_finch_headers(headers)
+        {^ref, {:headers, headers}} ->
+          headers
       end
 
     async = %Req.Response.Async{
@@ -281,8 +266,6 @@ defmodule Req.Finch do
     with {:status, status} <- recv_status(req, ref),
          {:headers, headers} <- recv_headers(req, ref) do
       # TODO: handle trailers
-      headers = handle_finch_headers(headers)
-
       async = %Req.Response.Async{
         pid: self(),
         ref: ref,
@@ -375,18 +358,6 @@ defmodule Req.Finch do
        when is_list(private_options) or is_map(private_options) do
     Enum.reduce(private_options, finch_request, fn {k, v}, acc_finch_req ->
       Finch.Request.put_private(acc_finch_req, k, v)
-    end)
-  end
-
-  if Req.MixProject.legacy_headers_as_lists?() do
-    defp handle_finch_headers(headers), do: headers
-  else
-    defp handle_finch_headers(headers), do: finch_fields_to_map(headers)
-  end
-
-  defp finch_fields_to_map(fields) do
-    Enum.reduce(fields, %{}, fn {name, value}, acc ->
-      Map.update(acc, name, [value], &(&1 ++ [value]))
     end)
   end
 

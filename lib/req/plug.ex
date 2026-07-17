@@ -106,15 +106,7 @@ if Code.ensure_loaded?(Plug) do
             end
         end
 
-      req_headers =
-        if unquote(Req.MixProject.legacy_headers_as_lists?()) do
-          request.headers
-        else
-          for {name, values} <- request.headers,
-              value <- values do
-            {name, value}
-          end
-        end
+      req_headers = Req.Fields.get_list(request.headers)
 
       parser_opts =
         Plug.Parsers.init(

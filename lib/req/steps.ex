@@ -1246,6 +1246,7 @@ defmodule Req.Steps do
 
       request = Req.Request.put_new_header(request, "host", request.url.host)
       headers = Req.Fields.drop(request.headers, @aws_sigv4_excluded_headers)
+      headers = Req.Fields.get_list(headers)
 
       headers =
         Req.Utils.aws_sigv4_headers(

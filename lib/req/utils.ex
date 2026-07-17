@@ -60,18 +60,20 @@ defmodule Req.Utils do
 
     canonical_headers = headers ++ aws_headers
 
+    ## Duplicate header values must be comma-joined under a single name and
     ## canonical_headers needs to be sorted for canonical_request construction
-    canonical_headers = Enum.sort(canonical_headers)
+    canonical_headers =
+      canonical_headers
+      |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+      |> Enum.sort()
 
     signed_headers =
-      Enum.map_intersperse(
-        Enum.sort(canonical_headers),
-        ";",
-        &String.downcase(elem(&1, 0), :ascii)
-      )
+      Enum.map_intersperse(canonical_headers, ";", &String.downcase(elem(&1, 0), :ascii))
 
     canonical_headers =
-      Enum.map_intersperse(canonical_headers, "\n", fn {name, value} -> [name, ":", value] end)
+      Enum.map_intersperse(canonical_headers, "\n", fn {name, values} ->
+        [name, ":", Enum.intersperse(values, ",")]
+      end)
 
     path = URI.encode(url.path || "/", &(&1 == ?/ or URI.char_unreserved?(&1)))
 
