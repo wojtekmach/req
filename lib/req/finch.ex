@@ -148,19 +148,14 @@ defmodule Req.Finch do
         {:cont, {request, %{resp | status: status}}}
 
       {:headers, fields}, {request, resp} ->
-        resp =
-          Enum.reduce(fields, resp, fn {name, value}, resp ->
-            Req.Response.put_header(resp, name, value)
-          end)
-
+        resp = put_in(resp.headers, Req.Fields.new_without_normalize_with_duplicates(fields))
         {:cont, {request, resp}}
 
       {:data, data}, acc ->
         fun.({:data, data}, acc)
 
       {:trailers, fields}, {request, resp} ->
-        fields = finch_fields_to_map(fields)
-        resp = update_in(resp.trailers, &Map.merge(&1, fields))
+        resp = put_in(resp.trailers, Req.Fields.new_without_normalize_with_duplicates(fields))
         {:cont, {request, resp}}
     end
 

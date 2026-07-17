@@ -269,6 +269,8 @@ defmodule Req.AdapterTest do
           HTTP/1.1 200 OK\r
           transfer-encoding: chunked\r
           trailer: x-foo, x-bar\r
+          set-cookie: foo=1\r
+          set-cookie: bar=2\r
           \r
           6\r
           chunk1\r
@@ -298,6 +300,7 @@ defmodule Req.AdapterTest do
       assert resp.status == 200
       assert resp.headers["transfer-encoding"] == ["chunked"]
       assert resp.headers["trailer"] == ["x-foo, x-bar"]
+      assert Req.Response.get_header(resp, "set-cookie") == ["foo=1", "bar=2"]
 
       assert resp.trailers["x-foo"] == ["foo"]
       assert resp.trailers["x-bar"] == ["bar"]
