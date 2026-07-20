@@ -86,7 +86,8 @@ defmodule Req.Case do
         port: 0,
         plug: fn conn, _ -> plug.(conn) end,
         startup_log: false,
-        http_options: [compress: false]
+        http_options: [compress: false],
+        thousand_island_options: [shutdown_timeout: 100]
       ] ++ options
 
     pid = ExUnit.Callbacks.start_supervised!({Bandit, options})
@@ -101,6 +102,7 @@ defmodule Req.Case do
       plug: fn conn, _ -> plug.(conn) end,
       startup_log: false,
       http_options: [compress: false],
+      thousand_island_options: [shutdown_timeout: 100],
       certfile: "#{__DIR__}/support/cert.pem",
       keyfile: "#{__DIR__}/support/key.pem"
     ]
