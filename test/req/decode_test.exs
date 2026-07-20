@@ -454,7 +454,7 @@ defmodule Req.DecodeTest do
       {:error, err} = Req.get(req, decoders: [:zst])
 
       assert err == %RuntimeError{
-               message: "Could not decompress Zstandard data: \"Unknown frame descriptor\""
+               message: "decoding response body failed: \"Unknown frame descriptor\""
              }
     end
   end
