@@ -4,6 +4,7 @@ defmodule Req.Case do
   using do
     quote do
       import Req.Case
+      import Plug.Conn
     end
   end
 
@@ -175,6 +176,105 @@ defmodule Req.Case do
 
       adapter ->
         raise "unknown REQ_ADAPTER=#{inspect(adapter)}"
+    end
+  end
+
+  def create_tar(files, options \\ []) when is_list(files) do
+    options = Keyword.validate!(options, compressed: false)
+    compressed = Keyword.fetch!(options, :compressed)
+
+    fun = fn
+      :write, {pid, data} -> IO.write(pid, data)
+      :position, {_pid, {:cur, 0}} -> {:ok, 0}
+      :close, _pid -> :ok
+    end
+
+    {:ok, pid} = StringIO.open("")
+    {:ok, tar} = :erl_tar.init(pid, :write, fun)
+
+    for {path, content} <- files do
+      :ok = :erl_tar.add(tar, content, to_charlist(path), [])
+    end
+
+    :ok = :erl_tar.close(tar)
+    data = StringIO.flush(pid)
+    if compressed, do: :zlib.gzip(data), else: data
+  end
+
+  def send_resp_gzip(conn, body) when is_binary(body) do
+    conn
+    |> put_new_resp_header("content-encoding", "gzip")
+    |> Plug.Conn.send_resp(200, :zlib.gzip(body))
+  end
+
+  def send_resp_br(conn, body) when is_binary(body) do
+    {:ok, compressed} = :brotli.encode(body)
+
+    conn
+    |> put_new_resp_header("content-encoding", "br")
+    |> Plug.Conn.send_resp(200, compressed)
+  end
+
+  def send_resp_zstd(conn, body) when is_binary(body) do
+    conn
+    |> put_new_resp_header("content-encoding", "zstd")
+    |> Plug.Conn.send_resp(200, IO.iodata_to_binary(:zstd.compress(body)))
+  end
+
+  def send_resp_zip(conn, files) when is_list(files) do
+    {:ok, {_name, zip}} = :zip.create(~c"a.zip", files, [:memory])
+
+    conn
+    |> put_new_resp_header("content-type", "application/zip")
+    |> Plug.Conn.send_resp(200, zip)
+  end
+
+  def send_resp_tar(conn, files) when is_list(files) do
+    fun = fn
+      :write, {pid, data} -> IO.write(pid, data)
+      :position, {_pid, {:cur, 0}} -> {:ok, 0}
+      :close, _pid -> :ok
+    end
+
+    {:ok, pid} = StringIO.open("")
+    {:ok, tar} = :erl_tar.init(pid, :write, fun)
+
+    for {path, content} <- files do
+      :ok = :erl_tar.add(tar, content, to_charlist(path), [])
+    end
+
+    :ok = :erl_tar.close(tar)
+
+    conn
+    |> put_new_resp_header("content-type", "application/x-tar")
+    |> Plug.Conn.send_resp(200, StringIO.flush(pid))
+  end
+
+  def send_resp_csv(conn, rows) when is_list(rows) do
+    conn
+    |> put_new_resp_header("content-type", "text/csv")
+    |> Plug.Conn.send_resp(200, NimbleCSV.RFC4180.dump_to_iodata(rows))
+  end
+
+  def send_resp_retry_after(conn, retry_after) do
+    conn
+    |> Plug.Conn.put_resp_header("retry-after", retry_after(retry_after))
+    |> Plug.Conn.send_resp(conn.status || 429, "")
+  end
+
+  defp retry_after(integer) when is_integer(integer), do: to_string(integer)
+  defp retry_after(%DateTime{} = dt), do: Req.Utils.format_http_date(dt)
+
+  def send_redirect(conn, status, url) do
+    conn
+    |> Plug.Conn.put_resp_header("location", url)
+    |> Plug.Conn.send_resp(status, "redirecting to #{url}")
+  end
+
+  defp put_new_resp_header(conn, name, value) do
+    case Plug.Conn.get_resp_header(conn, name) do
+      [] -> Plug.Conn.put_resp_header(conn, name, value)
+      _ -> conn
     end
   end
 end
