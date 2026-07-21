@@ -417,44 +417,6 @@ defmodule Req.Utils do
     end
   end
 
-  @doc """
-  Returns a stream where each element is gzipped.
-
-  ## Examples
-
-      iex> gzipped = Req.Utils.stream_gzip(~w[foo bar baz]) |> Enum.to_list()
-      iex> :zlib.gunzip(gzipped)
-      "foobarbaz"
-  """
-  def stream_gzip(enumerable) do
-    Stream.transform(
-      enumerable,
-      # start_fun
-      fn ->
-        z = :zlib.open()
-        # copied from :zlib.gzip/1
-        :ok = :zlib.deflateInit(z, :default, :deflated, 16 + 15, 8, :default)
-        z
-      end,
-      # reducer
-      fn chunk, z ->
-        case :zlib.deflate(z, chunk) do
-          # optimization: avoid emitting empty chunks
-          [] -> {[], z}
-          compressed -> {[compressed], z}
-        end
-      end,
-      # last_fun
-      fn z ->
-        last = :zlib.deflate(z, [], :finish)
-        :ok = :zlib.deflateEnd(z)
-        {[last], z}
-      end,
-      # after_fun
-      fn z -> :ok = :zlib.close(z) end
-    )
-  end
-
   defmodule CollectWithHash do
     @moduledoc false
 
@@ -858,18 +820,6 @@ defmodule Req.Utils do
     System.otp_release() >= "28"
   end
 
-  # Decompresses zstd `body` using the built-in OTP 28+ `:zstd` module. `:zstd.decompress/1`
-  # returns iodata and raises `{:zstd_error, reason}` on invalid input.
-  def zstd_decompress(body) do
-    {:ok, IO.iodata_to_binary(:zstd.decompress(body))}
-  rescue
-    e in ErlangError ->
-      case e.original do
-        {:zstd_error, reason} -> {:error, reason}
-        _ -> reraise(e, __STACKTRACE__)
-      end
-  end
-
   def decompress_with_encoding([], body), do: {body, []}
 
   def decompress_with_encoding(encoding_headers, body) do
@@ -878,25 +828,22 @@ defmodule Req.Utils do
   end
 
   defp decompress_body([gzip | rest], body, acc) when gzip in ["gzip", "x-gzip"] do
-    try do
-      decompress_body(rest, :zlib.gunzip(body), acc)
-    rescue
-      e in ErlangError ->
-        if e.original == :data_error do
-          %Req.DecompressError{format: :gzip, data: body}
-        else
-          reraise e, __STACKTRACE__
-        end
+    case Req.Gzip.decode(body) do
+      {:ok, decompressed} ->
+        decompress_body(rest, decompressed, acc)
+
+      {:error, _reason} ->
+        %Req.DecompressError{format: :gzip, data: body}
     end
   end
 
   defp decompress_body(["br" | rest], body, acc) do
     if brotli_loaded?() do
-      case :brotli.decode(body) do
+      case Req.Brotli.decode(body) do
         {:ok, decompressed} ->
           decompress_body(rest, decompressed, acc)
 
-        :error ->
+        {:error, _reason} ->
           %Req.DecompressError{format: :br, data: body}
       end
     else
@@ -907,7 +854,7 @@ defmodule Req.Utils do
 
   defp decompress_body(["zstd" | rest], body, acc) do
     if zstd_available?() do
-      case zstd_decompress(body) do
+      case Req.Zstd.decode(body) do
         {:ok, decompressed} ->
           decompress_body(rest, decompressed, acc)
 

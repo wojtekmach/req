@@ -752,13 +752,13 @@ defmodule Req.Steps do
       body =
         case request.body do
           iodata when is_binary(iodata) or is_list(iodata) ->
-            :zlib.gzip(iodata)
+            Req.Gzip.encode_to_iodata(iodata)
 
           fun when is_function(fun, 1) ->
             raise ArgumentError, "compress_body does not support req_body_fun"
 
           enumerable ->
-            Req.Utils.stream_gzip(enumerable)
+            Req.Gzip.encode_to_stream(enumerable)
         end
 
       request
@@ -1628,11 +1628,11 @@ defmodule Req.Steps do
   defp builtin_codec(_request, :zip), do: &Req.ZIP.decode/1
   defp builtin_codec(_request, :tar), do: &Req.Tar.decode/1
   defp builtin_codec(_request, :tgz), do: &Req.Tar.decode/1
-  defp builtin_codec(_request, :gz), do: fn body -> {:ok, :zlib.gunzip(body)} end
+  defp builtin_codec(_request, :gz), do: &Req.Gzip.decode/1
 
   defp builtin_codec(_request, :zst) do
     fn body ->
-      case Req.Utils.zstd_decompress(body) do
+      case Req.Zstd.decode(body) do
         {:ok, decompressed} ->
           {:ok, decompressed}
 

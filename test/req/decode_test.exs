@@ -325,9 +325,9 @@ defmodule Req.DecodeTest do
         end
       )
 
-    assert_raise ErlangError, "Erlang error: :data_error", fn ->
-      Req.get(req, decoders: [:gz])
-    end
+    assert {:error, e} = Req.get(req, decoders: [:gz])
+    assert %RuntimeError{} = e
+    assert Exception.message(e) == "decoding response body failed: :data_error"
   end
 
   # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
