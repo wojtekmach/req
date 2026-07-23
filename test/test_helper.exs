@@ -212,6 +212,12 @@ defmodule Req.Case do
     end)
   end
 
+  def send_resp_sse(conn, enumerable) do
+    conn
+    |> put_new_resp_header("content-type", "text/event-stream")
+    |> send_resp_chunked(enumerable)
+  end
+
   def send_resp_gzip(conn, body) when is_binary(body) do
     conn
     |> put_new_resp_header("content-encoding", "gzip")
