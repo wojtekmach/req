@@ -17,78 +17,72 @@ defmodule Req.DecodeTest do
     assert Req.get!(req).body == "ok"
   end
 
-  test "json" do
-    %{req: req} =
-      serve(
-        "GET /": fn conn ->
-          Req.Test.json(conn, %{a: 1})
-        end
-      )
+  describe "json" do
+    test "success" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            Req.Test.json(conn, %{a: 1})
+          end
+        )
 
-    assert Req.get!(req).body == %{"a" => 1}
-  end
+      assert Req.get!(req).body == %{"a" => 1}
+    end
 
-  test "json-api" do
-    %{req: req} =
-      serve(
-        "GET /": fn conn ->
-          conn
-          |> Plug.Conn.put_resp_header(
-            "content-type",
-            "application/vnd.api+json; charset=utf-8"
-          )
-          |> Req.Test.json(%{a: 1})
-        end
-      )
+    test "json-api" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_header(
+              "content-type",
+              "application/vnd.api+json; charset=utf-8"
+            )
+            |> Req.Test.json(%{a: 1})
+          end
+        )
 
-    assert Req.get!(req).body == %{"a" => 1}
-  end
+      assert Req.get!(req).body == %{"a" => 1}
+    end
 
-  test "json with custom options" do
-    %{req: req} =
-      serve(
-        "GET /": fn conn ->
-          Req.Test.json(conn, %{a: 1})
-        end
-      )
+    test "custom options" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            Req.Test.json(conn, %{a: 1})
+          end
+        )
 
-    assert Req.get!(req, decoders: [json: &Jason.decode(&1, keys: :atoms)]).body == %{
-             a: 1
-           }
-  end
+      assert Req.get!(req, decoders: [json: &Jason.decode(&1, keys: :atoms)]).body == %{
+               a: 1
+             }
+    end
 
-  test "deprecated :decode_json option" do
-    %{req: req} =
-      serve(
-        "GET /": fn conn ->
-          Req.Test.json(conn, %{a: 1})
-        end
-      )
+    test "deprecated :decode_json option" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            Req.Test.json(conn, %{a: 1})
+          end
+        )
 
-    assert ExUnit.CaptureIO.capture_io(:stderr, fn ->
-             assert Req.get!(req, decode_json: [keys: :atoms]).body == %{a: 1}
-           end) =~ "setting `decode_json: options` is deprecated"
-  end
+      assert ExUnit.CaptureIO.capture_io(:stderr, fn ->
+               assert Req.get!(req, decode_json: [keys: :atoms]).body == %{a: 1}
+             end) =~ "setting `decode_json: options` is deprecated"
+    end
 
-  test "json invalid" do
-    %{req: req} =
-      serve(
-        "GET /": fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/json")
-          |> Plug.Conn.send_resp(200, "bad")
-        end
-      )
+    test "invalid" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/json")
+            |> Plug.Conn.send_resp(200, "bad")
+          end
+        )
 
-    assert {:error, %Jason.DecodeError{}} = Req.get(req)
-  end
-
-  test "archives are not decoded by default" do
-    %{req: req} =
-      serve("GET /": &send_resp_zip(&1, [{~c"foo.txt", "bar"}]))
-
-    body = Req.get!(req).body
-    assert is_binary(body)
+      assert {:error, %Jason.DecodeError{}} = Req.get(req)
+    end
   end
 
   test "decoders: false disables JSON decoding" do
@@ -183,200 +177,252 @@ defmodule Req.DecodeTest do
     assert Req.get!(req, decoders: [ics: :json]).body == %{"a" => 1}
   end
 
-  test "tar (content-type)" do
-    files = [{~c"foo.txt", "bar"}]
-    %{req: req} = serve("GET /": &send_resp_tar(&1, files))
+  describe "tar" do
+    test "not decoded by default" do
+      %{req: req} =
+        serve("GET /": &send_resp_tar(&1, [{~c"foo.txt", "bar"}]))
 
-    assert Req.get!(req, decoders: [:tar]).body == files
+      body = Req.get!(req).body
+      assert is_binary(body)
+    end
+
+    test "content-type" do
+      files = [{~c"foo.txt", "bar"}]
+      %{req: req} = serve("GET /": &send_resp_tar(&1, files))
+
+      assert Req.get!(req, decoders: [:tar]).body == files
+    end
+
+    test "path" do
+      files = [{~c"foo.txt", "bar"}]
+
+      %{req: req, url: url} =
+        serve(
+          "GET /foo.tar": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+            |> send_resp_tar(files)
+          end
+        )
+
+      assert Req.get!(req, url: "#{url}/foo.tar", decoders: [:tar]).body == files
+    end
+
+    test "path, content type with charset utf8" do
+      files = [{~c"foo.txt", "bar"}]
+
+      %{req: req, url: url} =
+        serve(
+          "GET /foo.tar": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/octet-stream")
+            |> send_resp_tar(files)
+          end
+        )
+
+      resp = Req.get!(req, url: "#{url}/foo.tar", decoders: [:tar])
+      assert resp.headers["content-type"] == ["application/octet-stream; charset=utf-8"]
+      assert resp.body == files
+    end
+
+    test "path, no content-type" do
+      files = [{~c"foo.txt", "bar"}]
+
+      %{req: req, url: url} =
+        serve(
+          "GET /foo.tar.gz": fn conn ->
+            Plug.Conn.send_resp(conn, 200, create_tar(files))
+          end
+        )
+
+      assert Req.get!(req, url: "#{url}/foo.tar.gz", decoders: [:tgz]).body == files
+    end
+
+    test "tar.gz (path)" do
+      files = [{~c"foo.txt", "bar"}]
+
+      %{req: req, url: url} =
+        serve(
+          "GET /foo.tar.gz": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+            |> Plug.Conn.send_resp(200, create_tar(files, compressed: true))
+          end
+        )
+
+      assert Req.get!(req, url: "#{url}/foo.tar.gz", decoders: [:tgz]).body == files
+    end
+
+    test "invalid" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/x-tar", nil)
+            |> Plug.Conn.send_resp(200, "invalid")
+          end
+        )
+
+      assert {:error, e} = Req.get(req, decoders: [:tar])
+      assert e == %Req.ArchiveError{format: :tar, reason: :eof, data: "invalid"}
+      assert Exception.message(e) == "tar unpacking failed: Unexpected end of file"
+    end
   end
 
-  test "tar (path)" do
-    files = [{~c"foo.txt", "bar"}]
+  describe "zip" do
+    test "not decoded by default" do
+      %{req: req} =
+        serve("GET /": &send_resp_zip(&1, [{~c"foo.txt", "bar"}]))
 
-    %{req: req, url: url} =
-      serve(
-        "GET /foo.tar": fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
-          |> send_resp_tar(files)
-        end
-      )
+      body = Req.get!(req).body
+      assert is_binary(body)
+    end
 
-    assert Req.get!(req, url: "#{url}/foo.tar", decoders: [:tar]).body == files
+    test "content-type" do
+      files = [{~c"foo.txt", "bar"}]
+      %{req: req} = serve("GET /": &send_resp_zip(&1, files))
+
+      assert Req.get!(req, decoders: [:zip]).body == files
+    end
+
+    test "path" do
+      files = [{~c"foo.txt", "bar"}]
+
+      %{req: req, url: url} =
+        serve(
+          "GET /foo.zip": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+            |> send_resp_zip(files)
+          end
+        )
+
+      assert Req.get!(req, url: "#{url}/foo.zip", decoders: [:zip]).body == files
+    end
+
+    test "invalid" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/zip", nil)
+            |> Plug.Conn.send_resp(200, "invalid")
+          end
+        )
+
+      assert {:error, e} = Req.get(req, decoders: [:zip])
+      assert e == %Req.ArchiveError{format: :zip, reason: nil, data: "invalid"}
+      assert Exception.message(e) == "zip unpacking failed"
+    end
   end
 
-  test "tar (path, content type with charset utf8)" do
-    files = [{~c"foo.txt", "bar"}]
+  describe "gzip" do
+    test "not decoded by default" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/x-gzip", nil)
+            |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
+          end
+        )
 
-    %{req: req, url: url} =
-      serve(
-        "GET /foo.tar": fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/octet-stream")
-          |> send_resp_tar(files)
-        end
-      )
+      assert Req.get!(req).body == :zlib.gzip("foo")
+    end
 
-    resp = Req.get!(req, url: "#{url}/foo.tar", decoders: [:tar])
-    assert resp.headers["content-type"] == ["application/octet-stream; charset=utf-8"]
-    assert resp.body == files
-  end
+    test "content-type" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/x-gzip", nil)
+            |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
+          end
+        )
 
-  test "tar (path, no content-type)" do
-    files = [{~c"foo.txt", "bar"}]
+      assert Req.get!(req, decoders: [:gz]).body == "foo"
+    end
 
-    %{req: req, url: url} =
-      serve(
-        "GET /foo.tar.gz": fn conn ->
-          Plug.Conn.send_resp(conn, 200, create_tar(files))
-        end
-      )
+    test "invalid" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/x-gzip", nil)
+            |> Plug.Conn.send_resp(200, "bad")
+          end
+        )
 
-    assert Req.get!(req, url: "#{url}/foo.tar.gz", decoders: [:tgz]).body == files
-  end
-
-  test "tar.gz (path)" do
-    files = [{~c"foo.txt", "bar"}]
-
-    %{req: req, url: url} =
-      serve(
-        "GET /foo.tar.gz": fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
-          |> Plug.Conn.send_resp(200, create_tar(files, compressed: true))
-        end
-      )
-
-    assert Req.get!(req, url: "#{url}/foo.tar.gz", decoders: [:tgz]).body == files
-  end
-
-  test "tar invalid" do
-    %{req: req} =
-      serve(
-        "GET /": fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/x-tar", nil)
-          |> Plug.Conn.send_resp(200, "invalid")
-        end
-      )
-
-    assert {:error, e} = Req.get(req, decoders: [:tar])
-    assert e == %Req.ArchiveError{format: :tar, reason: :eof, data: "invalid"}
-    assert Exception.message(e) == "tar unpacking failed: Unexpected end of file"
-  end
-
-  test "zip (content-type)" do
-    files = [{~c"foo.txt", "bar"}]
-    %{req: req} = serve("GET /": &send_resp_zip(&1, files))
-
-    assert Req.get!(req, decoders: [:zip]).body == files
-  end
-
-  test "zip (path)" do
-    files = [{~c"foo.txt", "bar"}]
-
-    %{req: req, url: url} =
-      serve(
-        "GET /foo.zip": fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
-          |> send_resp_zip(files)
-        end
-      )
-
-    assert Req.get!(req, url: "#{url}/foo.zip", decoders: [:zip]).body == files
-  end
-
-  test "zip invalid" do
-    %{req: req} =
-      serve(
-        "GET /": fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/zip", nil)
-          |> Plug.Conn.send_resp(200, "invalid")
-        end
-      )
-
-    assert {:error, e} = Req.get(req, decoders: [:zip])
-    assert e == %Req.ArchiveError{format: :zip, reason: nil, data: "invalid"}
-    assert Exception.message(e) == "zip unpacking failed"
-  end
-
-  test "gzip (content-type)" do
-    %{req: req} =
-      serve(
-        "GET /": fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/x-gzip", nil)
-          |> Plug.Conn.send_resp(200, :zlib.gzip("foo"))
-        end
-      )
-
-    assert Req.get!(req, decoders: [:gz]).body == "foo"
-  end
-
-  test "gzip invalid" do
-    %{req: req} =
-      serve(
-        "GET /": fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/x-gzip", nil)
-          |> Plug.Conn.send_resp(200, "bad")
-        end
-      )
-
-    assert {:error, e} = Req.get(req, decoders: [:gz])
-    assert %RuntimeError{} = e
-    assert Exception.message(e) == "decoding response body failed: :data_error"
+      assert {:error, e} = Req.get(req, decoders: [:gz])
+      assert %RuntimeError{} = e
+      assert Exception.message(e) == "decoding response body failed: :data_error"
+    end
   end
 
   # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
-  @tag skip: System.otp_release() < "28"
-  test "zstd (content-type)" do
-    %{req: req} =
-      serve(
-        "GET /": fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/zstd", nil)
-          |> Plug.Conn.send_resp(200, :zstd.compress("foo"))
-        end
-      )
+  describe "zstd" do
+    @tag skip: System.otp_release() < "28"
+    test "not decoded by default" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/zstd", nil)
+            |> Plug.Conn.send_resp(200, :zstd.compress("foo"))
+          end
+        )
 
-    assert Req.get!(req, decoders: [:zst]).body == "foo"
-  end
+      body = Req.get!(req).body
+      assert IO.iodata_to_binary(body) == IO.iodata_to_binary(:zstd.compress("foo"))
+    end
 
-  # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
-  @tag skip: System.otp_release() < "28"
-  test "zstd (path)" do
-    %{req: req, url: url} =
-      serve(
-        "GET /foo.zst": fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
-          |> Plug.Conn.send_resp(200, :zstd.compress("foo"))
-        end
-      )
+    @tag skip: System.otp_release() < "28"
+    test "content-type" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/zstd", nil)
+            |> Plug.Conn.send_resp(200, :zstd.compress("foo"))
+          end
+        )
 
-    assert Req.get!(req, url: "#{url}/foo.zst", decoders: [:zst]).body == "foo"
-  end
+      assert Req.get!(req, decoders: [:zst]).body == "foo"
+    end
 
-  # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
-  @tag skip: System.otp_release() < "28"
-  test "zstd invalid" do
-    %{req: req} =
-      serve(
-        "GET /": fn conn ->
-          conn
-          |> Plug.Conn.put_resp_content_type("application/zstd", nil)
-          |> Plug.Conn.send_resp(200, "bad")
-        end
-      )
+    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+    @tag skip: System.otp_release() < "28"
+    test "path" do
+      %{req: req, url: url} =
+        serve(
+          "GET /foo.zst": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/octet-stream", nil)
+            |> Plug.Conn.send_resp(200, :zstd.compress("foo"))
+          end
+        )
 
-    assert {:error, e} = Req.get(req, decoders: [:zst])
-    assert %RuntimeError{} = e
+      assert Req.get!(req, url: "#{url}/foo.zst", decoders: [:zst]).body == "foo"
+    end
 
-    assert Exception.message(e) ==
-             "Could not decompress Zstandard data: \"Unknown frame descriptor\""
+    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+    @tag skip: System.otp_release() < "28"
+    test "invalid" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/zstd", nil)
+            |> Plug.Conn.send_resp(200, "bad")
+          end
+        )
+
+      assert {:error, e} = Req.get(req, decoders: [:zst])
+      assert %RuntimeError{} = e
+
+      assert Exception.message(e) ==
+               "Could not decompress Zstandard data: \"Unknown frame descriptor\""
+    end
   end
 
   test "csv" do
