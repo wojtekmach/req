@@ -47,40 +47,42 @@ defmodule Req.DecompressTest do
     assert resp.body == "foo"
   end
 
-  test "gzip success" do
-    %{req: req} =
-      serve(
-        "GET /": fn conn ->
-          # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
-          if System.otp_release() >= "28" do
-            assert get_req_header(conn, "accept-encoding") == ["zstd, br, gzip"]
-          else
-            assert get_req_header(conn, "accept-encoding") == ["br, gzip"]
+  describe "gzip" do
+    test "success" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+            if System.otp_release() >= "28" do
+              assert get_req_header(conn, "accept-encoding") == ["zstd, br, gzip"]
+            else
+              assert get_req_header(conn, "accept-encoding") == ["br, gzip"]
+            end
+
+            conn
+            |> put_resp_header("content-encoding", "x-gzip")
+            |> send_resp_gzip("foo")
           end
+        )
 
-          conn
-          |> put_resp_header("content-encoding", "x-gzip")
-          |> send_resp_gzip("foo")
-        end
-      )
+      resp = Req.get!(req, compressed: true)
+      assert Req.Response.get_header(resp, "content-encoding") == []
+      assert resp.body == "foo"
+    end
 
-    resp = Req.get!(req, compressed: true)
-    assert Req.Response.get_header(resp, "content-encoding") == []
-    assert resp.body == "foo"
-  end
+    test "error" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> put_resp_header("content-encoding", "x-gzip")
+            |> send_resp(200, "bad")
+          end
+        )
 
-  test "gzip error" do
-    %{req: req} =
-      serve(
-        "GET /": fn conn ->
-          conn
-          |> put_resp_header("content-encoding", "x-gzip")
-          |> send_resp(200, "bad")
-        end
-      )
-
-    assert_raise Req.DecompressError, "gzip decompression failed", fn ->
-      Req.get!(req, compressed: true)
+      assert_raise Req.DecompressError, "gzip decompression failed", fn ->
+        Req.get!(req, compressed: true)
+      end
     end
   end
 
@@ -99,59 +101,65 @@ defmodule Req.DecompressTest do
     assert resp.body == "foo"
   end
 
-  test "brotli success" do
-    %{req: req} =
-      serve("GET /": &send_resp_br(&1, "foo"))
+  describe "brotli" do
+    test "success" do
+      %{req: req} =
+        serve("GET /": &send_resp_br(&1, "foo"))
 
-    resp = Req.get!(req, compressed: true)
-    assert resp.body == "foo"
-  end
-
-  test "brotli error" do
-    %{req: req} =
-      serve(
-        "GET /": fn conn ->
-          conn
-          |> put_resp_header("content-encoding", "br")
-          |> send_resp(200, "bad")
-        end
-      )
-
-    assert_raise Req.DecompressError, "br decompression failed", fn ->
-      Req.get!(req, compressed: true)
+      resp = Req.get!(req, compressed: true)
+      assert resp.body == "foo"
     end
+
+    test "error" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> put_resp_header("content-encoding", "br")
+            |> send_resp(200, "bad")
+          end
+        )
+
+      assert_raise Req.DecompressError, "br decompression failed", fn ->
+        Req.get!(req, compressed: true)
+      end
+    end
+
+    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
   end
 
-  # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
-  @tag skip: System.otp_release() < "28"
-  test "zstd success" do
-    %{req: req} =
-      serve("GET /": &send_resp_zstd(&1, "foo"))
+  describe "zstd" do
+    @tag skip: System.otp_release() < "28"
+    test "success" do
+      %{req: req} =
+        serve("GET /": &send_resp_zstd(&1, "foo"))
 
-    resp = Req.get!(req, compressed: true)
-    assert resp.body == "foo"
+      resp = Req.get!(req, compressed: true)
+      assert resp.body == "foo"
+    end
+
+    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+    @tag skip: System.otp_release() < "28"
+    test "error" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> put_resp_header("content-encoding", "zstd")
+            |> send_resp(200, "bad")
+          end
+        )
+
+      assert_raise Req.DecompressError,
+                   ~S[zstd decompression failed, reason: "Unknown frame descriptor"],
+                   fn ->
+                     Req.get!(req, compressed: true)
+                   end
+    end
+
+    # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
   end
 
-  # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
-  @tag skip: System.otp_release() < "28"
-  test "zstd error" do
-    %{req: req} =
-      serve(
-        "GET /": fn conn ->
-          conn
-          |> put_resp_header("content-encoding", "zstd")
-          |> send_resp(200, "bad")
-        end
-      )
-
-    assert_raise Req.DecompressError,
-                 ~S[zstd decompression failed, reason: "Unknown frame descriptor"],
-                 fn ->
-                   Req.get!(req, compressed: true)
-                 end
-  end
-
-  # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
   @tag skip: System.otp_release() < "28"
   test "multiple codecs" do
     %{req: req} =
