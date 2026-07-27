@@ -1,12 +1,51 @@
 # CHANGELOG
 
-## Unreleased
+## v0.7.0 (2026-07-28)
+
+  * [`Req`]: Add `Req.new(req, options)`.
 
   * [`Req`]: Treat URL userinfo as Basic Authentication.
+
+  * [`Req`], [`Req.Request`]: Deprecate `adapter: fun` in favour of `adapter: mod`.
+
+  * [`Req.Request`]: **(BREAKING CHANGE)** Remove `current_request_steps` field.
+
+  * [`Req.Request`]: Fix redacting remaining auth values.
+
+  * **(BREAKING CHANGE)** Replace `run_finch` step with [`Req.Finch`] adapter module.
+
+  * **(BREAKING CHANGE)** Replace `put_plug` and `run_plug` steps with [`Req.Plug`] adapter module.
+
+  * [`Req.Finch`]: Support `finch: options`.
+
+  * [`Req.Finch`]: Support `:request_timeout`.
+
+  * [`Req.Finch`]: Fix handling duplicate response headers.
+
+  * [`Req.Finch`]: Deprecate `finch: name` in favour of `finch: [name: name]`.
+
+  * [`Req.Finch`]: Deprecate `pool_timeout: value` in favour of `finch: [pool_timeout: value]`.
+
+  * [`Req.Finch`]: Deprecate `pool_max_idle_time: value` in favour of `finch: [pool_max_idle_time: value]`.
+
+  * [`Req.Finch`]: Deprecate `:finch_request`.
+
+  * [`Req.Plug`]: Handle individual response body chunks.
+
+  * [`Req.Plug`]: Support non-UTF8 request params.
+
+  * [`Req.Plug`]: Put original request private data in `conn.private`.
+
+  * [`Req.Test`]: Allow descendant processes.
+
+  * [`Req.Test`]: Fix concurrent plug fetches immediately after switching to shared mode.
 
   * [`compress_body`]: Do nothing when request content-encoding is already set.
 
   * [`compress_body`]: Update multipart boundary when re-running the step.
+
+  * [`compressed`], [`decode_body`]: Replace optional `ezstd` dependency with Erlang/OTP 28+
+    built-in `:zstd`.
 
   * [`decode_body`]: Deprecate `:decode_json` in favour of setting a custom JSON
     decoder via `:decoders`:
@@ -17,7 +56,16 @@
         # after:
         Req.get!(url, decoders: [json: &Jason.decode(&1, keys: :atoms)])
 
-  * [`put_params`]: (**BREAKING CHANGE**) Overwrite existing query params instead of appending.
+  * [`encode_body`]: **(BREAKING CHANGE)** Automatically change GET to POST when request body is set.
+
+  * [`put_aws_sigv4`]: Exclude `accept-encoding`, `x-amzn-trace-id`, and
+    hop-by-hop headers from the signature.
+
+  * [`put_aws_sigv4`]: Correctly sign duplicate header values.
+
+  * [`put_params`]: **(BREAKING CHANGE)** Overwrite existing query params instead of appending.
+
+  * [`put_path_params`]: Preserve the path template when re-running the step.
 
   * [`redirect`]: Strip userinfo from redirect locations and log a warning.
 
@@ -25,19 +73,22 @@
     kept the userinfo in the request URL (without converting it to auth). It is
     now dropped so credentials supplied by the redirecting server aren't sent.
 
+  * [`redirect`]: Clear the request body, body options, and content headers when
+    changing POST to GET after a 301, 302, or 303 response.
+
+  * [`retry`]: Use jitter by default.
+
   * [`retry`]: Honor configured `:retry_delay` over `Retry-After`.
 
-  * [`run_finch`]: Support `finch: options`.
+  * **(BREAKING CHANGE)** Remove deprecated `follow_redirects` step.
 
-  * [`run_finch`]: Deprecate `finch: name` in favour of `finch: [name: name]`.
+  * **(BREAKING CHANGE)** Remove deprecated `output` step.
 
-  * [`run_finch`]: Deprecate `pool_timeout: value` in favour of `finch: [pool_timeout: value]`.
-
-  * [`run_finch`]: Deprecate `pool_max_idle_time: value` in favour of `finch: [pool_max_idle_time: value]`.
+  * Require Elixir 1.15 or later.
 
 ## v0.6.3 (2026-07-16)
 
-  * [`Req.Test`]: Fix race condition
+  * [`Req.Test`]: Fix `__fetch_plug__/1` when called immediately after switching to shared mode.
 
 ## v0.6.2 (2026-06-19)
 
@@ -1466,6 +1517,9 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Response.to_map/1`]:         https://hexdocs.pm/req/Req.Response.html#to_map/1
 [`Req.Response.Async`]:            https://hexdocs.pm/req/Req.Response.Async.html
 
+[`Req.Finch`]: https://hexdocs.pm/req/Req.Finch.html
+[`Req.Plug`]:  https://hexdocs.pm/req/Req.Plug.html
+
 [`Req.Test`]: https://hexdocs.pm/req/Req.Test.html
 [`Req.Test.stub/2`]: https://hexdocs.pm/req/Req.Test.html#stub/2
 [`Req.Test.json/2`]: https://hexdocs.pm/req/Req.Test.html#json/2
@@ -1482,8 +1536,10 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Test.set_req_test_to_private/1`]: https://hexdocs.pm/req/Req.Test.html#set_req_test_to_private/1
 [`Req.Test.set_req_test_to_shared/1`]: https://hexdocs.pm/req/Req.Test.html#set_req_test_to_shared/1
 
+[`Req.Finch`]: https://hexdocs.pm/req/Req.Finch.html
+[`Req.Plug`]:  https://hexdocs.pm/req/Req.Plug.html
 
-[`Req.Steps`]:   https://hexdocs.pm/req/Req.Steps.html
+[`Req.Steps`]: https://hexdocs.pm/req/Req.Steps.html
 
 [`Req.TransportError`]: https://hexdocs.pm/req/Req.TransportError.html
 [`Req.HTTPError`]: https://hexdocs.pm/req/Req.HTTPError.html

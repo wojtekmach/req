@@ -1,7 +1,7 @@
 defmodule Req.MixProject do
   use Mix.Project
 
-  @version "0.7.0-dev"
+  @version "0.7.0"
   @source_url "https://github.com/wojtekmach/req"
 
   def project do
@@ -22,6 +22,8 @@ defmodule Req.MixProject do
           Plug.HTML,
           Plug.Test,
           :brotli,
+          :brotli_encoder,
+          :brotli_decoder,
           :zstd
         ]
       ]

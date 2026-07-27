@@ -56,7 +56,7 @@ defmodule Req.IntegrationTest do
       put_user_agent: 1
     ]
 
-  @tag :s3
+  @tag skip: !System.get_env("REQ_AWS_ACCESS_KEY_ID")
   test "s3" do
     aws_access_key_id = System.fetch_env!("REQ_AWS_ACCESS_KEY_ID")
     aws_secret_access_key = System.fetch_env!("REQ_AWS_SECRET_ACCESS_KEY")
