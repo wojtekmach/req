@@ -108,9 +108,6 @@ defmodule Req.Request do
           Note that the collectable is only used, if the response status is 200. In other cases,
           the body is accumulated and processed as usual.
 
-    * `:assigns` is a place for user data. It's commonly used when streaming response body with
-      `into: fun` or when using application-specific custom steps.
-
     * `:options` - the options to be used by steps. The exact representation of options is private.
       Calling `request.options[key]`, `put_in(request.options[key], value)`, and
       `update_in(request.options[key], fun)` is allowed. `get_option/3` and `delete_option/2`
@@ -126,9 +123,9 @@ defmodule Req.Request do
 
     * `:error_steps` - the list of error steps
 
-    * `:private` - a map reserved for libraries and frameworks to use.  The keys must be atoms.
-      Prefix the keys with the name of your project to avoid any future conflicts. The `req_`
-      prefix is reserved for Req.
+    * `:private` - a map reserved for libraries and frameworks to use.
+      The keys must be atoms. Prefix the keys with the name of your project
+      to avoid any future conflicts. The `req_` prefix is reserved for Req.
 
   ## Steps
 
@@ -332,7 +329,6 @@ defmodule Req.Request do
                  {:cont | :halt, {t, Req.Response.t()}})
             | Collectable.t(),
           options: options(),
-          assigns: map(),
           halted: boolean(),
           adapter: module(),
           request_steps: [{name :: atom(), request_step()}],
@@ -391,7 +387,6 @@ defmodule Req.Request do
             headers: Req.Fields.new([]),
             body: nil,
             options: %{},
-            assigns: %{},
             halted: false,
             adapter: Req.Finch,
             request_steps: [],
@@ -415,8 +410,6 @@ defmodule Req.Request do
 
     * `:body` - the request body, defaults to `nil`.
 
-    * `:assigns` - shared user data as a map.
-
     * `:adapter` - the request adapter, defaults to `Req.Finch`.
 
   ## Examples
@@ -432,11 +425,10 @@ defmodule Req.Request do
   def new(options \\ []) do
     options =
       options
-      |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options, :assigns])
+      |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
       |> Keyword.update(:url, URI.new!(""), &URI.parse/1)
       |> Keyword.update(:headers, Req.Fields.new([]), &Req.Fields.new_without_normalize/1)
       |> Keyword.update(:options, %{}, &Map.new/1)
-      |> Keyword.update(:assigns, %{}, &Map.new/1)
 
     struct!(__MODULE__, options)
   end
@@ -1196,7 +1188,6 @@ defmodule Req.Request do
         url: request.url,
         headers: headers,
         body: request.body,
-        assigns: request.assigns,
         options:
           Map.new(request.options, fn {name, value} ->
             {name, redact_option(name, value)}

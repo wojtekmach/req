@@ -2,24 +2,11 @@ defmodule ReqTest do
   use Req.Case, async: true
 
   doctest Req,
-    only:
-      [
-        new: 2,
-        merge: 2,
-        get_headers_list: 1,
-        assign: 2,
-        assign: 3,
-        assign_new: 2,
-        assign_new: 3
-      ] ++
-        (if Version.match?(System.version(), ">= 1.19.0") do
-           [
-             update_assign: 3,
-             update_assign: 4
-           ]
-         else
-           []
-         end)
+    only: [
+      new: 2,
+      merge: 2,
+      get_headers_list: 1
+    ]
 
   test "default_headers" do
     %{req: req} =
