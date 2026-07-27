@@ -65,9 +65,9 @@ write new ones.
 
   * Easily create test stubs (see [`Req.Test`].)
 
-  * Running against a plug (via [`run_plug`] step.)
+  * Running against a plug (via [`Req.Plug`] adapter.)
 
-  * Pluggable adapters. By default, Req uses [Finch] (via [`run_finch`] step.)
+  * Pluggable adapters. By default, Req uses [Finch] (via [`Req.Finch`] adapter.)
 
 ## Usage
 
@@ -206,7 +206,7 @@ See [`Req.Request`] module documentation for more information on low-level API, 
 
 Req supports many configuration options, see [`Req.new/1`] for a full list and see each step for
 more details. In particular, if you are looking for slightly lower level HTTP options such as
-timeouts, pool sizes, and certificates, see the [`run_finch`] documentation.
+timeouts, pool sizes, and certificates, see the [`Req.Finch`] documentation.
 
 ## Related Packages
 
@@ -258,6 +258,8 @@ limitations under the License.
 [`Req.post!/2`]:         https://hexdocs.pm/req/Req.html#post!/2
 [`Req`]:                 https://hexdocs.pm/req
 [`Req.Request`]:         https://hexdocs.pm/req/Req.Request.html
+[`Req.Finch`]:           https://hexdocs.pm/req/Req.Finch.html
+[`Req.Plug`]:            https://hexdocs.pm/req/Req.Plug.html
 [`Req.Steps`]:           https://hexdocs.pm/req/Req.Steps.html
 [`Req.Test`]:            https://hexdocs.pm/req/Req.Test.html
 
@@ -270,15 +272,12 @@ limitations under the License.
 [`encode_body`]:        https://hexdocs.pm/req/Req.Steps.html#encode_body/1
 [`expect`]:             https://hexdocs.pm/req/Req.Steps.html#expect/1
 [`redirect`]:           https://hexdocs.pm/req/Req.Steps.html#redirect/1
-[`output`]:             https://hexdocs.pm/req/Req.Steps.html#output/1
 [`put_base_url`]:       https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
 [`put_params`]:         https://hexdocs.pm/req/Req.Steps.html#put_params/1
 [`put_path_params`]:    https://hexdocs.pm/req/Req.Steps.html#put_path_params/1
-[`run_plug`]:           https://hexdocs.pm/req/Req.Steps.html#run_plug/1
 [`put_range`]:          https://hexdocs.pm/req/Req.Steps.html#put_range/1
 [`put_user_agent`]:     https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
 [`retry`]:              https://hexdocs.pm/req/Req.Steps.html#retry/1
-[`run_finch`]:          https://hexdocs.pm/req/Req.Steps.html#run_finch/1
 [`checksum`]:           https://hexdocs.pm/req/Req.Steps.html#checksum/1
 [`put_aws_sigv4`]:       https://hexdocs.pm/req/Req.Steps.html#put_aws_sigv4/1
 

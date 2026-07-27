@@ -1096,12 +1096,12 @@ defmodule Req.Steps do
 
   Supported formats:
 
-  | Format        | Decoder                                         |
-  | ------------- | ----------------------------------------------- |
-  | gzip, x-gzip  | `:zlib.gunzip/1`                                |
-  | br            | `:brotli.decode/1` (if [brotli] is installed)   |
-  | zstd          | `:zstd.decompress/1` (requires Erlang/OTP 28+)  |
-  | _other_       | Returns data as is                              |
+  | Format        | Decoder                                      |
+  | ------------- | -------------------------------------------- |
+  | gzip, x-gzip  | [`:zlib`](`:zlib`)                           |
+  | br            | [`:brotli`](`:brotli`) (requires [brotli])   |
+  | zstd          | [`:zstd`](`:zstd`) (requires Erlang/OTP 28+) |
+  | _other_       | Returns data as is                           |
 
   This step updates the following headers to reflect the changes:
 
@@ -1190,14 +1190,14 @@ defmodule Req.Steps do
 
   ## Built-in decoders
 
-  | Format               | Decoder                                                     |
-  | -------------------- | ----------------------------------------------------------- |
-  | `:json`, `:json_api` | `Jason.decode(term)` (enabled by default)                   |
-  | `:zip`               | `Req.ZIP.decode(term)`                                      |
-  | `:tar`, `:tgz`       | `Req.Tar.decode(term)`                                      |
-  | `:gz`                | `:zlib.gunzip(term)`                                        |
-  | `:zst`               | `:zstd.decompress(term)` (requires Erlang/OTP 28+)          |
-  | `:csv`               | `NimbleCSV.RFC4180.parse_string(term)` ([nimble_csv] must be installed to use this format) |
+  | Format               | Decoder                                       |
+  | -------------------- | --------------------------------------------- |
+  | `:json`, `:json_api` | `Jason` (enabled by default)                  |
+  | `:zip`               | [`:zip`](`:zip`)                              |
+  | `:tar`, `:tgz`       | [`:erl_tar`](`:erl_tar`)                      |
+  | `:gz`                | [`:zlib`](`:zlib`)                            |
+  | `:zst`               | [`:zstd`](`:zstd`) (requires Erlang/OTP 28+)  |
+  | `:csv`               | `NimbleCSV.RFC4180` (requires [nimble_csv]) |
 
   The format is determined by the response `content-type` header. See `MIME` for registering
   content-type/format mapping.

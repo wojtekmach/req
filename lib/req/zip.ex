@@ -1,6 +1,11 @@
 defmodule Req.ZIP do
   @moduledoc """
-  ZIP archive decoding.
+  ZIP archive decoding using [`:zip`].
+
+  This module is used by [`decode_body`] on `.zip` and `application/zip`.
+
+  [`:zip`]: `:zip`
+  [`decode_body`]: `Req.Steps.decode_body/1`
   """
 
   @doc """

@@ -1,6 +1,11 @@
 defmodule Req.Tar do
   @moduledoc """
-  Tar archive decoding.
+  Tar archive decoding using [`:erl_tar`].
+
+  This module is used by [`decode_body`] on `.tar`, `.tgz`, `.tar.gz`, and `application/x-tar`.
+
+  [`:erl_tar`]: `:erl_tar`
+  [`decode_body`]: `Req.Steps.decode_body/1`
   """
 
   @doc """

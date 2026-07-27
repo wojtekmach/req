@@ -1,8 +1,19 @@
 defmodule Req.Gzip do
-  @moduledoc false
+  @moduledoc """
+  [gzip] decoding using [`:zlib`].
+
+  This module is used by [`decode_body`] on `.gz`, `application/gzip`, and `application/x-gzip`
+  and by [`decompress_body`] on `content-encoding: gzip`.
+
+  [gzip]: https://en.wikipedia.org/wiki/Gzip
+  [`:zlib`]: `:zlib`
+  [`decode_body`]: `Req.Steps.decode_body/1`
+  [`decompress_body`]: `Req.Steps.decompress_body/1`
+  """
 
   ## Encode
 
+  @doc false
   def encode_init do
     z = :zlib.open()
     # 16 + 15 means gzip format with 15 window bits, copied from :zlib.gzip/1
@@ -10,10 +21,12 @@ defmodule Req.Gzip do
     z
   end
 
+  @doc false
   def encode_chunk(z, data) do
     IO.iodata_to_binary(:zlib.deflate(z, data))
   end
 
+  @doc false
   def encode_finish(z) do
     compressed = IO.iodata_to_binary(:zlib.deflate(z, [], :finish))
     :ok = :zlib.deflateEnd(z)
@@ -21,14 +34,17 @@ defmodule Req.Gzip do
     compressed
   end
 
+  @doc false
   def encode(data) do
     IO.iodata_to_binary(encode_to_iodata(data))
   end
 
+  @doc false
   def encode_to_iodata(data) do
     :zlib.gzip(data)
   end
 
+  @doc false
   def encode_to_stream(enumerable) do
     Stream.transform(
       enumerable,
@@ -55,12 +71,14 @@ defmodule Req.Gzip do
 
   ## Decode
 
+  @doc false
   def decode_init do
     z = :zlib.open()
     :ok = :zlib.inflateInit(z, 16 + 15, :reset)
     z
   end
 
+  @doc false
   def decode_chunk(z, data) do
     decompressed = IO.iodata_to_binary(safe_inflate(z, data))
     {:ok, decompressed}
@@ -73,6 +91,7 @@ defmodule Req.Gzip do
       end
   end
 
+  @doc false
   def decode_finish(z) do
     :ok = :zlib.inflateEnd(z)
     :ok = :zlib.close(z)
@@ -86,10 +105,12 @@ defmodule Req.Gzip do
       end
   end
 
+  @doc false
   def decode_close(z) do
     :ok = :zlib.close(z)
   end
 
+  @doc false
   def decode(data) do
     {:ok, :zlib.gunzip(data)}
   rescue
@@ -101,6 +122,7 @@ defmodule Req.Gzip do
       end
   end
 
+  @doc false
   def decode_stream(enumerable) do
     Stream.transform(
       enumerable,

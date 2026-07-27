@@ -146,6 +146,19 @@ defmodule Req.MixProject do
         "Functions (Async Response)": &(&1[:type] == :async),
         "Functions (Mocks & Stubs)": &(&1[:type] == :mock)
       ],
+      groups_for_modules: [
+        Adapters: [
+          Req.Finch,
+          Req.Plug
+        ],
+        Formats: [
+          Req.Brotli,
+          Req.Gzip,
+          Req.Tar,
+          Req.ZIP,
+          Req.Zstd
+        ]
+      ],
       extras: [
         "README.md",
         "CHANGELOG.md"

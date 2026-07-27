@@ -1,31 +1,49 @@
 defmodule Req.Zstd do
-  @moduledoc false
+  @moduledoc """
+  [Zstandard] decoding using [`:zstd`].
+
+  This module is used by [`decode_body`] on `.zst` and `application/zstd` and by
+  [`decompress_body`] on `content-encoding: zstd`.
+
+  [`:zstd`] requires Erlang/OTP 28+.
+
+  [Zstandard]: https://facebook.github.io/zstd/
+  [`:zstd`]: `:zstd`
+  [`decode_body`]: `Req.Steps.decode_body/1`
+  [`decompress_body`]: `Req.Steps.decompress_body/1`
+  """
 
   ## Encode
 
+  @doc false
   def encode_init do
     {:ok, ctx} = :zstd.context(:compress)
     ctx
   end
 
+  @doc false
   def encode_chunk(ctx, data) do
     IO.iodata_to_binary(stream(ctx, data))
   end
 
+  @doc false
   def encode_finish(ctx) do
     {:done, compressed} = :zstd.finish(ctx, "")
     :ok = :zstd.close(ctx)
     IO.iodata_to_binary(compressed)
   end
 
+  @doc false
   def encode(data) do
     IO.iodata_to_binary(encode_to_iodata(data))
   end
 
+  @doc false
   def encode_to_iodata(data) do
     :zstd.compress(data)
   end
 
+  @doc false
   def encode_to_stream(enumerable) do
     Stream.transform(
       enumerable,
@@ -52,11 +70,13 @@ defmodule Req.Zstd do
 
   ## Decode
 
+  @doc false
   def decode_init do
     {:ok, ctx} = :zstd.context(:decompress)
     ctx
   end
 
+  @doc false
   def decode_chunk(ctx, data) do
     decompressed = IO.iodata_to_binary(stream(ctx, data))
     {:ok, decompressed}
@@ -71,6 +91,7 @@ defmodule Req.Zstd do
       end
   end
 
+  @doc false
   def decode_finish(ctx) do
     {:done, decompressed} = :zstd.finish(ctx, "")
     :ok = :zstd.close(ctx)
@@ -86,10 +107,12 @@ defmodule Req.Zstd do
       end
   end
 
+  @doc false
   def decode_close(ctx) do
     :ok = :zstd.close(ctx)
   end
 
+  @doc false
   def decode(data) do
     decompressed = IO.iodata_to_binary(:zstd.decompress(data))
     {:ok, decompressed}
@@ -104,6 +127,7 @@ defmodule Req.Zstd do
       end
   end
 
+  @doc false
   def decode_stream(enumerable) do
     Stream.transform(
       enumerable,
