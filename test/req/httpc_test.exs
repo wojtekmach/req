@@ -65,26 +65,30 @@ defmodule Req.HTTPCTest do
       req = Req.new(adapter: Req.HTTPC, url: url)
       pid = self()
 
+      # httpc seems to randomly chunk things
       resp =
         Req.get!(
           req,
-          into: fn {:data, data}, acc ->
-            send(pid, {:data, data})
-            {:cont, acc}
+          into: fn
+            {:data, "foo"}, acc ->
+              {:cont, acc}
+
+            {:data, "bar"}, acc ->
+              send(pid, :ok)
+              {:cont, acc}
+
+            {:data, "foobar"}, acc ->
+              send(pid, :ok)
+              {:cont, acc}
+
+            {:data, ""}, acc ->
+              {:cont, acc}
           end
         )
 
       assert resp.status == 200
       assert resp.headers["transfer-encoding"] == ["chunked"]
-      assert_receive {:data, "foobar"}
-
-      # httpc seems to randomly chunk things
-      receive do
-        {:data, ""} -> :ok
-      after
-        0 -> :ok
-      end
-
+      assert_receive :ok
       refute_receive _
     end
 
