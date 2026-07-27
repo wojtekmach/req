@@ -540,68 +540,6 @@ defmodule Req.StepsTest do
 
   ## Response steps
 
-  describe "expect" do
-    test "status integer" do
-      %{req: req} =
-        serve("GET /": &send_resp(&1, 200, "ok"))
-
-      assert Req.get!(req, expect: 200).body == "ok"
-      assert {:error, e} = Req.get(req, expect: 201)
-      assert Exception.message(e) =~ "expected status 201, got: 200"
-    end
-
-    test "status range" do
-      %{req: req} =
-        serve("GET /": &send_resp(&1, 200, "ok"))
-
-      assert Req.get!(req, expect: 200..201).body == "ok"
-      assert {:error, e} = Req.get(req, expect: 201..202)
-      assert Exception.message(e) =~ "expected status 201..202, got: 200"
-    end
-
-    test "status list" do
-      %{req: req} =
-        serve("GET /": &send_resp(&1, 200, "ok"))
-
-      assert Req.get!(req, expect: [200, 201]).body == "ok"
-      assert {:error, e} = Req.get(req, expect: [201, 202])
-      assert Exception.message(e) =~ "expected status [201, 202], got: 200"
-
-      assert Req.get!(req, expect: [200..201]).body == "ok"
-      assert {:error, e} = Req.get(req, expect: [201..202])
-      assert Exception.message(e) =~ "expected status [201..202], got: 200"
-    end
-
-    test "status category atom" do
-      %{req: req, url: url} =
-        serve(
-          "GET /200": &send_resp(&1, 200, "ok"),
-          "GET /301": &send_resp(&1, 301, "moved"),
-          "GET /404": &send_resp(&1, 404, "not found"),
-          "GET /500": &send_resp(&1, 500, "error")
-        )
-
-      assert Req.get!(req, url: "#{url}/200", expect: :successful).body == "ok"
-      assert {:error, e} = Req.get(req, url: "#{url}/404", expect: :successful)
-      assert Exception.message(e) =~ "expected status :successful, got: 404"
-
-      assert Req.get!(req, url: "#{url}/301", expect: :redirection).body == "moved"
-      assert {:error, e} = Req.get(req, url: "#{url}/200", expect: :redirection)
-      assert Exception.message(e) =~ "expected status :redirection, got: 200"
-
-      assert Req.get!(req, url: "#{url}/404", expect: :client_error).body == "not found"
-
-      assert Req.get!(req, url: "#{url}/500", expect: :server_error, retry: false).body == "error"
-    end
-
-    test "status category atom in list" do
-      %{req: req} = serve("GET /": &send_resp(&1, 200, "ok"))
-
-      assert Req.get!(req, expect: [:successful, :redirection]).body == "ok"
-      assert {:error, _} = Req.get(req, expect: [:redirection, :client_error])
-    end
-  end
-
   @tag :tmp_dir
   test "cache", c do
     pid = self()

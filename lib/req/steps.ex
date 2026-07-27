@@ -42,7 +42,6 @@ defmodule Req.Steps do
       :decode_body,
       :decoders,
       :decode_json,
-      :expect,
       :redirect,
       :redirect_trusted,
       :redirect_log_level,
@@ -86,12 +85,12 @@ defmodule Req.Steps do
     )
     |> Req.Request.prepend_response_steps(
       retry: &Req.Steps.retry/1,
+      handle_http_errors: &Req.Steps.handle_http_errors/1,
       redirect: &Req.Steps.redirect/1,
       http_digest: &Req.Steps.handle_http_digest/1,
       decompress_body: &Req.Steps.decompress_body/1,
       verify_checksum: &Req.Steps.verify_checksum/1,
-      decode_body: &Req.Steps.decode_body/1,
-      expect: &Req.Steps.expect/1
+      decode_body: &Req.Steps.decode_body/1
     )
     |> Req.Request.prepend_error_steps(retry: &Req.Steps.retry/1)
   end
@@ -1600,6 +1599,47 @@ defmodule Req.Steps do
   end
 
   @doc """
+  Handles HTTP 4xx/5xx error responses.
+
+  ## Request Options
+
+    * `:http_errors` - how to handle HTTP 4xx/5xx error responses. Can be one of the following:
+
+      * `:return` (default) - return the response
+
+      * `:raise` - raise an error
+
+  ## Examples
+
+      iex> Req.get!("https://httpbin.org/status/404").status
+      404
+
+      iex> Req.get!("https://httpbin.org/status/404", http_errors: :raise)
+      ** (RuntimeError) The requested URL returned error: 404
+      Response body: ""
+  """
+  @doc step: :response
+  def handle_http_errors(request_response)
+
+  # TODO: deprecate
+  def handle_http_errors({request, response}) when response.status >= 400 do
+    case Map.get(request.options, :http_errors, :return) do
+      :return ->
+        {request, response}
+
+      :raise ->
+        raise """
+        The requested URL returned error: #{response.status}
+        Response body: #{inspect(response.body)}\
+        """
+    end
+  end
+
+  def handle_http_errors({request, response}) do
+    {request, response}
+  end
+
+  @doc """
   Handles HTTP Digest authentication.
 
   This step is invoked when setting `:auth` option with `{:digest, ...}`. When response is HTTP 401 with `www-authenticate` header, this step will calculate `authorization: Digest ...` header and make another request.
@@ -1642,114 +1682,6 @@ defmodule Req.Steps do
 
   def handle_http_digest(other) do
     other
-  end
-
-  @doc """
-  Expect that response matches the given status.
-
-  This step ensures the HTTP response has the given expected status, otherwise it
-  returns `Req.UnexpectedStatusError`.
-
-  ## Request Options
-
-    * `:expect` - the expected HTTP response status. Can be one of the following:
-
-        * integer
-        * range
-        * atom - one of `:informational` (1xx), `:successful` (2xx), `:redirection` (3xx),
-          `:client_error` (4xx), or `:server_error` (5xx)
-        * list of integers/ranges/atoms
-
-  > #### Order Matters! {: .info}
-  >
-  > By default, `expect/1` runs AFTER `retry/1`, `redirect/1`, `decompress_body/1`,
-  > and `decode_body/1` steps.
-  >
-  > This means that, for example, HTTP 503 error would be first retried,
-  > HTTP 307 redirect would be first followed, and the response body
-  > would be first decompressed and decoded before checking for expected HTTP status.
-  > If this is undesirable, re-arrange or disable and manually run given steps.
-
-  > #### Sensitive Response Data {: .warning}
-  >
-  > This step returns `Req.UnexpectedStatusError` which contains full `Req.Response`.
-  > Since response headers/body can contain sensitive data, be careful about raising
-  > this error and automatically logging it, sending to exception trackers, etc.
-
-  ## Examples
-
-      iex> resp = Req.get!("https://httpbin.org/status/200", expect: 200)
-      iex> resp.status
-      200
-
-      iex> Req.get!("https://httpbin.org/status/404", expect: 200..299)
-      ** (Req.UnexpectedStatusError) expected status 200..299, got: 404
-
-      iex> {:error, e} = Req.get("https://httpbin.org/status/404", expect: 200..299)
-      iex> e.expected_status
-      200..299
-      iex> e.response.status
-      404
-  """
-  @doc step: :response
-  def expect(request_response)
-
-  def expect({request, response}) do
-    if Req.Request.get_option(request, :http_errors) do
-      IO.warn("the `:http_errors` option is deprecated in favour of `:expect`")
-    end
-
-    expect =
-      if request.options[:http_errors] == :raise do
-        request.options[:expect] || 100..399
-      else
-        request.options[:expect]
-      end
-
-    cond do
-      is_nil(expect) ->
-        {request, response}
-
-      expect_success?(response.status, expect) ->
-        {request, response}
-
-      true ->
-        {request,
-         Req.UnexpectedStatusError.exception(expected_status: expect, response: response)}
-    end
-  end
-
-  defp expect_success?(status, status) do
-    true
-  end
-
-  defp expect_success?(_, other_status) when is_integer(other_status) do
-    false
-  end
-
-  defp expect_success?(status, %Range{} = statuses) do
-    status in statuses
-  end
-
-  @status_category_atoms [:informational, :successful, :redirection, :client_error, :server_error]
-
-  defp expect_success?(status, :informational), do: status in 100..199
-  defp expect_success?(status, :successful), do: status in 200..299
-  defp expect_success?(status, :redirection), do: status in 300..399
-  defp expect_success?(status, :client_error), do: status in 400..499
-  defp expect_success?(status, :server_error), do: status in 500..599
-
-  defp expect_success?(status, [expect | tail])
-       when is_integer(expect) or is_struct(expect, Range) or expect in @status_category_atoms do
-    if expect_success?(status, expect) do
-      true
-    else
-      expect_success?(status, tail)
-    end
-  end
-
-  defp expect_success?(_status, []) do
-    false
   end
 
   ## Error steps

@@ -48,7 +48,7 @@ defmodule Req.IntegrationTest do
       compressed: 1,
       decompress_body: 1,
       encode_body: 1,
-      expect: 1,
+      handle_http_errors: 1,
       put_base_url: 1,
       put_params: 1,
       put_path_params: 1,
