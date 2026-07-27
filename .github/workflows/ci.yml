@@ -9,47 +9,64 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       MIX_ENV: test
+      REQ_ADAPTERS: finch,mint,plug
+    continue-on-error: ${{ matrix.test_args == '--only integration' }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - pair:
-              elixir: "1.15"
-              otp: "25"
-          - pair:
-              elixir: "1.20"
-              otp: "28.5"
-            lint: lint
+          - elixir: "1.15"
+            otp: "25"
+          - elixir: "1.20"
+            otp: "29"
+            test_args: "--warnings-as-errors"
+          - elixir: "1.20"
+            otp: "29"
+            test_args: "--warnings-as-errors --only integration"
     steps:
       - uses: actions/checkout@v6
 
       - uses: erlef/setup-beam@main
+        id: beam
         with:
-          otp-version: ${{ matrix.pair.otp }}
-          elixir-version: ${{ matrix.pair.elixir }}
+          otp-version: ${{ matrix.otp }}
+          elixir-version: ${{ matrix.elixir }}
 
       - uses: actions/cache@v5
         with:
           path: deps
-          # brotli is compiling native objects to deps/x/_build, not _build,
-          # so we need to cache per OTP
-          key: mix-otp-${{ matrix.pair.otp }}-deps-${{ hashFiles('**/mix.lock') }}
+          key: mix-otp-${{ steps.beam.outputs.otp-version }}-deps-${{ hashFiles('**/mix.lock') }}
+
+      - run: mix deps.get --check-locked
+
+      - run: mix deps.compile
+
+      - run: mix test.adapters --slowest 5 ${{ matrix.test_args }}
+
+  lint:
+    runs-on: ubuntu-24.04
+    env:
+      MIX_ENV: test
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: erlef/setup-beam@main
+        id: beam
+        with:
+          otp-version: "29"
+          elixir-version: "1.20"
+
+      - uses: actions/cache@v5
+        with:
+          path: deps
+          key: mix-otp-${{ steps.beam.outputs.otp-version }}-deps-${{ hashFiles('**/mix.lock') }}
 
       - run: mix deps.get --check-locked
 
       - run: mix format --check-formatted
-        if: ${{ matrix.lint }}
 
       - run: mix deps.unlock --check-unused
-        if: ${{ matrix.lint }}
 
       - run: mix deps.compile
 
       - run: mix compile --no-optional-deps --warnings-as-errors
-        if: ${{ matrix.lint }}
-
-      - run: mix test.all --slowest 5
-        if: ${{ ! matrix.lint }}
-
-      - run: mix test.all --slowest 5 --warnings-as-errors
-        if: ${{ matrix.lint }}

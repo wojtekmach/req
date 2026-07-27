@@ -75,7 +75,14 @@ defmodule Req.MixProject do
   end
 
   defp test_adapters(args) do
-    for adapter <- ~w(finch httpc mint plug) do
+    adapters =
+      if adapters = System.get_env("REQ_ADAPTERS") do
+        String.split(adapters, ",")
+      else
+        ~w(finch httpc mint plug)
+      end
+
+    for adapter <- adapters do
       {_, status} =
         System.cmd("mix", ["test" | args],
           env: [{"REQ_ADAPTER", adapter}],
