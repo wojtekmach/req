@@ -55,15 +55,15 @@ defmodule Req.Case do
 
       :finch ->
         %{url: url} = start_http_server(plugs, options)
-        %{req: Req.new(url: url), url: url}
+        %{req: Req.new(url: url), adapter: Req.Finch, url: url}
 
       :httpc ->
         %{url: url} = start_http_server(plugs, options)
-        %{req: Req.new(url: url, adapter: &Req.HTTPC.run/1), url: url}
+        %{req: Req.new(url: url, adapter: Req.HTTPC), url: url}
 
       :mint ->
         %{url: url} = start_http_server(plugs, options)
-        %{req: Req.new(url: url, adapter: &Req.Mint.run/1), url: url}
+        %{req: Req.new(url: url, adapter: Req.Mint), url: url}
     end
   end
 
@@ -152,13 +152,13 @@ defmodule Req.Case do
   def adapter_fun do
     case adapter() do
       :finch ->
-        &Req.Steps.run_finch/1
+        Req.Finch
 
       :httpc ->
-        &Req.HTTPC.run/1
+        Req.HTTPC
 
       :mint ->
-        &Req.Mint.run/1
+        Req.Mint
     end
   end
 

@@ -1,9 +1,174 @@
 defmodule Req.Finch do
-  @moduledoc false
+  @default_protocols [:http1]
+
+  @moduledoc """
+  Runs the request using `Finch`.
+
+  This is the default Req _adapter_. See
+  ["Adapter" section in the `Req.Request`](Req.Request.html#module-adapter) module documentation
+  for more information on adapters.
+
+  Finch returns `Mint.TransportError` exceptions on HTTP connection problems. These are automatically
+  converted to `Req.TransportError` exceptions. Similarly, HTTP-protocol-related errors,
+  `Mint.HTTPError` and `Finch.Error`, and converted to `Req.HTTPError`.
+
+  ## HTTP/1 Pools
+
+  On HTTP/1 connections, Finch creates a pool per `{scheme, host, port}` tuple. These pools
+  are kept around to re-use connections as much as possible, however they are **not automatically
+  terminated**. To do so, you can configure custom Finch pool:
+
+      {:ok, _} =
+        Finch.start_link(
+          name: MyFinch,
+          pools: %{
+            default: [
+              # terminate idle {scheme, host, port} pool after 60s
+              pool_max_idle_time: 60_000
+            ]
+          }
+        )
+
+      Req.get!("https://httpbin.org/json", finch: [name: MyFinch])
+
+  More commonly you'd add the custom Finch pool as part of your supervision tree in your
+  `application.ex`:
+
+      children = [
+        {Finch,
+         name: MyFinch,
+         pools: %{
+           default: [size: 70]
+         }}
+      ]
+
+  That way you can also configure a bigger pool size for the HTTP pool. You just mustn't forget to
+  pass along `finch: [name: MyFinch]` as discussed above. You could use `Req.default_options/1` to make it
+  a global default but it's generally discouraged.
+
+  For documentation about the possible pool options and their meaning, please check out the
+  [Finch docs on pool configuration options](https://hexdocs.pm/finch/Finch.html#start_link/1-pool-configuration-options).
+
+  ## Request Options
+
+    * `:finch` - options for the Finch adapter. Defaults to a pool automatically started by
+      Req. Can include:
+
+        * `:name` - the name of the Finch pool.
+
+        * Finch request options, e.g. `:pool_tag`, `:pool_timeout`, `:receive_timeout`. See
+          `t:Finch.Request.build_opt/0` and `t:Finch.request_opt/0` for more information.
+
+        * Finch pool options, e.g.: `:conn_max_idle_time`, `:pool_max_idle_time`, `:conn_opts`.
+          See `Finch.start_link/1` for more information.
+
+          Finch pool options cannot be mixed with `:name` option.
+
+      Examples:
+
+          Req.get!("https://httpbin.org/json", finch: [name: MyFinch])
+          Req.get!("https://httpbin.org/json", finch: [name: MyFinch, pool_tag: :bulk])
+          Req.get!("https://httpbin.org/json", finch: [conn_max_idle_time: 10_000])
+
+    * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
+      the given connection options:
+
+        * `:timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
+
+        * `:protocols` - the HTTP protocols to use, defaults to
+          `#{inspect(@default_protocols)}`.
+
+        * `:hostname` - Mint explicit hostname, see `Mint.HTTP.connect/4` for more information.
+
+        * `:transport_opts` - Mint transport options, see `Mint.HTTP.connect/4` for more
+        information.
+
+        * `:proxy_headers` - Mint proxy headers, see `Mint.HTTP.connect/4` for more information.
+
+        * `:proxy` - Mint HTTP/1 proxy settings, a `{scheme, address, port, options}` tuple.
+          See `Mint.HTTP.connect/4` for more information.
+
+        * `:client_settings` - Mint HTTP/2 client settings, see `Mint.HTTP.connect/4` for more
+        information.
+
+    * `:inet6` - if set to true, uses IPv6.
+
+      If the request URL looks like IPv6 address, i.e., say, `[::1]`, it defaults to `true`
+      and otherwise defaults to `false`.
+      This is a shortcut for setting `connect_options: [transport_opts: [inet6: true]]`.
+
+    * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
+
+    * `:request_timeout` - response timeout in milliseconds, defaults to `:infinity`.
+      See `Finch.request/3`.
+
+    * `:unix_socket` - if set, connect through the given UNIX domain socket.
+
+    * `:finch_private` - a map or keyword list of private metadata to add to the Finch request.
+      May be useful for adding custom data when handling telemetry with `Finch.Telemetry`.
+
+    * `:finch_request` - a function that executes the Finch request, defaults to using
+      `Finch.request/3`.
+
+      The function should accept 4 arguments:
+
+        * `request` - the `%Req.Request{}` struct
+
+        * `finch_request` - the Finch request
+
+        * `finch_name` - the Finch name
+
+        * `finch_options` - the Finch options
+
+      And it should return either `{request, response}` or `{request, exception}`.
+
+  ## Examples
+
+  Custom `:receive_timeout`:
+
+      iex> Req.get!(url, receive_timeout: 1000)
+
+  Connecting through UNIX socket:
+
+      iex> Req.get!("http:///v1.41/_ping", unix_socket: "/var/run/docker.sock").body
+      "OK"
+
+  Custom connection options:
+
+      iex> Req.get!(url, connect_options: [timeout: 5000])
+
+      iex> Req.get!(url, connect_options: [protocols: [:http2]])
+
+  Connecting without certificate check (useful in development, not recommended in production):
+
+      iex> Req.get!(url, connect_options: [transport_opts: [verify: :verify_none]])
+
+  Connecting with custom certificates:
+
+      iex> Req.get!(url, connect_options: [transport_opts: [cacertfile: "certs.pem"]])
+
+  Connecting through a proxy with basic authentication:
+
+      iex> Req.new(
+      ...>  url: "https://elixir-lang.org",
+      ...>  connect_options: [
+      ...>    proxy: {:http, "your.proxy.com", 8888, []},
+      ...>    proxy_headers: [{"proxy-authorization", "Basic " <> Base.encode64("user:pass")}]
+      ...>  ]
+      ...> )
+      iex> |> Req.get!()
+
+  Transport errors are represented as `Req.TransportError` exceptions:
+
+      iex> Req.get("https://httpbin.org/delay/1", receive_timeout: 0, retry: false)
+      {:error, %Req.TransportError{reason: :timeout}}
+
+  """
 
   @finch_build_options [:pool_tag, :unix_socket]
   @finch_request_options [:pool_timeout, :receive_timeout, :request_timeout, :pool_strategy]
 
+  @doc false
   def child_spec(options) do
     {name, options} = Keyword.pop!(options, :name)
     Finch.child_spec(name: name, pools: %{default: pool_options(options)})
@@ -107,7 +272,7 @@ defmodule Req.Finch do
       deprecated_fun when is_function(deprecated_fun, 1) ->
         IO.warn(
           "passing a :finch_request function accepting a single argument is deprecated. " <>
-            "See Req.Steps.run_finch/1 for more information."
+            "See Req.Finch for more information."
         )
 
         run_finch_request(req, deprecated_fun.(finch_req), finch_name, finch_options)
@@ -517,7 +682,7 @@ defmodule Req.Finch do
           [protocol]
 
         true ->
-          [:http1]
+          @default_protocols
       end
 
     pool_options ++

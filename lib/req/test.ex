@@ -71,7 +71,7 @@ defmodule Req.Test do
       ]
 
   In tests, instead of hitting the network, we make the request against
-  a [plug](`Req.Steps.run_plug/1`) _stub_ named `MyApp.Weather`:
+  a [plug](`Req.Plug`) _stub_ named `MyApp.Weather`:
 
       # config/test.exs
       config :myapp, weather_req_options: [
@@ -505,7 +505,7 @@ defmodule Req.Test do
   Creates a request stub with the given `name` and `plug`.
 
   Req allows running requests against _plugs_ (instead of over the network) using the
-  [`:plug`](`Req.Steps.run_plug/1`) option. However, passing the `:plug` value throughout the
+  [`:plug`](`Req.Plug`) option. However, passing the `:plug` value throughout the
   system can be cumbersome. Instead, you can tell Req to find plugs by `name` by setting
   `plug: {Req.Test, name}`, and register plug stubs for that `name` by calling
   `Req.Test.stub(name, plug)`. In other words, multiple concurrent tests can register test stubs

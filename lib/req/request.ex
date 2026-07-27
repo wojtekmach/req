@@ -118,8 +118,7 @@ defmodule Req.Request do
 
     * `:halted` - whether the request pipeline is halted. See `halt/2`.
 
-    * `:adapter` - a request step that makes the actual HTTP request. Defaults to
-      `Req.Steps.run_finch/1`. See ["Adapter"](#module-adapter) section below for more information.
+    * `:adapter` - a request step that makes the actual HTTP request. Defaults to `Req.Finch`.
 
     * `:request_steps` - the list of request steps
 
@@ -310,61 +309,6 @@ defmodule Req.Request do
       `attach/2` function and call `merge_options/2`. Remember to first register
       options before merging!
 
-  ## Adapter
-
-  As noted in the ["Request Steps"](#module-request-steps) section, a request step besides returning the request,
-  might also return `{request, response}` or `{request, exception}`, thus invoking either response or error steps next.
-  This is exactly how Req makes the underlying HTTP call, by invoking a request step that follows this contract.
-
-  The default adapter is using Finch via the `Req.Steps.run_finch/1` step.
-
-  Here is a mock adapter that always returns a successful response:
-
-      adapter = fn request ->
-        response = %Req.Response{status: 200, body: "it works!"}
-        {request, response}
-      end
-
-      Req.request!(url: "http://example", adapter: adapter).body
-      #=> "it works!"
-
-  Here is another one that uses the `Req.Response.json/2` function to conveniently
-  return a JSON response:
-
-      adapter = fn request ->
-        response = Req.Response.json(%{hello: 42})
-        {request, response}
-      end
-
-      resp = Req.request!(url: "http://example", adapter: adapter)
-      resp.headers
-      #=> %{"content-type" => ["application/json"]}
-      resp.body
-      #=> %{"hello" => 42}
-
-  And here is a naive Hackney-based adapter:
-
-      hackney = fn request ->
-        case :hackney.request(
-               request.method,
-               URI.to_string(request.url),
-               request.headers,
-               request.body,
-               [:with_body]
-             ) do
-          {:ok, status, headers, body} ->
-            headers = for {name, value} <- headers, do: {String.downcase(name, :ascii), value}
-            response = Req.Response.new(status: status, headers: headers, body: body)
-            {request, response}
-
-          {:error, reason} ->
-            {request, RuntimeError.exception(inspect(reason))}
-        end
-      end
-
-      Req.get!("https://api.github.com/repos/wojtekmach/req", adapter: hackney).body["description"]
-      #=> "Req is a batteries-included HTTP client for Elixir."
-
   """
 
   @typedoc """
@@ -390,7 +334,7 @@ defmodule Req.Request do
           options: options(),
           assigns: map(),
           halted: boolean(),
-          adapter: request_step(),
+          adapter: module(),
           request_steps: [{name :: atom(), request_step()}],
           response_steps: [{name :: atom(), response_step()}],
           error_steps: [{name :: atom(), error_step()}],
@@ -449,7 +393,7 @@ defmodule Req.Request do
             options: %{},
             assigns: %{},
             halted: false,
-            adapter: &Req.Steps.run_finch/1,
+            adapter: Req.Finch,
             request_steps: [],
             response_steps: [],
             error_steps: [],
@@ -473,7 +417,7 @@ defmodule Req.Request do
 
     * `:assigns` - shared user data as a map.
 
-    * `:adapter` - the request adapter, defaults to calling [`run_finch`](`Req.Steps.run_finch/1`).
+    * `:adapter` - the request adapter, defaults to `Req.Finch`.
 
   ## Examples
 
@@ -1133,7 +1077,7 @@ defmodule Req.Request do
   end
 
   defp run_request(request, []) do
-    case run_step(request.adapter, request) do
+    case run_step(adapter(request.adapter), request) do
       {request, %Req.Response{} = response} ->
         run_response(request, response)
 
@@ -1144,6 +1088,13 @@ defmodule Req.Request do
         raise "expected adapter to return {request, response} or {request, exception}, " <>
                 "got: #{inspect(other)}"
     end
+  end
+
+  defp adapter(mod) when is_atom(mod), do: &mod.run/1
+
+  defp adapter(fun) when is_function(fun, 1) do
+    IO.warn("setting `adapter` to a function is deprecated in favour of setting it to a module")
+    fun
   end
 
   defp run_response(request, response) do

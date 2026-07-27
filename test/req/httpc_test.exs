@@ -11,7 +11,7 @@ defmodule Req.HTTPCTest do
 
     req =
       Req.new(
-        adapter: &Req.HTTPC.run/1,
+        adapter: Req.HTTPC,
         url: url
       )
 
@@ -32,7 +32,7 @@ defmodule Req.HTTPCTest do
           Plug.Conn.send_resp(conn, 200, body)
         end)
 
-      req = Req.new(adapter: &Req.HTTPC.run/1, url: url)
+      req = Req.new(adapter: Req.HTTPC, url: url)
 
       resp = Req.post!(req, body: "foofoofoo")
       assert resp.status == 200
@@ -46,7 +46,7 @@ defmodule Req.HTTPCTest do
           Plug.Conn.send_resp(conn, 200, body)
         end)
 
-      req = Req.new(adapter: &Req.HTTPC.run/1, url: url)
+      req = Req.new(adapter: Req.HTTPC, url: url)
 
       resp = Req.post!(req, body: {:stream, Stream.take(["foo", "foo", "foo"], 2)})
       assert resp.status == 200
@@ -62,7 +62,7 @@ defmodule Req.HTTPCTest do
           conn
         end)
 
-      req = Req.new(adapter: &Req.HTTPC.run/1, url: url)
+      req = Req.new(adapter: Req.HTTPC, url: url)
       pid = self()
 
       resp =
@@ -97,7 +97,7 @@ defmodule Req.HTTPCTest do
           conn
         end)
 
-      req = Req.new(adapter: &Req.HTTPC.run/1, url: url)
+      req = Req.new(adapter: Req.HTTPC, url: url)
       resp = Req.get!(req, into: :self)
       assert resp.status == 200
 
@@ -123,7 +123,7 @@ defmodule Req.HTTPCTest do
           conn
         end)
 
-      req = Req.new(adapter: &Req.HTTPC.run/1, url: url)
+      req = Req.new(adapter: Req.HTTPC, url: url)
       resp = Req.get!(req, into: :self)
       assert resp.status == 200
       assert :ok = Req.cancel_async_response(resp)

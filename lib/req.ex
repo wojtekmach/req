@@ -46,7 +46,7 @@ defmodule Req do
       iex> resp.status
       200
 
-  See [`run_finch`](`Req.Steps.run_finch/1`) for more connection related options and usage examples.
+  See `Req.Finch` for more connection related options and usage examples.
 
   Stream request body:
 
@@ -423,9 +423,9 @@ defmodule Req do
     * `:adapter` - adapter to use to make the actual HTTP request. See `:adapter` field description
       in the `Req.Request` module documentation for more information.
 
-      The default is [`run_finch`](`Req.Steps.run_finch/1`).
+      The default is `Req.Finch`.
 
-    * `:plug` - if set, calls the given plug instead of making an HTTP request over the network (via [`run_plug`](`Req.Steps.run_plug/1`) step).
+    * `:plug` - if set, calls the given plug instead of making an HTTP request over the network (via the `Req.Plug` adapter).
 
       The plug can be one of:
 
@@ -434,7 +434,7 @@ defmodule Req do
 
         * A _module_ plug: a `module` name or a `{module, options}` tuple.
 
-  Finch options ([`run_finch`](`Req.Steps.run_finch/1`) step), see `Finch.start_link/1` for options:
+  Finch options (`Req.Finch` adapter), see `Finch.start_link/1` for options:
 
     * `:finch` - options for the Finch adapter. Defaults to a pool automatically started by
       Req. Can include:
@@ -627,16 +627,23 @@ defmodule Req do
           %{acc | name => value}
       end)
 
-    update_in(
-      request.options,
-      &Map.merge(&1, Map.new(options), fn
-        :params, old, new ->
-          Keyword.merge(old, new)
+    request =
+      update_in(
+        request.options,
+        &Map.merge(&1, Map.new(options), fn
+          :params, old, new ->
+            Keyword.merge(old, new)
 
-        _, _, new ->
-          new
-      end)
-    )
+          _, _, new ->
+            new
+        end)
+      )
+
+    if options[:plug] do
+      %{request | adapter: Req.Plug}
+    else
+      request
+    end
   end
 
   @doc """

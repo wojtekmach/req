@@ -340,7 +340,7 @@ defmodule Req.StepsTest do
           "POST /": fn conn ->
             assert {:ok, body, conn} = read_body(conn)
 
-            # run_plug decompresses the request body and strips content-encoding
+            # Req.Plug decompresses the request body and strips content-encoding
             body =
               case get_req_header(conn, "content-encoding") do
                 ["gzip"] ->

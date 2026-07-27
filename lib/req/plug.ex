@@ -59,7 +59,85 @@ if Code.ensure_loaded?(Plug) do
   end
 
   defmodule Req.Plug do
-    @moduledoc false
+    @moduledoc """
+    Runs the request against a plug instead of over the network.
+
+    This is a Req _adapter_, used automatically when the `:plug` option is set.
+
+    It requires [`:plug`](https://hexdocs.pm/plug) dependency:
+
+        {:plug, "~> 1.0"}
+
+    ## Request Options
+
+      * `:plug` - the plug to run the request through. It can be one of:
+
+          * A _function_ plug: a `fun(conn)` or `fun(conn, options)` function that takes a
+            `Plug.Conn` and returns a `Plug.Conn`.
+
+          * A _module_ plug: a `module` name or a `{module, options}` tuple.
+
+        Req automatically calls `Plug.Conn.fetch_query_params/2` before your plug, so you can
+        get query params using `conn.query_params`.
+
+        Req also automatically parses request body using `Plug.Parsers` for JSON, urlencoded and
+        multipart requests and you can access it with `conn.body_params`. The raw request body of
+        the request is available by calling `Req.Test.raw_body/1` with the `conn` in your tests.
+
+    ## Examples
+
+    This step is particularly useful to test plugs:
+
+        defmodule Echo do
+          def call(conn, _) do
+            "/" <> path = conn.request_path
+            Plug.Conn.send_resp(conn, 200, path)
+          end
+        end
+
+        test "echo" do
+          assert Req.get!("http:///hello", plug: Echo).body == "hello"
+        end
+
+    You can define plugs as functions too:
+
+        test "echo" do
+          echo = fn conn ->
+            "/" <> path = conn.request_path
+            Plug.Conn.send_resp(conn, 200, path)
+          end
+
+          assert Req.get!("http:///hello", plug: echo).body == "hello"
+        end
+
+    which is particularly useful to create HTTP service stubs, similar to tools like
+    [Bypass](https://github.com/PSPDFKit-labs/bypass).
+
+    When testing JSON APIs, it's common to use the `Req.Test.json/2` helper:
+
+        test "JSON" do
+          plug = fn conn ->
+            Req.Test.json(conn, %{message: "Hello, World!"})
+          end
+
+          resp = Req.get!(plug: plug)
+          assert resp.status == 200
+          assert resp.headers["content-type"] == ["application/json; charset=utf-8"]
+          assert resp.body == %{"message" => "Hello, World!"}
+        end
+
+    You can simulate network errors by calling `Req.Test.transport_error/2`
+    in your plugs:
+
+        test "network issues" do
+          plug = fn conn ->
+            Req.Test.transport_error(conn, :timeout)
+          end
+
+          assert Req.get(plug: plug, retry: false) ==
+                   {:error, %Req.TransportError{reason: :timeout}}
+        end
+    """
 
     def run(request) do
       result =
