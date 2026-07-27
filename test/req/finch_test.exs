@@ -19,7 +19,10 @@ defmodule Req.FinchTest do
         {req, Req.Response.new(status: resp.status, headers: resp.headers, body: "finch_request")}
       end
 
-      assert Req.get!(url, finch_request: fun).body == "finch_request"
+      assert ExUnit.CaptureIO.capture_io(:stderr, fn ->
+               assert Req.get!(url, finch_request: fun).body == "finch_request"
+             end) =~ "setting `:finch_request` is deprecated"
+
       assert_received %Finch.Response{body: "ok"}
     end
 
@@ -28,17 +31,21 @@ defmodule Req.FinchTest do
         {req, %ArgumentError{message: "exec error"}}
       end
 
-      assert_raise ArgumentError, "exec error", fn ->
-        Req.get!("http://localhost", finch_request: fun, retry: false)
-      end
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        assert_raise ArgumentError, "exec error", fn ->
+          Req.get!("http://localhost", finch_request: fun, retry: false)
+        end
+      end)
     end
 
     test ":finch_request with invalid return" do
       fun = fn _, _, _, _ -> :ok end
 
-      assert_raise RuntimeError, ~r"expected adapter to return \{request, response\}", fn ->
-        Req.get!("http://localhost", finch_request: fun)
-      end
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        assert_raise RuntimeError, ~r"expected adapter to return \{request, response\}", fn ->
+          Req.get!("http://localhost", finch_request: fun)
+        end
+      end)
     end
 
     test "pool timeout" do

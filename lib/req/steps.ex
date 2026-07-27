@@ -55,7 +55,6 @@ defmodule Req.Steps do
       :cache_dir,
       :plug,
       :finch,
-      # TODO: Deprecate :finch_request option.
       :finch_request,
       :finch_private,
       :connect_options,

@@ -107,21 +107,6 @@ defmodule Req.Finch do
     * `:finch_private` - a map or keyword list of private metadata to add to the Finch request.
       May be useful for adding custom data when handling telemetry with `Finch.Telemetry`.
 
-    * `:finch_request` - a function that executes the Finch request, defaults to using
-      `Finch.request/3`.
-
-      The function should accept 4 arguments:
-
-        * `request` - the `%Req.Request{}` struct
-
-        * `finch_request` - the Finch request
-
-        * `finch_name` - the Finch name
-
-        * `finch_options` - the Finch options
-
-      And it should return either `{request, response}` or `{request, exception}`.
-
   ## Examples
 
   Custom `:receive_timeout`:
@@ -267,14 +252,11 @@ defmodule Req.Finch do
   defp run(req, finch_req, finch_name, finch_options) do
     case req.options[:finch_request] do
       fun when is_function(fun, 4) ->
+        IO.warn("setting `:finch_request` is deprecated")
         fun.(req, finch_req, finch_name, finch_options)
 
       deprecated_fun when is_function(deprecated_fun, 1) ->
-        IO.warn(
-          "passing a :finch_request function accepting a single argument is deprecated. " <>
-            "See Req.Finch for more information."
-        )
-
+        IO.warn("setting `:finch_request` is deprecated")
         run_finch_request(req, deprecated_fun.(finch_req), finch_name, finch_options)
 
       nil ->

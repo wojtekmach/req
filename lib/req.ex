@@ -485,9 +485,6 @@ defmodule Req do
     * `:finch_private` - a map or keyword list of private metadata to add to the Finch request. May be useful
       for adding custom data when handling telemetry with `Finch.Telemetry`.
 
-    * `:finch_request` - a function that executes the Finch request, defaults to using
-      `Finch.request/3`.
-
   ## Examples
 
       iex> req = Req.new(url: "https://elixir-lang.org")
