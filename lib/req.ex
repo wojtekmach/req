@@ -200,16 +200,6 @@ defmodule Req do
 
         * `enumerable` - stream request body chunks emitted by the given `Enumerable`.
 
-        * `req_body_fun` - stream request body chunks from a 1-arity function.
-
-          The function receives the `request` and should return one of:
-
-            * `{:data, chunk, request}` - Emit request body `chunk` and continue streaming.
-
-            * `{:done, request}` - request body streaming is done.
-
-            * `{:halt, request}` - cancel request. On HTTP/1, this closes the connection.
-
   Additional URL options:
 
     * `:base_url` - if set, the request URL is prepended with this base URL (via

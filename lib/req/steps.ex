@@ -734,8 +734,6 @@ defmodule Req.Steps do
   @doc """
   Compresses the request body.
 
-  Not supported with `body: req_body_fun`.
-
   ## Request Options
 
     * `:compress_body` - if set to `true`, compresses the request body using gzip.
