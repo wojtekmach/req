@@ -65,14 +65,16 @@ defmodule Req.HTTPCTest do
       req = Req.new(adapter: Req.HTTPC, url: url)
       pid = self()
 
-      resp =
-        Req.get!(
-          req,
-          into: fn {:data, data}, acc ->
-            send(pid, {:data, data})
-            {:cont, acc}
-          end
-        )
+      {resp, _stderr} =
+        ExUnit.CaptureIO.with_io(:stderr, fn ->
+          Req.request!(
+            req,
+            into: fn {:data, data}, acc ->
+              send(pid, {:data, data})
+              {:cont, acc}
+            end
+          )
+        end)
 
       assert resp.status == 200
       assert resp.headers["transfer-encoding"] == ["chunked"]

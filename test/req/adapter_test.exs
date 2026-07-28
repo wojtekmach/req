@@ -319,15 +319,19 @@ defmodule Req.AdapterTest do
 
       pid = self()
 
-      resp =
-        Req.get!(
-          adapter: adapter_fun(),
-          url: url,
-          into: fn {:data, data}, acc ->
-            send(pid, {:data, data})
-            {:cont, acc}
-          end
-        )
+      {resp, stderr} =
+        ExUnit.CaptureIO.with_io(:stderr, fn ->
+          Req.request!(
+            adapter: adapter_fun(),
+            url: url,
+            into: fn {:data, data}, acc ->
+              send(pid, {:data, data})
+              {:cont, acc}
+            end
+          )
+        end)
+
+      assert stderr =~ "setting `into: fun` is deprecated in favour of `Req.stream/4`"
 
       assert resp.status == 200
       assert resp.headers["transfer-encoding"] == ["chunked"]
@@ -369,15 +373,17 @@ defmodule Req.AdapterTest do
           []
         end
 
-      resp =
-        Req.get!(
-          req,
-          connect_options: connect_options,
-          into: fn {:data, data}, {req, resp} ->
-            resp = update_in(resp.body, &(&1 <> data))
-            {:halt, {req, resp}}
-          end
-        )
+      {resp, _stderr} =
+        ExUnit.CaptureIO.with_io(:stderr, fn ->
+          Req.request!(
+            req,
+            connect_options: connect_options,
+            into: fn {:data, data}, {req, resp} ->
+              resp = update_in(resp.body, &(&1 <> data))
+              {:halt, {req, resp}}
+            end
+          )
+        end)
 
       assert resp.status == 200
       assert resp.body == "foo"
@@ -385,18 +391,20 @@ defmodule Req.AdapterTest do
 
     @tag :transport
     test "into: fun handle error" do
-      {:error, err} =
-        Req.get(
-          adapter: adapter_fun(),
-          url: "http://localhost:9999",
-          retry: false,
-          into: fn {:data, data}, {req, resp} ->
-            resp = update_in(resp.body, &(&1 <> data))
-            {:halt, {req, resp}}
-          end
-        )
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        {:error, err} =
+          Req.request(
+            adapter: adapter_fun(),
+            url: "http://localhost:9999",
+            retry: false,
+            into: fn {:data, data}, {req, resp} ->
+              resp = update_in(resp.body, &(&1 <> data))
+              {:halt, {req, resp}}
+            end
+          )
 
-      assert err == %Req.TransportError{reason: :econnrefused}
+        assert err == %Req.TransportError{reason: :econnrefused}
+      end)
     end
 
     @tag :transport

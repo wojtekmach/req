@@ -216,26 +216,28 @@ defmodule Req.PlugTest do
   end
 
   test "into: fun" do
-    req =
-      Req.new(
-        plug: fn conn ->
-          conn = send_chunked(conn, 200)
-          {:ok, conn} = chunk(conn, "foo")
-          {:ok, conn} = chunk(conn, "bar")
-          {:ok, conn} = chunk(conn, "baz")
-          conn
-        end,
-        into: fn {:data, data}, {req, resp} ->
-          body =
-            if resp.body == "" do
-              [data]
-            else
-              resp.body ++ [data]
-            end
+    {req, _stderr} =
+      ExUnit.CaptureIO.with_io(:stderr, fn ->
+        Req.new(
+          plug: fn conn ->
+            conn = send_chunked(conn, 200)
+            {:ok, conn} = chunk(conn, "foo")
+            {:ok, conn} = chunk(conn, "bar")
+            {:ok, conn} = chunk(conn, "baz")
+            conn
+          end,
+          into: fn {:data, data}, {req, resp} ->
+            body =
+              if resp.body == "" do
+                [data]
+              else
+                resp.body ++ [data]
+              end
 
-          {:cont, {req, put_in(resp.body, body)}}
-        end
-      )
+            {:cont, {req, put_in(resp.body, body)}}
+          end
+        )
+      end)
 
     resp = Req.request!(req)
     assert resp.status == 200
@@ -244,18 +246,20 @@ defmodule Req.PlugTest do
   end
 
   test "into: fun with halt" do
-    req =
-      Req.new(
-        plug: fn conn ->
-          conn = send_chunked(conn, 200)
-          {:ok, conn} = chunk(conn, "foo")
-          {:ok, conn} = chunk(conn, "bar")
-          conn
-        end,
-        into: fn {:data, data}, {req, resp} ->
-          {:halt, {req, put_in(resp.body, [data])}}
-        end
-      )
+    {req, _stderr} =
+      ExUnit.CaptureIO.with_io(:stderr, fn ->
+        Req.new(
+          plug: fn conn ->
+            conn = send_chunked(conn, 200)
+            {:ok, conn} = chunk(conn, "foo")
+            {:ok, conn} = chunk(conn, "bar")
+            conn
+          end,
+          into: fn {:data, data}, {req, resp} ->
+            {:halt, {req, put_in(resp.body, [data])}}
+          end
+        )
+      end)
 
     resp = Req.request!(req)
     assert resp.status == 200
@@ -264,15 +268,17 @@ defmodule Req.PlugTest do
   end
 
   test "into: fun with send_resp" do
-    req =
-      Req.new(
-        plug: fn conn ->
-          send_resp(conn, 200, "foo")
-        end,
-        into: fn {:data, data}, {req, resp} ->
-          {:cont, {req, put_in(resp.body, [data])}}
-        end
-      )
+    {req, _stderr} =
+      ExUnit.CaptureIO.with_io(:stderr, fn ->
+        Req.new(
+          plug: fn conn ->
+            send_resp(conn, 200, "foo")
+          end,
+          into: fn {:data, data}, {req, resp} ->
+            {:cont, {req, put_in(resp.body, [data])}}
+          end
+        )
+      end)
 
     resp = Req.request!(req)
     assert resp.status == 200
@@ -281,15 +287,17 @@ defmodule Req.PlugTest do
   end
 
   test "into: fun with send_file" do
-    req =
-      Req.new(
-        plug: fn conn ->
-          send_file(conn, 200, "mix.exs")
-        end,
-        into: fn {:data, data}, {req, resp} ->
-          {:cont, {req, put_in(resp.body, [data])}}
-        end
-      )
+    {req, _stderr} =
+      ExUnit.CaptureIO.with_io(:stderr, fn ->
+        Req.new(
+          plug: fn conn ->
+            send_file(conn, 200, "mix.exs")
+          end,
+          into: fn {:data, data}, {req, resp} ->
+            {:cont, {req, put_in(resp.body, [data])}}
+          end
+        )
+      end)
 
     resp = Req.request!(req)
     assert resp.status == 200
