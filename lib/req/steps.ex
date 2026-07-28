@@ -269,7 +269,7 @@ defmodule Req.Steps do
     * `:compressed` - if set to `true`, sets the `accept-encoding` header with compression
       algorithms that Req supports and decompresses the response body. Defaults to `false`.
 
-      This option has no effect when streaming the response body (`into: fun | collectable`).
+      This option has no effect when streaming the response body using `into: collectable`.
 
   ## Examples
 

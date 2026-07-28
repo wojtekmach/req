@@ -63,13 +63,14 @@ defmodule Req.ChecksumTest do
     %{req: req} =
       serve("GET /": &send_resp(&1, 200, "foo"))
 
-    req =
-      req
-      |> Req.merge(
-        into: fn {:data, chunk}, {req, resp} ->
-          {:cont, {req, update_in(resp.body, &(&1 <> chunk))}}
-        end
-      )
+    {req, _stderr} =
+      ExUnit.CaptureIO.with_io(:stderr, fn ->
+        Req.merge(req,
+          into: fn {:data, chunk}, {req, resp} ->
+            {:cont, {req, update_in(resp.body, &(&1 <> chunk))}}
+          end
+        )
+      end)
 
     resp = Req.get!(req, checksum: @foo_sha1)
     assert resp.body == "foo"

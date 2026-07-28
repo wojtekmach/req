@@ -54,19 +54,19 @@ defmodule Req do
       iex> Req.post!("https://httpbingo.org/post", body: stream, headers: [content_type: "text/plain"]).body["data"]
       "foofoofoo"
 
-  Stream response body using a callback:
+  Stream response body using `Req.stream/4`:
 
-      iex> resp =
-      ...>   Req.get!("http://httpbingo.org/stream/2", into: fn {:data, data}, {req, resp} ->
+      iex> {:ok, resp, acc} =
+      ...>   Req.stream("http://httpbingo.org/stream/2", [], fn data, _resp, acc ->
       ...>     IO.puts(data)
-      ...>     {:cont, {req, resp}}
+      ...>     {:cont, acc}
       ...>   end)
       # output: {"url": "http://httpbingo.org/stream/2", ...}
       # output: {"url": "http://httpbingo.org/stream/2", ...}
       iex> resp.status
       200
       iex> resp.body
-      ""
+      nil
 
   Stream response body into a `Collectable`:
 
@@ -282,16 +282,6 @@ defmodule Req do
         * `nil` - (default) read the whole response body and store it in the `response.body`
           field.
 
-        * `fun` - stream response body using a function. The first argument is a `{:data, data}`
-          tuple containing the chunk of the response body. The second argument is a
-          `{request, response}` tuple. To continue streaming chunks, return `{:cont, {req, resp}}`.
-          To cancel, return `{:halt, {req, resp}}`. For example:
-
-              into: fn {:data, data}, {req, resp} ->
-                IO.puts(data)
-                {:cont, {req, resp}}
-              end
-
         * `collectable` - stream response body into a `t:Collectable.t/0`. For example:
 
                into: File.stream!("path")
@@ -310,7 +300,7 @@ defmodule Req do
           If the request is sent using HTTP/1, an extra process is spawned to consume messages
           from the underlying socket. On both HTTP/1 and HTTP/2 the messages are sent to the
           current process as soon as they arrive, as a firehose. If you wish to maximize request
-          rate or have more control over how messages are streamed, use `into: fun` or
+          rate or have more control over how messages are streamed, use `Req.stream/4` or
           `into: collectable` instead.
 
   Response redirect options ([`redirect`](`Req.Steps.redirect/1`) step):
@@ -573,6 +563,13 @@ defmodule Req do
 
         {:private, private}, acc ->
           update_in(acc.private, &Enum.into(private, &1))
+
+        {:into, into}, acc ->
+          if is_function(into) do
+            IO.warn("setting `into: fun` is deprecated in favour of `Req.stream/4`")
+          end
+
+          put_in(acc.into, into)
 
         {name, value}, acc ->
           %{acc | name => value}

@@ -51,7 +51,7 @@ write new ones.
 
   * Request body streaming (by setting `body: enumerable`.)
 
-  * Response body streaming (by setting `into: fun | collectable | :self`.)
+  * Response body streaming (via `Req.stream/4` or by setting `into: collectable | :self`.)
 
   * Follows redirects (via [`redirect`] step.)
 

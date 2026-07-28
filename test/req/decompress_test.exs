@@ -36,13 +36,15 @@ defmodule Req.DecompressTest do
         end
       )
 
-    resp =
-      Req.get!(req,
-        compressed: true,
-        into: fn {:data, data}, {req, resp} ->
-          {:cont, {req, update_in(resp.body, &(&1 <> data))}}
-        end
-      )
+    {resp, _stderr} =
+      ExUnit.CaptureIO.with_io(:stderr, fn ->
+        Req.request!(req,
+          compressed: true,
+          into: fn {:data, data}, {req, resp} ->
+            {:cont, {req, update_in(resp.body, &(&1 <> data))}}
+          end
+        )
+      end)
 
     assert resp.body == "foo"
   end

@@ -78,16 +78,6 @@ defmodule Req.Request do
         * `nil` - (default) read the whole response body and store it in the `response.body`
           field.
 
-        * `fun` - stream response body using a function. The first argument is a `{:data, data}`
-          tuple containing the chunk of the response body. The second argument is a
-          `{request, response}` tuple. To continue streaming chunks, return `{:cont, {req, resp}}`.
-          To cancel, return `{:halt, {req, resp}}`. For example:
-
-              into: fn {:data, data}, {req, resp} ->
-                IO.puts(data)
-                {:cont, {req, resp}}
-              end
-
         * `collectable` - stream response body into a `t:Collectable.t/0`. For example:
 
               into: File.stream!("path")
@@ -303,12 +293,7 @@ defmodule Req.Request do
           url: URI.t(),
           headers: %{optional(binary()) => [binary()]},
           body: iodata() | Enumerable.t() | nil,
-          into:
-            nil
-            | iodata()
-            | ({:data, binary()}, {t(), Req.Response.t()} ->
-                 {:cont | :halt, {t, Req.Response.t()}})
-            | Collectable.t(),
+          into: nil | iodata() | Collectable.t(),
           options: options(),
           halted: boolean(),
           adapter: module(),
