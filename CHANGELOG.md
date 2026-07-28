@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## v0.7.1 (2026-07-28)
+
+  * Deprecate `cache: true`/[`cache`] step. It will be removed in Req v0.8. I plan a comprehensive cache solution for Req v1.0+.
+
 ## v0.7.0 (2026-07-28)
 
   * [`Req`]: Add `Req.new(req, options)`.
