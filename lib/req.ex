@@ -385,13 +385,6 @@ defmodule Req do
     * `:max_retries` - maximum number of retry attempts, defaults to `3` (for a total of `4`
       requests to the server, including the initial one.)
 
-  Caching options ([`cache`](`Req.Steps.cache/1`) step):
-
-    * `:cache` - if `true`, performs HTTP caching. Defaults to `false`.
-
-    * `:cache_dir` - the directory to store the cache, defaults to `<user_cache_dir>/req`
-      (see: `:filename.basedir/3`)
-
   Request adapters:
 
     * `:adapter` - adapter to use to make the actual HTTP request. See `:adapter` field description

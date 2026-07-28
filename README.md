@@ -61,8 +61,6 @@ write new ones.
 
   * Verify response body against a checksum (via [`checksum`] step.)
 
-  * Basic HTTP caching (via [`cache`] step.)
-
   * Easily create test stubs (see [`Req.Test`].)
 
   * Running against a plug (via [`Req.Plug`] adapter.)
@@ -264,7 +262,6 @@ limitations under the License.
 [`Req.Test`]:            https://hexdocs.pm/req/Req.Test.html
 
 [`auth`]:               https://hexdocs.pm/req/Req.Steps.html#auth/1
-[`cache`]:              https://hexdocs.pm/req/Req.Steps.html#cache/1
 [`compress_body`]:      https://hexdocs.pm/req/Req.Steps.html#compress_body/1
 [`compressed`]:         https://hexdocs.pm/req/Req.Steps.html#compressed/1
 [`decode_body`]:        https://hexdocs.pm/req/Req.Steps.html#decode_body/1

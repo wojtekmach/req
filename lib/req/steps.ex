@@ -660,34 +660,11 @@ defmodule Req.Steps do
     request
   end
 
-  @doc """
-  Performs HTTP caching using `if-modified-since` header.
-
-  Only successful (200 OK) responses are cached.
-
-  This step also _prepends_ a response step that loads and writes the cache. Be careful when
-  _prepending_ other response steps, make sure the cache is loaded/written as soon as possible.
-
-  ## Options
-
-    * `:cache` - if `true`, performs simple caching using `if-modified-since` header. Defaults to `false`.
-
-    * `:cache_dir` - the directory to store the cache, defaults to `<user_cache_dir>/req`
-      (see: `:filename.basedir/3`)
-
-  ## Examples
-
-      iex> url = "https://elixir-lang.org"
-      iex> response1 = Req.get!(url, cache: true)
-      iex> response2 = Req.get!(url, cache: true)
-      iex> response1 == response2
-      true
-
-  """
-  @doc step: :request
+  @doc false
   def cache(request) do
     case request.options[:cache] do
       true ->
+        IO.warn("`cache: true`/cache step are deprecated and will be removed in Req v0.8")
         dir = request.options[:cache_dir] || :filename.basedir(:user_cache, ~c"req")
         cache_path = cache_path(dir, request)
 

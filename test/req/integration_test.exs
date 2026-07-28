@@ -43,7 +43,6 @@ defmodule Req.IntegrationTest do
   doctest Req.Steps,
     only: [
       auth: 1,
-      cache: 1,
       checksum: 1,
       compressed: 1,
       decompress_body: 1,

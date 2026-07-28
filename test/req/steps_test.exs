@@ -567,14 +567,20 @@ defmodule Req.StepsTest do
 
     request = Req.merge(request, cache: true, cache_dir: c.tmp_dir)
 
-    response = Req.get!(request)
-    assert response.status == 200
-    assert response.body == "ok"
+    assert ExUnit.CaptureIO.capture_io(:stderr, fn ->
+             response = Req.get!(request)
+             assert response.status == 200
+             assert response.body == "ok"
+           end) =~ "`cache: true`/cache step are deprecated and will be removed in Req v0.8"
+
     assert_received :cache_miss
 
-    response = Req.Request.run!(request)
-    assert response.status == 200
-    assert response.body == "ok"
+    ExUnit.CaptureIO.capture_io(:stderr, fn ->
+      response = Req.Request.run!(request)
+      assert response.status == 200
+      assert response.body == "ok"
+    end)
+
     assert_received :cache_hit
   end
 
@@ -611,14 +617,20 @@ defmodule Req.StepsTest do
 
     request = Req.merge(request, retry_delay: 10, cache: true, cache_dir: c.tmp_dir)
 
-    response = Req.get!(request)
-    assert response.status == 200
-    assert response.body == %{"a" => 1}
+    ExUnit.CaptureIO.capture_io(:stderr, fn ->
+      response = Req.get!(request)
+      assert response.status == 200
+      assert response.body == %{"a" => 1}
+    end)
+
     assert_received :cache_miss
 
-    response = Req.Request.run!(request)
-    assert response.status == 200
-    assert response.body == %{"a" => 1}
+    ExUnit.CaptureIO.capture_io(:stderr, fn ->
+      response = Req.Request.run!(request)
+      assert response.status == 200
+      assert response.body == %{"a" => 1}
+    end)
+
     assert_received :cache_hit
     assert_received :cache_hit
     assert_received :cache_hit
