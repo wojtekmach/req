@@ -50,8 +50,6 @@ defmodule Req.Steps do
       :retry_delay,
       :retry_log_level,
       :max_retries,
-      :cache,
-      :cache_dir,
       :plug,
       :finch,
       :finch_request,
@@ -78,7 +76,6 @@ defmodule Req.Steps do
       put_params: &Req.Steps.put_params/1,
       put_path_params: &Req.Steps.put_path_params/1,
       put_range: &Req.Steps.put_range/1,
-      cache: &Req.Steps.cache/1,
       compress_body: &Req.Steps.compress_body/1,
       checksum: &Req.Steps.checksum/1,
       put_aws_sigv4: &Req.Steps.put_aws_sigv4/1
@@ -658,54 +655,6 @@ defmodule Req.Steps do
 
   def put_range(request) do
     request
-  end
-
-  @doc false
-  def cache(request) do
-    case request.options[:cache] do
-      true ->
-        IO.warn("`cache: true`/cache step are deprecated and will be removed in Req v0.8")
-        dir = request.options[:cache_dir] || :filename.basedir(:user_cache, ~c"req")
-        cache_path = cache_path(dir, request)
-
-        request
-        |> put_if_modified_since(cache_path)
-        |> Req.Request.prepend_response_steps(handle_cache: &handle_cache(&1, cache_path))
-
-      other when other in [false, nil] ->
-        request
-    end
-  end
-
-  defp put_if_modified_since(request, cache_path) do
-    case File.stat(cache_path) do
-      {:ok, stat} ->
-        http_datetime_string =
-          stat.mtime
-          |> NaiveDateTime.from_erl!()
-          |> DateTime.from_naive!("Etc/UTC")
-          |> Req.Utils.format_http_date()
-
-        Req.Request.put_new_header(request, "if-modified-since", http_datetime_string)
-
-      _ ->
-        request
-    end
-  end
-
-  defp handle_cache({request, response}, cache_path) do
-    cond do
-      response.status == 200 ->
-        write_cache(cache_path, response)
-        {request, response}
-
-      response.status == 304 ->
-        response = load_cache(cache_path)
-        {request, response}
-
-      true ->
-        {request, response}
-    end
   end
 
   @doc """
@@ -1896,31 +1845,5 @@ defmodule Req.Steps do
       response ->
         Logger.log(level, ["retry: got response with status #{response.status}, ", message])
     end
-  end
-
-  ## Utilities
-
-  defp cache_path(cache_dir, request) do
-    cache_key =
-      Enum.join(
-        [
-          request.url.host,
-          Atom.to_string(request.method),
-          :crypto.hash(:sha256, :erlang.term_to_binary(request.url))
-          |> Base.encode16(case: :lower)
-        ],
-        "-"
-      )
-
-    Path.join(cache_dir, cache_key)
-  end
-
-  defp write_cache(path, response) do
-    File.mkdir_p!(Path.dirname(path))
-    File.write!(path, :erlang.term_to_binary(response))
-  end
-
-  defp load_cache(path) do
-    path |> File.read!() |> :erlang.binary_to_term()
   end
 end
