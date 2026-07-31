@@ -831,6 +831,14 @@ defmodule Req.Steps do
     "x-amzn-trace-id",
     # Authorization is set by SigV4 itself / not part of canonical request
     "authorization",
+    # Excluded by botocore's SigV4 signer and rejected by e.g. Supabase Storage
+    "expect",
+    "user-agent",
+    # Rejected by e.g. Supabase Storage
+    "from",
+    "max-forwards",
+    "pragma",
+    "referer",
     # RFC 2616 Section 13.5.1 "hop-by-hop" headers
     # (list is historical; RFC 7230/9110 use Connection header as the
     # authoritative mechanism, but this enumeration remains the practical baseline)

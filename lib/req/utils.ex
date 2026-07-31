@@ -500,7 +500,8 @@ defmodule Req.Utils do
     {Stream.concat(parts1, parts2), add_sizes(size1, size2)}
   end
 
-  defp encode_form_part({name, {value, options}}, boundary) when is_atom(name) do
+  defp encode_form_part({name, {value, options}}, boundary)
+       when is_atom(name) or is_binary(name) do
     options = Keyword.validate!(options, [:filename, :content_type, :size])
 
     {parts, parts_size, options} =
@@ -551,7 +552,7 @@ defmodule Req.Utils do
         []
       end
 
-    name = escape_form_param(Atom.to_string(name))
+    name = escape_form_param(to_string(name))
     headers = ["content-disposition: form-data; name=\"#{name}\"", params, @crlf, headers]
     header = [["--", boundary, @crlf, headers, @crlf]]
 
@@ -560,7 +561,7 @@ defmodule Req.Utils do
     |> add_form_parts({[@crlf], 2})
   end
 
-  defp encode_form_part({name, value}, boundary) when is_atom(name) do
+  defp encode_form_part({name, value}, boundary) when is_atom(name) or is_binary(name) do
     encode_form_part({name, {value, []}}, boundary)
   end
 

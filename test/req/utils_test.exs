@@ -252,6 +252,31 @@ defmodule Req.UtilsTest do
              """
     end
 
+    test "it works with binary names" do
+      %{body: body} =
+        Req.Utils.encode_form_multipart(
+          [
+            {"content-type", "text/plain"},
+            {"file", {"22", filename: "2.txt"}}
+          ],
+          boundary: "foo"
+        )
+
+      body = IO.iodata_to_binary(body)
+
+      assert body == """
+             --foo\r\n\
+             content-disposition: form-data; name=\"content-type\"\r\n\
+             \r\n\
+             text/plain\r\n\
+             --foo\r\n\
+             content-disposition: form-data; name=\"file\"; filename=\"2.txt\"\r\n\
+             \r\n\
+             22\r\n\
+             --foo--\r\n\
+             """
+    end
+
     test "escapes name, filename, and content_type to prevent header injection" do
       %{body: body} =
         Req.Utils.encode_form_multipart(

@@ -442,7 +442,7 @@ defmodule Req.StepsTest do
 
     # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
     @tag skip: System.otp_release() < "28"
-    test "excludes accept-encoding, hop-by-hop, and trace-id headers from signature" do
+    test "excludes accept-encoding, hop-by-hop, and other unsignable headers from signature" do
       plug = fn conn ->
         [authorization] = get_req_header(conn, "authorization")
 
@@ -459,6 +459,12 @@ defmodule Req.StepsTest do
         for excluded <- [
               "accept-encoding",
               "x-amzn-trace-id",
+              "expect",
+              "user-agent",
+              "from",
+              "max-forwards",
+              "pragma",
+              "referer",
               "connection",
               "keep-alive",
               "proxy-authenticate",
@@ -476,6 +482,7 @@ defmodule Req.StepsTest do
         assert ["zstd, br, gzip"] = get_req_header(conn, "accept-encoding")
         assert ["trace-123"] = get_req_header(conn, "x-amzn-trace-id")
         assert ["keep-alive"] = get_req_header(conn, "connection")
+        assert ["req/" <> _] = get_req_header(conn, "user-agent")
 
         # Non-excluded custom headers are still signed.
         assert "x-custom" in signed_headers
@@ -490,6 +497,11 @@ defmodule Req.StepsTest do
           aws_sigv4: [access_key_id: "foo", secret_access_key: "bar"],
           headers: [
             "x-amzn-trace-id": "trace-123",
+            expect: "100-continue",
+            from: "user@example.com",
+            "max-forwards": "10",
+            pragma: "no-cache",
+            referer: "https://example.com",
             connection: "keep-alive",
             "keep-alive": "timeout=5",
             "proxy-authenticate": "Basic",
