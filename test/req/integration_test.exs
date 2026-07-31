@@ -1,7 +1,12 @@
 defmodule Req.IntegrationTest do
-  use ExUnit.Case, async: true
+  use Req.Case, async: true
 
   @moduletag :integration
+
+  # for Req.Steps.auth/1 doctest
+  defmodule Authentication do
+    def fetch_token, do: {:basic, "foo:bar"}
+  end
 
   setup context do
     if context[:doctest] do
@@ -29,23 +34,28 @@ defmodule Req.IntegrationTest do
       run!: 2
     ]
 
+  doctest Req.Request,
+    only: [
+      new: 1,
+      run_request: 1
+    ]
+
   doctest Req.Steps,
     only: [
       auth: 1,
       checksum: 1,
-      put_user_agent: 1,
       compressed: 1,
-      put_base_url: 1,
+      decompress_body: 1,
       encode_body: 1,
+      handle_http_errors: 1,
+      put_base_url: 1,
       put_params: 1,
       put_path_params: 1,
       put_range: 1,
-      cache: 1,
-      decompress_body: 1,
-      handle_http_errors: 1
+      put_user_agent: 1
     ]
 
-  @tag :s3
+  @tag skip: !System.get_env("REQ_AWS_ACCESS_KEY_ID")
   test "s3" do
     aws_access_key_id = System.fetch_env!("REQ_AWS_ACCESS_KEY_ID")
     aws_secret_access_key = System.fetch_env!("REQ_AWS_SECRET_ACCESS_KEY")

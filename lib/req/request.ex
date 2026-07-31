@@ -102,8 +102,7 @@ defmodule Req.Request do
 
     * `:halted` - whether the request pipeline is halted. See `halt/2`.
 
-    * `:adapter` - a request step that makes the actual HTTP request. Defaults to
-      `Req.Steps.run_finch/1`. See ["Adapter"](#module-adapter) section below for more information.
+    * `:adapter` - a request step that makes the actual HTTP request. Defaults to `Req.Finch`.
 
     * `:request_steps` - the list of request steps
 
@@ -231,7 +230,7 @@ defmodule Req.Request do
 
         defp print_request_headers(request) do
           if request.options[:print_headers] do
-            print_headers("> ", request.headers)
+            print_headers("> ", request)
           end
 
           request
@@ -239,14 +238,14 @@ defmodule Req.Request do
 
         defp print_response_headers({request, response}) do
           if request.options[:print_headers] do
-            print_headers("< ", response.headers)
+            print_headers("< ", response)
           end
 
           {request, response}
         end
 
-        defp print_headers(prefix, headers) do
-          for {name, value} <- headers do
+        defp print_headers(prefix, request_or_response) do
+          for {name, value} <- Req.get_headers_list(request_or_response) do
             IO.puts([prefix, name, ": ", value])
           end
         end
@@ -294,61 +293,6 @@ defmodule Req.Request do
       `attach/2` function and call `merge_options/2`. Remember to first register
       options before merging!
 
-  ## Adapter
-
-  As noted in the ["Request Steps"](#module-request-steps) section, a request step besides returning the request,
-  might also return `{request, response}` or `{request, exception}`, thus invoking either response or error steps next.
-  This is exactly how Req makes the underlying HTTP call, by invoking a request step that follows this contract.
-
-  The default adapter is using Finch via the `Req.Steps.run_finch/1` step.
-
-  Here is a mock adapter that always returns a successful response:
-
-      adapter = fn request ->
-        response = %Req.Response{status: 200, body: "it works!"}
-        {request, response}
-      end
-
-      Req.request!(url: "http://example", adapter: adapter).body
-      #=> "it works!"
-
-  Here is another one that uses the `Req.Response.json/2` function to conveniently
-  return a JSON response:
-
-      adapter = fn request ->
-        response = Req.Response.json(%{hello: 42})
-        {request, response}
-      end
-
-      resp = Req.request!(url: "http://example", adapter: adapter)
-      resp.headers
-      #=> [{"content-type", "application/json"}]
-      resp.body
-      #=> %{"hello" => 42}
-
-  And here is a naive Hackney-based adapter:
-
-      hackney = fn request ->
-        case :hackney.request(
-               request.method,
-               URI.to_string(request.url),
-               request.headers,
-               request.body,
-               [:with_body]
-             ) do
-          {:ok, status, headers, body} ->
-            headers = for {name, value} <- headers, do: {String.downcase(name, :ascii), value}
-            response = %Req.Response{status: status, headers: headers, body: body}
-            {request, response}
-
-          {:error, reason} ->
-            {request, RuntimeError.exception(inspect(reason))}
-        end
-      end
-
-      Req.get!("https://api.github.com/repos/wojtekmach/req", adapter: hackney).body["description"]
-      #=> "Req is a batteries-included HTTP client for Elixir."
-
   """
 
   @typedoc """
@@ -367,7 +311,7 @@ defmodule Req.Request do
             | Collectable.t(),
           options: options(),
           halted: boolean(),
-          adapter: request_step(),
+          adapter: module(),
           request_steps: [{name :: atom(), request_step()}],
           response_steps: [{name :: atom(), response_step()}],
           error_steps: [{name :: atom(), error_step()}],
@@ -425,13 +369,12 @@ defmodule Req.Request do
             body: nil,
             options: %{},
             halted: false,
-            adapter: &Req.Steps.run_finch/1,
+            adapter: Req.Finch,
             request_steps: [],
             response_steps: [],
             error_steps: [],
             private: %{},
             registered_options: MapSet.new(),
-            current_request_steps: [],
             into: nil,
             async: nil
 
@@ -448,7 +391,7 @@ defmodule Req.Request do
 
     * `:body` - the request body, defaults to `nil`.
 
-    * `:adapter` - the request adapter, defaults to calling [`run_finch`](`Req.Steps.run_finch/1`).
+    * `:adapter` - the request adapter, defaults to `Req.Finch`.
 
   ## Examples
 
@@ -734,11 +677,7 @@ defmodule Req.Request do
   """
   @spec append_request_steps(t(), keyword(request_step())) :: t()
   def append_request_steps(request, steps) do
-    %{
-      request
-      | request_steps: request.request_steps ++ steps,
-        current_request_steps: request.current_request_steps ++ Keyword.keys(steps)
-    }
+    update_in(request.request_steps, &(&1 ++ steps))
   end
 
   @doc """
@@ -756,11 +695,7 @@ defmodule Req.Request do
   """
   @spec prepend_request_steps(t(), keyword(request_step())) :: t()
   def prepend_request_steps(request, steps) do
-    %{
-      request
-      | request_steps: steps ++ request.request_steps,
-        current_request_steps: Keyword.keys(steps) ++ request.current_request_steps
-    }
+    update_in(request.request_steps, &(steps ++ &1))
   end
 
   @doc """
@@ -1031,7 +966,7 @@ defmodule Req.Request do
   end
 
   @doc """
-  Registers options to be used by a custom steps.
+  Registers options to be used by custom steps.
 
   Req ensures that all used options were previously registered which helps
   finding accidentally mistyped option names. If you're adding custom steps
@@ -1094,14 +1029,14 @@ defmodule Req.Request do
       200
   """
   @spec run_request(t()) :: {t(), Req.Response.t() | Exception.t()}
-  def run_request(request)
+  def run_request(request) do
+    run_request(request, request.request_steps)
+  end
 
-  def run_request(%{current_request_steps: [step | rest]} = request) do
-    step = Keyword.fetch!(request.request_steps, step)
-
+  defp run_request(request, [{_name, step} | rest]) do
     case run_step(step, request) do
       %Req.Request{} = request ->
-        run_request(%{request | current_request_steps: rest})
+        run_request(request, rest)
 
       {%Req.Request{halted: true} = request, response_or_exception} ->
         {request, response_or_exception}
@@ -1114,8 +1049,8 @@ defmodule Req.Request do
     end
   end
 
-  def run_request(%{current_request_steps: []} = request) do
-    case run_step(request.adapter, request) do
+  defp run_request(request, []) do
+    case run_step(adapter(request.adapter), request) do
       {request, %Req.Response{} = response} ->
         run_response(request, response)
 
@@ -1126,6 +1061,13 @@ defmodule Req.Request do
         raise "expected adapter to return {request, response} or {request, exception}, " <>
                 "got: #{inspect(other)}"
     end
+  end
+
+  defp adapter(mod) when is_atom(mod), do: &mod.run/1
+
+  defp adapter(fun) when is_function(fun, 1) do
+    IO.warn("setting `adapter` to a function is deprecated in favour of setting it to a module")
+    fun
   end
 
   defp run_response(request, response) do
@@ -1213,26 +1155,14 @@ defmodule Req.Request do
       close = color("}", :map, opts)
 
       headers =
-        if unquote(Req.MixProject.legacy_headers_as_lists?()) do
-          for {name, value} <- request.headers do
-            if Req.Fields.ensure_name_downcase(name) == "authorization" do
-              [scheme, value] = String.split(value, " ", parts: 2)
-              {name, scheme <> " " <> redact(value)}
-            else
-              {name, value}
-            end
+        Req.Fields.map(request.headers, fn name, value ->
+          if Req.Fields.ensure_name_downcase(name) == "authorization" do
+            [scheme, value] = String.split(value, " ", parts: 2)
+            scheme <> " " <> redact(value)
+          else
+            value
           end
-        else
-          for {name, values} <- request.headers, into: %{} do
-            if Req.Fields.ensure_name_downcase(name) == "authorization" do
-              [value] = values
-              [scheme, value] = String.split(value, " ", parts: 2)
-              {name, [scheme <> " " <> redact(value)]}
-            else
-              {name, values}
-            end
-          end
-        end
+        end)
 
       list = [
         method: request.method,
@@ -1275,12 +1205,16 @@ defmodule Req.Request do
       {:bearer, redact(bearer)}
     end
 
-    defp redact_option(:auth, fun) when is_function(fun, 0) do
-      fun
-    end
-
     defp redact_option(:auth, {:basic, userinfo}) do
       {:basic, redact(userinfo)}
+    end
+
+    defp redact_option(:auth, {:digest, userinfo}) do
+      {:digest, redact(userinfo)}
+    end
+
+    defp redact_option(:auth, authorization) when is_binary(authorization) do
+      redact(authorization)
     end
 
     # TODO: remove on 1.0/1.1?
@@ -1291,7 +1225,7 @@ defmodule Req.Request do
 
     defp redact_option(:aws_sigv4, options) do
       Enum.map(options, fn {name, value} ->
-        if name in [:access_key_id, :secret_access_key] do
+        if name in [:access_key_id, :secret_access_key, :token] do
           {name, redact(value)}
         else
           {name, value}

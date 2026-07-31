@@ -1,29 +1,30 @@
 defmodule Req.MixProject do
   use Mix.Project
 
-  @version "0.5.15"
+  @version "0.7.1"
   @source_url "https://github.com/wojtekmach/req"
 
   def project do
     [
       app: :req,
       version: @version,
-      elixir: "~> 1.14",
+      elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       package: package(),
       docs: docs(),
-      aliases: [
-        "test.all": ["test --include integration"]
-      ],
-      xref: [
-        exclude: [
+      aliases: aliases(),
+      elixirc_paths: elixirc_paths(Mix.env()),
+      elixirc_options: [
+        no_warn_undefined: [
           NimbleCSV.RFC4180,
           Plug.Conn,
           Plug.HTML,
           Plug.Test,
           :brotli,
-          :ezstd
+          :brotli_encoder,
+          :brotli_decoder,
+          :zstd
         ]
       ]
     ]
@@ -32,7 +33,7 @@ defmodule Req.MixProject do
   def application do
     [
       mod: {Req.Application, []},
-      extra_applications: [:logger]
+      extra_applications: extra_applications(Mix.env())
     ]
   end
 
@@ -40,6 +41,7 @@ defmodule Req.MixProject do
     [
       preferred_envs: [
         "test.all": :test,
+        "test.adapters": :test,
         docs: :docs,
         "hex.publish": :docs
       ]
@@ -57,20 +59,56 @@ defmodule Req.MixProject do
     ]
   end
 
+  defp aliases do
+    [
+      "test.all": &test_all/1,
+      "test.adapters": &test_adapters/1
+    ]
+  end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
+
+  defp extra_applications(:test), do: [:logger, :inets]
+  defp extra_applications(_), do: [:logger]
+
+  defp test_all(args) do
+    test_adapters(["--include", "integration" | args])
+  end
+
+  defp test_adapters(args) do
+    adapters =
+      if adapters = System.get_env("REQ_ADAPTERS") do
+        String.split(adapters, ",")
+      else
+        ~w(finch httpc mint plug)
+      end
+
+    for adapter <- adapters do
+      {_, status} =
+        System.cmd("mix", ["test" | args],
+          env: [{"REQ_ADAPTER", adapter}],
+          into: IO.stream(:stdio, :line)
+        )
+
+      if status != 0 do
+        exit({:shutdown, status})
+      end
+    end
+  end
+
   defp deps do
     [
-      {:finch, "~> 0.17", finch_opts()},
+      {:finch, "~> 0.21", finch_opts()},
       {:mime, "~> 2.0.6 or ~> 2.1"},
       {:jason, "~> 1.0"},
       {:nimble_csv, "~> 1.0", optional: true},
       {:plug, "~> 1.0", [optional: true] ++ plug_opts()},
       {:brotli, "~> 0.3.1", optional: true},
-      {:ezstd, "~> 1.0", optional: true},
       {:aws_signature, "~> 0.3.2", only: :test},
       {:bypass, "~> 2.1", only: :test},
       {:ex_doc, ">= 0.0.0", only: :docs, warn_if_outdated: true},
-      {:bandit, "~> 1.0", only: :test},
-      {:castore, "~> 1.0", only: :test}
+      {:bandit, "~> 1.0", only: :test}
     ]
   end
 
@@ -115,6 +153,19 @@ defmodule Req.MixProject do
         "Functions (Making Requests)": &(&1[:type] == :request),
         "Functions (Async Response)": &(&1[:type] == :async),
         "Functions (Mocks & Stubs)": &(&1[:type] == :mock)
+      ],
+      groups_for_modules: [
+        Adapters: [
+          Req.Finch,
+          Req.Plug
+        ],
+        Formats: [
+          Req.Brotli,
+          Req.Gzip,
+          Req.Tar,
+          Req.ZIP,
+          Req.Zstd
+        ]
       ],
       extras: [
         "README.md",

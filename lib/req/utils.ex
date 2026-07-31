@@ -1,6 +1,8 @@
 defmodule Req.Utils do
   @moduledoc false
 
+  require Logger
+
   defmacrop iodata({:<<>>, _, parts}) do
     Enum.map(parts, &to_iodata/1)
   end
@@ -58,18 +60,20 @@ defmodule Req.Utils do
 
     canonical_headers = headers ++ aws_headers
 
+    ## Duplicate header values must be comma-joined under a single name and
     ## canonical_headers needs to be sorted for canonical_request construction
-    canonical_headers = Enum.sort(canonical_headers)
+    canonical_headers =
+      canonical_headers
+      |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+      |> Enum.sort()
 
     signed_headers =
-      Enum.map_intersperse(
-        Enum.sort(canonical_headers),
-        ";",
-        &String.downcase(elem(&1, 0), :ascii)
-      )
+      Enum.map_intersperse(canonical_headers, ";", &String.downcase(elem(&1, 0), :ascii))
 
     canonical_headers =
-      Enum.map_intersperse(canonical_headers, "\n", fn {name, value} -> [name, ":", value] end)
+      Enum.map_intersperse(canonical_headers, "\n", fn {name, values} ->
+        [name, ":", Enum.intersperse(values, ",")]
+      end)
 
     path = URI.encode(url.path || "/", &(&1 == ?/ or URI.char_unreserved?(&1)))
 
@@ -413,44 +417,6 @@ defmodule Req.Utils do
     end
   end
 
-  @doc """
-  Returns a stream where each element is gzipped.
-
-  ## Examples
-
-      iex> gzipped = Req.Utils.stream_gzip(~w[foo bar baz]) |> Enum.to_list()
-      iex> :zlib.gunzip(gzipped)
-      "foobarbaz"
-  """
-  def stream_gzip(enumerable) do
-    Stream.transform(
-      enumerable,
-      # start_fun
-      fn ->
-        z = :zlib.open()
-        # copied from :zlib.gzip/1
-        :ok = :zlib.deflateInit(z, :default, :deflated, 16 + 15, 8, :default)
-        z
-      end,
-      # reducer
-      fn chunk, z ->
-        case :zlib.deflate(z, chunk) do
-          # optimization: avoid emitting empty chunks
-          [] -> {[], z}
-          compressed -> {[compressed], z}
-        end
-      end,
-      # last_fun
-      fn z ->
-        last = :zlib.deflate(z, [], :finish)
-        :ok = :zlib.deflateEnd(z)
-        {[last], z}
-      end,
-      # after_fun
-      fn z -> :ok = :zlib.close(z) end
-    )
-  end
-
   defmodule CollectWithHash do
     @moduledoc false
 
@@ -534,7 +500,8 @@ defmodule Req.Utils do
     {Stream.concat(parts1, parts2), add_sizes(size1, size2)}
   end
 
-  defp encode_form_part({name, {value, options}}, boundary) do
+  defp encode_form_part({name, {value, options}}, boundary)
+       when is_atom(name) or is_binary(name) do
     options = Keyword.validate!(options, [:filename, :content_type, :size])
 
     {parts, parts_size, options} =
@@ -549,9 +516,8 @@ defmodule Req.Utils do
         stream = %File.Stream{} ->
           filename = Path.basename(stream.path)
 
-          # TODO: Simplify when we require Elixir v1.15
           size =
-            if not Map.has_key?(stream, :node) or stream.node == node() do
+            if stream.node == node() do
               File.stat!(stream.path).size
             else
               :erpc.call(stream.node, fn -> File.stat!(stream.path).size end)
@@ -574,18 +540,19 @@ defmodule Req.Utils do
 
     params =
       if filename = options[:filename] do
-        ["; filename=\"", filename, "\""]
+        ["; filename=\"", escape_form_param(filename), "\""]
       else
         []
       end
 
     headers =
       if content_type = options[:content_type] do
-        ["content-type: ", content_type, @crlf]
+        ["content-type: ", escape_form_param(content_type), @crlf]
       else
         []
       end
 
+    name = escape_form_param(to_string(name))
     headers = ["content-disposition: form-data; name=\"#{name}\"", params, @crlf, headers]
     header = [["--", boundary, @crlf, headers, @crlf]]
 
@@ -594,8 +561,13 @@ defmodule Req.Utils do
     |> add_form_parts({[@crlf], 2})
   end
 
-  defp encode_form_part({name, value}, boundary) do
+  defp encode_form_part({name, value}, boundary) when is_atom(name) or is_binary(name) do
     encode_form_part({name, {value, []}}, boundary)
+  end
+
+  # Per RFC 7578 / WHATWG form-data behavior, escape `"`, CR, and LF.
+  defp escape_form_param(value) when is_binary(value) do
+    URI.encode(value, &(&1 not in [?", ?\r, ?\n]))
   end
 
   @doc """
@@ -646,4 +618,280 @@ defmodule Req.Utils do
   end
 
   defp parse_netrc(_, _), do: raise("error parsing .netrc file")
+
+  @doc """
+  Parses HTTP Digest authentication header (RFC 7616).
+
+  ## Examples
+
+      iex> Req.Utils.parse_http_digest(~s(Digest realm="example", nonce="abc123", qop="auth"))
+      %{"realm" => "example", "nonce" => "abc123", "qop" => "auth"}
+
+  """
+  def parse_http_digest("Digest " <> rest) do
+    rest
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Map.new(&parse_digest_header_part/1)
+  end
+
+  @doc """
+  Generates HTTP Digest authentication header (RFC 7616).
+
+  Takes a challenge header from the server's `WWW-Authenticate` response and generates
+  the corresponding `Authorization` header value for digest authentication.
+
+  Returns `{:ok, header_value}` on success or `{:error, reason}` on failure.
+
+  ## Options
+
+    * `:count` - The nonce count (default: 1). Used for tracking request count with same nonce.
+
+  ## Examples
+
+      challenge = ~s(Digest realm="example", nonce="abc123", qop="auth")
+      {:ok, value} = Req.Utils.http_digest_auth(challenge, "user", "pass", :get, "/path")
+      #=> {:ok, "Digest response=..."}
+  """
+  def http_digest_auth(challenge_header, username, password, method, uri, opts \\ []) do
+    count = Keyword.get(opts, :count, 1)
+    challenge = parse_http_digest(challenge_header)
+    generate_digest_auth_header(challenge, username, password, method, uri, count)
+  end
+
+  defp parse_digest_header_part(part) do
+    case String.split(part, "=", parts: 2) do
+      [key, value] ->
+        {String.trim(key), unquote_digest_value(value)}
+
+      [key] ->
+        {String.trim(key), ""}
+    end
+  end
+
+  defp unquote_digest_value(value) do
+    value = String.trim(value)
+
+    if String.starts_with?(value, ~s(")) and String.ends_with?(value, ~s(")) do
+      value
+      |> String.slice(1..-2//1)
+      |> Macro.unescape_string()
+    else
+      value
+    end
+  end
+
+  defp quote_digest_value(str) when is_binary(str) do
+    inspect(str, printable_limit: :infinity)
+  end
+
+  defp digest_count_to_nc(count) do
+    String.pad_leading(Integer.to_string(count, 16), 8, "0")
+  end
+
+  defp generate_digest_auth_header(challenge, username, password, method, uri, count) do
+    algorithm = Map.get(challenge, "algorithm", "MD5")
+    realm = Map.get(challenge, "realm", "")
+    nonce = Map.get(challenge, "nonce", "")
+    opaque = Map.get(challenge, "opaque")
+    qop = Map.get(challenge, "qop")
+    cnonce = generate_digest_cnonce()
+    nc = digest_count_to_nc(count)
+
+    with {:ok, hash_func, sess?} <- digest_hash_function(algorithm) do
+      ha1 = hash_func.("#{username}:#{realm}:#{password}")
+
+      ha1 =
+        if sess? do
+          hash_func.("#{ha1}:#{nonce}:#{cnonce}")
+        else
+          ha1
+        end
+
+      method_str = method |> to_string() |> String.upcase()
+      ha2 = hash_func.("#{method_str}:#{uri}")
+
+      response =
+        if qop in ["auth", "auth-int"] do
+          hash_func.("#{ha1}:#{nonce}:#{nc}:#{cnonce}:#{qop}:#{ha2}")
+        else
+          hash_func.("#{ha1}:#{nonce}:#{ha2}")
+        end
+
+      build_digest_auth_header(
+        username: username,
+        realm: realm,
+        nonce: nonce,
+        uri: uri,
+        response: response,
+        qop: qop,
+        nc: nc,
+        cnonce: cnonce,
+        opaque: opaque,
+        algorithm: algorithm
+      )
+    end
+  end
+
+  defp digest_md5_hash(data) do
+    :md5
+    |> :crypto.hash(data)
+    |> Base.encode16(case: :lower)
+  end
+
+  defp digest_sha256_hash(data) do
+    :sha256
+    |> :crypto.hash(data)
+    |> Base.encode16(case: :lower)
+  end
+
+  defp generate_digest_cnonce do
+    16
+    |> :crypto.strong_rand_bytes()
+    |> Base.encode16(case: :lower)
+  end
+
+  defp digest_hash_function(algorithm) do
+    case String.upcase(algorithm) do
+      "MD5" -> {:ok, &digest_md5_hash/1, false}
+      "MD5-SESS" -> {:ok, &digest_md5_hash/1, true}
+      "SHA-256" -> {:ok, &digest_sha256_hash/1, false}
+      "SHA-256-SESS" -> {:ok, &digest_sha256_hash/1, true}
+      _ -> {:error, {:unsupported_digest_algorithm, algorithm}}
+    end
+  end
+
+  defp build_digest_auth_header(opts) do
+    opts =
+      Keyword.validate!(opts, [
+        :username,
+        :realm,
+        :nonce,
+        :uri,
+        :response,
+        :nc,
+        :cnonce,
+        :algorithm,
+        opaque: nil,
+        qop: nil
+      ])
+
+    header_parts = Keyword.take(opts, [:username, :realm, :nonce, :uri, :response])
+
+    qop_parts =
+      if is_binary(opts[:qop]) do
+        Keyword.take(opts, [:qop, :nc, :cnonce])
+      end
+
+    opaque_part =
+      if is_binary(opts[:opaque]) do
+        Keyword.take(opts, [:opaque])
+      end
+
+    algorithm_parts =
+      if opts[:algorithm] |> String.upcase() |> String.ends_with?("-SESS") do
+        Keyword.take(opts, [:algorithm, :cnonce])
+      else
+        Keyword.take(opts, [:algorithm])
+      end
+
+    header =
+      header_parts
+      |> Keyword.merge(qop_parts || [])
+      |> Keyword.merge(opaque_part || [])
+      |> Keyword.merge(algorithm_parts)
+      |> Enum.map_join(", ", &encode_digest_header_part/1)
+
+    {:ok, "Digest #{header}"}
+  end
+
+  defp encode_digest_header_part({key, value}) when key in [:algorithm, :qop, :nc] do
+    "#{key}=#{value}"
+  end
+
+  defp encode_digest_header_part({key, value}) do
+    "#{key}=#{quote_digest_value(value)}"
+  end
+
+  defmacro brotli_loaded? do
+    Code.ensure_loaded?(:brotli)
+  end
+
+  def zstd_available? do
+    System.otp_release() >= "28"
+  end
+
+  def decompress_with_encoding([], body), do: {body, []}
+
+  def decompress_with_encoding(encoding_headers, body) do
+    codecs = compression_algorithms(encoding_headers)
+    decompress_body(codecs, body, [])
+  end
+
+  defp decompress_body([gzip | rest], body, acc) when gzip in ["gzip", "x-gzip"] do
+    case Req.Gzip.decode(body) do
+      {:ok, decompressed} ->
+        decompress_body(rest, decompressed, acc)
+
+      {:error, _reason} ->
+        %Req.DecompressError{format: :gzip, data: body}
+    end
+  end
+
+  defp decompress_body(["br" | rest], body, acc) do
+    if brotli_loaded?() do
+      case Req.Brotli.decode(body) do
+        {:ok, decompressed} ->
+          decompress_body(rest, decompressed, acc)
+
+        {:error, _reason} ->
+          %Req.DecompressError{format: :br, data: body}
+      end
+    else
+      Logger.debug(":brotli library not loaded, skipping brotli decompression")
+      decompress_body(rest, body, ["br" | acc])
+    end
+  end
+
+  defp decompress_body(["zstd" | rest], body, acc) do
+    if zstd_available?() do
+      case Req.Zstd.decode(body) do
+        {:ok, decompressed} ->
+          decompress_body(rest, decompressed, acc)
+
+        {:error, reason} ->
+          %Req.DecompressError{format: :zstd, data: body, reason: reason}
+      end
+    else
+      Logger.debug(
+        ":zstd module not available (requires Erlang/OTP 28+), skipping zstd decompression"
+      )
+
+      decompress_body(rest, body, ["zstd" | acc])
+    end
+  end
+
+  defp decompress_body(["identity" | rest], body, acc) do
+    decompress_body(rest, body, acc)
+  end
+
+  defp decompress_body([codec | rest], body, acc) do
+    Logger.debug("algorithm #{inspect(codec)} is not supported")
+    decompress_body(rest, body, [codec | acc])
+  end
+
+  defp decompress_body([], body, acc) do
+    {body, acc}
+  end
+
+  defp compression_algorithms(values) do
+    values
+    |> Enum.flat_map(fn value ->
+      value
+      |> String.downcase()
+      |> String.split(",", trim: true)
+      |> Enum.map(&String.trim/1)
+    end)
+    |> Enum.reverse()
+  end
 end

@@ -153,6 +153,52 @@ defmodule Req.Fields do
   end
 
   @doc """
+  Maps field values using `fun`, preserving field names.
+
+  ## Examples
+
+      iex> Req.Fields.map(%{"a" => ["1", "2"]}, fn _name, value -> value <> "0" end)
+      %{"a" => ["10", "20"]}
+  """
+  def map(fields, fun)
+
+  if @legacy? do
+    def map(fields, fun) do
+      for {name, value} <- fields do
+        {name, fun.(name, value)}
+      end
+    end
+  else
+    def map(fields, fun) do
+      Map.new(fields, fn {name, values} ->
+        {name, Enum.map(values, &fun.(name, &1))}
+      end)
+    end
+  end
+
+  @doc """
+  Prepends `new_fields` before `fields`, keeping any existing values.
+
+  ## Examples
+
+      iex> Req.Fields.prepend(%{"a" => ["1"]}, [{"a", "2"}, {"b", "3"}])
+      %{"a" => ["2", "1"], "b" => ["3"]}
+  """
+  def prepend(fields, new_fields)
+
+  if @legacy? do
+    def prepend(fields, new_fields) do
+      new(new_fields) ++ fields
+    end
+  else
+    def prepend(fields, new_fields) do
+      Map.merge(new(new_fields), fields, fn _name, new_values, old_values ->
+        new_values ++ old_values
+      end)
+    end
+  end
+
+  @doc """
   Adds a new field `name` with the given `value` if not present,
   otherwise replaces previous value with `value`.
   """
@@ -210,6 +256,31 @@ defmodule Req.Fields do
     def delete(fields, name) when is_binary(name) do
       name = ensure_name_downcase(name)
       Map.delete(fields, name)
+    end
+  end
+
+  @doc """
+  Drops the given `names`.
+
+  ## Examples
+
+      iex> fields = Req.Fields.new(a: 1, b: 2)
+      iex> Req.Fields.drop(fields, ["A"]) == Req.Fields.new(b: 2)
+      true
+  """
+  if @legacy? do
+    def drop(fields, names) when is_list(names) do
+      names_to_drop = Enum.map(names, &ensure_name_downcase/1)
+
+      for {name, value} <- fields,
+          name not in names_to_drop do
+        {name, value}
+      end
+    end
+  else
+    def drop(fields, names) when is_list(names) do
+      names_to_drop = Enum.map(names, &ensure_name_downcase/1)
+      Map.drop(fields, names_to_drop)
     end
   end
 

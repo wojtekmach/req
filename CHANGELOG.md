@@ -1,5 +1,188 @@
 # CHANGELOG
 
+## v0.7.1 (2026-07-28)
+
+  * Deprecate `cache: true`/[`cache`] step. It will be removed in Req v0.8. I plan a comprehensive cache solution for Req v1.0+.
+
+## v0.7.0 (2026-07-28)
+
+  * [`Req`]: Add `Req.new(req, options)`.
+
+  * [`Req`]: Treat URL userinfo as Basic Authentication.
+
+  * [`Req`], [`Req.Request`]: Deprecate `adapter: fun` in favour of `adapter: mod`.
+
+  * [`Req.Request`]: **(BREAKING CHANGE)** Remove `current_request_steps` field.
+
+  * [`Req.Request`]: Fix redacting remaining auth values.
+
+  * **(BREAKING CHANGE)** Replace `run_finch` step with [`Req.Finch`] adapter module.
+
+  * **(BREAKING CHANGE)** Replace `put_plug` and `run_plug` steps with [`Req.Plug`] adapter module.
+
+  * [`Req.Finch`]: Support `finch: options`.
+
+  * [`Req.Finch`]: Support `:request_timeout`.
+
+  * [`Req.Finch`]: Fix handling duplicate response headers.
+
+  * [`Req.Finch`]: Deprecate `finch: name` in favour of `finch: [name: name]`.
+
+  * [`Req.Finch`]: Deprecate `pool_timeout: value` in favour of `finch: [pool_timeout: value]`.
+
+  * [`Req.Finch`]: Deprecate `pool_max_idle_time: value` in favour of `finch: [pool_max_idle_time: value]`.
+
+  * [`Req.Finch`]: Deprecate `:finch_request`.
+
+  * [`Req.Plug`]: Handle individual response body chunks.
+
+  * [`Req.Plug`]: Support non-UTF8 request params.
+
+  * [`Req.Plug`]: Put original request private data in `conn.private`.
+
+  * [`Req.Test`]: Allow descendant processes.
+
+  * [`Req.Test`]: Fix concurrent plug fetches immediately after switching to shared mode.
+
+  * [`compress_body`]: Do nothing when request content-encoding is already set.
+
+  * [`compress_body`]: Update multipart boundary when re-running the step.
+
+  * [`compressed`], [`decode_body`]: Replace optional `ezstd` dependency with Erlang/OTP 28+
+    built-in `:zstd`.
+
+  * [`decode_body`]: Deprecate `:decode_json` in favour of setting a custom JSON
+    decoder via `:decoders`:
+
+        # before:
+        Req.get!(url, decode_json: [keys: :atoms])
+
+        # after:
+        Req.get!(url, decoders: [json: &Jason.decode(&1, keys: :atoms)])
+
+  * [`encode_body`]: **(BREAKING CHANGE)** Automatically change GET to POST when request body is set.
+
+  * [`put_aws_sigv4`]: Exclude `accept-encoding`, `x-amzn-trace-id`, and
+    hop-by-hop headers from the signature.
+
+  * [`put_aws_sigv4`]: Correctly sign duplicate header values.
+
+  * [`put_params`]: **(BREAKING CHANGE)** Overwrite existing query params instead of appending.
+
+  * [`put_path_params`]: Preserve the path template when re-running the step.
+
+  * [`redirect`]: Strip userinfo from redirect locations and log a warning.
+
+    Previously, redirecting to a URL with userinfo (e.g. `http://user:pass@host`)
+    kept the userinfo in the request URL (without converting it to auth). It is
+    now dropped so credentials supplied by the redirecting server aren't sent.
+
+  * [`redirect`]: Clear the request body, body options, and content headers when
+    changing POST to GET after a 301, 302, or 303 response.
+
+  * [`retry`]: Use jitter by default.
+
+  * [`retry`]: Honor configured `:retry_delay` over `Retry-After`.
+
+  * **(BREAKING CHANGE)** Remove deprecated `follow_redirects` step.
+
+  * **(BREAKING CHANGE)** Remove deprecated `output` step.
+
+  * Require Elixir 1.15 or later.
+
+## v0.6.3 (2026-07-16)
+
+  * [`Req.Test`]: Fix `__fetch_plug__/1` when called immediately after switching to shared mode.
+
+## v0.6.2 (2026-06-19)
+
+  * Use finch ~> 0.21.
+
+## v0.6.1 (2026-06-08)
+
+  * [`compressed`], [`decompress_body`]: Disable automatic decompression
+
+    Decompression is now opt-in by setting `compressed: true`.
+
+## v0.6.0 (2026-06-08)
+
+  * [`encode_body`]: Security fix for `:form_multipart` header injection
+    ([GHSA-px9f-whj3-246m](https://github.com/wojtekmach/req/security/advisories/GHSA-px9f-whj3-246m)).
+
+    The multipart encoder interpolated the per-part `name`, `filename`, and
+    `content_type` into the part headers without escaping, so an
+    attacker-controlled value could inject extra headers or smuggle additional
+    parts into the request. These values are now escaped per RFC 7578 / WHATWG
+    form-data (`"`, CR, and LF are percent-encoded).
+
+    Thanks to @PJUllrich for reporting it.
+
+  * [`decode_body`]: Drop automatic zip/tar/tgz/gz/zst/csv decoding,
+    ([GHSA-655f-mp8p-96gv](https://github.com/wojtekmach/req/security/advisories/GHSA-655f-mp8p-96gv)).
+
+    Req previously auto-decoded archive and compressed response bodies (`zip`,
+    `tar`, `tgz`, `gz`, `zst`, and `csv`) based on the server-supplied
+    `content-type`, materialising the full decompressed contents in memory with
+    no size cap. An attacker-controlled (or redirect-reachable) endpoint could
+    return a tiny "decompression bomb" that expanded to gigabytes and exhausted
+    the node's memory.
+
+    Now only JSON is decoded by default. Other formats are opt-in via the new
+    `:decoders` option, which defaults to `[:json, :json_api]`. Setting it
+    replaces the default (include `:json` to keep JSON decoding), and `false`
+    disables all decoding:
+
+        # opt into archives (only for endpoints you trust):
+        Req.get!(url, decoders: [:json, :zip])
+
+    **Note**: The decoded zip/tar is still list of
+    `{filename :: charlist(), contents :: binary}` tuples.
+    In the future release, this will be list of
+    `{filename :: binary(), contents :: binary()}` tuples.
+
+    While automatic CSV decoding wasn't a security issue, the behaviour based
+    on presence/absence of `nimble_csv` dependency was suprising. CSV support
+    is still built-in but need to be enabled with `decoders: [:csv]`.
+
+    Custom decoders are supported via `{format, codec}` tuples, where `codec` is
+    a module exporting `decode/1` or a 1-arity function returning an `:ok`/`:error`
+    tuple, for example:
+
+        Req.get!(url, decoders: [:json, ics: &{:ok, ICal.from_ics(&1)}])
+
+    Thanks to @PJUllrich for reporting it.
+
+## v0.5.18 (2026-05-20)
+
+  * [`run_finch`]: Allow :finch option with IPv6 URLs.
+
+  * [`run_finch`]: Normalize `Finch.TransportError` and `Finch.HTTPError`
+    (introduced in Finch v0.22.0) into `Req.TransportError` and `Req.HTTPError`.
+
+  * [`retry`]: Automatically retry on `:pool_not_available`.
+
+  * Require Finch ~> 0.21.0 or ~> 0.22.0.
+
+## v0.5.17 (2026-01-22)
+
+  * [`retry`]: Use default delay if `retry-after` is "negative"
+
+    Previously, we were only handling "negative" retry-after in "http date"
+    format and slept for zero seconds. We were crashing on retry-after with
+    negative seconds.
+
+    Now, we're using the default delay (1s, 2s, 4s, ...) in either format.
+
+## v0.5.16 (2025-11-10)
+
+  * [`Req.Test`]: Fix `verify_on_exit!` accidentally using Mox name
+  * [`auth`]: Support MFArgs
+  * [`auth`]: Support digest auth
+  * [`put_aws_sigv4`]: Support MFArgs
+  * [`put_path_params`]: Encode `:path_params` even with reserved characters
+  * [`put_path_params`]: Set `:path_params_template` on empty params
+  * [`run_plug`]: Handle compressed request body
+
 ## v0.5.15 (2025-07-14)
 
   * [`Req.Response`]: Add [`Req.Response.to_map/1`].
@@ -1338,6 +1521,9 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Response.to_map/1`]:         https://hexdocs.pm/req/Req.Response.html#to_map/1
 [`Req.Response.Async`]:            https://hexdocs.pm/req/Req.Response.Async.html
 
+[`Req.Finch`]: https://hexdocs.pm/req/Req.Finch.html
+[`Req.Plug`]:  https://hexdocs.pm/req/Req.Plug.html
+
 [`Req.Test`]: https://hexdocs.pm/req/Req.Test.html
 [`Req.Test.stub/2`]: https://hexdocs.pm/req/Req.Test.html#stub/2
 [`Req.Test.json/2`]: https://hexdocs.pm/req/Req.Test.html#json/2
@@ -1354,8 +1540,10 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Test.set_req_test_to_private/1`]: https://hexdocs.pm/req/Req.Test.html#set_req_test_to_private/1
 [`Req.Test.set_req_test_to_shared/1`]: https://hexdocs.pm/req/Req.Test.html#set_req_test_to_shared/1
 
+[`Req.Finch`]: https://hexdocs.pm/req/Req.Finch.html
+[`Req.Plug`]:  https://hexdocs.pm/req/Req.Plug.html
 
-[`Req.Steps`]:   https://hexdocs.pm/req/Req.Steps.html
+[`Req.Steps`]: https://hexdocs.pm/req/Req.Steps.html
 
 [`Req.TransportError`]: https://hexdocs.pm/req/Req.TransportError.html
 [`Req.HTTPError`]: https://hexdocs.pm/req/Req.HTTPError.html

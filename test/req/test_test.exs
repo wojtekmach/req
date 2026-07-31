@@ -1,40 +1,62 @@
 defmodule Req.TestTest do
-  use ExUnit.Case, async: true
+  use Req.Case, async: true
   doctest Req.Test, except: [expect: 3, redirect: 2]
 
-  test "__fetch_plug__" do
-    assert_raise RuntimeError, ~r/cannot find mock/, fn ->
-      Req.Test.__fetch_plug__(:foo)
-    end
+  describe "__fetch_plug__/1" do
+    test "works as expected" do
+      assert_raise RuntimeError, ~r/cannot find mock/, fn ->
+        Req.Test.__fetch_plug__(:foo)
+      end
 
-    Req.Test.stub(:foo, {MyPlug, [1]})
-    assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [1]}
+      Req.Test.stub(:foo, {MyPlug, [1]})
+      assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [1]}
 
-    Req.Test.stub(:foo, {MyPlug, [2]})
-    assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [2]}
-
-    Task.async(fn ->
+      Req.Test.stub(:foo, {MyPlug, [2]})
       assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [2]}
-      Req.Test.stub(:foo, {MyPlug, [3]})
-    end)
-    |> Task.await()
 
-    assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [2]}
+      Task.async(fn ->
+        assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [2]}
+        Req.Test.stub(:foo, {MyPlug, [3]})
+      end)
+      |> Task.await()
 
+      assert Req.Test.__fetch_plug__(:foo) == {MyPlug, [2]}
+
+      try do
+        Req.Test.set_req_test_to_shared()
+        Req.Test.stub(:bar, {SharedPlug, [1]})
+
+        Task.async(fn ->
+          assert Req.Test.__fetch_plug__(:bar) == {SharedPlug, [1]}
+        end)
+        |> Task.await()
+
+        Req.Test.expect(:baz, {SharedPlug, [1]})
+
+        Task.async(fn ->
+          assert Req.Test.__fetch_plug__(:baz) == {SharedPlug, [1]}
+        end)
+        |> Task.await()
+      after
+        Req.Test.set_req_test_to_private()
+      end
+    end
+  end
+
+  test "raises expected error if called immediately after mode is set to shared" do
     Req.Test.set_req_test_to_shared()
-    Req.Test.stub(:bar, {SharedPlug, [1]})
 
-    Task.async(fn ->
-      assert Req.Test.__fetch_plug__(:bar) == {SharedPlug, [1]}
-    end)
-    |> Task.await()
+    # Multiple concurrent calls - first gets nil, subsequent get %{}
+    tasks =
+      for _ <- 1..5 do
+        Task.async(fn ->
+          assert_raise RuntimeError, ~r/no mock or stub/, fn ->
+            Req.Test.__fetch_plug__(:foo)
+          end
+        end)
+      end
 
-    Req.Test.expect(:baz, {SharedPlug, [1]})
-
-    Task.async(fn ->
-      assert Req.Test.__fetch_plug__(:baz) == {SharedPlug, [1]}
-    end)
-    |> Task.await()
+    Task.await_many(tasks)
   after
     Req.Test.set_req_test_to_private()
   end
@@ -132,6 +154,26 @@ defmodule Req.TestTest do
       Req.Test.allow(:foo, self(), child_pid)
 
       send(child_pid, :go)
+      assert_receive {^ref, Plug.Logger}
+    end
+
+    test "allows the request for descendant process" do
+      defmodule FooServer do
+        use GenServer, restart: :temporary
+
+        def init({test_pid, ref}) do
+          send(test_pid, {ref, Req.Test.__fetch_plug__(:foo)})
+          {:ok, nil}
+        end
+
+        def start_link(arg), do: GenServer.start_link(__MODULE__, arg)
+      end
+
+      ref = make_ref()
+      Req.Test.stub(:foo, Plug.Logger)
+
+      start_link_supervised!({FooServer, {self(), ref}})
+
       assert_receive {^ref, Plug.Logger}
     end
   end

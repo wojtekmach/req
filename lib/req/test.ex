@@ -71,7 +71,7 @@ defmodule Req.Test do
       ]
 
   In tests, instead of hitting the network, we make the request against
-  a [plug](`Req.Steps.run_plug/1`) _stub_ named `MyApp.Weather`:
+  a [plug](`Req.Plug`) _stub_ named `MyApp.Weather`:
 
       # config/test.exs
       config :myapp, weather_req_options: [
@@ -124,9 +124,9 @@ defmodule Req.Test do
 
   ## Broadway
 
-  If you're using `Req.Test` with [Broadway](https://hex.pm/broadway), you may need to use
+  If you're using `Req.Test` with [Broadway](https://hex.pm/packages/broadway), you may need to use
   `allow/3` to make stubs available in the Broadway processors. A great way to do that is
-  to hook into the [Telemetry](https://hex.pm/telemetry) events that Broadway publishes to
+  to hook into the [Telemetry](https://hex.pm/packages/telemetry) events that Broadway publishes to
   manually allow the processors and batch processors to access the stubs. This approach is
   similar to what is [documented in Broadway
   itself](https://hexdocs.pm/broadway/Broadway.html#module-testing-with-ecto).
@@ -163,8 +163,6 @@ defmodule Req.Test do
       BroadwayReqStubs.attach(MyStub)
 
   """
-
-  require Logger
 
   @typep name() :: term()
 
@@ -222,6 +220,8 @@ defmodule Req.Test do
     end
   else
     def json(_conn, _data) do
+      require Logger
+
       Logger.error("""
       Could not find plug dependency.
 
@@ -257,6 +257,8 @@ defmodule Req.Test do
     end
   else
     def html(_conn, _data) do
+      require Logger
+
       Logger.error("""
       Could not find plug dependency.
 
@@ -292,6 +294,8 @@ defmodule Req.Test do
     end
   else
     def text(_conn, _data) do
+      require Logger
+
       Logger.error("""
       Could not find plug dependency.
 
@@ -325,7 +329,6 @@ defmodule Req.Test do
       ...>
       ...>   conn when conn.request_path == "/hello" ->
       ...>     Req.Test.text(conn, "Hello, World!")
-      ...>   conn -> dbg(conn)
       ...> end
       iex>
       iex> resp = Req.get!(plug: plug, url: "http://example.com")
@@ -381,6 +384,8 @@ defmodule Req.Test do
     end
   else
     def redirect(_conn, _opts) do
+      require Logger
+
       Logger.error("""
       Could not find plug dependency.
 
@@ -439,6 +444,8 @@ defmodule Req.Test do
     end
   else
     def transport_error(_conn, _reason) do
+      require Logger
+
       Logger.error("""
       Could not find plug dependency.
 
@@ -470,6 +477,9 @@ defmodule Req.Test do
 
             %{expectations: []} = map ->
               {{:error, :no_expectations_and_no_stub}, map}
+
+            map when map == nil or map == %{} ->
+              {{:error, :no_expectations_and_no_stub}, %{}}
           end)
 
         case result do
@@ -495,7 +505,7 @@ defmodule Req.Test do
   Creates a request stub with the given `name` and `plug`.
 
   Req allows running requests against _plugs_ (instead of over the network) using the
-  [`:plug`](`Req.Steps.run_plug/1`) option. However, passing the `:plug` value throughout the
+  [`:plug`](`Req.Plug`) option. However, passing the `:plug` value throughout the
   system can be cumbersome. Instead, you can tell Req to find plugs by `name` by setting
   `plug: {Req.Test, name}`, and register plug stubs for that `name` by calling
   `Req.Test.stub(name, plug)`. In other words, multiple concurrent tests can register test stubs
@@ -627,7 +637,7 @@ defmodule Req.Test do
   @doc """
   Sets the `Req.Test` mode based on the given `ExUnit` context.
 
-  This works as a ExUnit callback:
+  This works as an ExUnit callback:
 
       setup :set_req_test_from_context
 
@@ -641,11 +651,11 @@ defmodule Req.Test do
   def set_req_test_from_context(context), do: set_req_test_to_shared(context)
 
   @doc """
-  Sets a ExUnit callback to verify the expectations on exit.
+  Sets an ExUnit callback to verify the expectations on exit.
 
   Similar to calling `verify!/0` at the end of your test.
 
-  This works as a ExUnit callback:
+  This works as an ExUnit callback:
 
       setup {Req.Test, :verify_on_exit!}
 
@@ -705,7 +715,11 @@ defmodule Req.Test do
   ## Helpers
 
   defp callers do
-    [self() | Process.get(:"$callers") || []]
+    Enum.concat([
+      [self()],
+      List.wrap(Process.get(:"$callers")),
+      List.wrap(Process.get(:"$ancestors"))
+    ])
   end
 
   ## Plug callbacks
@@ -766,11 +780,13 @@ defmodule Req.Test do
   if Code.ensure_loaded?(Plug.Test) do
     @spec raw_body(Plug.Conn.t()) :: iodata()
     def raw_body(%Plug.Conn{} = conn) do
-      {Req.Test.Adapter, %{raw_body: raw_body}} = conn.adapter
+      {Req.Plug.Adapter, %{raw_body: raw_body}} = conn.adapter
       raw_body
     end
   else
     def raw_body(_conn) do
+      require Logger
+
       Logger.error("""
       Could not find plug dependency.
 

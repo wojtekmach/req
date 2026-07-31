@@ -1,10 +1,165 @@
 defmodule Req.Finch do
-  @moduledoc false
+  @default_protocols [:http1]
 
-  @doc """
+  @moduledoc """
   Runs the request using `Finch`.
+
+  This is the default Req _adapter_. See
+  ["Adapter" section in the `Req.Request`](Req.Request.html#module-adapter) module documentation
+  for more information on adapters.
+
+  Finch returns `Mint.TransportError` exceptions on HTTP connection problems. These are automatically
+  converted to `Req.TransportError` exceptions. Similarly, HTTP-protocol-related errors,
+  `Mint.HTTPError` and `Finch.Error`, and converted to `Req.HTTPError`.
+
+  ## HTTP/1 Pools
+
+  On HTTP/1 connections, Finch creates a pool per `{scheme, host, port}` tuple. These pools
+  are kept around to re-use connections as much as possible, however they are **not automatically
+  terminated**. To do so, you can configure custom Finch pool:
+
+      {:ok, _} =
+        Finch.start_link(
+          name: MyFinch,
+          pools: %{
+            default: [
+              # terminate idle {scheme, host, port} pool after 60s
+              pool_max_idle_time: 60_000
+            ]
+          }
+        )
+
+      Req.get!("https://httpbin.org/json", finch: [name: MyFinch])
+
+  More commonly you'd add the custom Finch pool as part of your supervision tree in your
+  `application.ex`:
+
+      children = [
+        {Finch,
+         name: MyFinch,
+         pools: %{
+           default: [size: 70]
+         }}
+      ]
+
+  That way you can also configure a bigger pool size for the HTTP pool. You just mustn't forget to
+  pass along `finch: [name: MyFinch]` as discussed above. You could use `Req.default_options/1` to make it
+  a global default but it's generally discouraged.
+
+  For documentation about the possible pool options and their meaning, please check out the
+  [Finch docs on pool configuration options](https://hexdocs.pm/finch/Finch.html#start_link/1-pool-configuration-options).
+
+  ## Request Options
+
+    * `:finch` - options for the Finch adapter. Defaults to a pool automatically started by
+      Req. Can include:
+
+        * `:name` - the name of the Finch pool.
+
+        * Finch request options, e.g. `:pool_tag`, `:pool_timeout`, `:receive_timeout`. See
+          `t:Finch.Request.build_opt/0` and `t:Finch.request_opt/0` for more information.
+
+        * Finch pool options, e.g.: `:conn_max_idle_time`, `:pool_max_idle_time`, `:conn_opts`.
+          See `Finch.start_link/1` for more information.
+
+          Finch pool options cannot be mixed with `:name` option.
+
+      Examples:
+
+          Req.get!("https://httpbin.org/json", finch: [name: MyFinch])
+          Req.get!("https://httpbin.org/json", finch: [name: MyFinch, pool_tag: :bulk])
+          Req.get!("https://httpbin.org/json", finch: [conn_max_idle_time: 10_000])
+
+    * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
+      the given connection options:
+
+        * `:timeout` - socket connect timeout in milliseconds, defaults to `30_000`.
+
+        * `:protocols` - the HTTP protocols to use, defaults to
+          `#{inspect(@default_protocols)}`.
+
+        * `:hostname` - Mint explicit hostname, see `Mint.HTTP.connect/4` for more information.
+
+        * `:transport_opts` - Mint transport options, see `Mint.HTTP.connect/4` for more
+        information.
+
+        * `:proxy_headers` - Mint proxy headers, see `Mint.HTTP.connect/4` for more information.
+
+        * `:proxy` - Mint HTTP/1 proxy settings, a `{scheme, address, port, options}` tuple.
+          See `Mint.HTTP.connect/4` for more information.
+
+        * `:client_settings` - Mint HTTP/2 client settings, see `Mint.HTTP.connect/4` for more
+        information.
+
+    * `:inet6` - if set to true, uses IPv6.
+
+      If the request URL looks like IPv6 address, i.e., say, `[::1]`, it defaults to `true`
+      and otherwise defaults to `false`.
+      This is a shortcut for setting `connect_options: [transport_opts: [inet6: true]]`.
+
+    * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
+
+    * `:request_timeout` - response timeout in milliseconds, defaults to `:infinity`.
+      See `Finch.request/3`.
+
+    * `:unix_socket` - if set, connect through the given UNIX domain socket.
+
+    * `:finch_private` - a map or keyword list of private metadata to add to the Finch request.
+      May be useful for adding custom data when handling telemetry with `Finch.Telemetry`.
+
+  ## Examples
+
+  Custom `:receive_timeout`:
+
+      iex> Req.get!(url, receive_timeout: 1000)
+
+  Connecting through UNIX socket:
+
+      iex> Req.get!("http:///v1.41/_ping", unix_socket: "/var/run/docker.sock").body
+      "OK"
+
+  Custom connection options:
+
+      iex> Req.get!(url, connect_options: [timeout: 5000])
+
+      iex> Req.get!(url, connect_options: [protocols: [:http2]])
+
+  Connecting without certificate check (useful in development, not recommended in production):
+
+      iex> Req.get!(url, connect_options: [transport_opts: [verify: :verify_none]])
+
+  Connecting with custom certificates:
+
+      iex> Req.get!(url, connect_options: [transport_opts: [cacertfile: "certs.pem"]])
+
+  Connecting through a proxy with basic authentication:
+
+      iex> Req.new(
+      ...>  url: "https://elixir-lang.org",
+      ...>  connect_options: [
+      ...>    proxy: {:http, "your.proxy.com", 8888, []},
+      ...>    proxy_headers: [{"proxy-authorization", "Basic " <> Base.encode64("user:pass")}]
+      ...>  ]
+      ...> )
+      iex> |> Req.get!()
+
+  Transport errors are represented as `Req.TransportError` exceptions:
+
+      iex> Req.get("https://httpbin.org/delay/1", receive_timeout: 0, retry: false)
+      {:error, %Req.TransportError{reason: :timeout}}
+
   """
-  def run(request) do
+
+  @finch_build_options [:pool_tag, :unix_socket]
+  @finch_request_options [:pool_timeout, :receive_timeout, :request_timeout, :pool_strategy]
+
+  @doc false
+  def child_spec(options) do
+    {name, options} = Keyword.pop!(options, :name)
+    Finch.child_spec(name: name, pools: %{default: pool_options(options)})
+  end
+
+  defp build(request) do
     # URI.parse removes `[` and `]` so we can't check for these. The host
     # should not have `:` so it should be safe to check for it.
     request =
@@ -17,17 +172,22 @@ defmodule Req.Finch do
         request
       end
 
-    finch_name = finch_name(request)
+    {finch_name, build_options, request_options} = finch_name_options(request)
 
-    request_headers =
-      if unquote(Req.MixProject.legacy_headers_as_lists?()) do
-        request.headers
-      else
-        for {name, values} <- request.headers,
-            value <- values do
-          {name, value}
-        end
-      end
+    # TODO: Remove when :finch_request is removed
+    if match?(
+         %{body: req_body_fun, options: %{finch_request: finch_request_fun}}
+         when is_function(req_body_fun, 1) and is_function(finch_request_fun),
+         request
+       ) do
+      raise ArgumentError, ":finch_request does not support body set to req_body_fun"
+    end
+
+    if is_function(request.body, 1) and request.options[:into] in [:self, :legacy_self] do
+      raise ArgumentError, "into: :self does not support body set to req_body_fun"
+    end
+
+    request_headers = Req.Fields.get_list(request.headers)
 
     body =
       case request.body do
@@ -37,38 +197,72 @@ defmodule Req.Finch do
         nil ->
           nil
 
+        req_body_fun when is_function(req_body_fun, 1) ->
+          wrapped_req_body_fun = fn
+            {request, state} ->
+              case req_body_fun.(request) do
+                {:data, chunk, request} ->
+                  {:data, chunk, {request, state}}
+
+                {:done, request} ->
+                  {:done, {request, state}}
+
+                {:halt, request} ->
+                  {:halt, {request, state}}
+
+                other ->
+                  raise "expected req_body_fun to return {:data, chunk, request}, {:done, request}, or {:halt, request}, got: #{inspect(other)}"
+              end
+          end
+
+          {:stream, wrapped_req_body_fun}
+
         enumerable ->
           {:stream, enumerable}
       end
 
+    build_options =
+      if unix_socket = request.options[:unix_socket] do
+        Keyword.put_new(build_options, :unix_socket, unix_socket)
+      else
+        build_options
+      end
+
     finch_request =
-      Finch.build(request.method, request.url, request_headers, body)
-      |> Map.replace!(:unix_socket, request.options[:unix_socket])
+      Finch.build(request.method, request.url, request_headers, body, build_options)
       |> add_private_options(request.options[:finch_private])
 
     finch_options =
-      request.options |> Map.take([:receive_timeout, :pool_timeout]) |> Enum.to_list()
+      request.options
+      |> Map.take([:receive_timeout, :pool_timeout, :request_timeout])
+      |> Enum.to_list()
+      |> Keyword.merge(request_options)
 
-    run(request, finch_request, finch_name, finch_options)
+    {request, finch_name, finch_request, finch_options}
+  end
+
+  @doc """
+  Runs the request using `Finch`.
+  """
+  def run(req) do
+    {req, finch_name, finch_req, finch_options} = build(req)
+    run(req, finch_req, finch_name, finch_options)
   end
 
   defp run(req, finch_req, finch_name, finch_options) do
     case req.options[:finch_request] do
       fun when is_function(fun, 4) ->
+        IO.warn("setting `:finch_request` is deprecated")
         fun.(req, finch_req, finch_name, finch_options)
 
       deprecated_fun when is_function(deprecated_fun, 1) ->
-        IO.warn(
-          "passing a :finch_request function accepting a single argument is deprecated. " <>
-            "See Req.Steps.run_finch/1 for more information."
-        )
-
-        {req, run_finch_request(deprecated_fun.(finch_req), finch_name, finch_options)}
+        IO.warn("setting `:finch_request` is deprecated")
+        run_finch_request(req, deprecated_fun.(finch_req), finch_name, finch_options)
 
       nil ->
         case req.into do
           nil ->
-            {req, run_finch_request(finch_req, finch_name, finch_options)}
+            run_finch_request(req, finch_req, finch_name, finch_options)
 
           fun when is_function(fun, 2) ->
             finch_stream_into_fun(req, finch_req, finch_name, finch_options, fun)
@@ -88,85 +282,67 @@ defmodule Req.Finch do
   defp finch_stream_into_fun(req, finch_req, finch_name, finch_options, fun) do
     resp = Req.Response.new()
 
-    fun = fn
-      {:status, status}, {req, resp} ->
-        {:cont, {req, %{resp | status: status}}}
+    stream_fun = fn
+      {:status, status}, {request, resp} ->
+        {:cont, {request, %{resp | status: status}}}
 
-      {:headers, fields}, {req, resp} ->
-        resp =
-          Enum.reduce(fields, resp, fn {name, value}, resp ->
-            Req.Response.put_header(resp, name, value)
-          end)
-
-        {:cont, {req, resp}}
+      {:headers, fields}, {request, resp} ->
+        resp = put_in(resp.headers, Req.Fields.new_without_normalize_with_duplicates(fields))
+        {:cont, {request, resp}}
 
       {:data, data}, acc ->
         fun.({:data, data}, acc)
 
-      {:trailers, fields}, {req, resp} ->
-        fields = finch_fields_to_map(fields)
-        resp = update_in(resp.trailers, &Map.merge(&1, fields))
-        {:cont, {req, resp}}
+      {:trailers, fields}, {request, resp} ->
+        resp = put_in(resp.trailers, Req.Fields.new_without_normalize_with_duplicates(fields))
+        {:cont, {request, resp}}
     end
 
-    case Finch.stream_while(finch_req, finch_name, {req, resp}, fun, finch_options) do
-      {:ok, acc} ->
-        acc
+    case run_stream_while(req, finch_req, finch_name, resp, stream_fun, finch_options) do
+      {:ok, request, response} ->
+        {request, response}
 
-      # TODO: remove when we require Finch 0.20
-      {:error, exception} ->
-        {req, normalize_error(exception)}
-
-      {:error, exception, _acc} ->
-        {req, normalize_error(exception)}
+      {:error, request, exception, _response} ->
+        {request, exception}
     end
   end
 
   defp finch_stream_into_collectable(req, finch_req, finch_name, finch_options, collectable) do
     resp = Req.Response.new()
 
-    fun = fn
-      {:status, 200}, {nil, req, resp} ->
+    stream_fun = fn
+      {:status, 200}, {request, {nil, resp}} ->
         {acc, collector} = Collectable.into(collectable)
-        {{acc, collector}, req, %{resp | status: 200}}
+        {:cont, {request, {{acc, collector}, %{resp | status: 200}}}}
 
-      {:status, status}, {nil, req, resp} ->
+      {:status, status}, {request, {nil, resp}} ->
         {acc, collector} = Collectable.into("")
-        {{acc, collector}, req, %{resp | status: status}}
+        {:cont, {request, {{acc, collector}, %{resp | status: status}}}}
 
-      {:headers, fields}, {acc, req, resp} ->
-        resp =
-          Enum.reduce(fields, resp, fn {name, value}, resp ->
-            Req.Response.put_header(resp, name, value)
-          end)
+      {:headers, fields}, {request, {collector_acc, resp}} ->
+        resp = put_in(resp.headers, Req.Fields.new_without_normalize_with_duplicates(fields))
+        {:cont, {request, {collector_acc, resp}}}
 
-        {acc, req, resp}
-
-      {:data, data}, {{acc, collector}, req, resp} ->
+      {:data, data}, {request, {{acc, collector}, resp}} ->
         acc = collector.(acc, {:cont, data})
-        {{acc, collector}, req, resp}
+        {:cont, {request, {{acc, collector}, resp}}}
 
-      {:trailers, fields}, {acc, req, resp} ->
-        fields = finch_fields_to_map(fields)
-        resp = update_in(resp.trailers, &Map.merge(&1, fields))
-        {acc, req, resp}
+      {:trailers, fields}, {request, {collector_acc, resp}} ->
+        resp = put_in(resp.trailers, Req.Fields.new_without_normalize_with_duplicates(fields))
+        {:cont, {request, {collector_acc, resp}}}
     end
 
-    case Finch.stream(finch_req, finch_name, {nil, req, resp}, fun, finch_options) do
-      {:ok, {{acc, collector}, req, resp}} ->
+    case run_stream_while(req, finch_req, finch_name, {nil, resp}, stream_fun, finch_options) do
+      {:ok, request, {{acc, collector}, resp}} ->
         acc = collector.(acc, :done)
-        {req, %{resp | body: acc}}
+        {request, %{resp | body: acc}}
 
-      # TODO: remove when we require Finch 0.20
-      {:error, exception} ->
-        {req, normalize_error(exception)}
+      {:error, request, exception, {nil, _resp}} ->
+        {request, exception}
 
-      {:error, exception, {nil, _req, _resp}} ->
-        {req, normalize_error(exception)}
-
-      {:error, exception, {{acc, collector}, _req, _resp}} ->
+      {:error, request, exception, {{acc, collector}, _resp}} ->
         collector.(acc, :halt)
-        {req, normalize_error(exception)}
+        {request, exception}
     end
   end
 
@@ -186,6 +362,20 @@ defmodule Req.Finch do
     %Req.HTTPError{protocol: :http2, reason: reason}
   end
 
+  # TODO: When using finch ~> 0.22.0, convert to pattern matching
+  # and revisit explicitly handling Mint errors.
+  #
+  # Finch >= 0.22 wraps Mint errors in its own structs. Use `is_struct/2` so
+  # this still compiles against older Finch versions where these modules don't exist.
+  defp normalize_error(error) when is_struct(error, Finch.TransportError) do
+    %Req.TransportError{reason: error.reason}
+  end
+
+  defp normalize_error(error) when is_struct(error, Finch.HTTPError) do
+    protocol = if error.module == Mint.HTTP2, do: :http2, else: :http1
+    %Req.HTTPError{protocol: protocol, reason: error.reason}
+  end
+
   defp normalize_error(error) do
     error
   end
@@ -201,10 +391,8 @@ defmodule Req.Finch do
 
     headers =
       receive do
-        {^ref, message} ->
-          {:headers, headers} = message
-
-          handle_finch_headers(headers)
+        {^ref, {:headers, headers}} ->
+          headers
       end
 
     async = %Req.Response.Async{
@@ -225,8 +413,6 @@ defmodule Req.Finch do
     with {:status, status} <- recv_status(req, ref),
          {:headers, headers} <- recv_headers(req, ref) do
       # TODO: handle trailers
-      headers = handle_finch_headers(headers)
-
       async = %Req.Response.Async{
         pid: self(),
         ref: ref,
@@ -259,13 +445,55 @@ defmodule Req.Finch do
     end
   end
 
-  defp run_finch_request(finch_request, finch_name, finch_options) do
-    case Finch.request(finch_request, finch_name, finch_options) do
-      {:ok, response} ->
-        Req.Response.new(response)
+  defp run_finch_request(req, finch_request, finch_name, finch_options) do
+    response_acc = {nil, [], [], []}
 
-      {:error, exception} ->
-        normalize_error(exception)
+    response_from_acc = fn {status, headers, body, trailers} ->
+      Req.Response.new(
+        status: status,
+        headers: headers,
+        body: IO.iodata_to_binary(body),
+        trailers: trailers
+      )
+    end
+
+    stream_fun = fn
+      {:status, value}, {request, {_, headers, body, trailers}} ->
+        {:cont, {request, {value, headers, body, trailers}}}
+
+      {:headers, value}, {request, {status, headers, body, trailers}} ->
+        {:cont, {request, {status, headers ++ value, body, trailers}}}
+
+      {:data, value}, {request, {status, headers, body, trailers}} ->
+        {:cont, {request, {status, headers, [body | value], trailers}}}
+
+      {:trailers, value}, {request, {status, headers, body, trailers}} ->
+        {:cont, {request, {status, headers, body, trailers ++ value}}}
+    end
+
+    case run_stream_while(
+           req,
+           finch_request,
+           finch_name,
+           response_acc,
+           stream_fun,
+           finch_options
+         ) do
+      {:ok, request, response_acc} ->
+        {request, response_from_acc.(response_acc)}
+
+      {:error, request, exception, _response_acc} ->
+        {request, exception}
+    end
+  end
+
+  defp run_stream_while(request, finch_req, finch_name, state, fun, finch_options) do
+    case Finch.stream_while(finch_req, finch_name, {request, state}, fun, finch_options) do
+      {:ok, {request, state}} ->
+        {:ok, request, state}
+
+      {:error, exception, {request, state}} ->
+        {:error, request, normalize_error(exception), state}
     end
   end
 
@@ -277,18 +505,6 @@ defmodule Req.Finch do
        when is_list(private_options) or is_map(private_options) do
     Enum.reduce(private_options, finch_request, fn {k, v}, acc_finch_req ->
       Finch.Request.put_private(acc_finch_req, k, v)
-    end)
-  end
-
-  if Req.MixProject.legacy_headers_as_lists?() do
-    defp handle_finch_headers(headers), do: headers
-  else
-    defp handle_finch_headers(headers), do: finch_fields_to_map(headers)
-  end
-
-  defp finch_fields_to_map(fields) do
-    Enum.reduce(fields, %{}, fn {name, value}, acc ->
-      Map.update(acc, name, [value], &(&1 ++ [value]))
     end)
   end
 
@@ -326,43 +542,74 @@ defmodule Req.Finch do
     end
   end
 
-  defp finch_name(request) do
+  defp finch_name_options(request) do
+    if request.options[:finch] && Map.has_key?(request.options, :connect_options) do
+      raise ArgumentError, "cannot set both :finch and :connect_options"
+    end
+
     custom_options? =
-      Map.has_key?(request.options, :connect_options) or Map.has_key?(request.options, :inet6)
+      Map.has_key?(request.options, :connect_options) or
+        Map.has_key?(request.options, :inet6) or
+        Map.has_key?(request.options, :pool_max_idle_time)
+
+    {name, build_options, request_options, pool_options} =
+      case request.options[:finch] do
+        nil ->
+          {nil, [], [], []}
+
+        name when is_atom(name) ->
+          IO.warn(
+            "setting `:finch` to a Finch pool name is deprecated, use `finch: [name: name]` instead"
+          )
+
+          {name, [], [], []}
+
+        options when is_list(options) ->
+          {name, options} = Keyword.pop(options, :name)
+          {build_options, options} = Keyword.split(options, @finch_build_options)
+          {request_options, pool_options} = Keyword.split(options, @finch_request_options)
+          {name, build_options, request_options, pool_options}
+
+        other ->
+          raise ArgumentError, "expected `finch: options`, got: #{inspect(other)}"
+      end
 
     cond do
-      name = request.options[:finch] ->
-        if custom_options? do
-          raise ArgumentError, "cannot set both :finch and :connect_options"
-        else
-          name
+      name ->
+        if pool_options != [] do
+          raise ArgumentError,
+                "cannot set Finch pool options together with :name in :finch, " <>
+                  "configure the pool when starting #{inspect(name)} instead"
         end
 
-      custom_options? ->
-        pool_options = pool_options(request.options)
+        {name, build_options, request_options}
 
-        name =
-          pool_options
-          |> :erlang.term_to_binary()
-          |> :erlang.md5()
-          |> Base.url_encode64(padding: false)
-
-        name = Module.concat(Req.FinchSupervisor, "Pool_#{name}")
+      pool_options != [] or custom_options? ->
+        pool_options = Keyword.merge(pool_options(request.options), pool_options)
+        name = pool_name(pool_options)
 
         case DynamicSupervisor.start_child(
                Req.FinchSupervisor,
                {Finch, name: name, pools: %{default: pool_options}}
              ) do
-          {:ok, _} ->
-            name
-
-          {:error, {:already_started, _}} ->
-            name
+          {:ok, _} -> {name, build_options, request_options}
+          {:error, {:already_started, _}} -> {name, build_options, request_options}
         end
 
       true ->
-        Req.Finch
+        {Req.Finch, build_options, request_options}
     end
+  end
+
+  @doc false
+  def pool_name(pool_options) do
+    hash =
+      pool_options
+      |> :erlang.term_to_binary()
+      |> :erlang.md5()
+      |> Base.encode32(padding: false)
+
+    Module.concat(Req.FinchSupervisor, "Pool_#{hash}")
   end
 
   @doc """
@@ -417,7 +664,7 @@ defmodule Req.Finch do
           [protocol]
 
         true ->
-          [:http1]
+          @default_protocols
       end
 
     pool_options ++

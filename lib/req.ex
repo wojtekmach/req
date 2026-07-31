@@ -46,7 +46,7 @@ defmodule Req do
       iex> resp.status
       200
 
-  See [`run_finch`](`Req.Steps.run_finch/1`) for more connection related options and usage examples.
+  See `Req.Finch` for more connection related options and usage examples.
 
   Stream request body:
 
@@ -194,9 +194,11 @@ defmodule Req do
 
       Can be one of:
 
-        * `iodata` - send request body eagerly
+        * `nil` - no body is sent with the request.
 
-        * `enumerable` - stream `enumerable` as request body
+        * `iodata` - request body as ["IO data"](https://hexdocs.pm/elixir/IO.html#module-io-data).
+
+        * `enumerable` - stream request body chunks emitted by the given `Enumerable`.
 
   Additional URL options:
 
@@ -226,6 +228,8 @@ defmodule Req do
 
         * `{:basic, userinfo}` - uses Basic HTTP authentication.
 
+        * `{:digest, userinfo}` - uses Digest HTTP authentication.
+
         * `{:bearer, token}` - uses Bearer HTTP authentication.
 
         * `:netrc` - load credentials from the default .netrc file.
@@ -235,6 +239,8 @@ defmodule Req do
         * `string` - sets to this value.
 
         * `&fun/0` - a function that returns one of the above (such as a `{:bearer, token}`).
+
+        * `{mod, fun, args}` - an MFArgs tuple that returns one of the above (such as a `{:bearer, token}`).
 
   Request body encoding options ([`encode_body`](`Req.Steps.encode_body/1`)):
 
@@ -265,17 +271,24 @@ defmodule Req do
 
   Response body options:
 
-    * `:compressed` - if set to `true`, asks the server to return compressed response.
-      (via [`compressed`](`Req.Steps.compressed/1`) step.) Defaults to `true`.
+    * `:compressed` - if set to `true`, asks the server to return a compressed response and
+      decompresses it (via the [`compressed`](`Req.Steps.compressed/1`) and
+      [`decompress_body`](`Req.Steps.decompress_body/1`) steps.) Defaults to `false`.
 
-    * `:raw` - if set to `true`, disables automatic body decompression
-      ([`decompress_body`](`Req.Steps.decompress_body/1`) step) and decoding
+    * `:raw` - if set to `true`, disables body decompression
+      ([`decompress_body`](`Req.Steps.decompress_body/1`) step) and automatic decoding
       ([`decode_body`](`Req.Steps.decode_body/1`) step.) Defaults to `false`.
 
     * `:decode_body` - if set to `false`, disables automatic response body decoding.
       Defaults to `true`.
 
-    * `:decode_json` - options to pass to `Jason.decode!/2`, defaults to `[]`.
+    * `:decoders` - the list of decoders to use for automatic response body decoding.
+      Defaults to `[:json, :json_api]`. See [`decode_body`](`Req.Steps.decode_body/1`) for
+      the supported formats and how to add custom decoders.
+
+    * `:decode_json` - (deprecated) options to pass to `Jason.decode/2`. Deprecated in favour
+      of passing a custom JSON decoder via the `:decoders` option, e.g.
+      `decoders: [json: &Jason.decode(&1, keys: :atoms)]`.
 
     * `:into` - where to send the response body. It can be one of:
 
@@ -360,7 +373,8 @@ defmodule Req do
 
     * `:retry_delay` - if not set, which is the default, the retry delay is determined by
       the value of the `Retry-After` header on HTTP 429/503 responses. If the header is not set,
-      the default delay follows a simple exponential backoff: 1s, 2s, 4s, 8s, ...
+      the default delay follows a simple exponential backoff with jitter, for example:
+      0.949s, 1.97s, 3.87s, 7.55s, ...
 
       `:retry_delay` can be set to a function that receives the retry count (starting at 0)
       and returns the delay, the number of milliseconds to sleep before making another attempt.
@@ -371,21 +385,14 @@ defmodule Req do
     * `:max_retries` - maximum number of retry attempts, defaults to `3` (for a total of `4`
       requests to the server, including the initial one.)
 
-  Caching options ([`cache`](`Req.Steps.cache/1`) step):
-
-    * `:cache` - if `true`, performs HTTP caching. Defaults to `false`.
-
-    * `:cache_dir` - the directory to store the cache, defaults to `<user_cache_dir>/req`
-      (see: `:filename.basedir/3`)
-
   Request adapters:
 
     * `:adapter` - adapter to use to make the actual HTTP request. See `:adapter` field description
       in the `Req.Request` module documentation for more information.
 
-      The default is [`run_finch`](`Req.Steps.run_finch/1`).
+      The default is `Req.Finch`.
 
-    * `:plug` - if set, calls the given plug instead of making an HTTP request over the network (via [`run_plug`](`Req.Steps.run_plug/1`) step).
+    * `:plug` - if set, calls the given plug instead of making an HTTP request over the network (via the `Req.Plug` adapter).
 
       The plug can be one of:
 
@@ -394,9 +401,26 @@ defmodule Req do
 
         * A _module_ plug: a `module` name or a `{module, options}` tuple.
 
-  Finch options ([`run_finch`](`Req.Steps.run_finch/1`) step), see `Finch.start_link/1` for options:
+  Finch options (`Req.Finch` adapter), see `Finch.start_link/1` for options:
 
-    * `:finch` - the Finch pool to use. Defaults to pool automatically started by `Req`.
+    * `:finch` - options for the Finch adapter. Defaults to a pool automatically started by
+      Req. Can include:
+
+        * `:name` - the name of the Finch pool.
+
+        * Finch request options, e.g. `:pool_tag`, `:pool_timeout`, `:receive_timeout`. See
+          `t:Finch.Request.build_opt/0` and `t:Finch.request_opt/0` for more information.
+
+        * Finch pool options, e.g.: `:conn_max_idle_time`, `:pool_max_idle_time`, `:conn_opts`.
+          See `Finch.start_link/1` for more information.
+
+          Finch pool options cannot be mixed with `:name` option.
+
+      Examples:
+
+          Req.get!("https://httpbin.org/json", finch: [name: MyFinch])
+          Req.get!("https://httpbin.org/json", finch: [name: MyFinch, pool_tag: :bulk])
+          Req.get!("https://httpbin.org/json", finch: [conn_max_idle_time: 10_000])
 
     * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
       the given connection options (see `Mint.HTTP.connect/4` for options):
@@ -412,25 +436,21 @@ defmodule Req do
 
         * `:proxy_headers` - Mint proxy headers.
 
-        * `:proxy` - Mint HTTP/1 proxy settings, a `{schema, address, port, options}` tuple.
+        * `:proxy` - Mint HTTP/1 proxy settings, a `{scheme, address, port, options}` tuple.
 
         * `:client_settings` - Mint HTTP/2 client settings.
 
     * `:inet6` - if set to true, uses IPv6. Defaults to `false`.
 
-    * `:pool_timeout` - pool checkout timeout in milliseconds, defaults to `5000`.
-
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
+
+    * `:request_timeout` - response timeout in milliseconds, defaults to `:infinity`.
+      See `Finch.request/3`.
 
     * `:unix_socket` - if set, connect through the given UNIX domain socket.
 
-    * `:pool_max_idle_time` - the maximum number of milliseconds that a pool can be
-      idle before being terminated, used only by HTTP1 pools. Default to `:infinity`.
-
     * `:finch_private` - a map or keyword list of private metadata to add to the Finch request. May be useful
       for adding custom data when handling telemetry with `Finch.Telemetry`.
-
-    * `:finch_request` - a function that executes the Finch request, defaults to using `Finch.request/3`.
 
   ## Examples
 
@@ -440,20 +460,19 @@ defmodule Req do
       iex> URI.to_string(req.url)
       "https://elixir-lang.org"
 
-  Fake adapter:
+  With a url and options:
 
-      iex> fake = fn request ->
-      ...>   {request, Req.Response.new(status: 200, body: "it works!")}
-      ...> end
-      iex>
-      iex> req = Req.new(adapter: fake)
-      iex> Req.get!(req).body
-      "it works!"
+      iex> req = Req.new("https://elixir-lang.org", method: :head)
+      iex> req.method
+      :head
 
   """
-  @spec new(options :: keyword()) :: Req.Request.t()
-  def new(options \\ []) do
-    options = Keyword.merge(default_options(), options)
+  @spec new(request :: url() | keyword() | Req.Request.t(), options :: keyword()) ::
+          Req.Request.t()
+  def new(request \\ [], options \\ [])
+
+  def new(options1, options2) when is_list(options1) and is_list(options2) do
+    options = Keyword.merge(default_options(), options1 ++ options2)
     {plugins, options} = Keyword.pop(options, :plugins, [])
 
     @req
@@ -461,26 +480,22 @@ defmodule Req do
     |> merge(options)
   end
 
-  defp new(%Req.Request{} = request, options) when is_list(options) do
-    Req.merge(request, options)
-  end
-
-  defp new(options1, options2) when is_list(options1) and is_list(options2) do
-    new(options1 ++ options2)
-  end
-
-  defp new(url, options) when (is_binary(url) or is_struct(url, URI)) and is_list(options) do
+  def new(url, options) when (is_binary(url) or is_struct(url, URI)) and is_list(options) do
     new([url: url] ++ options)
   end
 
-  defp new(request, options) when is_list(options) do
-    raise ArgumentError,
-          "expected 1st argument to be a request, got: #{inspect(request)}"
+  def new(%Req.Request{} = request, options) when is_list(options) do
+    Req.merge(request, options)
   end
 
-  defp new(_request, options) do
+  def new(request, options) when is_list(options) do
     raise ArgumentError,
-          "expected 2nd argument to be an options keywords list, got: #{inspect(options)}"
+          "expected 1st argument to be a url, a keyword list, or a request, got: #{inspect(request)}"
+  end
+
+  def new(_request, options) do
+    raise ArgumentError,
+          "expected 2nd argument to be a keyword list, got: #{inspect(options)}"
   end
 
   @doc false
@@ -532,13 +547,19 @@ defmodule Req do
       IO.warn("Setting :redact_auth is deprecated and has no effect")
     end
 
+    if Keyword.has_key?(options, :pool_timeout) do
+      IO.warn("setting `pool_timeout` is deprecated in favour of `finch: [pool_timeout: ...]`")
+    end
+
+    if Keyword.has_key?(options, :pool_max_idle_time) do
+      IO.warn(
+        "setting `pool_max_idle_time` is deprecated in favour of `finch: [pool_max_idle_time: ...]`"
+      )
+    end
+
     request_option_names = [:method, :url, :headers, :body, :adapter, :into]
 
     {request_options, options} = Keyword.split(options, request_option_names)
-
-    if options[:output] && unquote(!System.get_env("REQ_NOWARN_OUTPUT")) do
-      IO.warn("setting `output: path` is deprecated in favour of `into: File.stream!(path)`")
-    end
 
     registered =
       MapSet.union(
@@ -551,7 +572,14 @@ defmodule Req do
     request =
       Enum.reduce(request_options, request, fn
         {:url, url}, acc ->
-          put_in(acc.url, URI.parse(url))
+          case URI.parse(url) do
+            uri when is_binary(uri.userinfo) ->
+              acc = put_in(acc.url, %{uri | userinfo: nil})
+              update_in(acc.options, &Map.put_new(&1, :auth, {:basic, uri.userinfo}))
+
+            uri ->
+              put_in(acc.url, uri)
+          end
 
         {:headers, new_headers}, acc ->
           update_in(acc.headers, &Req.Fields.merge(&1, new_headers))
@@ -560,16 +588,23 @@ defmodule Req do
           %{acc | name => value}
       end)
 
-    update_in(
-      request.options,
-      &Map.merge(&1, Map.new(options), fn
-        :params, old, new ->
-          Keyword.merge(old, new)
+    request =
+      update_in(
+        request.options,
+        &Map.merge(&1, Map.new(options), fn
+          :params, old, new ->
+            Keyword.merge(old, new)
 
-        _, _, new ->
-          new
-      end)
-    )
+          _, _, new ->
+            new
+        end)
+      )
+
+    if options[:plug] do
+      %{request | adapter: Req.Plug}
+    else
+      request
+    end
   end
 
   @doc """
@@ -1259,7 +1294,7 @@ defmodule Req do
     * `{:ok, chunks}` - where a chunk can be `{:data, binary}`, `{:trailers, trailers}`, or
       `:done`.
 
-    * `{:error, reason}` - an error occured
+    * `{:error, reason}` - an error occurred
 
     * `:unknown` - the message was not meant for this response.
 
