@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v0.7.2
+
+  * [`encode_body`]: Bring back `form_multipart: [{string_name, value}]`.
+  * [`put_aws_sigv4`]: Fix AWS SigV4 compatibility with Supabase Storage S3.
+
 ## v0.7.1 (2026-07-28)
 
   * Deprecate `cache: true`/[`cache`] step. It will be removed in Req v0.8. I plan a comprehensive cache solution for Req v1.0+.
