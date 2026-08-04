@@ -385,7 +385,12 @@ defmodule Req.DecodeTest do
         )
 
       {:error, err} = Req.get(req, decoders: [:gz])
-      assert err == %RuntimeError{message: "decoding response body failed: :data_error"}
+
+      assert err == %Req.DecompressError{
+               format: :gzip,
+               data: "bad",
+               reason: :data_error
+             }
     end
   end
 
@@ -453,8 +458,10 @@ defmodule Req.DecodeTest do
 
       {:error, err} = Req.get(req, decoders: [:zst])
 
-      assert err == %RuntimeError{
-               message: "decoding response body failed: \"Unknown frame descriptor\""
+      assert err == %Req.DecompressError{
+               format: :zstd,
+               data: "bad",
+               reason: "Unknown frame descriptor"
              }
     end
   end

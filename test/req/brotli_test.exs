@@ -16,9 +16,10 @@ defmodule Req.BrotliTest do
   end
 
   test "invalid data" do
-    assert Req.Brotli.decode("invalid") == {:error, :brotli_error}
+    assert Req.Brotli.decode("invalid") ==
+             {:error, %Req.DecompressError{format: :br, data: "invalid", reason: :brotli_error}}
 
-    assert_raise ErlangError, fn ->
+    assert_raise Req.DecompressError, "br decompression failed, reason: :brotli_error", fn ->
       ["inv", "alid"]
       |> Req.Brotli.decode_stream()
       |> Enum.join()

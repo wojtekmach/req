@@ -1001,6 +1001,11 @@ defmodule Req.Request do
     run_request(request, request.request_steps)
   end
 
+  # Module steps only run on the `Req.stream/4` pipeline.
+  defp run_request(request, [{_name, mod} | rest]) when is_atom(mod) do
+    run_request(request, rest)
+  end
+
   defp run_request(request, [{_name, step} | rest]) do
     case run_step(step, request) do
       %Req.Request{} = request ->

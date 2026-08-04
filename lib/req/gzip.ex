@@ -2,13 +2,11 @@ defmodule Req.Gzip do
   @moduledoc """
   [gzip] decoding using [`:zlib`].
 
-  This module is used by [`decode_body`] on `.gz`, `application/gzip`, and `application/x-gzip`
-  and by [`decompress_body`] on `content-encoding: gzip`.
+  This module is used by `Req.Decode` on `.gz`, `application/gzip`, and `application/x-gzip`
+  and by `Req.Decompress` on `content-encoding: gzip`.
 
   [gzip]: https://en.wikipedia.org/wiki/Gzip
   [`:zlib`]: `:zlib`
-  [`decode_body`]: `Req.Steps.decode_body/1`
-  [`decompress_body`]: `Req.Steps.decompress_body/1`
   """
 
   ## Encode
@@ -80,12 +78,14 @@ defmodule Req.Gzip do
 
   @doc false
   def decode_chunk(z, data) do
-    decompressed = IO.iodata_to_binary(safe_inflate(z, data))
-    {:ok, decompressed}
+    case IO.iodata_to_binary(safe_inflate(z, data)) do
+      "" -> {:ok, nil, z}
+      decompressed -> {:ok, decompressed, z}
+    end
   rescue
     e in ErlangError ->
       if e.original == :data_error do
-        {:error, :data_error}
+        {:error, %Req.DecompressError{format: :gzip, data: data, reason: :data_error}}
       else
         reraise e, __STACKTRACE__
       end
@@ -95,11 +95,11 @@ defmodule Req.Gzip do
   def decode_finish(z) do
     :ok = :zlib.inflateEnd(z)
     :ok = :zlib.close(z)
-    {:ok, ""}
+    {:ok, nil}
   rescue
     e in ErlangError ->
       if e.original == :data_error do
-        {:error, :data_error}
+        {:error, %Req.DecompressError{format: :gzip, reason: :data_error}}
       else
         reraise e, __STACKTRACE__
       end
@@ -116,7 +116,7 @@ defmodule Req.Gzip do
   rescue
     e in ErlangError ->
       if e.original == :data_error do
-        {:error, :data_error}
+        {:error, %Req.DecompressError{format: :gzip, data: data, reason: :data_error}}
       else
         reraise e, __STACKTRACE__
       end
@@ -129,26 +129,23 @@ defmodule Req.Gzip do
       fn -> decode_init() end,
       fn data, z ->
         case decode_chunk(z, data) do
-          {:ok, ""} ->
+          {:ok, nil, z} ->
             {[], z}
 
-          {:ok, decompressed} ->
+          {:ok, decompressed, z} ->
             {[decompressed], z}
 
-          {:error, reason} ->
-            :erlang.error(reason)
+          {:error, exception} ->
+            raise exception
         end
       end,
       fn z ->
         case decode_finish(z) do
-          {:ok, ""} ->
+          {:ok, nil} ->
             {[], :closed}
 
-          {:ok, decompressed} ->
-            {[decompressed], :closed}
-
-          {:error, reason} ->
-            :erlang.error(reason)
+          {:error, exception} ->
+            raise exception
         end
       end,
       fn

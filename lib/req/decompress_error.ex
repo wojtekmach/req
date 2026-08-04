@@ -1,6 +1,6 @@
 defmodule Req.DecompressError do
   @moduledoc """
-  Represents an error when decompression fails, returned by `Req.Steps.decompress_body/1`.
+  Represents an error when decompression fails.
   """
 
   defexception [:format, :data, :reason]
