@@ -14,7 +14,9 @@ defmodule Req.DecodeTest do
         end
       )
 
-    assert Req.get!(req).body == "ok"
+    resp = Req.get!(req)
+    assert resp.status == 200
+    assert resp.body == "ok"
   end
 
   describe "json" do
@@ -26,7 +28,9 @@ defmodule Req.DecodeTest do
           end
         )
 
-      assert Req.get!(req).body == %{"a" => 1}
+      resp = Req.get!(req)
+      assert resp.status == 200
+      assert resp.body == %{"a" => 1}
     end
 
     test "json-api" do
@@ -42,7 +46,9 @@ defmodule Req.DecodeTest do
           end
         )
 
-      assert Req.get!(req).body == %{"a" => 1}
+      resp = Req.get!(req)
+      assert resp.status == 200
+      assert resp.body == %{"a" => 1}
     end
 
     test "custom options" do
@@ -53,9 +59,9 @@ defmodule Req.DecodeTest do
           end
         )
 
-      assert Req.get!(req, decoders: [json: &Jason.decode(&1, keys: :atoms)]).body == %{
-               a: 1
-             }
+      resp = Req.get!(req, decoders: [json: &Jason.decode(&1, keys: :atoms)])
+      assert resp.status == 200
+      assert resp.body == %{a: 1}
     end
 
     test "deprecated :decode_json option" do
@@ -67,7 +73,9 @@ defmodule Req.DecodeTest do
         )
 
       assert ExUnit.CaptureIO.capture_io(:stderr, fn ->
-               assert Req.get!(req, decode_json: [keys: :atoms]).body == %{a: 1}
+               resp = Req.get!(req, decode_json: [keys: :atoms])
+               assert resp.status == 200
+               assert resp.body == %{a: 1}
              end) =~ "setting `decode_json: options` is deprecated"
     end
 
@@ -81,7 +89,8 @@ defmodule Req.DecodeTest do
           end
         )
 
-      assert {:error, %Jason.DecodeError{}} = Req.get(req)
+      {:error, err} = Req.get(req)
+      assert err == %Jason.DecodeError{position: 0, token: nil, data: "bad"}
     end
   end
 
@@ -93,7 +102,9 @@ defmodule Req.DecodeTest do
         end
       )
 
-    assert Req.get!(req, decoders: false).body == ~s|{"a":1}|
+    resp = Req.get!(req, decoders: false)
+    assert resp.status == 200
+    assert resp.body == ~s|{"a":1}|
   end
 
   test "setting :decoders overwrites the default" do
@@ -105,7 +116,9 @@ defmodule Req.DecodeTest do
     %{req: req} =
       serve("GET /": &Req.Test.json(&1, %{a: 1}))
 
-    assert Req.get!(req, decoders: [:zip]).body == ~s|{"a":1}|
+    resp = Req.get!(req, decoders: [:zip])
+    assert resp.status == 200
+    assert resp.body == ~s|{"a":1}|
   end
 
   test "unknown decoder format raises" do
@@ -145,7 +158,9 @@ defmodule Req.DecodeTest do
         end
       )
 
-    assert Req.get!(req, decoders: [epub: Req.ZIP]).body == files
+    resp = Req.get!(req, decoders: [epub: Req.ZIP])
+    assert resp.status == 200
+    assert resp.body == files
   end
 
   test "custom decoder error" do
@@ -158,10 +173,8 @@ defmodule Req.DecodeTest do
         end
       )
 
-    assert {:error, %RuntimeError{} = e} =
-             Req.get(req, decoders: [ics: fn _ -> {:error, :nope} end])
-
-    assert Exception.message(e) == "decoding response body failed: :nope"
+    {:error, err} = Req.get(req, decoders: [ics: fn _ -> {:error, :nope} end])
+    assert err == %RuntimeError{message: "decoding response body failed: :nope"}
   end
 
   test "{format, format} reuses a built-in decoder" do
@@ -174,7 +187,9 @@ defmodule Req.DecodeTest do
         end
       )
 
-    assert Req.get!(req, decoders: [ics: :json]).body == %{"a" => 1}
+    resp = Req.get!(req, decoders: [ics: :json])
+    assert resp.status == 200
+    assert resp.body == %{"a" => 1}
   end
 
   describe "tar" do
@@ -190,7 +205,9 @@ defmodule Req.DecodeTest do
       files = [{~c"foo.txt", "bar"}]
       %{req: req} = serve("GET /": &send_resp_tar(&1, files))
 
-      assert Req.get!(req, decoders: [:tar]).body == files
+      resp = Req.get!(req, decoders: [:tar])
+      assert resp.status == 200
+      assert resp.body == files
     end
 
     test "path" do
@@ -205,7 +222,9 @@ defmodule Req.DecodeTest do
           end
         )
 
-      assert Req.get!(req, url: "#{url}/foo.tar", decoders: [:tar]).body == files
+      resp = Req.get!(req, url: "#{url}/foo.tar", decoders: [:tar])
+      assert resp.status == 200
+      assert resp.body == files
     end
 
     test "path, content type with charset utf8" do
@@ -235,7 +254,9 @@ defmodule Req.DecodeTest do
           end
         )
 
-      assert Req.get!(req, url: "#{url}/foo.tar.gz", decoders: [:tgz]).body == files
+      resp = Req.get!(req, url: "#{url}/foo.tar.gz", decoders: [:tgz])
+      assert resp.status == 200
+      assert resp.body == files
     end
 
     test "tar.gz (path)" do
@@ -250,7 +271,9 @@ defmodule Req.DecodeTest do
           end
         )
 
-      assert Req.get!(req, url: "#{url}/foo.tar.gz", decoders: [:tgz]).body == files
+      resp = Req.get!(req, url: "#{url}/foo.tar.gz", decoders: [:tgz])
+      assert resp.status == 200
+      assert resp.body == files
     end
 
     test "invalid" do
@@ -263,9 +286,9 @@ defmodule Req.DecodeTest do
           end
         )
 
-      assert {:error, e} = Req.get(req, decoders: [:tar])
-      assert e == %Req.ArchiveError{format: :tar, reason: :eof, data: "invalid"}
-      assert Exception.message(e) == "tar unpacking failed: Unexpected end of file"
+      {:error, err} = Req.get(req, decoders: [:tar])
+      assert err == %Req.ArchiveError{format: :tar, reason: :eof, data: "invalid"}
+      assert Exception.message(err) == "tar unpacking failed: Unexpected end of file"
     end
   end
 
@@ -282,7 +305,9 @@ defmodule Req.DecodeTest do
       files = [{~c"foo.txt", "bar"}]
       %{req: req} = serve("GET /": &send_resp_zip(&1, files))
 
-      assert Req.get!(req, decoders: [:zip]).body == files
+      resp = Req.get!(req, decoders: [:zip])
+      assert resp.status == 200
+      assert resp.body == files
     end
 
     test "path" do
@@ -297,7 +322,9 @@ defmodule Req.DecodeTest do
           end
         )
 
-      assert Req.get!(req, url: "#{url}/foo.zip", decoders: [:zip]).body == files
+      resp = Req.get!(req, url: "#{url}/foo.zip", decoders: [:zip])
+      assert resp.status == 200
+      assert resp.body == files
     end
 
     test "invalid" do
@@ -310,9 +337,9 @@ defmodule Req.DecodeTest do
           end
         )
 
-      assert {:error, e} = Req.get(req, decoders: [:zip])
-      assert e == %Req.ArchiveError{format: :zip, reason: nil, data: "invalid"}
-      assert Exception.message(e) == "zip unpacking failed"
+      {:error, err} = Req.get(req, decoders: [:zip])
+      assert err == %Req.ArchiveError{format: :zip, reason: nil, data: "invalid"}
+      assert Exception.message(err) == "zip unpacking failed"
     end
   end
 
@@ -327,7 +354,9 @@ defmodule Req.DecodeTest do
           end
         )
 
-      assert Req.get!(req).body == :zlib.gzip("foo")
+      resp = Req.get!(req)
+      assert resp.status == 200
+      assert resp.body == :zlib.gzip("foo")
     end
 
     test "content-type" do
@@ -340,7 +369,9 @@ defmodule Req.DecodeTest do
           end
         )
 
-      assert Req.get!(req, decoders: [:gz]).body == "foo"
+      resp = Req.get!(req, decoders: [:gz])
+      assert resp.status == 200
+      assert resp.body == "foo"
     end
 
     test "invalid" do
@@ -353,9 +384,8 @@ defmodule Req.DecodeTest do
           end
         )
 
-      assert {:error, e} = Req.get(req, decoders: [:gz])
-      assert %RuntimeError{} = e
-      assert Exception.message(e) == "decoding response body failed: :data_error"
+      {:error, err} = Req.get(req, decoders: [:gz])
+      assert err == %RuntimeError{message: "decoding response body failed: :data_error"}
     end
   end
 
@@ -387,7 +417,9 @@ defmodule Req.DecodeTest do
           end
         )
 
-      assert Req.get!(req, decoders: [:zst]).body == "foo"
+      resp = Req.get!(req, decoders: [:zst])
+      assert resp.status == 200
+      assert resp.body == "foo"
     end
 
     # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
@@ -402,7 +434,9 @@ defmodule Req.DecodeTest do
           end
         )
 
-      assert Req.get!(req, url: "#{url}/foo.zst", decoders: [:zst]).body == "foo"
+      resp = Req.get!(req, url: "#{url}/foo.zst", decoders: [:zst])
+      assert resp.status == 200
+      assert resp.body == "foo"
     end
 
     # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
@@ -417,11 +451,11 @@ defmodule Req.DecodeTest do
           end
         )
 
-      assert {:error, e} = Req.get(req, decoders: [:zst])
-      assert %RuntimeError{} = e
+      {:error, err} = Req.get(req, decoders: [:zst])
 
-      assert Exception.message(e) ==
-               "Could not decompress Zstandard data: \"Unknown frame descriptor\""
+      assert err == %RuntimeError{
+               message: "Could not decompress Zstandard data: \"Unknown frame descriptor\""
+             }
     end
   end
 
@@ -434,7 +468,9 @@ defmodule Req.DecodeTest do
 
     %{req: req} = serve("GET /": &send_resp_csv(&1, csv))
 
-    assert Req.get!(req, decoders: [:csv]).body == csv
+    resp = Req.get!(req, decoders: [:csv])
+    assert resp.status == 200
+    assert resp.body == csv
   end
 
   test "decompress and decode" do
@@ -453,7 +489,9 @@ defmodule Req.DecodeTest do
         end
       )
 
-    assert Req.get!(req, compressed: true).body == %{"a" => 1}
+    resp = Req.get!(req, compressed: true)
+    assert resp.status == 200
+    assert resp.body == %{"a" => 1}
   end
 
   test "decompress and decode in raw mode" do
@@ -472,7 +510,10 @@ defmodule Req.DecodeTest do
         end
       )
 
-    assert Req.get!(req, compressed: true, raw: true).body
+    resp = Req.get!(req, compressed: true, raw: true)
+    assert resp.status == 200
+
+    assert resp.body
            |> :zlib.gunzip()
            |> Jason.decode!() == %{
              "a" => 1

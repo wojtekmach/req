@@ -20,7 +20,9 @@ defmodule Req.FinchTest do
       end
 
       assert ExUnit.CaptureIO.capture_io(:stderr, fn ->
-               assert Req.get!(url, finch_request: fun).body == "finch_request"
+               resp = Req.get!(url, finch_request: fun)
+               assert resp.status == 200
+               assert resp.body == "finch_request"
              end) =~ "setting `:finch_request` is deprecated"
 
       assert_received %Finch.Response{body: "ok"}
@@ -72,7 +74,9 @@ defmodule Req.FinchTest do
       proxy = {:http, "localhost", url.port, []}
 
       req = Req.new(base_url: url, connect_options: [proxy: proxy])
-      assert Req.request!(req).body == "ok"
+      resp = Req.request!(req)
+      assert resp.status == 200
+      assert resp.body == "ok"
     end
 
     test ":connect_options :hostname" do
@@ -83,7 +87,9 @@ defmodule Req.FinchTest do
         end)
 
       req = Req.new(base_url: url, connect_options: [hostname: "example.com"])
-      assert Req.request!(req).body == "ok"
+      resp = Req.request!(req)
+      assert resp.status == 200
+      assert resp.body == "ok"
     end
 
     defmodule ExamplePlug do
@@ -140,10 +146,13 @@ defmodule Req.FinchTest do
 
       # :inet6 can be auto-set for IPv6 URLs; it should not conflict with :finch
       req = Req.new(url: "http://[::1]:#{ipv6_port}", finch: [name: finch_name])
-      assert Req.request!(req).body == "ok"
+      resp = Req.request!(req)
+      assert resp.status == 200
+      assert resp.body == "ok"
 
-      assert Req.request!("http://localhost:#{ipv6_port}", finch: [name: finch_name], inet6: true).body ==
-               "ok"
+      resp = Req.request!("http://localhost:#{ipv6_port}", finch: [name: finch_name], inet6: true)
+      assert resp.status == 200
+      assert resp.body == "ok"
     end
 
     def send_telemetry_metadata_pid(_name, _measurements, metadata, _) do
@@ -170,7 +179,9 @@ defmodule Req.FinchTest do
           Plug.Conn.send_resp(conn, 200, "finch_private")
         end)
 
-      assert Req.get!(url, finch_private: %{pid: self()}).body == "finch_private"
+      resp = Req.get!(url, finch_private: %{pid: self()})
+      assert resp.status == 200
+      assert resp.body == "finch_private"
       assert_received :telemetry_private
     end
 
@@ -191,7 +202,9 @@ defmodule Req.FinchTest do
         {:cont, acc}
       end
 
-      assert Req.get!(url: url, into: fun).body == ""
+      resp = Req.get!(url: url, into: fun)
+      assert resp.status == 200
+      assert resp.body == ""
       assert_received {:data, "foo"}
       refute_receive _
     end
@@ -265,11 +278,11 @@ defmodule Req.FinchTest do
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
 
-      assert Req.get!(url,
-               finch: [name: Req.Finch, pool_tag: :bulk],
-               finch_private: %{pid: self()}
-             ).body ==
-               "ok"
+      resp =
+        Req.get!(url, finch: [name: Req.Finch, pool_tag: :bulk], finch_private: %{pid: self()})
+
+      assert resp.status == 200
+      assert resp.body == "ok"
 
       assert_received {:pool_tag, :bulk}
     end
@@ -280,7 +293,9 @@ defmodule Req.FinchTest do
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
 
-      assert Req.get!(url, finch: [conn_max_idle_time: 10_000]).body == "ok"
+      resp = Req.get!(url, finch: [conn_max_idle_time: 10_000])
+      assert resp.status == 200
+      assert resp.body == "ok"
     end
 
     test "finch: pool options cannot be set together with :name" do

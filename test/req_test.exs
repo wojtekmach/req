@@ -150,7 +150,9 @@ defmodule ReqTest do
       end)
 
     resp = Req.get!(origin, into: :self)
-    assert Req.put!(echo, body: resp.body).body == "foobarbaz"
+    resp = Req.put!(echo, body: resp.body)
+    assert resp.status == 200
+    assert resp.body == "foobarbaz"
   end
 
   @tag :transport
@@ -177,7 +179,9 @@ defmodule ReqTest do
         Req.request!(req)
       end
     else
-      assert Req.request!(req).body == "ok"
+      resp = Req.request!(req)
+      assert resp.status == 200
+      assert resp.body == "ok"
     end
   end
 end

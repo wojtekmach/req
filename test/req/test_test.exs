@@ -95,23 +95,33 @@ defmodule Req.TestTest do
   describe "plug" do
     test "function" do
       Req.Test.stub(:foo, &Plug.Conn.send_resp(&1, 200, "1"))
-      assert Req.get!(plug: {Req.Test, :foo}).body == "1"
+      resp = Req.get!(plug: {Req.Test, :foo})
+      assert resp.status == 200
+      assert resp.body == "1"
 
       Req.Test.stub(:foo, fn conn, _ ->
         Plug.Conn.send_resp(conn, 200, "2")
       end)
 
-      assert Req.get!(plug: {Req.Test, :foo}).body == "2"
+      resp = Req.get!(plug: {Req.Test, :foo})
+      assert resp.status == 200
+      assert resp.body == "2"
 
       Task.async(fn ->
-        assert Req.get!(plug: {Req.Test, :foo}).body == "2"
+        resp = Req.get!(plug: {Req.Test, :foo})
+        assert resp.status == 200
+        assert resp.body == "2"
 
         Req.Test.stub(:foo, &Plug.Conn.send_resp(&1, 200, "3"))
-        assert Req.get!(plug: {Req.Test, :foo}).body == "3"
+        resp = Req.get!(plug: {Req.Test, :foo})
+        assert resp.status == 200
+        assert resp.body == "3"
       end)
       |> Task.await()
 
-      assert Req.get!(plug: {Req.Test, :foo}).body == "2"
+      resp = Req.get!(plug: {Req.Test, :foo})
+      assert resp.status == 200
+      assert resp.body == "2"
 
       assert_raise RuntimeError, ~r/cannot find mock/, fn ->
         Req.get(plug: {Req.Test, :bad})
@@ -126,10 +136,14 @@ defmodule Req.TestTest do
       end
 
       Req.Test.stub(:foo, Foo)
-      assert Req.get!(plug: {Req.Test, :foo}).body == "default"
+      resp = Req.get!(plug: {Req.Test, :foo})
+      assert resp.status == 200
+      assert resp.body == "default"
 
       Req.Test.stub(:foo, {Foo, "hi"})
-      assert Req.get!(plug: {Req.Test, :foo}).body == "hi"
+      resp = Req.get!(plug: {Req.Test, :foo})
+      assert resp.status == 200
+      assert resp.body == "hi"
     end
   end
 

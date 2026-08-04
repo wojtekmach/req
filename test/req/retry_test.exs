@@ -151,7 +151,9 @@ defmodule Req.RetryTest do
         "GET /": &send_resp(&1, 200, "ok")
       )
 
-    assert Req.request!(req, max_retries: 5).body == "ok"
+    resp = Req.request!(req, max_retries: 5)
+    assert resp.status == 200
+    assert resp.body == "ok"
   end
 
   @tag :capture_log
@@ -173,7 +175,9 @@ defmodule Req.RetryTest do
       0
     end
 
-    assert Req.request!(req, retry_delay: retry_delay, max_retries: 5).body == "ok"
+    resp = Req.request!(req, retry_delay: retry_delay, max_retries: 5)
+    assert resp.status == 200
+    assert resp.body == "ok"
     assert_received {:retry_delay, 0}
     assert_received {:retry_delay, 1}
     assert_received {:retry_delay, 2}
@@ -201,7 +205,9 @@ defmodule Req.RetryTest do
         end
       )
 
-    assert Req.get!(request).body == "oops - updated"
+    resp = Req.get!(request)
+    assert resp.status == 500
+    assert resp.body == "oops - updated"
     assert_received :ping
     assert_received :ping
     assert_received :ping
@@ -223,7 +229,8 @@ defmodule Req.RetryTest do
 
     request = Req.merge(request, retry: :safe_transient, max_retries: 10)
 
-    assert Req.post!(request).status == 500
+    resp = Req.post!(request)
+    assert resp.status == 500
     assert_received :ping
     refute_received _
   end
@@ -242,7 +249,8 @@ defmodule Req.RetryTest do
 
     request = Req.merge(request, retry: :transient, retry_delay: 1, max_retries: 1)
 
-    assert Req.post!(request).status == 500
+    resp = Req.post!(request)
+    assert resp.status == 500
     assert_received :ping
     assert_received :ping
     refute_received _
@@ -261,7 +269,8 @@ defmodule Req.RetryTest do
 
     request = Req.merge(request, retry: false)
 
-    assert Req.get!(request).status == 500
+    resp = Req.get!(request)
+    assert resp.status == 500
     assert_received :ping
     refute_received _
   end
@@ -285,7 +294,8 @@ defmodule Req.RetryTest do
 
     request = Req.merge(request, retry: fun, retry_delay: 1)
 
-    assert Req.post!(request).status == 500
+    resp = Req.post!(request)
+    assert resp.status == 500
     assert_received :ping
     assert_received :ping
     assert_received :ping
@@ -312,7 +322,8 @@ defmodule Req.RetryTest do
 
     request = Req.merge(request, retry: fun)
 
-    assert Req.get!(request).status == 500
+    resp = Req.get!(request)
+    assert resp.status == 500
     assert_received :ping
     assert_received :ping
     assert_received :ping
@@ -357,7 +368,8 @@ defmodule Req.RetryTest do
         end
       )
 
-    assert Req.get!(req, params: [a: 1, b: 2], retry_delay: 1).status == 500
+    resp = Req.get!(req, params: [a: 1, b: 2], retry_delay: 1)
+    assert resp.status == 500
     assert_received :ping
     assert_received :ping
     assert_received :ping
@@ -380,7 +392,8 @@ defmodule Req.RetryTest do
         end
       )
 
-    assert Req.get!(req, retry_delay: 1, max_retries: 3).status == 500
+    resp = Req.get!(req, retry_delay: 1, max_retries: 3)
+    assert resp.status == 500
 
     # 1 initial attempt + 3 retries
     assert_received :step_ran

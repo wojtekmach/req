@@ -78,7 +78,9 @@ defmodule Req.IntegrationTest do
         body: now
       )
 
-    assert Req.get!(req, url: "/key1").body == now
+    resp = Req.get!(req, url: "/key1")
+    assert resp.status == 200
+    assert resp.body == now
 
     now = to_string(DateTime.utc_now())
 
@@ -89,6 +91,8 @@ defmodule Req.IntegrationTest do
         body: Stream.take(Stream.cycle([now]), 2)
       )
 
-    assert Req.get!(req, url: "/key1").body == String.duplicate(now, 2)
+    resp = Req.get!(req, url: "/key1")
+    assert resp.status == 200
+    assert resp.body == String.duplicate(now, 2)
   end
 end

@@ -358,7 +358,8 @@ defmodule Req.AuthTest do
       password bar
       """)
 
-      assert Req.get!(req, auth: :netrc).status == 200
+      resp = Req.get!(req, auth: :netrc)
+      assert resp.status == 200
 
       System.put_env("NETRC", "#{c.tmp_dir}/tabs")
 
@@ -368,7 +369,8 @@ defmodule Req.AuthTest do
            password bar
       """)
 
-      assert Req.get!(req, auth: :netrc).status == 200
+      resp = Req.get!(req, auth: :netrc)
+      assert resp.status == 200
 
       System.put_env("NETRC", "#{c.tmp_dir}/single_line")
 
@@ -379,7 +381,8 @@ defmodule Req.AuthTest do
       machine localhost login foo password bar
       """)
 
-      assert Req.get!(req, auth: :netrc).status == 200
+      resp = Req.get!(req, auth: :netrc)
+      assert resp.status == 200
 
       if old_netrc, do: System.put_env("NETRC", old_netrc), else: System.delete_env("NETRC")
     end
@@ -411,7 +414,8 @@ defmodule Req.AuthTest do
       password bar
       """)
 
-      assert Req.get!(req, auth: {:netrc, c.tmp_dir <> "/custom_netrc"}).status == 200
+      resp = Req.get!(req, auth: {:netrc, c.tmp_dir <> "/custom_netrc"})
+      assert resp.status == 200
 
       File.write!("#{c.tmp_dir}/wrong_netrc", """
       machine localhost
@@ -419,7 +423,8 @@ defmodule Req.AuthTest do
       password bad
       """)
 
-      assert Req.get!(req, auth: {:netrc, "#{c.tmp_dir}/wrong_netrc"}).status == 401
+      resp = Req.get!(req, auth: {:netrc, "#{c.tmp_dir}/wrong_netrc"})
+      assert resp.status == 401
 
       File.write!("#{c.tmp_dir}/empty_netrc", "")
 

@@ -5,7 +5,8 @@ defmodule Req.RedirectTest do
     %{req: req, url: url} =
       serve("GET /redirect": &send_redirect(&1, 302, "/ok"))
 
-    assert Req.get!(req, url: "#{url}/redirect", redirect: false).status == 302
+    resp = Req.get!(req, url: "#{url}/redirect", redirect: false)
+    assert resp.status == 302
   end
 
   test "absolute" do
@@ -20,7 +21,8 @@ defmodule Req.RedirectTest do
       )
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(req, url: "#{url}/redirect", retry: false).status == 200
+             resp = Req.get!(req, url: "#{url}/redirect", retry: false)
+             assert resp.status == 200
            end) =~ "[debug] redirecting to #{url}/ok\n"
   end
 
@@ -42,7 +44,8 @@ defmodule Req.RedirectTest do
       )
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(req, url: "#{url}/redirect").status == 200
+             resp = Req.get!(req, url: "#{url}/redirect")
+             assert resp.status == 200
            end) =~ "[debug] redirecting to /ok\n"
 
     # 1 initial request + 1 redirect hop
@@ -109,7 +112,8 @@ defmodule Req.RedirectTest do
         )
 
       assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.post!(req, url: "#{url}/redirect", body: "body").status == 200
+               resp = Req.post!(req, url: "#{url}/redirect", body: "body")
+               assert resp.status == 200
              end) =~ "[debug] redirecting to #{url}/ok\n"
     end
   end
@@ -129,7 +133,8 @@ defmodule Req.RedirectTest do
         end
       )
 
-    assert Req.post!(req, url: "#{url}/redirect", json: %{a: 1}).status == 200
+    resp = Req.post!(req, url: "#{url}/redirect", json: %{a: 1})
+    assert resp.status == 200
   end
 
   test "do not change method on 307 and 308" do
@@ -143,7 +148,8 @@ defmodule Req.RedirectTest do
         )
 
       assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.post!(req, url: "#{url}/redirect", body: "body").status == 200
+               resp = Req.post!(req, url: "#{url}/redirect", body: "body")
+               assert resp.status == 200
              end) =~ "[debug] redirecting to #{url}/ok\n"
     end
   end
@@ -159,7 +165,8 @@ defmodule Req.RedirectTest do
         )
 
       assert ExUnit.CaptureLog.capture_log(fn ->
-               assert Req.head!(req, url: "#{url}/redirect").status == 200
+               resp = Req.head!(req, url: "#{url}/redirect")
+               assert resp.status == 200
              end) =~ "[debug] redirecting to #{url}/ok\n"
     end
   end
@@ -172,7 +179,8 @@ defmodule Req.RedirectTest do
         end
       )
 
-    assert Req.post!(req, url: "#{url}/redirect").status == 303
+    resp = Req.post!(req, url: "#{url}/redirect")
+    assert resp.status == 303
   end
 
   test "auth same host" do
@@ -190,8 +198,8 @@ defmodule Req.RedirectTest do
       end)
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(req, url: "#{url}/redirect", auth: {:basic, "foo:bar"}).status ==
-                      200
+             resp = Req.get!(req, url: "#{url}/redirect", auth: {:basic, "foo:bar"})
+             assert resp.status == 200
            end) =~ "[debug] redirecting to #{url}/auth\n"
   end
 
@@ -208,10 +216,10 @@ defmodule Req.RedirectTest do
       end)
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(req,
-                      auth: {:basic, "authorization:credentials"},
-                      redirect_trusted: true
-                    ).status == 200
+             resp =
+               Req.get!(req, auth: {:basic, "authorization:credentials"}, redirect_trusted: true)
+
+             assert resp.status == 200
            end) =~ "[debug] redirecting to http://127.0.0.1:#{url.port}/ok\n"
   end
 
@@ -228,7 +236,8 @@ defmodule Req.RedirectTest do
       end)
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(req, auth: {:basic, "foo:bar"}).status == 200
+             resp = Req.get!(req, auth: {:basic, "foo:bar"})
+             assert resp.status == 200
            end) =~ "[debug] redirecting to http://127.0.0.1:#{url.port}/ok\n"
   end
 
@@ -249,7 +258,8 @@ defmodule Req.RedirectTest do
     req = Req.new(url: trusted_url, adapter: adapter_fun())
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(req, auth: {:basic, "foo:bar"}).status == 200
+             resp = Req.get!(req, auth: {:basic, "foo:bar"})
+             assert resp.status == 200
            end) =~ "[debug] redirecting to #{untrusted_url}/ok\n"
   end
 
@@ -275,7 +285,8 @@ defmodule Req.RedirectTest do
       )
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(req, auth: {:basic, "authorization:credentials"}).status == 200
+             resp = Req.get!(req, auth: {:basic, "authorization:credentials"})
+             assert resp.status == 200
            end) =~ "[debug] redirecting to #{untrusted_url}/ok\n"
   end
 
@@ -301,7 +312,8 @@ defmodule Req.RedirectTest do
 
     log =
       ExUnit.CaptureLog.capture_log(fn ->
-        assert Req.get!(req).status == 200
+        resp = Req.get!(req)
+        assert resp.status == 200
       end)
 
     assert log =~ "[warning] stripping userinfo from redirect location\n"
@@ -321,7 +333,8 @@ defmodule Req.RedirectTest do
       )
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(req, url: "#{url}/redirect", params: [a: 1]).status == 200
+             resp = Req.get!(req, url: "#{url}/redirect", params: [a: 1])
+             assert resp.status == 200
            end) =~ "[debug] redirecting to #{url}/ok\n"
   end
 
@@ -358,7 +371,8 @@ defmodule Req.RedirectTest do
       )
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(req, url: "#{url}/redirect").status == 200
+             resp = Req.get!(req, url: "#{url}/redirect")
+             assert resp.status == 200
            end) =~ "[debug] redirecting to /ok\n"
   end
 
@@ -370,8 +384,8 @@ defmodule Req.RedirectTest do
       )
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(req, url: "#{url}/redirect", redirect_log_level: :error).status ==
-                      200
+             resp = Req.get!(req, url: "#{url}/redirect", redirect_log_level: :error)
+             assert resp.status == 200
            end) =~ "[error] redirecting to /ok\n"
   end
 
@@ -382,7 +396,8 @@ defmodule Req.RedirectTest do
         "GET /ok": &send_resp(&1, 200, "ok")
       )
 
-    assert Req.get!(req, url: "#{url}/redirect", redirect_log_level: false).status == 200
+    resp = Req.get!(req, url: "#{url}/redirect", redirect_log_level: false)
+    assert resp.status == 200
   end
 
   test "inherit scheme" do
@@ -397,7 +412,8 @@ defmodule Req.RedirectTest do
     "http:" <> no_scheme = "#{url}"
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             assert Req.get!(req, url: "#{url}/redirect").status == 200
+             resp = Req.get!(req, url: "#{url}/redirect")
+             assert resp.status == 200
            end) =~ "[debug] redirecting to #{no_scheme}/ok\n"
   end
 end

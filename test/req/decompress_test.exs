@@ -219,6 +219,8 @@ defmodule Req.DecompressTest do
     %{req: req} =
       serve("HEAD /": &send_resp_gzip(&1, ""))
 
-    assert Req.head!(req, compressed: true).body == ""
+    resp = Req.head!(req, compressed: true)
+    assert resp.status == 200
+    assert resp.body == ""
   end
 end

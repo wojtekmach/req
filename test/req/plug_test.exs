@@ -10,7 +10,9 @@ defmodule Req.PlugTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end
 
-    assert Req.post!(plug: plug, json: %{a: 1}).body == "ok"
+    resp = Req.post!(plug: plug, json: %{a: 1})
+    assert resp.status == 200
+    assert resp.body == "ok"
   end
 
   test "partially reading body" do
@@ -28,7 +30,9 @@ defmodule Req.PlugTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end
 
-    assert Req.post!(plug: plug, json: %{a: 1}).body == "ok"
+    resp = Req.post!(plug: plug, json: %{a: 1})
+    assert resp.status == 200
+    assert resp.body == "ok"
   end
 
   test "reading json body with parsers" do
@@ -49,7 +53,9 @@ defmodule Req.PlugTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end
 
-    assert Req.post!(plug: plug, json: %{a: 1}).body == "ok"
+    resp = Req.post!(plug: plug, json: %{a: 1})
+    assert resp.status == 200
+    assert resp.body == "ok"
   end
 
   test "reading binary body" do
@@ -61,7 +67,9 @@ defmodule Req.PlugTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end
 
-    assert Req.post!(plug: plug, body: "foo").body == "ok"
+    resp = Req.post!(plug: plug, body: "foo")
+    assert resp.status == 200
+    assert resp.body == "ok"
   end
 
   test "reading binary body with parsers" do
@@ -83,7 +91,9 @@ defmodule Req.PlugTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end
 
-    assert Req.post!(plug: plug, body: "foo").body == "ok"
+    resp = Req.post!(plug: plug, body: "foo")
+    assert resp.status == 200
+    assert resp.body == "ok"
   end
 
   test "request" do
@@ -94,7 +104,9 @@ defmodule Req.PlugTest do
       send_resp(conn, 200, "ok")
     end
 
-    assert Req.request!(plug: plug, json: %{a: 1}, params: %{foo: <<0xFF>>}).body == "ok"
+    resp = Req.request!(plug: plug, json: %{a: 1}, params: %{foo: <<0xFF>>})
+    assert resp.status == 200
+    assert resp.body == "ok"
     refute_receive _
   end
 
@@ -108,7 +120,9 @@ defmodule Req.PlugTest do
         body: Stream.take(~w[foo foo foo], 2)
       )
 
-    assert Req.request!(req).body == "foofoo"
+    resp = Req.request!(req)
+    assert resp.status == 200
+    assert resp.body == "foofoo"
     refute_receive _
   end
 
@@ -146,7 +160,9 @@ defmodule Req.PlugTest do
       send_resp(conn, 200, "ok")
     end
 
-    assert Req.request!(plug: plug, params: [a: 1]).body == "ok"
+    resp = Req.request!(plug: plug, params: [a: 1])
+    assert resp.status == 200
+    assert resp.body == "ok"
   end
 
   test "fetches request body" do
@@ -156,7 +172,9 @@ defmodule Req.PlugTest do
       send_resp(conn, 200, "ok")
     end
 
-    assert Req.post!(plug: plug, json: %{a: 1}).body == "ok"
+    resp = Req.post!(plug: plug, json: %{a: 1})
+    assert resp.status == 200
+    assert resp.body == "ok"
   end
 
   test "into: fun" do
@@ -343,8 +361,8 @@ defmodule Req.PlugTest do
         retry: false
       )
 
-    assert Req.request(req) ==
-             {:error, %Req.TransportError{reason: :timeout}}
+    {:error, err} = Req.request(req)
+    assert err == %Req.TransportError{reason: :timeout}
   end
 
   test "compressed request body" do

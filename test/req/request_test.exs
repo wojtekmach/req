@@ -15,7 +15,9 @@ defmodule Req.RequestTest do
     end)
 
     request = new(url: c.url <> "/ok")
-    assert {:ok, %{status: 200, body: "ok"}} = Req.Request.run(request)
+    {:ok, resp} = Req.Request.run(request)
+    assert resp.status == 200
+    assert resp.body == "ok"
   end
 
   test "merge_options/2: deprecated options" do
@@ -40,7 +42,9 @@ defmodule Req.RequestTest do
         end
       )
 
-    assert {:ok, %{status: 200, body: "ok"}} = Req.Request.run(request)
+    {:ok, resp} = Req.Request.run(request)
+    assert resp.status == 200
+    assert resp.body == "ok"
   end
 
   test "step as MFArgs", c do
@@ -52,7 +56,9 @@ defmodule Req.RequestTest do
       new(url: c.url)
       |> Req.Request.prepend_request_steps(foo: {__MODULE__, :simple_step, [:hi]})
 
-    assert {:ok, %{status: 200, body: "ok"}} = Req.Request.run(request)
+    {:ok, resp} = Req.Request.run(request)
+    assert resp.status == 200
+    assert resp.body == "ok"
     assert_received :hi
   end
 
@@ -75,7 +81,9 @@ defmodule Req.RequestTest do
         end
       )
 
-    assert {:ok, %{status: 200, body: "from cache - updated"}} = Req.Request.run(request)
+    {:ok, resp} = Req.Request.run(request)
+    assert resp.status == 200
+    assert resp.body == "from cache - updated"
   end
 
   test "request step returns exception", c do
@@ -92,7 +100,8 @@ defmodule Req.RequestTest do
         end
       )
 
-    assert {:error, %RuntimeError{message: "oops - updated"}} = Req.Request.run(request)
+    {:error, err} = Req.Request.run(request)
+    assert err == %RuntimeError{message: "oops - updated"}
   end
 
   test "request step halts with response", c do
@@ -107,7 +116,9 @@ defmodule Req.RequestTest do
       |> Req.Request.prepend_response_steps(foo: &unreachable/1)
       |> Req.Request.prepend_error_steps(foo: &unreachable/1)
 
-    assert {:ok, %{status: 200, body: "from cache"}} = Req.Request.run(request)
+    {:ok, resp} = Req.Request.run(request)
+    assert resp.status == 200
+    assert resp.body == "from cache"
   end
 
   test "request step halts with exception", c do
@@ -122,7 +133,8 @@ defmodule Req.RequestTest do
       |> Req.Request.prepend_response_steps(foo: &unreachable/1)
       |> Req.Request.prepend_error_steps(foo: &unreachable/1)
 
-    assert {:error, %RuntimeError{message: "oops"}} = Req.Request.run(request)
+    {:error, err} = Req.Request.run(request)
+    assert err == %RuntimeError{message: "oops"}
   end
 
   test "simple response step", c do
@@ -138,7 +150,9 @@ defmodule Req.RequestTest do
         end
       )
 
-    assert {:ok, %{status: 200, body: "ok - updated"}} = Req.Request.run(request)
+    {:ok, resp} = Req.Request.run(request)
+    assert resp.status == 200
+    assert resp.body == "ok - updated"
   end
 
   test "response step returns exception", c do
@@ -160,7 +174,8 @@ defmodule Req.RequestTest do
         end
       )
 
-    assert {:error, %RuntimeError{message: "oops - updated"}} = Req.Request.run(request)
+    {:error, err} = Req.Request.run(request)
+    assert err == %RuntimeError{message: "oops - updated"}
   end
 
   test "response step halts with response", c do
@@ -178,7 +193,9 @@ defmodule Req.RequestTest do
       )
       |> Req.Request.prepend_error_steps(foo: &unreachable/1)
 
-    assert {:ok, %{status: 200, body: "ok - updated"}} = Req.Request.run(request)
+    {:ok, resp} = Req.Request.run(request)
+    assert resp.status == 200
+    assert resp.body == "ok - updated"
   end
 
   test "response step halts with exception", c do
@@ -197,7 +214,8 @@ defmodule Req.RequestTest do
       )
       |> Req.Request.prepend_error_steps(foo: &unreachable/1)
 
-    assert {:error, %RuntimeError{message: "oops"}} = Req.Request.run(request)
+    {:error, err} = Req.Request.run(request)
+    assert err == %RuntimeError{message: "oops"}
   end
 
   test "simple error step", c do
@@ -212,7 +230,8 @@ defmodule Req.RequestTest do
         end
       )
 
-    assert {:error, %RuntimeError{message: "oops"}} = Req.Request.run(request)
+    {:error, err} = Req.Request.run(request)
+    assert err == %RuntimeError{message: "oops"}
   end
 
   test "error step returns response", c do
@@ -233,7 +252,9 @@ defmodule Req.RequestTest do
         bar: &unreachable/1
       )
 
-    assert {:ok, %{status: 200, body: "ok - updated"}} = Req.Request.run(request)
+    {:ok, resp} = Req.Request.run(request)
+    assert resp.status == 200
+    assert resp.body == "ok - updated"
   end
 
   test "error step halts with response", c do
@@ -250,7 +271,9 @@ defmodule Req.RequestTest do
         bar: &unreachable/1
       )
 
-    assert {:ok, %{status: 200, body: "ok"}} = Req.Request.run(request)
+    {:ok, resp} = Req.Request.run(request)
+    assert resp.status == 200
+    assert resp.body == "ok"
   end
 
   # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
