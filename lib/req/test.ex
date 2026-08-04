@@ -572,7 +572,7 @@ defmodule Req.Test do
 
   Let's simulate a server that is having issues: on the first request it is not responding
   and on the following two requests it returns an HTTP 500. Only on the third request it returns
-  an HTTP 200. Req by default automatically retries transient errors (using `Req.Steps.retry/1`)
+  an HTTP 200. Req by default automatically retries transient errors (using `Req.Retry`)
   so it will make multiple requests exercising all of our request expectations:
 
       iex> Req.Test.expect(MyStub, &Req.Test.transport_error(&1, :econnrefused))
