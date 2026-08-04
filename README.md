@@ -55,7 +55,7 @@ write new ones.
 
   * Follows redirects (via [`redirect`] step.)
 
-  * Retries on errors (via [`retry`] step.)
+  * Retries on errors (via [`Req.Retry`] step.)
 
   * Raise on 4xx/5xx errors (via [`handle_http_errors`] step.)
 
@@ -261,6 +261,7 @@ limitations under the License.
 [`Req.Checksum`]:        https://hexdocs.pm/req/Req.Checksum.html
 [`Req.Decode`]:          https://hexdocs.pm/req/Req.Decode.html
 [`Req.Decompress`]:      https://hexdocs.pm/req/Req.Decompress.html
+[`Req.Retry`]:           https://hexdocs.pm/req/Req.Retry.html
 [`Req.Steps`]:           https://hexdocs.pm/req/Req.Steps.html
 [`Req.Test`]:            https://hexdocs.pm/req/Req.Test.html
 
@@ -274,7 +275,6 @@ limitations under the License.
 [`put_path_params`]:    https://hexdocs.pm/req/Req.Steps.html#put_path_params/1
 [`put_range`]:          https://hexdocs.pm/req/Req.Steps.html#put_range/1
 [`put_user_agent`]:     https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
-[`retry`]:              https://hexdocs.pm/req/Req.Steps.html#retry/1
 [`put_aws_sigv4`]:       https://hexdocs.pm/req/Req.Steps.html#put_aws_sigv4/1
 
 [Finch]: https://github.com/sneako/finch
