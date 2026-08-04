@@ -15,7 +15,9 @@ defmodule Req.DefaultOptionsTest do
     end)
 
     Req.default_options(params: %{"foo" => "bar"})
-    Req.get!(c.url)
+    resp = Req.stream!(c.url)
+    assert resp.status == 200
+    assert resp.body == "ok"
     assert_received {:params, %{"foo" => "bar"}}
   after
     Application.put_env(:req, :default_options, [])

@@ -3,7 +3,7 @@ defmodule Req.IntegrationTest do
 
   @moduletag :integration
 
-  # for Req.Steps.auth/1 doctest
+  # for Req.Auth doctest
   defmodule Authentication do
     def fetch_token, do: {:basic, "foo:bar"}
   end
@@ -36,18 +36,16 @@ defmodule Req.IntegrationTest do
 
   doctest Req.Request,
     only: [
-      new: 1,
-      run_request: 1
+      new: 1
     ]
+
+  doctest Req.Auth
+
+  doctest Req.Expect
 
   doctest Req.Steps,
     only: [
-      auth: 1,
-      checksum: 1,
-      compressed: 1,
-      decompress_body: 1,
       encode_body: 1,
-      handle_http_errors: 1,
       put_base_url: 1,
       put_params: 1,
       put_path_params: 1,
@@ -78,9 +76,7 @@ defmodule Req.IntegrationTest do
         body: now
       )
 
-    resp = Req.get!(req, url: "/key1")
-    assert resp.status == 200
-    assert resp.body == now
+    assert Req.get!(req, url: "/key1").body == now
 
     now = to_string(DateTime.utc_now())
 
@@ -91,8 +87,6 @@ defmodule Req.IntegrationTest do
         body: Stream.take(Stream.cycle([now]), 2)
       )
 
-    resp = Req.get!(req, url: "/key1")
-    assert resp.status == 200
-    assert resp.body == String.duplicate(now, 2)
+    assert Req.get!(req, url: "/key1").body == String.duplicate(now, 2)
   end
 end

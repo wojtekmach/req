@@ -6,18 +6,18 @@ defmodule Req.StepsTest do
       %{req: req, url: url} =
         serve("GET /": &send_resp(&1, 200, "ok"))
 
-      resp = Req.get!(req, base_url: url, url: "/")
+      resp = Req.stream!(req, base_url: url, url: "/")
       assert resp.status == 200
       assert resp.body == "ok"
-      resp = Req.get!(req, base_url: url, url: "")
+      resp = Req.stream!(req, base_url: url, url: "")
       assert resp.status == 200
       assert resp.body == "ok"
 
       req = Req.merge(req, base_url: url)
-      resp = Req.get!(req, url: "/")
+      resp = Req.stream!(req, url: "/")
       assert resp.status == 200
       assert resp.body == "ok"
-      resp = Req.get!(req, url: "")
+      resp = Req.stream!(req, url: "")
       assert resp.status == 200
       assert resp.body == "ok"
     end
@@ -26,7 +26,7 @@ defmodule Req.StepsTest do
       %{req: req, url: url} =
         serve("GET /": &send_resp(&1, 200, "ok"))
 
-      resp = Req.get!(req, base_url: "ignored", url: url)
+      resp = Req.stream!(req, base_url: "ignored", url: url)
       assert resp.status == 200
       assert resp.body == "ok"
     end
@@ -35,19 +35,23 @@ defmodule Req.StepsTest do
       %{req: req, url: url} =
         serve("GET /api/v2/foo": &send_resp(&1, 200, "ok"))
 
-      resp = Req.get!(req, base_url: "#{url}/api/v2", url: "/foo", retry: false)
+      resp = Req.stream!(req, base_url: "#{url}/api/v2", url: "/foo", retry: false)
       assert resp.status == 200
       assert resp.body == "ok"
-      resp = Req.get!(req, base_url: "#{url}/api/v2", url: "foo")
+
+      resp = Req.stream!(req, base_url: "#{url}/api/v2", url: "foo")
       assert resp.status == 200
       assert resp.body == "ok"
-      resp = Req.get!(req, base_url: "#{url}/api/v2/", url: "/foo")
+
+      resp = Req.stream!(req, base_url: "#{url}/api/v2/", url: "/foo")
       assert resp.status == 200
       assert resp.body == "ok"
-      resp = Req.get!(req, base_url: "#{url}/api/v2/", url: "foo")
+
+      resp = Req.stream!(req, base_url: "#{url}/api/v2/", url: "foo")
       assert resp.status == 200
       assert resp.body == "ok"
-      resp = Req.get!(req, base_url: "#{url}/api/v2/foo", url: "")
+
+      resp = Req.stream!(req, base_url: "#{url}/api/v2/foo", url: "")
       assert resp.status == 200
       assert resp.body == "ok"
     end
@@ -61,16 +65,19 @@ defmodule Req.StepsTest do
           "GET /api/v1": &send_resp(&1, 200, "ok")
         )
 
-      resp = Req.get!(req, base_url: fn -> "#{url}/api/v1" end, url: "")
+      resp = Req.stream!(req, base_url: fn -> "#{url}/api/v1" end, url: "")
       assert resp.status == 200
       assert resp.body == "ok"
-      resp = Req.get!(req, base_url: fn -> "#{url}/api/v1" end, url: "foo")
+
+      resp = Req.stream!(req, base_url: fn -> "#{url}/api/v1" end, url: "foo")
       assert resp.status == 200
       assert resp.body == "ok"
-      resp = Req.get!(req, base_url: fn -> URI.new!("#{url}/api/v1") end, url: "")
+
+      resp = Req.stream!(req, base_url: fn -> URI.new!("#{url}/api/v1") end, url: "")
       assert resp.status == 200
       assert resp.body == "ok"
-      resp = Req.get!(req, base_url: {URI, :new!, ["#{url}/api/v1"]}, url: "")
+
+      resp = Req.stream!(req, base_url: {URI, :new!, ["#{url}/api/v1"]}, url: "")
       assert resp.status == 200
       assert resp.body == "ok"
     end
@@ -88,7 +95,7 @@ defmodule Req.StepsTest do
           end
         )
 
-      resp = Req.post!(req, body: "foo")
+      resp = Req.stream!(req, method: :post, body: "foo")
       assert resp.status == 200
       assert resp.body == "foo"
     end
@@ -102,7 +109,7 @@ defmodule Req.StepsTest do
           end
         )
 
-      resp = Req.post!(req, body: Stream.take(~w[foo foo foo], 2))
+      resp = Req.stream!(req, method: :post, body: Stream.take(~w[foo foo foo], 2))
       assert resp.status == 200
       assert resp.body == "foofoo"
     end
@@ -119,7 +126,9 @@ defmodule Req.StepsTest do
           end
         )
 
-      Req.post!(req, json: %{a: 1})
+      resp = Req.stream!(req, method: :post, json: %{a: 1})
+      assert resp.status == 200
+      assert resp.body == ""
     end
 
     test "form" do
@@ -131,8 +140,12 @@ defmodule Req.StepsTest do
           end
         )
 
-      Req.post!(req, form: [a: 1])
-      Req.post!(req, form: %{a: 1})
+      resp = Req.stream!(req, method: :post, form: [a: 1])
+      assert resp.status == 200
+      assert resp.body == ""
+      resp = Req.stream!(req, method: :post, form: %{a: 1})
+      assert resp.status == 200
+      assert resp.body == ""
     end
 
     @tag :tmp_dir
@@ -159,7 +172,8 @@ defmodule Req.StepsTest do
         )
 
       resp =
-        Req.post!(req,
+        Req.stream!(req,
+          method: :post,
           form_multipart: [
             a: 1,
             b: File.stream!("#{tmp_dir}/b.txt"),
@@ -168,6 +182,7 @@ defmodule Req.StepsTest do
         )
 
       assert resp.status == 200
+      assert resp.body == "ok"
     end
 
     test "form_multipart enum without size" do
@@ -186,7 +201,8 @@ defmodule Req.StepsTest do
         )
 
       resp =
-        Req.post!(req,
+        Req.stream!(req,
+          method: :post,
           form_multipart: [
             a: 1,
             b:
@@ -196,6 +212,7 @@ defmodule Req.StepsTest do
         )
 
       assert resp.status == 200
+      assert resp.body == "ok"
     end
 
     @tag :capture_log
@@ -212,8 +229,11 @@ defmodule Req.StepsTest do
           end
         )
 
-      resp = Req.post!(req, form_multipart: [a: 1], retry: :transient, retry_delay: 1)
+      resp =
+        Req.stream!(req, method: :post, form_multipart: [a: 1], retry: :transient, retry_delay: 1)
+
       assert resp.status == 200
+      assert resp.body == ""
     end
 
     test "GET to POST" do
@@ -224,19 +244,19 @@ defmodule Req.StepsTest do
           "PUT /": &send_resp(&1, 200, &1.method)
         )
 
-      resp = Req.request!(req)
+      resp = Req.stream!(req)
       assert resp.status == 200
       assert resp.body == "GET"
-      resp = Req.request!(req, body: "")
+      resp = Req.stream!(req, body: "")
       assert resp.status == 200
       assert resp.body == "POST"
-      resp = Req.request!(req, body: "foo")
+      resp = Req.stream!(req, body: "foo")
       assert resp.status == 200
       assert resp.body == "POST"
-      resp = Req.request!(req, json: %{a: 1})
+      resp = Req.stream!(req, json: %{a: 1})
       assert resp.status == 200
       assert resp.body == "POST"
-      resp = Req.request!(req, json: %{a: 1}, method: :put)
+      resp = Req.stream!(req, json: %{a: 1}, method: :put)
       assert resp.status == 200
       assert resp.body == "PUT"
     end
@@ -250,16 +270,18 @@ defmodule Req.StepsTest do
         end
       )
 
-    resp = Req.get!(req, params: [x: 1, y: 2])
+    resp = Req.stream!(req, params: [x: 1, y: 2])
     assert resp.status == 200
     assert resp.body == "x=1&y=2"
-    resp = Req.get!(req, params: [x: 1, x: 2])
+    resp = Req.stream!(req, params: [x: 1, x: 2])
     assert resp.status == 200
     assert resp.body == "x=2"
-    resp = Req.get!(req, url: "#{url}?x=1", params: [x: 9, y: 2])
+
+    resp = Req.stream!(req, url: "#{url}?x=1", params: [x: 9, y: 2])
     assert resp.status == 200
     assert resp.body == "x=9&y=2"
-    resp = Req.get!(req, url: "#{url}?x=1&x=2&y=1", params: [x: 9])
+
+    resp = Req.stream!(req, url: "#{url}?x=1&x=2&y=1", params: [x: 9])
     assert resp.status == 200
     assert resp.body == "x=9&x=2&y=1"
   end
@@ -270,7 +292,7 @@ defmodule Req.StepsTest do
       serve("GET /": &send_resp(&1, 200, ""))
 
     assert_raise ArgumentError, "encode_query/2 values cannot be lists, got: [1, 2]", fn ->
-      Req.get!(req, params: [a: [1, 2]])
+      Req.stream!(req, params: [a: [1, 2]])
     end
   end
 
@@ -278,14 +300,14 @@ defmodule Req.StepsTest do
     %{req: req, url: url} =
       serve(&send_resp(&1, 200, &1.request_path))
 
-    resp = Req.get!(req, url: "#{url}/:id/ola", path_params: [id: "abc|def"])
+    resp = Req.stream!(req, url: "#{url}/:id/ola", path_params: [id: "abc|def"])
     assert resp.status == 200
     assert resp.body == "/abc%7Cdef/ola"
 
     # With :curly style.
 
     resp =
-      Req.get!(req,
+      Req.stream!(req,
         url: "#{url}/{id}:bar",
         path_params: [id: "abc|def"],
         path_params_style: :curly
@@ -299,21 +321,27 @@ defmodule Req.StepsTest do
   test "put_path_params does not expand curly segments in :colon style" do
     %{req: req, url: url} = serve("GET /": &send_resp(&1, 200, ""))
 
-    {:error, err} =
-      Req.request(req, url: "#{url}/:id{ola}", path_params: [id: "abc"], retry: false)
+    {:error, err, resp} =
+      Req.stream(req, url: "#{url}/:id{ola}", path_params: [id: "abc"], retry: false)
 
     assert err == %Req.HTTPError{protocol: :http1, reason: {:invalid_request_target, "/abc{ola}"}}
+    assert resp.status == nil
+    assert resp.body == ""
   end
 
   test "put_path_params when path_params are empty still sets the template" do
     %{req: req, url: url} =
       serve("GET /bar": &send_resp(&1, 200, ""))
 
-    {sent, _resp} = Req.run!(req, url: "#{url}/bar", path_params: [])
-    assert Req.Request.get_private(sent, :path_params_template)
+    resp = Req.stream!(req, url: "#{url}/bar", path_params: [])
+    assert resp.status == 200
+    assert resp.body == ""
+    assert resp.request.private.path_params_template == "/bar"
 
-    {sent, _resp} = Req.run!(req, url: "#{url}/bar")
-    refute Req.Request.get_private(sent, :path_params_template)
+    resp = Req.stream!(req, url: "#{url}/bar")
+    assert resp.status == 200
+    assert resp.body == ""
+    assert resp.request.private == %{}
   end
 
   @tag :capture_log
@@ -321,26 +349,26 @@ defmodule Req.StepsTest do
     %{req: req, url: url} =
       serve("GET /users/123": &send_resp(&1, 500, ""))
 
-    {req, resp} =
-      Req.run!(req, url: "#{url}/users/:id", path_params: [id: 123], retry_delay: 1)
+    resp = Req.stream!(req, url: "#{url}/users/:id", path_params: [id: 123], retry_delay: 1)
 
     assert resp.status == 500
-    assert req.url.path == "/users/123"
-    assert Req.Request.get_private(req, :path_params_template) == "/users/:id"
+    assert resp.body == ""
+    assert resp.request.url.path == "/users/123"
+    assert resp.request.private.path_params_template == "/users/:id"
   end
 
   test "put_path_params properly escapes reserved characters" do
     %{req: req, url: url} =
       serve(&send_resp(&1, 200, &1.request_path))
 
-    resp = Req.get!(req, url: "#{url}/:id/ola", path_params: [id: "abc#def"])
+    resp = Req.stream!(req, url: "#{url}/:id/ola", path_params: [id: "abc#def"])
     assert resp.status == 200
     assert resp.body == "/abc%23def/ola"
 
     # With :curly style.
 
     resp =
-      Req.get!(req,
+      Req.stream!(req,
         url: "#{url}/{id}:bar",
         path_params: [id: "abc#def"],
         path_params_style: :curly
@@ -359,10 +387,10 @@ defmodule Req.StepsTest do
         end
       )
 
-    resp = Req.get!(req, range: "bytes=0-10")
+    resp = Req.stream!(req, range: "bytes=0-10")
     assert resp.status == 200
     assert resp.body == "bytes=0-10"
-    resp = Req.get!(req, range: 0..20)
+    resp = Req.stream!(req, range: 0..20)
     assert resp.status == 200
     assert resp.body == "bytes=0-20"
   end
@@ -386,8 +414,13 @@ defmodule Req.StepsTest do
           end
         )
 
-      Req.post!(req, json: %{a: 1})
-      Req.post!(req, json: %{a: 1}, compress_body: true)
+      resp = Req.stream!(req, method: :post, json: %{a: 1})
+      assert resp.status == 200
+      assert resp.body == ""
+
+      resp = Req.stream!(req, method: :post, json: %{a: 1}, compress_body: true)
+      assert resp.status == 200
+      assert resp.body == ""
     end
 
     @tag :transport
@@ -401,7 +434,16 @@ defmodule Req.StepsTest do
           end
         )
 
-      Req.post!(req, body: "foo", compress_body: true, headers: [content_encoding: "br"])
+      resp =
+        Req.stream!(req,
+          method: :post,
+          body: "foo",
+          compress_body: true,
+          headers: [content_encoding: "br"]
+        )
+
+      assert resp.status == 200
+      assert resp.body == ""
     end
 
     test "stream" do
@@ -424,28 +466,15 @@ defmodule Req.StepsTest do
           end
         )
 
-      resp = Req.post!(req, body: Stream.take(~w[foo foo foo], 2), compress_body: true)
+      resp =
+        Req.stream!(req,
+          method: :post,
+          body: Stream.take(~w[foo foo foo], 2),
+          compress_body: true
+        )
+
       assert resp.status == 200
       assert resp.body == "foofoo"
-    end
-
-    test "req_body_fun" do
-      req_body_fun = fn
-        %Req.Request{private: %{phase: :done}} = request ->
-          {:done, request}
-
-        %Req.Request{} = request ->
-          request = Req.Request.put_private(request, :phase, :done)
-          {:data, "foo", request}
-      end
-
-      %{req: req} = serve("POST /": &send_resp(&1, 200, ""))
-
-      assert_raise ArgumentError,
-                   "compress_body does not support req_body_fun",
-                   fn ->
-                     Req.post!(req, body: req_body_fun, compress_body: true)
-                   end
     end
 
     test "nil body" do
@@ -457,7 +486,7 @@ defmodule Req.StepsTest do
           end
         )
 
-      resp = Req.get!(req, compress_body: true)
+      resp = Req.stream!(req, compress_body: true)
       assert resp.status == 200
       assert resp.body == "ok"
     end
@@ -485,7 +514,7 @@ defmodule Req.StepsTest do
           plug: plug
         )
 
-      resp = Req.put!(req)
+      resp = Req.stream!(req, method: :put)
       assert resp.status == 200
       assert resp.body == "ok"
     end
@@ -512,7 +541,7 @@ defmodule Req.StepsTest do
           plug: plug
         )
 
-      resp = Req.put!(req)
+      resp = Req.stream!(req, method: :put)
       assert resp.status == 200
       assert resp.body == "ok"
     end
@@ -593,7 +622,7 @@ defmodule Req.StepsTest do
           plug: plug
         )
 
-      resp = Req.put!(req)
+      resp = Req.stream!(req, method: :put)
       assert resp.status == 200
       assert resp.body == "ok"
     end
@@ -602,7 +631,7 @@ defmodule Req.StepsTest do
       req = Req.new(aws_sigv4: [])
 
       assert_raise ArgumentError, "missing :access_key_id in :aws_sigv4 option", fn ->
-        Req.get(req)
+        Req.stream(req)
       end
     end
 
@@ -610,7 +639,7 @@ defmodule Req.StepsTest do
       req = Req.new(aws_sigv4: [access_key_id: "foo"])
 
       assert_raise ArgumentError, "missing :secret_access_key in :aws_sigv4 option", fn ->
-        Req.get(req)
+        Req.stream(req)
       end
     end
 
@@ -624,7 +653,7 @@ defmodule Req.StepsTest do
         )
 
       assert_raise ArgumentError, "missing :service in :aws_sigv4 option", fn ->
-        Req.get(req)
+        Req.stream(req)
       end
     end
   end

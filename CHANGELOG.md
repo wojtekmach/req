@@ -1023,7 +1023,7 @@ resp.body #=> %File.Stream{}
 ## v0.3.8 (2023-05-22)
 
   * Add `:redact_auth` option to redact auth credentials, defaults to `true`.
-  * Soft-deprecate `Req.Request.run,run!` in favour of [`Req.Request.run_request/1`].
+  * Soft-deprecate `Req.Request.run,run!` in favour of `Req.Request.run_request/1`.
 
 ## v0.3.7 (2023-05-18)
 
@@ -1493,7 +1493,6 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
 [`Req.Request`]:                     https://hexdocs.pm/req/Req.Request.html
 [`Req.Request.new/1`]:               https://hexdocs.pm/req/Req.Request.html#new/1
-[`Req.Request.run_request/1`]:       https://hexdocs.pm/req/Req.Request.html#run_request/1
 [`Req.Request.put_option/3`]:        https://hexdocs.pm/req/Req.Request.html#put_option/3
 [`Req.Request.put_new_option/3`]:    https://hexdocs.pm/req/Req.Request.html#put_new_option/3
 [`Req.Request.merge_options/2`]:     https://hexdocs.pm/req/Req.Request.html#merge_options/2
