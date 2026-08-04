@@ -73,6 +73,7 @@ defmodule Req.Steps do
       compressed: &Req.Steps.compressed/1,
       encode_body: &Req.Steps.encode_body/1,
       put_base_url: &Req.Steps.put_base_url/1,
+      auth: Req.Auth,
       auth: &Req.Steps.auth/1,
       put_params: &Req.Steps.put_params/1,
       put_path_params: &Req.Steps.put_path_params/1,
@@ -222,7 +223,7 @@ defmodule Req.Steps do
 
   """
   @doc step: :request
-  defdelegate auth(request), to: Req.Auth
+  defdelegate auth(request), to: Req.Auth, as: :legacy_auth
 
   @user_agent "req/#{Mix.Project.config()[:version]}"
 
