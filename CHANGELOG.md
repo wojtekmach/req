@@ -85,9 +85,9 @@
   * [`redirect`]: Clear the request body, body options, and content headers when
     changing POST to GET after a 301, 302, or 303 response.
 
-  * [`retry`]: Use jitter by default.
+  * `retry`: Use jitter by default.
 
-  * [`retry`]: Honor configured `:retry_delay` over `Retry-After`.
+  * `retry`: Honor configured `:retry_delay` over `Retry-After`.
 
   * **(BREAKING CHANGE)** Remove deprecated `follow_redirects` step.
 
@@ -164,13 +164,13 @@
   * `run_finch`: Normalize `Finch.TransportError` and `Finch.HTTPError`
     (introduced in Finch v0.22.0) into `Req.TransportError` and `Req.HTTPError`.
 
-  * [`retry`]: Automatically retry on `:pool_not_available`.
+  * `retry`: Automatically retry on `:pool_not_available`.
 
   * Require Finch ~> 0.21.0 or ~> 0.22.0.
 
 ## v0.5.17 (2026-01-22)
 
-  * [`retry`]: Use default delay if `retry-after` is "negative"
+  * `retry`: Use default delay if `retry-after` is "negative"
 
     Previously, we were only handling "negative" retry-after in "http date"
     format and slept for zero seconds. We were crashing on retry-after with
@@ -284,7 +284,7 @@
     If in your `:plug` usage you look at `conn.params`, it will
     now include `conn.body_params` as Plug always merges them.
 
-  * [`retry`]: Use jitter by default
+  * `retry`: Use jitter by default
 
   * [`Req.Request`]: Add [`Req.Request.put_option/3`].
 
@@ -304,7 +304,7 @@
 
   * [`Req.Test.expect/3`]: Fix usage in shared mode
 
-  * [`retry`]: Do not carry halt between retries
+  * `retry`: Do not carry halt between retries
 
   * (Internal) Support custom headers in `Req.Utils.aws_sigv4_url/1`
 
@@ -326,7 +326,7 @@
 
   * [`put_aws_sigv4`]: Fix signature when using custom port
 
-  * [`retry`]: Do not call `retry_delay` fun twice
+  * `retry`: Do not call `retry_delay` fun twice
 
   * [`auth`]: Support passing a 0-arity function
 
@@ -375,7 +375,7 @@
 
 ## v0.5.1 (2024-06-24)
 
-  * [`retry`]: Default `:retry_log_level` to `:warning`
+  * `retry`: Default `:retry_log_level` to `:warning`
 
   * [`put_path_params`]: Add `:path_params_style` option
 
@@ -445,7 +445,7 @@ errors.
 Here is another example using both of the new features, let's simulate a server that is
 having issues: on the first request it is not responding and on the following two requests it
 returns an HTTP 500. Only on the fourth request it returns an HTTP 200. Req by default
-automatically retries transient errors (using [`retry`] step) so it will make multiple
+automatically retries transient errors (using `retry` step) so it will make multiple
 requests exercising all of our request expectations:
 
 ```elixir
@@ -610,11 +610,11 @@ If you wish to maximize request rate or have more control over how messages are 
 
   * [`put_aws_sigv4`]: Drop `:aws_signature` dependency.
 
-  * [`retry`]: **(BREAKING CHANGE)** Consider
+  * `retry`: **(BREAKING CHANGE)** Consider
     `%Req.TransportError{reason: :closed | :econnrefused | :timeout}` as transient. Previously
     _any_ exceptions with those reason values were consider as such.
 
-  * [`retry`]: **(BREAKING CHANGE)** Consider
+  * `retry`: **(BREAKING CHANGE)** Consider
     `%Req.HTTPError{protocol: :http2, reason: :unprocessed}` as transient.
 
   * `run_finch`: **(BREAKING CHANGE)** Return [`Req.HTTPError`] instead of `Mint.HTTPError`.
@@ -698,7 +698,7 @@ If you wish to maximize request rate or have more control over how messages are 
 
 ## v0.4.9 (2024-02-14)
 
- * [`retry`]: Raise on invalid return from `:retry_delay` function
+ * `retry`: Raise on invalid return from `:retry_delay` function
 
  * `run_finch`: Update to Finch 0.17
 
@@ -726,7 +726,7 @@ If you wish to maximize request rate or have more control over how messages are 
 
   * New step: `checksum`
   * `put_plug`: Fix response streaming when plug uses `send_resp` or `send_file`
-  * [`retry`]: Retry on `:closed`
+  * `retry`: Retry on `:closed`
 
 ## v0.4.5 (2023-10-27)
 
@@ -953,19 +953,19 @@ resp.body #=> %File.Stream{}
 
   * `run_finch`: Add `:inet6` option
 
-  * [`retry`]: Support `retry: :safe_transient` which retries HTTP 408/429/500/502/503/504
+  * `retry`: Support `retry: :safe_transient` which retries HTTP 408/429/500/502/503/504
     or exceptions with `reason` field set to `:timeout`/`:econnrefused`.
 
     `:safe_transient` is the new default retry mode. (Previously we retried on 408/429/5xx and
     _any_ exception.)
 
-  * [`retry`]: Support `retry: :transient` which is the same as `:safe_transient` except
+  * `retry`: Support `retry: :transient` which is the same as `:safe_transient` except
     it retries on all HTTP methods
 
-  * [`retry`]: Use `retry-after` header value on HTTP 503 Service Unavailable. Previously
+  * `retry`: Use `retry-after` header value on HTTP 503 Service Unavailable. Previously
     only HTTP 429 Too Many Requests was using this header value.
 
-  * [`retry`]: Support `retry: &fun/2`. The function receives `request, response_or_exception`
+  * `retry`: Support `retry: &fun/2`. The function receives `request, response_or_exception`
     and returns either:
 
       * `true` - retry with the default delay
@@ -974,9 +974,9 @@ resp.body #=> %File.Stream{}
 
       * `false/nil` - don't retry
 
-  * [`retry`]: Deprecate `retry: :safe` in favour of `retry: :safe_transient`
+  * `retry`: Deprecate `retry: :safe` in favour of `retry: :safe_transient`
 
-  * [`retry`]: Deprecate `retry: :never` in favour of `retry: false`
+  * `retry`: Deprecate `retry: :never` in favour of `retry: false`
 
   * [`Req.request/2`]: Improve error message on invalid arguments
 
@@ -1007,7 +1007,7 @@ resp.body #=> %File.Stream{}
 
   * Support `Req.get(options)`, `Req.post(options)`, etc
   * Add [`Req.Request.new/1`]
-  * [`retry`]: Fix returning correct `private.req_retry_count`
+  * `retry`: Fix returning correct `private.req_retry_count`
 
 ## v0.3.10 (2023-06-20)
 
@@ -1047,7 +1047,7 @@ resp.body #=> %File.Stream{}
 
 ## v0.3.4 (2023-01-03)
 
-  * [`retry`]: Add `:retry_log_level` option
+  * `retry`: Add `:retry_log_level` option
 
 ## v0.3.3 (2022-12-08)
 
@@ -1059,8 +1059,8 @@ resp.body #=> %File.Stream{}
 
   * `decode_body`: Decode JSON when response is json-api mime type
   * [`put_params`]: Fix bug when params have been duplicated when retrying requeset
-  * [`retry`]: Remove `retry: :always` option
-  * [`retry`]: Soft-deprecate `retry: :never` in favour of `retry: false`
+  * `retry`: Remove `retry: :always` option
+  * `retry`: Soft-deprecate `retry: :never` in favour of `retry: false`
   * `run_finch`: Add `:transport_opts`, `:proxy_headers`, `:proxy`, and `:client_settings` options
   * `Req.Response.json/2`: Do not override content-type
 
@@ -1405,14 +1405,14 @@ See "Adapter" section in `Req.Request` module documentation for more information
   * [`follow_redirects`]: Don't send auth headers on redirect to different scheme/host/port
     unless `location_trusted: true` is set
 
-  * [`retry`]: The `Retry-After` response header on HTTP 429 responses is now respected
+  * `retry`: The `Retry-After` response header on HTTP 429 responses is now respected
 
-  * [`retry`]: The `:retry` option can now be set to `:safe` (default) to only retry GET/HEAD
+  * `retry`: The `:retry` option can now be set to `:safe` (default) to only retry GET/HEAD
     requests on HTTP 408/429/5xx responses or exceptions, `:always` to always retry, `:never` to never
     retry, and `fun` - a 1-arity function that accepts either a `Req.Response` or an exception
     struct and returns boolean whether to retry
 
-  * [`retry`]: The `:retry_delay` option now accepts a function that takes a retry count (starting at 0)
+  * `retry`: The `:retry_delay` option now accepts a function that takes a retry count (starting at 0)
     and returns the delay. Defaults to a simple exponential backoff: 1s, 2s, 4s, 8s, ...
 
 ### Deprecations
@@ -1482,7 +1482,6 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`put_path_params`]:     https://hexdocs.pm/req/Req.Steps.html#put_path_params/1
 [`put_user_agent`]:      https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
 [`put_range`]:           https://hexdocs.pm/req/Req.Steps.html#put_range/1
-[`retry`]:               https://hexdocs.pm/req/Req.Steps.html#retry/1
 [`put_aws_sigv4`]:       https://hexdocs.pm/req/Req.Steps.html#put_aws_sigv4/1
 
 [`Req`]:                        https://hexdocs.pm/req/Req.html

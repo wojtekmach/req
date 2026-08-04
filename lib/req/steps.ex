@@ -64,6 +64,7 @@ defmodule Req.Steps do
       :redact_auth
     ])
     |> Req.Request.prepend_request_steps(
+      retry: Req.Retry,
       decode: Req.Decode,
       checksum: Req.Checksum,
       decompress: Req.Decompress,
@@ -1146,5 +1147,5 @@ defmodule Req.Steps do
 
   """
   @doc step: :error
-  defdelegate retry(request_response_or_error), to: Req.Retry
+  defdelegate retry(request_response_or_error), to: Req.Retry, as: :legacy_retry
 end
