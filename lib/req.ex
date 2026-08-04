@@ -27,10 +27,10 @@ defmodule Req do
       iex> Req.get!(req, url: "/repos/wojtekmach/req").body["description"]
       "Req is a batteries-included HTTP client for Elixir."
 
-  Return the request that was sent using `Req.run!/2`:
+  The request that was sent is available in `resp.request`:
 
-      iex> {req, resp} = Req.run!("https://httpbingo.org/basic-auth/foo/bar", auth: {:basic, "foo:bar"})
-      iex> req.headers["authorization"]
+      iex> resp = Req.get!("https://httpbingo.org/basic-auth/foo/bar", auth: {:basic, "foo:bar"})
+      iex> resp.request.headers["authorization"]
       ["Basic Zm9vOmJhcg=="]
       iex> resp.status
       200
@@ -144,7 +144,7 @@ defmodule Req do
   @doc """
   Returns a new request struct with built-in steps.
 
-  See `request/2`, `run/2`, as well as `get/2`, `post/2`, and similar functions for
+  See `request/2`, as well as `get/2`, `post/2`, and similar functions for
   making requests.
 
   Also see `Req.Request` module documentation for more information on the underlying request
@@ -1101,8 +1101,6 @@ defmodule Req do
 
   See `new/1` for a list of available options.
 
-  Also see `run/2` for a similar function that returns the request and the response or error.
-
   ## Examples
 
   With options keywords list:
@@ -1283,8 +1281,6 @@ defmodule Req do
   Makes an HTTP request and returns a response or raises an error.
 
   See `new/1` for a list of available options.
-
-  Also see `run!/2` for a similar function that returns the request and the response or error.
 
   ## Examples
 
@@ -1511,8 +1507,8 @@ defmodule Req do
 
   With options keywords list:
 
-      iex> {req, resp} = Req.run(url: "https://api.github.com/repos/elixir-lang/elixir")
-      iex> req.url.host
+      iex> {:ok, resp} = Req.request(url: "https://api.github.com/repos/elixir-lang/elixir")
+      iex> resp.request.url.host
       "api.github.com"
       iex> resp.status
       200
@@ -1520,20 +1516,21 @@ defmodule Req do
   With request struct and options:
 
       iex> req = Req.new(base_url: "https://api.github.com")
-      iex> {req, resp} = Req.run(req, url: "/repos/elixir-lang/elixir")
-      iex> req.url.host
+      iex> {:ok, resp} = Req.request(req, url: "/repos/elixir-lang/elixir")
+      iex> resp.request.url.host
       "api.github.com"
       iex> resp.status
       200
 
   Returns an error:
 
-      iex> {_req, exception} = Req.run("http://localhost:9999", retry: false)
+      iex> {:error, exception} = Req.request("http://localhost:9999", retry: false)
       iex> exception
       %Req.TransportError{reason: :econnrefused}
 
   """
   @doc type: :request
+  @deprecated "Use Req.request/2 and `resp.request` instead"
   @spec run(request :: url() | keyword() | Req.Request.t(), options :: keyword()) ::
           {Req.Request.t(), Req.Response.t() | Exception.t()}
   def run(request, options \\ [])
@@ -1584,8 +1581,8 @@ defmodule Req do
 
   With options keywords list:
 
-      iex> {req, resp} = Req.run!(url: "https://api.github.com/repos/elixir-lang/elixir")
-      iex> req.url.host
+      iex> resp = Req.request!(url: "https://api.github.com/repos/elixir-lang/elixir")
+      iex> resp.request.url.host
       "api.github.com"
       iex> resp.status
       200
@@ -1593,18 +1590,19 @@ defmodule Req do
   With request struct and options:
 
       iex> req = Req.new(base_url: "https://api.github.com")
-      iex> {req, resp} = Req.run!(req, url: "/repos/elixir-lang/elixir")
-      iex> req.url.host
+      iex> resp = Req.request!(req, url: "/repos/elixir-lang/elixir")
+      iex> resp.request.url.host
       "api.github.com"
       iex> resp.status
       200
 
   Raises an error:
 
-      iex> Req.run!("http://localhost:9999", retry: false)
+      iex> Req.request!("http://localhost:9999", retry: false)
       ** (Req.TransportError) connection refused
   """
   @doc type: :request
+  @deprecated "Use Req.request!/2 and `resp.request` instead"
   @spec run!(request :: url() | keyword() | Req.Request.t(), options :: keyword()) ::
           {Req.Request.t(), Req.Response.t()}
   def run!(request, options \\ []) do

@@ -212,8 +212,8 @@ defmodule Req.RetryTest do
       resp.status == 500
     end
 
-    {req, resp} = Req.run(req, retry: retry_fun, retry_delay: 1)
-    assert req.private.req_retry_count == 3
+    {:ok, resp} = Req.stream(req, retry: retry_fun, retry_delay: 1)
+    assert resp.request.private.req_retry_count == 3
     assert resp.status == 500
     assert resp.body == "oops"
 
