@@ -35,7 +35,7 @@ write new ones.
 
   * Request body encoding. Supports urlencoded and multipart forms, and JSON. See [`encode_body`].
 
-  * Automatic response body decoding (via [`decode_body`] step.)
+  * Automatic response body decoding (via [`Req.Decode`] step.)
 
   * Encode params as query string (via [`put_params`] step.)
 
@@ -258,13 +258,13 @@ limitations under the License.
 [`Req.Request`]:         https://hexdocs.pm/req/Req.Request.html
 [`Req.Finch`]:           https://hexdocs.pm/req/Req.Finch.html
 [`Req.Plug`]:            https://hexdocs.pm/req/Req.Plug.html
+[`Req.Decode`]:          https://hexdocs.pm/req/Req.Decode.html
 [`Req.Decompress`]:      https://hexdocs.pm/req/Req.Decompress.html
 [`Req.Steps`]:           https://hexdocs.pm/req/Req.Steps.html
 [`Req.Test`]:            https://hexdocs.pm/req/Req.Test.html
 
 [`auth`]:               https://hexdocs.pm/req/Req.Steps.html#auth/1
 [`compress_body`]:      https://hexdocs.pm/req/Req.Steps.html#compress_body/1
-[`decode_body`]:        https://hexdocs.pm/req/Req.Steps.html#decode_body/1
 [`encode_body`]:        https://hexdocs.pm/req/Req.Steps.html#encode_body/1
 [`redirect`]:           https://hexdocs.pm/req/Req.Steps.html#redirect/1
 [`handle_http_errors`]: https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1

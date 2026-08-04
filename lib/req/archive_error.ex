@@ -1,6 +1,7 @@
 defmodule Req.ArchiveError do
   @moduledoc """
-  Represents an error when unpacking archives fails, returned by `Req.Steps.decode_body/1`.
+  Represents an error when unpacking archives fails, returned by the archive decoders.
+  See `Req.Decode`.
   """
 
   defexception [:format, :data, :reason]
