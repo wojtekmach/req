@@ -21,9 +21,10 @@ defmodule Req.RetryTest do
 
     log =
       ExUnit.CaptureLog.capture_log(fn ->
-        {request, response} = Req.Request.run_request(request)
-        assert request.private.req_retry_count == 3
-        assert response.body == "ok - updated"
+        {req, resp} = Req.run(request)
+        assert req.private.req_retry_count == 3
+        assert resp.status == 200
+        assert resp.body == "ok - updated"
       end)
 
     assert log =~
@@ -72,8 +73,10 @@ defmodule Req.RetryTest do
 
     log =
       ExUnit.CaptureLog.capture_log(fn ->
-        response = Req.get!(request)
-        assert response.body == "ok - updated"
+        {req, resp} = Req.run(request)
+        assert req.private.req_retry_count == 2
+        assert resp.status == 200
+        assert resp.body == "ok - updated"
       end)
 
     assert log =~
@@ -185,6 +188,34 @@ defmodule Req.RetryTest do
   end
 
   @tag :capture_log
+  test "retry: fun sees req.private.req_retry_count" do
+    pid = self()
+
+    %{req: req} =
+      serve(
+        "GET /": fn conn ->
+          send_resp(conn, 500, "oops")
+        end
+      )
+
+    retry_fun = fn req, resp ->
+      send(pid, {:retry_count, req.private[:req_retry_count]})
+      resp.status == 500
+    end
+
+    {req, resp} = Req.run(req, retry: retry_fun, retry_delay: 1)
+    assert req.private.req_retry_count == 3
+    assert resp.status == 500
+    assert resp.body == "oops"
+
+    assert_received {:retry_count, nil}
+    assert_received {:retry_count, 1}
+    assert_received {:retry_count, 2}
+    assert_received {:retry_count, 3}
+    refute_received {:retry_count, _}
+  end
+
+  @tag :capture_log
   test "always failing" do
     pid = self()
 
@@ -205,7 +236,8 @@ defmodule Req.RetryTest do
         end
       )
 
-    resp = Req.get!(request)
+    {req, resp} = Req.run(request)
+    assert req.private.req_retry_count == 3
     assert resp.status == 500
     assert resp.body == "oops - updated"
     assert_received :ping
