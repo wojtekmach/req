@@ -53,10 +53,10 @@
 
   * [`compress_body`]: Update multipart boundary when re-running the step.
 
-  * `compressed`, [`decode_body`]: Replace optional `ezstd` dependency with Erlang/OTP 28+
+  * `compressed`, `decode_body`: Replace optional `ezstd` dependency with Erlang/OTP 28+
     built-in `:zstd`.
 
-  * [`decode_body`]: Deprecate `:decode_json` in favour of setting a custom JSON
+  * `decode_body`: Deprecate `:decode_json` in favour of setting a custom JSON
     decoder via `:decoders`:
 
         # before:
@@ -122,7 +122,7 @@
 
     Thanks to @PJUllrich for reporting it.
 
-  * [`decode_body`]: Drop automatic zip/tar/tgz/gz/zst/csv decoding,
+  * `decode_body`: Drop automatic zip/tar/tgz/gz/zst/csv decoding,
     ([GHSA-655f-mp8p-96gv](https://github.com/wojtekmach/req/security/advisories/GHSA-655f-mp8p-96gv)).
 
     Req previously auto-decoded archive and compressed response bodies (`zip`,
@@ -371,7 +371,7 @@
 
   * [`redirect`]: Cancel async request before redirecting
 
-  * [`decode_body`]: Support `application/zstd` and `.zst`
+  * `decode_body`: Support `application/zstd` and `.zst`
 
 ## v0.5.1 (2024-06-24)
 
@@ -381,7 +381,7 @@
 
   * [`put_aws_sigv4`]: Fix path encoding
 
-  * [`decode_body`]: Improve tar detection
+  * `decode_body`: Improve tar detection
 
   * `run_finch`: Fix defaulting to using just HTTP/1
 
@@ -484,8 +484,8 @@ experience. In fact, this standardization was the pre-requisite of adding
 [`Req.Test.transport_error/2`]!
 
 Two additional exception structs have been added: [`Req.ArchiveError`] and [`Req.DecompressError`]
-for zip/tar/etc errors in [`decode_body`] and gzip/br/zstd/etc errors in `decompress_body`
-respectively. Additionally, [`decode_body`] now returns `Jason.DecodeError` instead of raising it.
+for zip/tar/etc errors in `decode_body` and gzip/br/zstd/etc errors in `decompress_body`
+respectively. Additionally, `decode_body` now returns `Jason.DecodeError` instead of raising it.
 
 ### `%Req.Response.Async{}`
 
@@ -602,9 +602,9 @@ If you wish to maximize request rate or have more control over how messages are 
   * [`Req.Test`]: Deprecate `Req.Test.stub/1`, i.e. the intended use case is to only work
     with _plug_ stubs/mocks.
 
-  * [`decode_body`]: Return `Jason.DecodeError` on JSON errors instead of raising it.
+  * `decode_body`: Return `Jason.DecodeError` on JSON errors instead of raising it.
 
-  * [`decode_body`]: Return [`Req.ArchiveError`] on tar/zip errors.
+  * `decode_body`: Return [`Req.ArchiveError`] on tar/zip errors.
 
   * `decompress_body`: Return [`Req.DecompressError`].
 
@@ -692,7 +692,7 @@ If you wish to maximize request rate or have more control over how messages are 
 
   * [`auth`]: Always update `authorization` header.
 
-  * [`decode_body`]: Gracefully handle multiple content-type values.
+  * `decode_body`: Gracefully handle multiple content-type values.
 
   * [`Req.Request.new/1`]: Use `URI.parse` for now.
 
@@ -872,7 +872,7 @@ resp.body #=> ""
 Notice we only stream response _body_, that is, Req automatically handles HTTP response status and
 headers. Once the stream is done, Req passes the response through response steps which allows
 following redirects, retrying on errors, etc. Response `body` is set to empty string `""`
-which is then ignored by `decompress_body`, [`decode_body`], and similar steps. If you need
+which is then ignored by `decompress_body`, `decode_body`, and similar steps. If you need
 to decompress or decode incoming chunks, you need to do that in your custom `into: fun` function.
 
 As the name `:into` implies, we can also stream response body into any [`Collectable`].
@@ -949,7 +949,7 @@ resp.body #=> %File.Stream{}
 
   * `decompress_body`: Remove `content-encoding` header after decompression
 
-  * [`decode_body`]: Do not decode response with `content-encoding` header
+  * `decode_body`: Do not decode response with `content-encoding` header
 
   * `run_finch`: Add `:inet6` option
 
@@ -1013,7 +1013,7 @@ resp.body #=> %File.Stream{}
 
   * `decompress_body`: No-op on non-binary response body
   * `decompress_body`: Support multiple `content-encoding` headers
-  * [`decode_body`]: Remove `:extract` option
+  * `decode_body`: Remove `:extract` option
   * Remove deprecated `Req.post!(url, body)` and similar functions
 
 ## v0.3.9 (2023-06-08)
@@ -1028,7 +1028,7 @@ resp.body #=> %File.Stream{}
 ## v0.3.7 (2023-05-18)
 
   * Deprecate setting headers to `%NaiveDateTime{}`, always use `%DateTime{}`.
-  * [`decode_body`]: Add `:decode_json` option
+  * `decode_body`: Add `:decode_json` option
   * [`follow_redirects`]: Add `:redirect_log_level`
   * [`follow_redirects`]: Preserve HTTP method on 307/308 redirects
   * `run_finch`: Allow `:finch_request` to perform the underlying request. This deprecates
@@ -1038,7 +1038,7 @@ resp.body #=> %File.Stream{}
 ## v0.3.6 (2023-03-06)
 
   * `run_finch`: Fix setting `:hostname` option
-  * [`decode_body`]: Add `:extract` option to automatically extract archives (zip, tar, etc)
+  * `decode_body`: Add `:extract` option to automatically extract archives (zip, tar, etc)
 
 ## v0.3.5 (2023-02-01)
 
@@ -1057,7 +1057,7 @@ resp.body #=> %File.Stream{}
 
 ## v0.3.2 (2022-11-14)
 
-  * [`decode_body`]: Decode JSON when response is json-api mime type
+  * `decode_body`: Decode JSON when response is json-api mime type
   * [`put_params`]: Fix bug when params have been duplicated when retrying requeset
   * [`retry`]: Remove `retry: :always` option
   * [`retry`]: Soft-deprecate `retry: :never` in favour of `retry: false`
@@ -1398,7 +1398,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
   * `decompress_body`, `compressed`: Support Zstandard
 
-  * [`decode_body`]: Support `decode_body: false` option to disable automatic body decoding
+  * `decode_body`: Support `decode_body: false` option to disable automatic body decoding
 
   * [`follow_redirects`]: Change method to GET on 301..303 redirects
 
@@ -1473,7 +1473,6 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
 [`auth`]:                https://hexdocs.pm/req/Req.Steps.html#auth/1
 [`compress_body`]:       https://hexdocs.pm/req/Req.Steps.html#compress_body/1
-[`decode_body`]:         https://hexdocs.pm/req/Req.Steps.html#decode_body/1
 [`compress_body`]:       https://hexdocs.pm/req/Req.Steps.html#compress_body/1
 [`encode_body`]:         https://hexdocs.pm/req/Req.Steps.html#encode_body/1
 [`redirect`]:            https://hexdocs.pm/req/Req.Steps.html#redirect/1

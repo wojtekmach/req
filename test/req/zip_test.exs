@@ -1,15 +1,26 @@
 defmodule Req.ZIPTest do
   use Req.Case, async: true
 
-  test "decode" do
-    files = [{~c"foo.txt", "bar"}]
-    {:ok, {_name, zip}} = :zip.create(~c"a.zip", files, [:memory])
+  test "success" do
+    %{req: req} =
+      serve(fn conn ->
+        send_resp_zip(conn, [{~c"a.txt", "aaa"}])
+      end)
 
-    assert Req.ZIP.decode(zip) == {:ok, files}
-  end
+    resp = Req.stream!(req, decoders: [:zip])
+    assert resp.status == 200
+    assert resp.body == [{~c"a.txt", "aaa"}]
 
-  test "invalid" do
-    assert Req.ZIP.decode("invalid") ==
-             {:error, %Req.ArchiveError{format: :zip, data: "invalid", reason: nil}}
+    {:ok, resp, acc} =
+      Req.stream(
+        req,
+        [],
+        fn data, _resp, acc -> {:cont, [data | acc]} end,
+        decoders: [:zip]
+      )
+
+    assert resp.status == 200
+    assert resp.body == nil
+    assert IO.iodata_to_binary(Enum.reverse(acc)) == Req.ZIP.encode!([{~c"a.txt", "aaa"}])
   end
 end
