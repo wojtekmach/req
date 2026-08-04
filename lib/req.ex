@@ -185,6 +185,19 @@ defmodule Req do
 
         * `enumerable` - stream request body chunks emitted by the given `Enumerable`.
 
+        * `req_body_fun` - stream request body chunks from a 1-arity function.
+          Only supported in `Req.stream/4`.
+
+          The function receives the accumulator passed to `Req.stream/4` and should
+          return one of:
+
+            * `{:data, chunk, acc}` - Emit request body `chunk` and continue streaming.
+
+            * `{:done, acc}` - request body streaming is done. `acc` is passed to the
+              response streaming function.
+
+            * `{:halt, acc}` - cancel request. On HTTP/1, this closes the connection.
+
     * `:private` - a map reserved for libraries and frameworks to use. The keys must be atoms.
 
   Additional URL options:

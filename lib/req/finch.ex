@@ -340,7 +340,31 @@ defmodule Req.Finch do
           nil
 
         req_body_fun when is_function(req_body_fun, 1) ->
-          raise ArgumentError, "body: fun is not supported in Req.stream/4"
+          wrapped_req_body_fun = fn
+            {:cont, resp, acc, state} ->
+              case req_body_fun.(acc) do
+                {:data, chunk, acc} ->
+                  {:data, chunk, {:cont, resp, acc, state}}
+
+                {:done, chunk, acc} ->
+                  {:data, chunk, {:done, resp, acc, state}}
+
+                {:done, acc} ->
+                  {:done, {:cont, resp, acc, state}}
+
+                {:halt, acc} ->
+                  {:halt, {:cont, resp, acc, state}}
+
+                other ->
+                  raise "expected req_body_fun to return {:data, chunk, acc}, {:done, chunk, acc}, " <>
+                          "{:done, acc}, or {:halt, acc}, got: #{inspect(other)}"
+              end
+
+            {:done, resp, acc, state} ->
+              {:done, {:cont, resp, acc, state}}
+          end
+
+          {:stream, wrapped_req_body_fun}
 
         enumerable ->
           {:stream, enumerable}

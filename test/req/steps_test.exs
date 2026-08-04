@@ -477,6 +477,28 @@ defmodule Req.StepsTest do
       assert resp.body == "foofoo"
     end
 
+    test "req_body_fun" do
+      req_body_fun = fn
+        [] ->
+          {:data, "foo", [:done]}
+
+        [:done] = acc ->
+          {:done, acc}
+      end
+
+      %{req: req} = serve("POST /": &send_resp(&1, 200, ""))
+
+      assert_raise ArgumentError,
+                   "compress_body does not support req_body_fun",
+                   fn ->
+                     Req.stream(req, [], fn _data, _resp, acc -> {:cont, acc} end,
+                       method: :post,
+                       body: req_body_fun,
+                       compress_body: true
+                     )
+                   end
+    end
+
     test "nil body" do
       %{req: req} =
         serve(

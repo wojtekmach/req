@@ -562,39 +562,169 @@ defmodule Req.AdapterTest do
     end
   end
 
-  test "Req.stream - response changes from steps" do
-    %{req: req} = serve(fn conn -> Plug.Conn.send_resp(conn, 200, "ok") end)
+  describe "body: req_body_fun" do
+    test "Req.request - raise" do
+      assert_raise ArgumentError, "body: fun is only supported in Req.stream/4", fn ->
+        Req.request!(url: "http://localhost", body: fn acc -> {:done, acc} end)
+      end
+    end
 
-    req =
-      Req.Request.prepend_request_steps(req,
-        stream_response: StreamResponseStep
-      )
+    test "Req.stream - success" do
+      %{req: req} =
+        serve(fn conn ->
+          assert {:ok, "foobar", conn} = Plug.Conn.read_body(conn)
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
 
-    {:ok, resp, acc} =
-      Req.stream(req, [], fn data, resp, acc ->
-        assert Req.Response.get_header(resp, "x-stream-step") == ["true"]
-        assert resp.request.private[:stream_step]
-        {:cont, [data | acc]}
-      end)
+      {:ok, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+          method: :post,
+          body: req_body_fun()
+        )
 
-    assert Req.Response.get_header(resp, "x-stream-step") == ["true"]
-    assert resp.request.private[:stream_step]
-    assert acc == ["ok"]
+      assert resp.status == 200
+      assert resp.body == nil
+      assert acc == ["ok", :done, "bar", "foo"]
+    end
+
+    test "Req.stream - response changes from steps" do
+      %{req: req} = serve(fn conn -> Plug.Conn.send_resp(conn, 200, "ok") end)
+
+      req =
+        Req.Request.prepend_request_steps(req,
+          stream_response: StreamResponseStep
+        )
+
+      {:ok, resp, acc} =
+        Req.stream(req, [], fn data, resp, acc ->
+          assert Req.Response.get_header(resp, "x-stream-step") == ["true"]
+          assert resp.request.private[:stream_step]
+          {:cont, [data | acc]}
+        end)
+
+      assert Req.Response.get_header(resp, "x-stream-step") == ["true"]
+      assert resp.request.private[:stream_step]
+      assert acc == ["ok"]
+    end
+
+    test "Req.stream - response changes from steps survive halt" do
+      %{req: req} = serve(fn conn -> Plug.Conn.send_resp(conn, 200, "ok") end)
+
+      req =
+        Req.Request.prepend_request_steps(req,
+          stream_response: StreamResponseStep
+        )
+
+      {:ok, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc -> {:halt, [data | acc]} end)
+
+      assert Req.Response.get_header(resp, "x-stream-step") == ["true"]
+      assert resp.request.private[:stream_step]
+      assert acc == ["ok"]
+    end
+
+    test "Req.stream - halt" do
+      %{req: req} =
+        serve(fn conn ->
+          assert {:ok, "", conn} = Plug.Conn.read_body(conn)
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      {:ok, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+          method: :post,
+          body: halting_req_body_fun()
+        )
+
+      assert resp.status == nil
+      assert resp.body == nil
+      assert acc == [:halted]
+    end
+
+    @tag :transport
+    test "Req.stream - transport error" do
+      %{url: url} =
+        start_tcp_server(fn _socket ->
+          nil
+        end)
+
+      req = Req.new(adapter: adapter_fun(), url: url)
+
+      {:error, err, resp, _acc} =
+        Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+          method: :post,
+          body: req_body_fun()
+        )
+
+      assert err == %Req.TransportError{reason: :closed}
+      assert resp.status == nil
+    end
+
+    @tag :transport
+    @tag :capture_log
+    @tag skip: @adapter == :httpc
+    test "Req.stream - mid-stream transport error" do
+      %{req: req} =
+        serve(fn conn ->
+          assert {:ok, "foobar", conn} = Plug.Conn.read_body(conn)
+          conn = Plug.Conn.send_chunked(conn, 200)
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk1")
+          raise "oops"
+          conn
+        end)
+
+      req =
+        Req.Request.prepend_request_steps(req,
+          stream_response: StreamResponseStep
+        )
+
+      {:error, err, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+          method: :post,
+          body: req_body_fun()
+        )
+
+      assert err == %Req.TransportError{reason: :closed}
+      assert resp.status == 200
+      assert Req.Response.get_header(resp, "x-stream-step") == ["true"]
+      assert resp.request.private[:stream_step]
+      assert acc == ["chunk1", :done, "bar", "foo"]
+    end
+
+    test "Req.stream - errored" do
+      %{req: req} =
+        serve(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      req_body_fun = fn [] -> :oops end
+
+      assert_raise RuntimeError,
+                   "expected req_body_fun to return {:data, chunk, acc}, {:done, chunk, acc}, " <>
+                     "{:done, acc}, or {:halt, acc}, got: :oops",
+                   fn ->
+                     Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+                       method: :post,
+                       body: req_body_fun
+                     )
+                   end
+    end
   end
 
-  test "Req.stream - response changes from steps survive halt" do
-    %{req: req} = serve(fn conn -> Plug.Conn.send_resp(conn, 200, "ok") end)
+  defp req_body_fun do
+    fn
+      [] ->
+        {:data, "foo", ["foo"]}
 
-    req =
-      Req.Request.prepend_request_steps(req,
-        stream_response: StreamResponseStep
-      )
+      ["foo"] ->
+        {:data, "bar", ["bar", "foo"]}
 
-    {:ok, resp, acc} =
-      Req.stream(req, [], fn data, _resp, acc -> {:halt, [data | acc]} end)
+      ["bar", "foo"] = acc ->
+        {:done, [:done | acc]}
+    end
+  end
 
-    assert Req.Response.get_header(resp, "x-stream-step") == ["true"]
-    assert resp.request.private[:stream_step]
-    assert acc == ["ok"]
+  defp halting_req_body_fun do
+    fn [] -> {:halt, [:halted]} end
   end
 end
