@@ -639,4 +639,40 @@ defmodule Req.DecodeTest do
     assert resp.status == 200
     assert IO.iodata_to_binary(Enum.reverse(acc)) == ~s|{"a":1}|
   end
+
+  test "stream step events" do
+    req = Req.new(decoders: [:ndjson])
+
+    next = fn req, acc, fun, state ->
+      resp =
+        Req.Response.new(status: 200)
+        |> Map.replace!(:request, req)
+        |> Req.Response.put_header("content-type", "application/x-ndjson")
+
+      {:cont, resp, acc, state} = fun.({:status, 200}, resp, acc, state)
+      {:cont, resp, acc, state} = fun.({:headers, resp.headers}, resp, acc, state)
+      {:cont, resp, acc, state} = fun.({:data, ~s|{"a":1}\n{"b|}, resp, acc, state)
+      {:cont, resp, acc, state} = fun.({:data, ~s|":2}\n|}, resp, acc, state)
+      {:cont, resp, acc, state} = fun.({:trailers, Req.Fields.new([])}, resp, acc, state)
+      {:ok, resp, acc, state}
+    end
+
+    fun = fn event, resp, events, state ->
+      {:cont, resp, [event | events], state}
+    end
+
+    assert {:ok, resp, events, []} = Req.Decode.stream(req, [], fun, [], next)
+    assert resp.status == 200
+
+    assert [
+             {:status, 200},
+             {:headers, headers},
+             {:data, %{"a" => 1}},
+             {:data, %{"b" => 2}},
+             {:trailers, trailers}
+           ] = Enum.reverse(events)
+
+    assert Req.Fields.get_values(headers, "content-type") == ["application/x-ndjson"]
+    assert trailers == Req.Fields.new([])
+  end
 end

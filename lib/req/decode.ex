@@ -9,6 +9,7 @@ defmodule Req.Decode do
   | Format               | Decoder                                       | Enabled | Streaming |
   | -------------------- | --------------------------------------------- | ------- | --------- |
   | `:json`, `:json_api` | `Req.JSON`                                    | ✓       |           |
+  | `:ndjson`            | `Req.NDJSON`                                  | ✓       | ✓         |
   | `:zip`               | `Req.ZIP`                                     |         |           |
   | `:tar`, `:tgz`       | `Req.Tar`                                     |         |           |
   | `:gz`                | [`:zlib`](`:zlib`)                            |         | ✓         |
@@ -28,7 +29,7 @@ defmodule Req.Decode do
   ## Request Options
 
     * `:decoders` - the list of decoders to use. Defaults to
-      `[:json, :json_api]`.
+      `[:json, :json_api, :ndjson]`.
 
       Each element is either:
 
@@ -87,12 +88,14 @@ defmodule Req.Decode do
 
   @default [
     json: Req.JSON,
-    json_api: Req.JSON
+    json_api: Req.JSON,
+    ndjson: Req.NDJSON
   ]
 
   @decoders [
     json: Req.JSON,
     json_api: Req.JSON,
+    ndjson: Req.NDJSON,
     gz: Req.Gzip,
     zip: Req.ZIP,
     tar: Req.Tar,

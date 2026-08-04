@@ -162,6 +162,7 @@ defmodule Req.MixProject do
         Formats: [
           Req.Brotli,
           Req.Gzip,
+          Req.NDJSON,
           Req.Tar,
           Req.ZIP,
           Req.Zstd
