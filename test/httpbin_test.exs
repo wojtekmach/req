@@ -1,9 +1,6 @@
 defmodule HTTPBinTest do
   use Req.Case, async: true
 
-  # TODO: Use JSON when we depend on Elixir 1.18.
-  @json Jason
-
   setup do
     serve(*: {HTTPBin, []})
   end
@@ -146,7 +143,7 @@ defmodule HTTPBinTest do
     lines =
       resp.body
       |> String.split("\n", trim: true)
-      |> Enum.map(&@json.decode!/1)
+      |> Enum.map(&JSON.decode!/1)
 
     assert Enum.map(lines, & &1["id"]) == [0, 1]
   end

@@ -6,13 +6,10 @@ defmodule HTTPBin do
   plug :match
   plug :read_raw_body
 
-  # TODO: Use JSON when we depend on Elixir 1.18.
-  @json Jason
-
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
     pass: ["*/*"],
-    json_decoder: @json,
+    json_decoder: JSON,
     body_reader: {__MODULE__, :read_cached_body, []},
     length: @max_body
 
@@ -129,7 +126,7 @@ defmodule HTTPBin do
       |> send_chunked(200)
 
     Enum.reduce(0..(n - 1), conn, fn i, conn ->
-      {:ok, conn} = chunk(conn, @json.encode!(Map.put(base, "id", i)) <> "\n")
+      {:ok, conn} = chunk(conn, JSON.encode!(Map.put(base, "id", i)) <> "\n")
       conn
     end)
   end
@@ -214,7 +211,7 @@ defmodule HTTPBin do
 
   get "/gzip" do
     body =
-      @json.encode!(%{
+      JSON.encode!(%{
         "origin" => origin(conn),
         "headers" => headers(conn),
         "method" => conn.method,
@@ -229,7 +226,7 @@ defmodule HTTPBin do
 
   get "/brotli" do
     body =
-      @json.encode!(%{
+      JSON.encode!(%{
         "origin" => origin(conn),
         "headers" => headers(conn),
         "method" => conn.method,
@@ -310,7 +307,7 @@ defmodule HTTPBin do
   defp try_json(""), do: nil
 
   defp try_json(binary) do
-    case @json.decode(binary) do
+    case JSON.decode(binary) do
       {:ok, decoded} -> decoded
       {:error, _} -> nil
     end
@@ -361,7 +358,7 @@ defmodule HTTPBin do
   defp json(conn, status, data) do
     conn
     |> put_resp_content_type("application/json")
-    |> send_resp(status, @json.encode!(data))
+    |> send_resp(status, JSON.encode!(data))
   end
 
   defp headers(conn) do
