@@ -859,8 +859,8 @@ defmodule Req.Utils do
         {:ok, decompressed} ->
           decompress_body(rest, decompressed, acc)
 
-        {:error, reason} ->
-          %Req.DecompressError{format: :zstd, data: body, reason: reason}
+        {:error, %Req.DecompressError{} = exception} ->
+          %{exception | data: body}
       end
     else
       Logger.debug(

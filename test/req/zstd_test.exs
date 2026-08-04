@@ -22,12 +22,20 @@ defmodule Req.ZstdTest do
   end
 
   test "invalid data" do
-    assert Req.Zstd.decode("invalid") == {:error, "Unknown frame descriptor"}
+    assert Req.Zstd.decode("invalid") ==
+             {:error,
+              %Req.DecompressError{
+                format: :zstd,
+                data: "invalid",
+                reason: "Unknown frame descriptor"
+              }}
 
-    assert_raise ErlangError, fn ->
-      ["inv", "alid"]
-      |> Req.Zstd.decode_stream()
-      |> Enum.join()
-    end
+    assert_raise Req.DecompressError,
+                 ~S[zstd decompression failed, reason: "Unknown frame descriptor"],
+                 fn ->
+                   ["inv", "alid"]
+                   |> Req.Zstd.decode_stream()
+                   |> Enum.join()
+                 end
   end
 end

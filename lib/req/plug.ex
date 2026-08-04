@@ -508,13 +508,9 @@ if Code.ensure_loaded?(Plug) do
             {acc, collector} = Collectable.into(collectable)
 
             acc =
-              Enum.reduce(
-                chunks || [conn.resp_body],
-                acc,
-                fn chunk, acc ->
-                  collector.(acc, {:cont, chunk})
-                end
-              )
+              for chunk <- chunks || [conn.resp_body], chunk != "", reduce: acc do
+                acc -> collector.(acc, {:cont, chunk})
+              end
 
             acc = collector.(acc, :done)
             {request, %{response | body: acc}}

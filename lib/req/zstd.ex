@@ -2,15 +2,13 @@ defmodule Req.Zstd do
   @moduledoc """
   [Zstandard] decoding using [`:zstd`].
 
-  This module is used by [`decode_body`] on `.zst` and `application/zstd` and by
-  [`decompress_body`] on `content-encoding: zstd`.
+  This module is used by `Req.Steps.decode_body/1` on `.zst` and `application/zstd` and by
+  `Req.Decompress` on `content-encoding: zstd`.
 
   [`:zstd`] requires Erlang/OTP 28+.
 
   [Zstandard]: https://facebook.github.io/zstd/
   [`:zstd`]: `:zstd`
-  [`decode_body`]: `Req.Steps.decode_body/1`
-  [`decompress_body`]: `Req.Steps.decompress_body/1`
   """
 
   ## Encode
@@ -77,14 +75,45 @@ defmodule Req.Zstd do
   end
 
   @doc false
+  def decode_init(:buffer) do
+    {:buffer, ""}
+  end
+
+  def decode_init(:stream) do
+    {:stream, decode_init()}
+  end
+
+  @doc false
+  def decode_chunk({:buffer, buffer}, data) do
+    {:ok, data, {:buffer, [buffer | data]}}
+  end
+
+  def decode_chunk({:stream, ctx} = state, data) do
+    case IO.iodata_to_binary(stream(ctx, data)) do
+      "" -> {:ok, nil, state}
+      decompressed -> {:ok, decompressed, state}
+    end
+  rescue
+    err in ErlangError ->
+      case err.original do
+        {:zstd_error, reason} ->
+          {:error, %Req.DecompressError{format: :zstd, data: data, reason: reason}}
+
+        _ ->
+          reraise err, __STACKTRACE__
+      end
+  end
+
   def decode_chunk(ctx, data) do
-    decompressed = IO.iodata_to_binary(stream(ctx, data))
-    {:ok, decompressed}
+    case IO.iodata_to_binary(stream(ctx, data)) do
+      "" -> {:ok, nil, ctx}
+      decompressed -> {:ok, decompressed, ctx}
+    end
   rescue
     e in ErlangError ->
       case e.original do
         {:zstd_error, reason} ->
-          {:error, reason}
+          {:error, %Req.DecompressError{format: :zstd, data: data, reason: reason}}
 
         _ ->
           reraise e, __STACKTRACE__
@@ -92,15 +121,27 @@ defmodule Req.Zstd do
   end
 
   @doc false
+  def decode_finish({:buffer, buffer}) do
+    decode(IO.iodata_to_binary(buffer))
+  end
+
+  def decode_finish({:stream, ctx}) do
+    decode_finish(ctx)
+  end
+
   def decode_finish(ctx) do
     {:done, decompressed} = :zstd.finish(ctx, "")
     :ok = :zstd.close(ctx)
-    {:ok, IO.iodata_to_binary(decompressed)}
+
+    case IO.iodata_to_binary(decompressed) do
+      "" -> {:ok, nil}
+      decompressed -> {:ok, decompressed}
+    end
   rescue
     e in ErlangError ->
       case e.original do
         {:zstd_error, reason} ->
-          {:error, reason}
+          {:error, %Req.DecompressError{format: :zstd, reason: reason}}
 
         _ ->
           reraise e, __STACKTRACE__
@@ -108,6 +149,14 @@ defmodule Req.Zstd do
   end
 
   @doc false
+  def decode_close({:buffer, _buffer}) do
+    :ok
+  end
+
+  def decode_close({:stream, ctx}) do
+    decode_close(ctx)
+  end
+
   def decode_close(ctx) do
     :ok = :zstd.close(ctx)
   end
@@ -120,7 +169,7 @@ defmodule Req.Zstd do
     e in ErlangError ->
       case e.original do
         {:zstd_error, reason} ->
-          {:error, reason}
+          {:error, %Req.DecompressError{format: :zstd, data: data, reason: reason}}
 
         _ ->
           reraise e, __STACKTRACE__
@@ -134,26 +183,26 @@ defmodule Req.Zstd do
       fn -> decode_init() end,
       fn data, ctx ->
         case decode_chunk(ctx, data) do
-          {:ok, ""} ->
+          {:ok, nil, ctx} ->
             {[], ctx}
 
-          {:ok, decompressed} ->
+          {:ok, decompressed, ctx} ->
             {[decompressed], ctx}
 
-          {:error, reason} ->
-            :erlang.error(reason)
+          {:error, exception} ->
+            raise exception
         end
       end,
       fn ctx ->
         case decode_finish(ctx) do
-          {:ok, ""} ->
+          {:ok, nil} ->
             {[], :closed}
 
           {:ok, decompressed} ->
             {[decompressed], :closed}
 
-          {:error, reason} ->
-            :erlang.error(reason)
+          {:error, exception} ->
+            raise exception
         end
       end,
       fn

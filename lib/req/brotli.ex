@@ -2,11 +2,10 @@ defmodule Req.Brotli do
   @moduledoc """
   [Brotli] decoding using [`:brotli`] package.
 
-  This module is used by [`decompress_body`] on `content-encoding: br`.
+  This module is used by `Req.Decompress` on `content-encoding: br`.
 
   [Brotli]: https://github.com/google/brotli
   [`:brotli`]: https://brotli.hexdocs.pm/
-  [`decompress_body`]: `Req.Steps.decompress_body/1`
   """
 
   ## Encode
@@ -75,19 +74,22 @@ defmodule Req.Brotli do
   def decode_chunk(decoder, data) do
     case :brotli_decoder.stream(decoder, data) do
       {status, decompressed} when status in [:ok, :more] ->
-        {:ok, IO.iodata_to_binary(decompressed)}
+        case IO.iodata_to_binary(decompressed) do
+          "" -> {:ok, nil, decoder}
+          decompressed -> {:ok, decompressed, decoder}
+        end
 
       :error ->
-        {:error, :brotli_error}
+        {:error, %Req.DecompressError{format: :br, data: data, reason: :brotli_error}}
     end
   end
 
   @doc false
   def decode_finish(decoder) do
     if :brotli_decoder.is_finished(decoder) do
-      {:ok, ""}
+      {:ok, nil}
     else
-      {:error, :brotli_error}
+      {:error, %Req.DecompressError{format: :br, reason: :brotli_error}}
     end
   end
 
@@ -103,7 +105,7 @@ defmodule Req.Brotli do
         {:ok, IO.iodata_to_binary(decompressed)}
 
       :error ->
-        {:error, :brotli_error}
+        {:error, %Req.DecompressError{format: :br, data: data, reason: :brotli_error}}
     end
   end
 
@@ -114,26 +116,23 @@ defmodule Req.Brotli do
       fn -> decode_init() end,
       fn data, decoder ->
         case decode_chunk(decoder, data) do
-          {:ok, ""} ->
+          {:ok, nil, decoder} ->
             {[], decoder}
 
-          {:ok, decompressed} ->
+          {:ok, decompressed, decoder} ->
             {[decompressed], decoder}
 
-          {:error, reason} ->
-            :erlang.error(reason)
+          {:error, exception} ->
+            raise exception
         end
       end,
       fn decoder ->
         case decode_finish(decoder) do
-          {:ok, ""} ->
+          {:ok, nil} ->
             {[], decoder}
 
-          {:ok, decompressed} ->
-            {[decompressed], decoder}
-
-          {:error, reason} ->
-            :erlang.error(reason)
+          {:error, exception} ->
+            raise exception
         end
       end,
       fn _decoder -> :ok end

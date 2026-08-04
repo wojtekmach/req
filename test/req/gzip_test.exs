@@ -21,9 +21,10 @@ defmodule Req.GzipTest do
   end
 
   test "invalid data" do
-    assert Req.Gzip.decode("invalid") == {:error, :data_error}
+    assert Req.Gzip.decode("invalid") ==
+             {:error, %Req.DecompressError{format: :gzip, data: "invalid", reason: :data_error}}
 
-    assert_raise ErlangError, fn ->
+    assert_raise Req.DecompressError, "gzip decompression failed, reason: :data_error", fn ->
       ["inv", "alid"]
       |> Req.Gzip.decode_stream()
       |> Enum.join()

@@ -31,7 +31,7 @@ write new ones.
 
   * Request body compression (via [`compress_body`] step)
 
-  * Opt-in response body decompression (via [`compressed`] and [`decompress_body`] steps). Supports gzip, brotli, and zstd.
+  * Opt-in response body decompression (via [`Req.Decompress`] step). Supports gzip, brotli, and zstd.
 
   * Request body encoding. Supports urlencoded and multipart forms, and JSON. See [`encode_body`].
 
@@ -258,14 +258,13 @@ limitations under the License.
 [`Req.Request`]:         https://hexdocs.pm/req/Req.Request.html
 [`Req.Finch`]:           https://hexdocs.pm/req/Req.Finch.html
 [`Req.Plug`]:            https://hexdocs.pm/req/Req.Plug.html
+[`Req.Decompress`]:      https://hexdocs.pm/req/Req.Decompress.html
 [`Req.Steps`]:           https://hexdocs.pm/req/Req.Steps.html
 [`Req.Test`]:            https://hexdocs.pm/req/Req.Test.html
 
 [`auth`]:               https://hexdocs.pm/req/Req.Steps.html#auth/1
 [`compress_body`]:      https://hexdocs.pm/req/Req.Steps.html#compress_body/1
-[`compressed`]:         https://hexdocs.pm/req/Req.Steps.html#compressed/1
 [`decode_body`]:        https://hexdocs.pm/req/Req.Steps.html#decode_body/1
-[`decompress_body`]:    https://hexdocs.pm/req/Req.Steps.html#decompress_body/1
 [`encode_body`]:        https://hexdocs.pm/req/Req.Steps.html#encode_body/1
 [`redirect`]:           https://hexdocs.pm/req/Req.Steps.html#redirect/1
 [`handle_http_errors`]: https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
