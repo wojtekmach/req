@@ -277,8 +277,42 @@ defmodule Req.Mint do
     {:ok, conn, acc}
   end
 
-  defp stream_request_body(_conn, _ref, req_body_fun, _acc) when is_function(req_body_fun, 1) do
-    raise ArgumentError, "body: fun is not supported in Req.stream/4"
+  defp stream_request_body(conn, ref, req_body_fun, acc) when is_function(req_body_fun, 1) do
+    case req_body_fun.(acc) do
+      {:data, chunk, acc} ->
+        case Mint.HTTP.stream_request_body(conn, ref, chunk) do
+          {:ok, conn} ->
+            stream_request_body(conn, ref, req_body_fun, acc)
+
+          {:error, conn, error} ->
+            {:error, conn, error, acc}
+        end
+
+      {:done, chunk, acc} ->
+        with {:ok, conn} <- Mint.HTTP.stream_request_body(conn, ref, chunk),
+             {:ok, conn} <- Mint.HTTP.stream_request_body(conn, ref, :eof) do
+          {:ok, conn, acc}
+        else
+          {:error, conn, error} ->
+            {:error, conn, error, acc}
+        end
+
+      {:done, acc} ->
+        case Mint.HTTP.stream_request_body(conn, ref, :eof) do
+          {:ok, conn} ->
+            {:ok, conn, acc}
+
+          {:error, conn, error} ->
+            {:error, conn, error, acc}
+        end
+
+      {:halt, acc} ->
+        {:halt, conn, acc}
+
+      other ->
+        raise "expected req_body_fun to return {:data, chunk, acc}, {:done, chunk, acc}, " <>
+                "{:done, acc}, or {:halt, acc}, got: #{inspect(other)}"
+    end
   end
 
   defp stream_request_body(conn, ref, enumerable, acc) do
