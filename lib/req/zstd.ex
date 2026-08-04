@@ -2,7 +2,7 @@ defmodule Req.Zstd do
   @moduledoc """
   [Zstandard] decoding using [`:zstd`].
 
-  This module is used by `Req.Steps.decode_body/1` on `.zst` and `application/zstd` and by
+  This module is used by `Req.Decode` on `.zst` and `application/zstd` and by
   `Req.Decompress` on `content-encoding: zstd`.
 
   [`:zstd`] requires Erlang/OTP 28+.

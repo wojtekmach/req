@@ -2,7 +2,7 @@ defmodule Req.Gzip do
   @moduledoc """
   [gzip] decoding using [`:zlib`].
 
-  This module is used by `Req.Steps.decode_body/1` on `.gz`, `application/gzip`, and `application/x-gzip`
+  This module is used by `Req.Decode` on `.gz`, `application/gzip`, and `application/x-gzip`
   and by `Req.Decompress` on `content-encoding: gzip`.
 
   [gzip]: https://en.wikipedia.org/wiki/Gzip
