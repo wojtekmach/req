@@ -159,6 +159,161 @@ defmodule Req.Finch do
     Finch.child_spec(name: name, pools: %{default: pool_options(options)})
   end
 
+  def stream(req, acc, fun, state) when is_function(fun, 4) do
+    case req.into do
+      :self ->
+        stream_into_self(req, acc, fun, state)
+
+      _other ->
+        stream_finch(acc, fun, state, build(req))
+    end
+  end
+
+  defp stream_finch(acc, fun, state, {req, finch_name, finch_req, finch_options}) do
+    resp = Req.Response.new(status: nil, body: nil)
+    resp = put_in(resp.request, req)
+
+    finch_fun = fn
+      {:status, status}, {:cont, resp, acc, state} ->
+        resp = put_in(resp.status, status)
+
+        case fun.({:status, status}, resp, acc, state) do
+          {:cont, resp, acc, state} ->
+            {:cont, {:cont, resp, acc, state}}
+
+          {:halt, resp, acc, state} ->
+            {:halt, {:halt, resp, acc, state}}
+
+          {{:error, exception}, resp, acc, state} ->
+            {:halt, {{:error, exception}, resp, acc, state}}
+        end
+
+      {:headers, headers}, {:cont, resp, acc, state} ->
+        resp = put_in(resp.headers, Req.Fields.new_without_normalize_with_duplicates(headers))
+
+        case fun.({:headers, headers}, resp, acc, state) do
+          {:cont, resp, acc, state} ->
+            {:cont, {:cont, resp, acc, state}}
+
+          {:halt, resp, acc, state} ->
+            {:halt, {:halt, resp, acc, state}}
+
+          {{:error, exception}, resp, acc, state} ->
+            {:halt, {{:error, exception}, resp, acc, state}}
+        end
+
+      {:data, data}, {:cont, resp, acc, state} ->
+        case fun.({:data, data}, resp, acc, state) do
+          {:cont, resp, acc, state} ->
+            {:cont, {:cont, resp, acc, state}}
+
+          {:halt, resp, acc, state} ->
+            {:halt, {:halt, resp, acc, state}}
+
+          {{:error, exception}, resp, acc, state} ->
+            {:halt, {{:error, exception}, resp, acc, state}}
+        end
+
+      {:trailers, trailers}, {:cont, resp, acc, state} ->
+        resp = put_in(resp.trailers, Req.Fields.new_without_normalize_with_duplicates(trailers))
+
+        case fun.({:trailers, trailers}, resp, acc, state) do
+          {:cont, resp, acc, state} ->
+            {:cont, {:cont, resp, acc, state}}
+
+          {:halt, resp, acc, state} ->
+            {:halt, {:halt, resp, acc, state}}
+
+          {{:error, exception}, resp, acc, state} ->
+            {:halt, {{:error, exception}, resp, acc, state}}
+        end
+    end
+
+    initial = {:cont, resp, acc, state}
+
+    case Finch.stream_while(finch_req, finch_name, initial, finch_fun, finch_options) do
+      {:ok, {:cont, resp, acc, state}} ->
+        {:ok, resp, acc, state}
+
+      {:ok, {:halt, resp, acc, state}} ->
+        {:halt, resp, acc, state}
+
+      {:ok, {{:error, exception}, resp, acc, state}} ->
+        {{:error, exception}, resp, acc, state}
+
+      {:error, exception, {_tag, resp, acc, state}} ->
+        {{:error, normalize_error(exception)}, resp, acc, state}
+    end
+  end
+
+  defp stream_into_self(req, acc, fun, state) do
+    {req, finch_name, finch_req, finch_options} = build(req)
+    ref = Finch.async_request(finch_req, finch_name, finch_options)
+    resp = Req.Response.new(status: nil, body: nil)
+    resp = put_in(resp.request, req)
+
+    case recv_message(ref) do
+      {:status, status} ->
+        resp = put_in(resp.status, status)
+
+        case fun.({:status, status}, resp, acc, state) do
+          {:cont, resp, acc, state} ->
+            stream_into_self_headers(ref, resp, acc, fun, state)
+
+          {:halt, resp, acc, state} ->
+            cancel(ref)
+            {:halt, resp, acc, state}
+
+          {{:error, exception}, resp, acc, state} ->
+            cancel(ref)
+            {{:error, exception}, resp, acc, state}
+        end
+
+      {:error, exception} ->
+        {{:error, normalize_error(exception)}, resp, acc, state}
+    end
+  end
+
+  defp stream_into_self_headers(ref, resp, acc, fun, state) do
+    case recv_message(ref) do
+      {:headers, headers} ->
+        resp = put_in(resp.headers, Req.Fields.new_without_normalize_with_duplicates(headers))
+
+        case fun.({:headers, headers}, resp, acc, state) do
+          {:cont, resp, acc, state} ->
+            # TODO: handle trailers
+            async = %Req.Response.Async{
+              pid: self(),
+              ref: ref,
+              stream_fun: &parse_message/2,
+              cancel_fun: &cancel/1
+            }
+
+            resp = put_in(resp.body, async)
+            {:ok, resp, acc, state}
+
+          {:halt, resp, acc, state} ->
+            cancel(ref)
+            {:halt, resp, acc, state}
+
+          {{:error, exception}, resp, acc, state} ->
+            cancel(ref)
+            {{:error, exception}, resp, acc, state}
+        end
+
+      {:error, exception} ->
+        cancel(ref)
+        {{:error, normalize_error(exception)}, resp, acc, state}
+    end
+  end
+
+  defp recv_message(ref) do
+    receive do
+      {^ref, message} ->
+        message
+    end
+  end
+
   defp build(request) do
     # URI.parse removes `[` and `]` so we can't check for these. The host
     # should not have `:` so it should be safe to check for it.

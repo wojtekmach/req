@@ -1,17 +1,216 @@
 # Experimental httpc adapter to test the adapter contract.
 
 defmodule Req.HTTPC do
-  def run(request) do
-    case prepare_body(request) do
-      {:halt, request} ->
-        {request, Req.Response.new(status: nil, body: "")}
+  def stream(request, acc, fun, state) when is_function(fun, 4) do
+    resp = Req.Response.new(status: nil, body: nil)
+    resp = put_in(resp.request, request)
 
-      {request, body} ->
-        run(request, body)
+    case prepare_body(request, acc) do
+      {:halt, acc} ->
+        {:halt, resp, acc, state}
+
+      {:ok, body, acc} ->
+        {profile, request, httpc_req, httpc_http_options, httpc_options} = build(request, body)
+        resp = put_in(resp.request, request)
+
+        case request.into do
+          :self ->
+            stream_into_self(
+              request,
+              httpc_req,
+              httpc_http_options,
+              httpc_options,
+              profile,
+              {resp, acc, state},
+              fun
+            )
+
+          _other ->
+            stream_request(
+              request,
+              httpc_req,
+              httpc_http_options,
+              httpc_options,
+              profile,
+              {resp, acc, state},
+              fun
+            )
+        end
     end
   end
 
-  defp run(request, body) do
+  defp stream_request(
+         request,
+         httpc_req,
+         httpc_http_options,
+         httpc_options,
+         profile,
+         s,
+         fun
+       ) do
+    caller = self()
+    receiver = &httpc_receiver(&1, caller)
+    # Plain :self (no :once flow control): the {:self, :once} stream_next
+    # round-trip makes httpc coalesce chunks into one data event and drop a
+    # buffered chunk when the socket closes uncleanly.
+    httpc_options = [sync: false, stream: :self, receiver: receiver] ++ httpc_options
+
+    {:ok, ref} =
+      :httpc.request(request.method, httpc_req, httpc_http_options, httpc_options, profile)
+
+    receive do
+      {^ref, :stream_start, headers} ->
+        {status, headers} = decode_status_and_headers(headers)
+
+        case stream_events([status: status, headers: headers], s, fun) do
+          {:cont, s} ->
+            stream_loop(s, ref, fun)
+
+          {tag, {resp, acc, state}} ->
+            :ok = :httpc.cancel_request(ref)
+            {tag, resp, acc, state}
+        end
+
+      {^ref, :complete, {{_, status, _}, headers, body}} ->
+        headers = decode_headers(headers)
+        events = [status: status, headers: headers] ++ if body == "", do: [], else: [data: body]
+
+        case stream_events(events, s, fun) do
+          {:cont, {resp, acc, state}} ->
+            {:ok, resp, acc, state}
+
+          {tag, {resp, acc, state}} ->
+            {tag, resp, acc, state}
+        end
+
+      {^ref, {:error, reason}} ->
+        {resp, acc, state} = s
+        {{:error, normalize_error(reason)}, resp, acc, state}
+    end
+  after
+    stop_profile(profile)
+  end
+
+  defp stream_loop(s, ref, fun) do
+    receive do
+      {^ref, {:data, data}} ->
+        case stream_events([data: data], s, fun) do
+          {:cont, s} ->
+            stream_loop(s, ref, fun)
+
+          {tag, {resp, acc, state}} ->
+            :ok = :httpc.cancel_request(ref)
+            {tag, resp, acc, state}
+        end
+
+      {^ref, {:trailers, trailers}} ->
+        case stream_events([trailers: trailers], s, fun) do
+          {:cont, s} ->
+            stream_loop(s, ref, fun)
+
+          {tag, {resp, acc, state}} ->
+            :ok = :httpc.cancel_request(ref)
+            {tag, resp, acc, state}
+        end
+
+      {^ref, :done} ->
+        {resp, acc, state} = s
+        {:ok, resp, acc, state}
+
+      {^ref, {:error, reason}} ->
+        {resp, acc, state} = s
+        {{:error, normalize_error(reason)}, resp, acc, state}
+    end
+  end
+
+  defp stream_into_self(
+         request,
+         httpc_req,
+         httpc_http_options,
+         httpc_options,
+         profile,
+         s,
+         fun
+       ) do
+    caller = self()
+    receiver = &httpc_receiver(&1, caller)
+    httpc_options = [sync: false, stream: :self, receiver: receiver] ++ httpc_options
+
+    {:ok, ref} =
+      :httpc.request(request.method, httpc_req, httpc_http_options, httpc_options, profile)
+
+    receive do
+      {^ref, :stream_start, headers} ->
+        {status, headers} = decode_status_and_headers(headers)
+
+        case stream_events([status: status, headers: headers], s, fun) do
+          {:cont, {resp, acc, state}} ->
+            async = %Req.Response.Async{
+              pid: self(),
+              ref: ref,
+              stream_fun: &httpc_stream/2,
+              cancel_fun: &httpc_cancel/1
+            }
+
+            resp = put_in(resp.body, async)
+            {:ok, resp, acc, state}
+
+          {tag, {resp, acc, state}} ->
+            httpc_cancel(ref)
+            {tag, resp, acc, state}
+        end
+
+      # httpc only streams 200/206 responses; others arrive complete.
+      {^ref, :complete, {{_, status, _}, headers, body}} ->
+        headers = decode_headers(headers)
+
+        case stream_events([status: status, headers: headers], s, fun) do
+          {:cont, {resp, acc, state}} ->
+            resp = put_in(resp.body, body)
+            {:ok, resp, acc, state}
+
+          {tag, {resp, acc, state}} ->
+            {tag, resp, acc, state}
+        end
+
+      {^ref, {:error, reason}} ->
+        {resp, acc, state} = s
+        {{:error, normalize_error(reason)}, resp, acc, state}
+    end
+  after
+    stop_profile(profile)
+  end
+
+  defp stream_events([], s, _fun) do
+    {:cont, s}
+  end
+
+  defp stream_events([event | events], {resp, acc, state}, fun) do
+    resp =
+      case event do
+        {:status, status} ->
+          put_in(resp.status, status)
+
+        {:headers, headers} ->
+          put_in(resp.headers, Req.Fields.new_without_normalize_with_duplicates(headers))
+
+        {:trailers, trailers} ->
+          put_in(resp.trailers, Req.Fields.new_without_normalize_with_duplicates(trailers))
+
+        _ ->
+          resp
+      end
+
+    case fun.(event, resp, acc, state) do
+      {:cont, resp, acc, state} ->
+        stream_events(events, {resp, acc, state}, fun)
+
+      {tag, resp, acc, state} ->
+        {tag, {resp, acc, state}}
+    end
+  end
+
+  defp build(request, body) do
     {profile, request, httpc_http_options, httpc_options} = prepare_request(request)
     httpc_url = request.url |> URI.to_string() |> String.to_charlist()
 
@@ -36,49 +235,30 @@ defmodule Req.HTTPC do
         {httpc_url, httpc_headers}
       end
 
-    case request.into do
-      nil ->
-        httpc_request(request, httpc_req, httpc_http_options, httpc_options, profile)
-
-      :self ->
-        httpc_async(request, httpc_req, httpc_http_options, httpc_options, :self, profile)
-
-      fun when is_function(fun, 2) ->
-        httpc_async(request, httpc_req, httpc_http_options, httpc_options, fun, profile)
-
-      collectable ->
-        httpc_async(
-          request,
-          httpc_req,
-          httpc_http_options,
-          httpc_options,
-          {:collectable, collectable},
-          profile
-        )
-    end
+    {profile, request, httpc_req, httpc_http_options, httpc_options}
   end
 
-  defp prepare_body(request) do
+  defp prepare_body(request, acc) do
     case request.body do
       nil ->
-        {request, ""}
+        {:ok, "", acc}
 
       iodata when is_binary(iodata) or is_list(iodata) ->
-        {request, iodata}
+        {:ok, iodata, acc}
 
       fun when is_function(fun, 1) ->
-        drain_req_body_fun(fun, request, [])
+        raise ArgumentError, "body: fun is not supported in Req.stream/4"
 
       %Req.Response.Async{} = async ->
         # Async's Enumerable reads response chunks from this (the caller's) process
         # mailbox, so it must be consumed here rather than driven from httpc's process.
-        {request, Enum.to_list(async)}
+        {:ok, Enum.to_list(async), acc}
 
       {:stream, enumerable} ->
-        {request, stream_body(request, enumerable)}
+        {:ok, stream_body(request, enumerable), acc}
 
       enumerable ->
-        {request, stream_body(request, enumerable)}
+        {:ok, stream_body(request, enumerable), acc}
     end
   end
 
@@ -122,22 +302,6 @@ defmodule Req.HTTPC do
       next_chunk(next)
     else
       {:ok, element, next}
-    end
-  end
-
-  defp drain_req_body_fun(fun, request, acc) do
-    case fun.(request) do
-      {:data, chunk, request} ->
-        drain_req_body_fun(fun, request, [acc | chunk])
-
-      {:done, request} ->
-        {request, acc}
-
-      {:halt, request} ->
-        {:halt, request}
-
-      other ->
-        raise "expected req_body_fun to return {:data, chunk, request}, {:done, request}, or {:halt, request}, got: #{inspect(other)}"
     end
   end
 
@@ -251,25 +415,12 @@ defmodule Req.HTTPC do
     {httpc_http_options, httpc_options}
   end
 
-  defp httpc_request(request, httpc_req, httpc_http_options, httpc_options, profile) do
-    case :httpc.request(request.method, httpc_req, httpc_http_options, httpc_options, profile) do
-      {:ok, {{_, status, _}, headers, body}} ->
-        headers =
-          for {name, value} <- headers do
-            {List.to_string(name), List.to_string(value)}
-          end
-
-        {request, Req.Response.new(status: status, headers: headers, body: body)}
-
-      {:error, reason} ->
-        {request, normalize_error(reason)}
-    end
-  after
-    stop_profile(profile)
-  end
-
   defp normalize_error(:timeout) do
     %Req.TransportError{reason: :timeout}
+  end
+
+  defp normalize_error(:socket_closed_remotely) do
+    %Req.TransportError{reason: :closed}
   end
 
   defp normalize_error({:failed_connect, _} = reason) do
@@ -291,77 +442,8 @@ defmodule Req.HTTPC do
     reason2
   end
 
-  defp httpc_async(request, httpc_req, httpc_http_options, httpc_options, self_or_fun, profile) do
-    stream =
-      case self_or_fun do
-        :self ->
-          :self
-
-        _fun_or_collectable ->
-          {:self, :once}
-      end
-
-    # Use a custom receiver function so we can translate httpc's stream events
-    # to the same shape Finch uses (`{ref, {:data, data}}`, `{ref, :done}`, etc.),
-    # filter empty :stream events, and route everything to the caller's mailbox.
-    caller = self()
-    receiver = &httpc_receiver(&1, caller)
-
-    httpc_options = [sync: false, stream: stream, receiver: receiver] ++ httpc_options
-
-    {:ok, ref} =
-      :httpc.request(request.method, httpc_req, httpc_http_options, httpc_options, profile)
-
-    receive do
-      {^ref, :stream_start, headers} ->
-        async = %Req.Response.Async{
-          pid: self(),
-          ref: ref,
-          stream_fun: &httpc_stream/2,
-          cancel_fun: &httpc_cancel/1
-        }
-
-        {status, headers} = decode_status_and_headers(headers)
-        response = Req.Response.new(status: status, headers: headers, body: async)
-        {request, response}
-
-      {^ref, :stream_start, headers, pid} ->
-        {status, headers} = decode_status_and_headers(headers)
-        response = Req.Response.new(status: status, headers: headers)
-
-        case self_or_fun do
-          :self ->
-            {request, response}
-
-          fun when is_function(fun) ->
-            httpc_loop(request, response, ref, pid, fun)
-
-          {:collectable, collectable} ->
-            {acc, collector} = Collectable.into(collectable)
-            httpc_collect_loop(request, response, ref, pid, acc, collector)
-        end
-
-      # httpc only streams 200/206 responses; others arrive complete, so a
-      # collectable is ignored and the body is returned as usual.
-      {^ref, :complete, {{_, status, _}, headers, body}} ->
-        headers =
-          for {name, value} <- headers do
-            {List.to_string(name), List.to_string(value)}
-          end
-
-        response = Req.Response.new(status: status, headers: headers, body: body)
-        {request, response}
-
-      {^ref, {:error, reason}} ->
-        {request, normalize_error(reason)}
-    end
-  end
-
   defp decode_status_and_headers(headers) do
-    headers =
-      for {name, value} <- headers do
-        {List.to_string(name), List.to_string(value)}
-      end
+    headers = decode_headers(headers)
 
     status =
       case List.keyfind(headers, "content-range", 0) do
@@ -370,6 +452,12 @@ defmodule Req.HTTPC do
       end
 
     {status, headers}
+  end
+
+  defp decode_headers(headers) do
+    for {name, value} <- headers do
+      {List.to_string(name), List.to_string(value)}
+    end
   end
 
   # Called from httpc's handler process. Translates httpc events to finch-shaped
@@ -415,11 +503,6 @@ defmodule Req.HTTPC do
     send(caller, msg)
   end
 
-  defp httpc_receiver({ref, :stream_start, headers, _pid} = msg, caller) do
-    Process.put({__MODULE__, ref}, headers)
-    send(caller, msg)
-  end
-
   defp httpc_receiver({ref, {{_, _, _}, _, _} = result}, caller) do
     send(caller, {ref, :complete, result})
   end
@@ -446,6 +529,271 @@ defmodule Req.HTTPC do
   @doc false
   def httpc_cancel(ref) do
     :httpc.cancel_request(ref)
+  end
+
+  defp stop_profile(:default), do: :ok
+  defp stop_profile(profile), do: :inets.stop(:httpc, profile)
+
+  def run(request) do
+    case legacy_prepare_body(request) do
+      {:halt, request} ->
+        {request, Req.Response.new(status: nil, body: "")}
+
+      {request, body} ->
+        run(request, body)
+    end
+  end
+
+  defp run(request, body) do
+    {profile, request, httpc_http_options, httpc_options} = prepare_request(request)
+    httpc_url = request.url |> URI.to_string() |> String.to_charlist()
+
+    httpc_headers =
+      for {name, value} <- Req.Fields.get_list(request.headers) do
+        {String.to_charlist(name), String.to_charlist(value)}
+      end
+
+    httpc_req =
+      if request.method in [:post, :put] do
+        content_type =
+          case Req.Request.get_header(request, "content-type") do
+            [value] ->
+              String.to_charlist(value)
+
+            [] ->
+              ~c"application/octet-stream"
+          end
+
+        {httpc_url, httpc_headers, content_type, body}
+      else
+        {httpc_url, httpc_headers}
+      end
+
+    case request.into do
+      nil ->
+        httpc_request(request, httpc_req, httpc_http_options, httpc_options, profile)
+
+      :self ->
+        httpc_async(request, httpc_req, httpc_http_options, httpc_options, :self, profile)
+
+      fun when is_function(fun, 2) ->
+        httpc_async(request, httpc_req, httpc_http_options, httpc_options, fun, profile)
+
+      collectable ->
+        httpc_async(
+          request,
+          httpc_req,
+          httpc_http_options,
+          httpc_options,
+          {:collectable, collectable},
+          profile
+        )
+    end
+  end
+
+  defp legacy_prepare_body(request) do
+    case request.body do
+      nil ->
+        {request, ""}
+
+      iodata when is_binary(iodata) or is_list(iodata) ->
+        {request, iodata}
+
+      fun when is_function(fun, 1) ->
+        drain_req_body_fun(fun, request, [])
+
+      %Req.Response.Async{} = async ->
+        # Async's Enumerable reads response chunks from this (the caller's) process
+        # mailbox, so it must be consumed here rather than driven from httpc's process.
+        {request, Enum.to_list(async)}
+
+      {:stream, enumerable} ->
+        {request, stream_body(request, enumerable)}
+
+      enumerable ->
+        {request, stream_body(request, enumerable)}
+    end
+  end
+
+  # Stream the body lazily, framing it the same way the finch and mint adapters do:
+  # when Req has computed the size (content-length is set) send it with that length
+  # (plain generator), otherwise use chunked transfer-encoding (`:chunkify`).
+  defp legacy_emit_chunk(element, next) do
+    if IO.iodata_length(element) == 0 do
+      next_chunk(next)
+    else
+      {:ok, element, next}
+    end
+  end
+
+  defp drain_req_body_fun(fun, request, acc) do
+    case fun.(request) do
+      {:data, chunk, request} ->
+        drain_req_body_fun(fun, request, [acc | chunk])
+
+      {:done, request} ->
+        {request, acc}
+
+      {:halt, request} ->
+        {:halt, request}
+
+      other ->
+        raise "expected req_body_fun to return {:data, chunk, request}, {:done, request}, or {:halt, request}, got: #{inspect(other)}"
+    end
+  end
+
+  defp httpc_request(request, httpc_req, httpc_http_options, httpc_options, profile) do
+    case :httpc.request(request.method, httpc_req, httpc_http_options, httpc_options, profile) do
+      {:ok, {{_, status, _}, headers, body}} ->
+        headers =
+          for {name, value} <- headers do
+            {List.to_string(name), List.to_string(value)}
+          end
+
+        {request, Req.Response.new(status: status, headers: headers, body: body)}
+
+      {:error, reason} ->
+        {request, normalize_error(reason)}
+    end
+  after
+    stop_profile(profile)
+  end
+
+  defp httpc_async(request, httpc_req, httpc_http_options, httpc_options, self_or_fun, profile) do
+    stream =
+      case self_or_fun do
+        :self ->
+          :self
+
+        _fun_or_collectable ->
+          {:self, :once}
+      end
+
+    # Use a custom receiver function so we can translate httpc's stream events
+    # to the same shape Finch uses (`{ref, {:data, data}}`, `{ref, :done}`, etc.),
+    # filter empty :stream events, and route everything to the caller's mailbox.
+    caller = self()
+    receiver = &legacy_httpc_receiver(&1, caller)
+
+    httpc_options = [sync: false, stream: stream, receiver: receiver] ++ httpc_options
+
+    {:ok, ref} =
+      :httpc.request(request.method, httpc_req, httpc_http_options, httpc_options, profile)
+
+    receive do
+      {^ref, :stream_start, headers} ->
+        async = %Req.Response.Async{
+          pid: self(),
+          ref: ref,
+          stream_fun: &httpc_stream/2,
+          cancel_fun: &httpc_cancel/1
+        }
+
+        {status, headers} = legacy_decode_status_and_headers(headers)
+        response = Req.Response.new(status: status, headers: headers, body: async)
+        {request, response}
+
+      {^ref, :stream_start, headers, pid} ->
+        {status, headers} = legacy_decode_status_and_headers(headers)
+        response = Req.Response.new(status: status, headers: headers)
+
+        case self_or_fun do
+          :self ->
+            {request, response}
+
+          fun when is_function(fun) ->
+            httpc_loop(request, response, ref, pid, fun)
+
+          {:collectable, collectable} ->
+            {acc, collector} = Collectable.into(collectable)
+            httpc_collect_loop(request, response, ref, pid, acc, collector)
+        end
+
+      # httpc only streams 200/206 responses; others arrive complete, so a
+      # collectable is ignored and the body is returned as usual.
+      {^ref, :complete, {{_, status, _}, headers, body}} ->
+        headers =
+          for {name, value} <- headers do
+            {List.to_string(name), List.to_string(value)}
+          end
+
+        response = Req.Response.new(status: status, headers: headers, body: body)
+        {request, response}
+
+      {^ref, {:error, reason}} ->
+        {request, normalize_error(reason)}
+    end
+  end
+
+  defp legacy_decode_status_and_headers(headers) do
+    headers =
+      for {name, value} <- headers do
+        {List.to_string(name), List.to_string(value)}
+      end
+
+    status =
+      case List.keyfind(headers, "content-range", 0) do
+        {_, _} -> 206
+        _ -> 200
+      end
+
+    {status, headers}
+  end
+
+  # Called from httpc's handler process. Translates httpc events to finch-shaped
+  # messages and forwards them to the caller. Drops empty :stream events and
+  # diffs stream_end's headers against stream_start to recover real trailers
+  # (httpc's stream_end carries the merged response+trailer headers — see
+  # httpc_response.erl:611 — so we have to diff to get just the trailers).
+  defp legacy_httpc_receiver({_ref, :stream, ""}, _caller), do: :ok
+
+  defp legacy_httpc_receiver({ref, :stream, data}, caller) do
+    send(caller, {ref, {:data, data}})
+  end
+
+  defp legacy_httpc_receiver({ref, :stream_end, end_headers}, caller) do
+    start_headers = Process.delete({__MODULE__, ref}) || []
+
+    # Only headers declared in the response's `Trailer:` field count as trailers;
+    # the rest of end_headers are httpc echoing back response headers.
+    trailer_names =
+      case List.keyfind(start_headers, ~c"trailer", 0) do
+        {_, value} ->
+          value |> List.to_string() |> String.downcase() |> String.split(~r/,\s*/)
+
+        _ ->
+          []
+      end
+
+    trailers =
+      for {name, _value} = field <- end_headers,
+          String.downcase(List.to_string(name)) in trailer_names do
+        field
+      end
+
+    if trailers != [] do
+      send(caller, {ref, {:trailers, decode_trailers(trailers)}})
+    end
+
+    send(caller, {ref, :done})
+  end
+
+  defp legacy_httpc_receiver({ref, :stream_start, headers} = msg, caller) do
+    Process.put({__MODULE__, ref}, headers)
+    send(caller, msg)
+  end
+
+  defp legacy_httpc_receiver({ref, :stream_start, headers, _pid} = msg, caller) do
+    Process.put({__MODULE__, ref}, headers)
+    send(caller, msg)
+  end
+
+  defp legacy_httpc_receiver({ref, {{_, _, _}, _, _} = result}, caller) do
+    send(caller, {ref, :complete, result})
+  end
+
+  defp legacy_httpc_receiver({ref, {:error, reason}}, caller) do
+    send(caller, {ref, {:error, reason}})
   end
 
   defp httpc_loop(request, response, ref, pid, fun) do
@@ -492,7 +840,4 @@ defmodule Req.HTTPC do
         {request, normalize_error(reason)}
     end
   end
-
-  defp stop_profile(:default), do: :ok
-  defp stop_profile(profile), do: :inets.stop(:httpc, profile)
 end
