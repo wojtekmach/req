@@ -5,51 +5,6 @@ defmodule Req.FinchTest do
   @moduletag :adapter_finch
 
   describe "run" do
-    test ":finch_request" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      pid = self()
-
-      fun = fn req, finch_request, finch_name, finch_opts ->
-        {:ok, resp} = Finch.request(finch_request, finch_name, finch_opts)
-        send(pid, resp)
-        {req, Req.Response.new(status: resp.status, headers: resp.headers, body: "finch_request")}
-      end
-
-      assert ExUnit.CaptureIO.capture_io(:stderr, fn ->
-               resp = Req.get!(url, finch_request: fun)
-               assert resp.status == 200
-               assert resp.body == "finch_request"
-             end) =~ "setting `:finch_request` is deprecated"
-
-      assert_received %Finch.Response{body: "ok"}
-    end
-
-    test ":finch_request error" do
-      fun = fn req, _finch_request, _finch_name, _finch_opts ->
-        {req, %ArgumentError{message: "exec error"}}
-      end
-
-      ExUnit.CaptureIO.capture_io(:stderr, fn ->
-        assert_raise ArgumentError, "exec error", fn ->
-          Req.get!("http://localhost", finch_request: fun, retry: false)
-        end
-      end)
-    end
-
-    test ":finch_request with invalid return" do
-      fun = fn _, _, _, _ -> :ok end
-
-      ExUnit.CaptureIO.capture_io(:stderr, fn ->
-        assert_raise RuntimeError, ~r"expected adapter to return \{request, response\}", fn ->
-          Req.get!("http://localhost", finch_request: fun)
-        end
-      end)
-    end
-
     test "pool timeout" do
       %{url: url} =
         start_http_server(fn conn ->

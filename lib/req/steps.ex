@@ -52,7 +52,6 @@ defmodule Req.Steps do
       :max_retries,
       :plug,
       :finch,
-      :finch_request,
       :finch_private,
       :connect_options,
       :inet6,
