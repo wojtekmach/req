@@ -142,8 +142,16 @@ if Code.ensure_loaded?(Plug) do
     def stream(request, acc, fun, state) when is_function(fun, 4) do
       resp = Req.Response.new(status: nil, body: nil)
 
-      {:ok, req_body, acc} = prepare_body(request, acc)
-      stream(request, req_body, resp, acc, fun, state)
+      case prepare_body(request, acc) do
+        {:ok, req_body, acc} ->
+          stream(request, req_body, resp, acc, fun, state)
+
+        # Halting req_body_fun closes the connection without reading the
+        # response, so the plug is never called.
+        {:halt, acc} ->
+          resp = put_in(resp.request, request)
+          {:halt, resp, acc, state}
+      end
     end
 
     defp prepare_body(request, acc) do
@@ -155,7 +163,7 @@ if Code.ensure_loaded?(Plug) do
           {:ok, "", acc}
 
         req_body_fun when is_function(req_body_fun, 1) ->
-          raise ArgumentError, "body: fun is not supported in Req.stream/4"
+          drain_req_body_fun(req_body_fun, acc, [])
 
         enumerable ->
           {:ok, enumerable |> Enum.to_list() |> IO.iodata_to_binary(), acc}
@@ -290,6 +298,26 @@ if Code.ensure_loaded?(Plug) do
       end
 
       {request, conn}
+    end
+
+    defp drain_req_body_fun(req_body_fun, acc, chunks) do
+      case req_body_fun.(acc) do
+        {:data, chunk, acc} ->
+          drain_req_body_fun(req_body_fun, acc, [chunk | chunks])
+
+        {:done, chunk, acc} ->
+          {:ok, [chunk | chunks] |> Enum.reverse() |> IO.iodata_to_binary(), acc}
+
+        {:done, acc} ->
+          {:ok, chunks |> Enum.reverse() |> IO.iodata_to_binary(), acc}
+
+        {:halt, acc} ->
+          {:halt, acc}
+
+        other ->
+          raise "expected req_body_fun to return {:data, chunk, acc}, {:done, chunk, acc}, " <>
+                  "{:done, acc}, or {:halt, acc}, got: #{inspect(other)}"
+      end
     end
 
     defp finish_conn(conn) do

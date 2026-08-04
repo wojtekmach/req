@@ -3,23 +3,6 @@ defmodule Req.AdapterTest do
 
   @adapter Req.Case.adapter()
 
-  defmodule StreamResponseStep do
-    def stream(req, acc, fun, state, next) do
-      fun = fn
-        {:headers, _headers} = event, resp, acc, state ->
-          resp = Req.Response.put_header(resp, "x-stream-step", "true")
-          request = Req.Request.put_private(resp.request, :stream_step, true)
-          resp = %{resp | request: request}
-          fun.(event, resp, acc, state)
-
-        event, resp, acc, state ->
-          fun.(event, resp, acc, state)
-      end
-
-      next.(req, acc, fun, state)
-    end
-  end
-
   describe "run" do
     @tag :transport
     test ":inet6" do
@@ -560,5 +543,128 @@ defmodule Req.AdapterTest do
 
       assert err == %Req.TransportError{reason: :timeout}
     end
+  end
+
+  describe "body: req_body_fun" do
+    test "Req.request - raise" do
+      assert_raise ArgumentError, "body: fun is only supported in Req.stream/4", fn ->
+        Req.request!(url: "http://localhost", body: fn acc -> {:done, acc} end)
+      end
+    end
+
+    test "Req.stream - success" do
+      %{req: req} =
+        serve(fn conn ->
+          assert {:ok, "foobarbaz", conn} = Plug.Conn.read_body(conn)
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      {:ok, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+          method: :post,
+          body: req_body_fun()
+        )
+
+      assert resp.status == 200
+      assert resp.body == nil
+      assert acc == ["ok", :done, "bar", "foo"]
+    end
+
+    test "Req.stream - halt" do
+      %{req: req} =
+        serve(fn conn ->
+          assert {:ok, "", conn} = Plug.Conn.read_body(conn)
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      {:ok, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+          method: :post,
+          body: halting_req_body_fun()
+        )
+
+      assert resp.status == nil
+      assert resp.body == nil
+      assert acc == [:halted]
+    end
+
+    @tag :transport
+    test "Req.stream - transport error" do
+      %{url: url} =
+        start_tcp_server(fn _socket ->
+          nil
+        end)
+
+      req = Req.new(adapter: adapter_fun(), url: url)
+
+      {:error, err, resp, _acc} =
+        Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+          method: :post,
+          body: req_body_fun()
+        )
+
+      assert err == %Req.TransportError{reason: :closed}
+      assert resp.status == nil
+    end
+
+    @tag :transport
+    @tag :capture_log
+    @tag skip: @adapter == :httpc
+    test "Req.stream - mid-stream transport error" do
+      %{req: req} =
+        serve(fn conn ->
+          assert {:ok, "foobarbaz", conn} = Plug.Conn.read_body(conn)
+          conn = Plug.Conn.send_chunked(conn, 200)
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk1")
+          raise "oops"
+          conn
+        end)
+
+      {:error, err, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+          method: :post,
+          body: req_body_fun()
+        )
+
+      assert err == %Req.TransportError{reason: :closed}
+      assert resp.status == 200
+      assert acc == ["chunk1", :done, "bar", "foo"]
+    end
+
+    test "Req.stream - errored" do
+      %{req: req} =
+        serve(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      req_body_fun = fn [] -> :oops end
+
+      assert_raise RuntimeError,
+                   "expected req_body_fun to return {:data, chunk, acc}, {:done, chunk, acc}, " <>
+                     "{:done, acc}, or {:halt, acc}, got: :oops",
+                   fn ->
+                     Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+                       method: :post,
+                       body: req_body_fun
+                     )
+                   end
+    end
+  end
+
+  defp req_body_fun do
+    fn
+      [] ->
+        {:data, "foo", ["foo"]}
+
+      ["foo"] ->
+        {:data, "bar", ["bar", "foo"]}
+
+      ["bar", "foo"] = acc ->
+        {:done, "baz", [:done | acc]}
+    end
+  end
+
+  defp halting_req_body_fun do
+    fn [] -> {:halt, [:halted]} end
   end
 end

@@ -146,6 +146,36 @@ defmodule Req.PlugTest do
     refute_receive _
   end
 
+  test "request body fun" do
+    req =
+      Req.new(
+        plug: fn conn ->
+          {:ok, body, conn} = read_body(conn)
+          send_resp(conn, 200, body)
+        end,
+        body: fn
+          [] ->
+            {:data, "chunk0", [0]}
+
+          [count | _] = acc when count < 2 ->
+            {:data, "chunk#{count + 1}", [count + 1 | acc]}
+
+          [2 | _] = acc ->
+            {:done, acc}
+        end
+      )
+
+    {:ok, resp, acc} =
+      Req.stream(req, [], fn data, _resp, acc ->
+        {:cont, [data | acc]}
+      end)
+
+    assert resp.status == 200
+    assert acc == ["chunk0chunk1chunk2", 2, 1, 0]
+
+    refute_receive _
+  end
+
   test "fetches query params" do
     plug = fn conn ->
       assert conn.query_params == %{"a" => "1"}

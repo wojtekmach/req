@@ -247,7 +247,7 @@ defmodule Req.HTTPC do
         {:ok, iodata, acc}
 
       fun when is_function(fun, 1) ->
-        raise ArgumentError, "body: fun is not supported in Req.stream/4"
+        drain_req_body_fun(fun, acc, [])
 
       %Req.Response.Async{} = async ->
         # Async's Enumerable reads response chunks from this (the caller's) process
@@ -302,6 +302,26 @@ defmodule Req.HTTPC do
       next_chunk(next)
     else
       {:ok, element, next}
+    end
+  end
+
+  defp drain_req_body_fun(fun, acc, chunks) do
+    case fun.(acc) do
+      {:data, chunk, acc} ->
+        drain_req_body_fun(fun, acc, [chunks | chunk])
+
+      {:done, chunk, acc} ->
+        {:ok, [chunks | chunk], acc}
+
+      {:done, acc} ->
+        {:ok, chunks, acc}
+
+      {:halt, acc} ->
+        {:halt, acc}
+
+      other ->
+        raise "expected req_body_fun to return {:data, chunk, acc}, {:done, chunk, acc}, " <>
+                "{:done, acc}, or {:halt, acc}, got: #{inspect(other)}"
     end
   end
 
