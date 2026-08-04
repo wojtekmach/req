@@ -273,7 +273,7 @@ defmodule Req do
       Defaults to `true`.
 
     * `:decoders` - the list of decoders to use for automatic response body decoding.
-      Defaults to `[:json, :json_api, :ndjson]`. See `Req.Decode` for the supported
+      Defaults to `[:json, :json_api, :ndjson, :sse]`. See `Req.Decode` for the supported
       formats and how to add custom decoders.
 
     * `:into` - where to send the response body. It can be one of:
