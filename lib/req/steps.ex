@@ -35,6 +35,7 @@ defmodule Req.Steps do
 
       # response steps
       :raw,
+      :expect,
       :http_errors,
       :decode_body,
       :decoders,
@@ -64,6 +65,7 @@ defmodule Req.Steps do
       :redact_auth
     ])
     |> Req.Request.prepend_request_steps(
+      expect: Req.Expect,
       retry: Req.Retry,
       decode: Req.Decode,
       checksum: Req.Checksum,
