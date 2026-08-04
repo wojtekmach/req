@@ -275,4 +275,151 @@ defmodule ReqTest do
       assert resp.body == "ok"
     end
   end
+
+  describe "stream" do
+    @tag skip: adapter() == :httpc
+    test "success" do
+      %{req: req} =
+        serve(fn conn ->
+          conn =
+            conn
+            |> Plug.Conn.put_resp_content_type("text/plain", nil)
+            |> Plug.Conn.send_chunked(200)
+
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk1")
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk2")
+          conn
+        end)
+
+      {:ok, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc ->
+          {:cont, [data | acc]}
+        end)
+
+      assert resp.status == 200
+      assert Req.Response.get_header(resp, "content-type") == ["text/plain"]
+      assert resp.body == nil
+      assert acc == ["chunk2", "chunk1"]
+    end
+
+    @tag skip: adapter() == :httpc
+    test "halt" do
+      %{req: req} =
+        serve(fn conn ->
+          conn = Plug.Conn.send_chunked(conn, 200)
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk1")
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk2")
+          conn
+        end)
+
+      {:ok, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc ->
+          {:halt, [data | acc]}
+        end)
+
+      assert resp.status == 200
+      assert resp.body == nil
+      assert acc == ["chunk1"]
+    end
+
+    @tag skip: adapter() == :httpc
+    test "invalid return" do
+      %{req: req} =
+        serve(fn conn ->
+          conn = Plug.Conn.send_chunked(conn, 200)
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk1")
+          conn
+        end)
+
+      assert_raise ArgumentError,
+                   ~s|expected {:cont, acc} or {:halt, acc}, got: ["chunk1"]|,
+                   fn ->
+                     Req.stream(req, [], fn data, _resp, acc ->
+                       [data | acc]
+                     end)
+                   end
+    end
+
+    @tag :transport
+    @tag skip: adapter() == :httpc
+    test "initial transport error" do
+      %{url: url} =
+        start_tcp_server(fn _socket ->
+          nil
+        end)
+
+      req = Req.new(adapter: adapter_fun(), url: url, retry: false)
+
+      {:error, err, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc ->
+          {:cont, [data | acc]}
+        end)
+
+      assert err == %Req.TransportError{reason: :closed}
+      assert resp.status == nil
+      assert resp.body == nil
+      assert resp.request.url == url
+      assert acc == []
+    end
+
+    @tag :transport
+    @tag :capture_log
+    @tag skip: adapter() == :httpc
+    test "mid-stream transport error" do
+      %{req: req} =
+        serve(fn conn ->
+          conn = Plug.Conn.send_chunked(conn, 200)
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk1")
+          raise "oops"
+          conn
+        end)
+
+      req = Req.new(req, retry: false)
+
+      {:error, err, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc ->
+          {:cont, [data | acc]}
+        end)
+
+      assert err == %Req.TransportError{reason: :closed}
+      assert resp.status == 200
+      assert resp.body == nil
+      assert resp.request.url == req.url
+      assert acc == ["chunk1"]
+    end
+
+    @tag :transport
+    test "trailers" do
+      %{url: url} =
+        start_tcp_server(fn socket ->
+          assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
+
+          data = """
+          HTTP/1.1 200 OK\r
+          transfer-encoding: chunked\r
+          trailer: x-foo, x-bar\r
+          \r
+          6\r
+          chunk1\r
+          0\r
+          x-foo: foo\r
+          x-bar: bar\r
+          \r
+          """
+
+          :ok = :gen_tcp.send(socket, data)
+        end)
+
+      req = Req.new(adapter: adapter_fun(), url: url)
+
+      assert {:ok, resp, :ok} =
+               Req.stream(req, :ok, fn _data, _resp, acc ->
+                 {:cont, acc}
+               end)
+
+      assert resp.status == 200
+      assert resp.trailers["x-foo"] == ["foo"]
+      assert resp.trailers["x-bar"] == ["bar"]
+    end
+  end
 end

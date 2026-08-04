@@ -139,6 +139,189 @@ if Code.ensure_loaded?(Plug) do
         end
     """
 
+    def stream(request, acc, fun, state) when is_function(fun, 4) do
+      resp = Req.Response.new(status: nil, body: nil)
+      {:ok, req_body, acc} = prepare_body(request, acc)
+      stream(request, req_body, resp, acc, fun, state)
+    end
+
+    defp prepare_body(request, acc) do
+      case request.body do
+        iodata when is_binary(iodata) or is_list(iodata) ->
+          {:ok, IO.iodata_to_binary(iodata), acc}
+
+        nil ->
+          {:ok, "", acc}
+
+        req_body_fun when is_function(req_body_fun, 1) ->
+          raise ArgumentError, "body: fun is not supported in Req.stream/4"
+
+        enumerable ->
+          {:ok, enumerable |> Enum.to_list() |> IO.iodata_to_binary(), acc}
+      end
+    end
+
+    defp stream(request, req_body, resp, acc, fun, state) do
+      {request, conn} = call_conn(request, req_body)
+      resp = put_in(resp.request, request)
+
+      if exception = conn.private[:req_test_exception] do
+        {{:error, exception}, resp, acc, state}
+      else
+        chunks = finish_conn(conn)
+
+        case request.into do
+          :self ->
+            stream_into_self(conn, chunks, resp, acc, fun, state)
+
+          _other ->
+            events =
+              [status: conn.status, headers: conn.resp_headers] ++
+                for chunk <- chunks || [conn.resp_body], chunk != "", do: {:data, chunk}
+
+            case stream_events(events, resp, acc, state, fun) do
+              {:cont, resp, acc, state} ->
+                {:ok, resp, acc, state}
+
+              result ->
+                result
+            end
+        end
+      end
+    end
+
+    defp stream_into_self(conn, chunks, resp, acc, fun, state) do
+      events = [status: conn.status, headers: conn.resp_headers]
+
+      case stream_events(events, resp, acc, state, fun) do
+        {:cont, resp, acc, state} ->
+          async = %Req.Response.Async{
+            pid: self(),
+            ref: make_ref(),
+            stream_fun: &plug_parse_message/2,
+            cancel_fun: &plug_cancel/1
+          }
+
+          for chunk <- chunks || [conn.resp_body], chunk != "" do
+            send(self(), {async.ref, {:data, chunk}})
+          end
+
+          send(self(), {async.ref, :done})
+          resp = put_in(resp.body, async)
+          {:ok, resp, acc, state}
+
+        result ->
+          result
+      end
+    end
+
+    defp stream_events([], resp, acc, state, _fun) do
+      {:cont, resp, acc, state}
+    end
+
+    defp stream_events([event | events], resp, acc, state, fun) do
+      resp =
+        case event do
+          {:status, status} ->
+            put_in(resp.status, status)
+
+          {:headers, headers} ->
+            put_in(resp.headers, Req.Fields.new_without_normalize_with_duplicates(headers))
+
+          _ ->
+            resp
+        end
+
+      case fun.(event, resp, acc, state) do
+        {:cont, resp, acc, state} ->
+          stream_events(events, resp, acc, state, fun)
+
+        result ->
+          result
+      end
+    end
+
+    defp call_conn(request, req_body) do
+      plug = request.options.plug
+
+      {req_body, request} =
+        case Req.Request.get_header(request, "content-encoding") do
+          [] ->
+            {req_body, request}
+
+          [encoding] when encoding in ["gzip", "x-gzip"] ->
+            case Req.Gzip.decode(req_body) do
+              {:ok, req_body} ->
+                {req_body, Req.Request.delete_header(request, "content-encoding")}
+
+              {:error, exception} ->
+                raise exception
+            end
+
+          _other ->
+            {req_body, request}
+        end
+
+      req_headers = Req.Fields.get_list(request.headers)
+
+      parser_opts =
+        Plug.Parsers.init(
+          parsers: [:urlencoded, :multipart, :json],
+          pass: ["*/*"],
+          json_decoder: Jason
+        )
+
+      conn =
+        Req.Plug.Adapter.conn(%Plug.Conn{}, request.method, request.url, req_body)
+        |> Map.replace!(:req_headers, req_headers)
+        |> Plug.Conn.fetch_query_params(validate_utf8: false)
+        |> Plug.Conn.put_private(:req_private, request.private)
+        |> Plug.Parsers.call(parser_opts)
+
+      # Handle cases where the body isn't read with Plug.Parsers
+      {mod, state} = conn.adapter
+      state = %{state | body_read: true}
+      conn = %{conn | adapter: {mod, state}}
+      conn = call_plug(conn, plug)
+
+      unless match?(%Plug.Conn{}, conn) do
+        raise ArgumentError, "expected to return %Plug.Conn{}, got: #{inspect(conn)}"
+      end
+
+      {request, conn}
+    end
+
+    defp finish_conn(conn) do
+      # consume messages sent by Plug.Test adapter
+      {Req.Plug.Adapter, %{ref: ref, chunks: chunks}} = conn.adapter
+
+      if conn.state == :unset do
+        raise """
+        expected connection to have a response but no response was set/sent.
+
+        Please verify that you are using Plug.Conn.send_resp/3 in your plug:
+
+            Req.Test.stub(MyStub, fn conn ->
+              Plug.Conn.send_resp(conn, 200, "Hello, World!")
+            end)
+        """
+      end
+
+      receive do
+        {^ref, {_status, _headers, _body}} -> :ok
+      after
+        0 -> :ok
+      end
+
+      receive do
+        {:plug_conn, :sent} -> :ok
+      after
+        0 -> :ok
+      end
+
+      chunks
+    end
+
     def run(request) do
       result =
         case request.body do

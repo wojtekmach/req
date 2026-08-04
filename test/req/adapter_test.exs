@@ -1,6 +1,23 @@
 defmodule Req.AdapterTest do
   use Req.Case, async: true
 
+  defmodule StreamResponseStep do
+    def stream(req, acc, fun, state, next) do
+      fun = fn
+        {:headers, _headers} = event, resp, acc, state ->
+          resp = Req.Response.put_header(resp, "x-stream-step", "true")
+          request = Req.Request.put_private(resp.request, :stream_step, true)
+          resp = %{resp | request: request}
+          fun.(event, resp, acc, state)
+
+        event, resp, acc, state ->
+          fun.(event, resp, acc, state)
+      end
+
+      next.(req, acc, fun, state)
+    end
+  end
+
   @adapter Req.Case.adapter()
 
   describe "run" do
@@ -544,5 +561,41 @@ defmodule Req.AdapterTest do
 
       assert err == %Req.TransportError{reason: :timeout}
     end
+  end
+
+  test "Req.stream - response changes from steps" do
+    %{req: req} = serve(fn conn -> Plug.Conn.send_resp(conn, 200, "ok") end)
+
+    req =
+      Req.Request.prepend_request_steps(req,
+        stream_response: StreamResponseStep
+      )
+
+    {:ok, resp, acc} =
+      Req.stream(req, [], fn data, resp, acc ->
+        assert Req.Response.get_header(resp, "x-stream-step") == ["true"]
+        assert resp.request.private[:stream_step]
+        {:cont, [data | acc]}
+      end)
+
+    assert Req.Response.get_header(resp, "x-stream-step") == ["true"]
+    assert resp.request.private[:stream_step]
+    assert acc == ["ok"]
+  end
+
+  test "Req.stream - response changes from steps survive halt" do
+    %{req: req} = serve(fn conn -> Plug.Conn.send_resp(conn, 200, "ok") end)
+
+    req =
+      Req.Request.prepend_request_steps(req,
+        stream_response: StreamResponseStep
+      )
+
+    {:ok, resp, acc} =
+      Req.stream(req, [], fn data, _resp, acc -> {:halt, [data | acc]} end)
+
+    assert Req.Response.get_header(resp, "x-stream-step") == ["true"]
+    assert resp.request.private[:stream_step]
+    assert acc == ["ok"]
   end
 end

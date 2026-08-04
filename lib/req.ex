@@ -1147,6 +1147,103 @@ defmodule Req do
     end
   end
 
+  def stream(req, acc, fun, options \\ []) when is_function(fun, 3) do
+    req = Req.new(req, options)
+
+    stream_fun = fn
+      {:data, data}, resp, acc, state ->
+        case fun.(data, resp, acc) do
+          {:cont, acc} ->
+            {:cont, resp, acc, state}
+
+          {:halt, acc} ->
+            {:halt, resp, acc, state}
+
+          other ->
+            raise ArgumentError, "expected {:cont, acc} or {:halt, acc}, got: #{inspect(other)}"
+        end
+
+      {tag, _value}, resp, acc, state when tag in [:status, :headers, :trailers] ->
+        {:cont, resp, acc, state}
+    end
+
+    run_stream(req, acc, stream_fun)
+  end
+
+  @doc false
+  def stream(req, options \\ []) do
+    req = Req.new(req, options)
+
+    stream_fun = fn
+      {:data, data}, resp, %Req.Buffer{} = buffer, state ->
+        {:cont, resp, %{buffer | iodata: [buffer.iodata | data]}, state}
+
+      {_tag, _value}, resp, acc, state ->
+        {:cont, resp, acc, state}
+    end
+
+    case run_stream(req, %Req.Buffer{}, stream_fun) do
+      {:ok, resp, %Req.Buffer{} = buffer} ->
+        resp = put_in(resp.body, Req.Buffer.body(buffer))
+        {:ok, resp}
+
+      {:error, exception, resp, %Req.Buffer{} = buffer} ->
+        resp = put_in(resp.body, Req.Buffer.body(buffer))
+        {:error, exception, resp}
+    end
+  end
+
+  @doc false
+  def stream!(req, options \\ []) do
+    case stream(req, options) do
+      {:ok, resp} ->
+        resp
+
+      {:error, exception, _resp} ->
+        raise exception
+    end
+  end
+
+  defp run_stream(req, acc, fun) when is_function(fun, 4) do
+    case do_stream(req, req.request_steps, acc, fun, []) do
+      {:ok, resp, acc, []} ->
+        {:ok, resp, acc}
+
+      {:halt, resp, acc, []} ->
+        {:ok, resp, acc}
+
+      {{:error, exception}, resp, acc, []} ->
+        {:error, exception, resp, acc}
+    end
+  end
+
+  defp do_stream(req, [{_name, mod} | rest], acc, fun, state) when is_atom(mod) do
+    mod.stream(req, acc, fun, state, &do_stream(&1, rest, &2, &3, &4))
+  end
+
+  defp do_stream(req, [{name, step} | rest], acc, fun, state) do
+    case run_step(step, req) do
+      %Req.Request{} = req ->
+        do_stream(req, rest, acc, fun, state)
+
+      other ->
+        raise "expected request step #{inspect(name)} to return %Req.Request{}, " <>
+                "got: #{inspect(other)}"
+    end
+  end
+
+  defp do_stream(req, [], acc, fun, state) do
+    req.adapter.stream(req, acc, fun, state)
+  end
+
+  defp run_step(step, req) when is_function(step, 1) do
+    step.(req)
+  end
+
+  defp run_step({mod, fun, args}, req) when is_atom(mod) and is_atom(fun) and is_list(args) do
+    apply(mod, fun, [req | args])
+  end
+
   @doc """
   Makes an HTTP request and returns the request and response or error.
 
