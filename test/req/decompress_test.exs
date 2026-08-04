@@ -27,9 +27,7 @@ defmodule Req.DecompressTest do
 
     resp = Req.request!(req, compressed: true, into: [])
     assert resp.status == 200
-    # TODO:
-    # assert resp.body == []
-    assert resp.body in [[], [""]]
+    assert resp.body == []
   end
 
   test "does not set accept-encoding with into: fun" do

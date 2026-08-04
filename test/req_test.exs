@@ -15,7 +15,9 @@ defmodule ReqTest do
         Plug.Conn.send_resp(conn, 200, user_agent)
       end)
 
-    assert "req/" <> _ = Req.get!(req).body
+    resp = Req.stream!(req)
+    assert resp.status == 200
+    assert "req/" <> _ = resp.body
   end
 
   test "headers" do
@@ -34,7 +36,10 @@ defmodule ReqTest do
         Plug.Conn.send_resp(conn, 200, "ok")
       end)
 
-    Req.get!(req, headers: [x_a: 1, x_b: ~U[2021-01-01 09:00:00Z]])
+    resp = Req.stream!(req, headers: [x_a: 1, x_b: ~U[2021-01-01 09:00:00Z]])
+    assert resp.status == 200
+    assert resp.body == "ok"
+
     assert_receive {:headers, headers}
     assert headers == [{"x-a", "1"}, {"x-b", "Fri, 01 Jan 2021 09:00:00 GMT"}]
 
@@ -44,12 +49,16 @@ defmodule ReqTest do
       assert req2.headers == %{"x-a" => ["1", "2"]}
     end
 
-    Req.get!(req2)
+    resp = Req.stream!(req2)
+    assert resp.status == 200
+    assert resp.body == "ok"
     assert_receive {:headers, headers}
     assert headers == [{"x-a", "1, 2"}]
 
     req2 = Req.merge(req, headers: [x_a: 1, x_b: 1])
-    Req.get!(req2, headers: [x_a: 2])
+    resp = Req.stream!(req2, headers: [x_a: 2])
+    assert resp.status == 200
+    assert resp.body == "ok"
     assert_receive {:headers, headers}
     assert headers == [{"x-a", "2"}, {"x-b", "1"}]
   end
@@ -68,15 +77,22 @@ defmodule ReqTest do
       end)
 
     with_userinfo = String.replace("#{url}", "http://", "http://foo:bar@")
-    Req.get!(req, url: with_userinfo)
+    resp = Req.stream!(req, url: with_userinfo)
+    assert resp.status == 200
+    assert resp.body == "ok"
     assert_receive {:authorization, "Basic " <> _}
 
     # explicit :auth option is favored over userinfo in URL
-    Req.get!(req, url: with_userinfo, auth: {:bearer, "token"})
+    resp = Req.stream!(req, url: with_userinfo, auth: {:bearer, "token"})
+    assert resp.status == 200
+    assert resp.body == "ok"
+
     assert_receive {:authorization, "Bearer token"}
 
     req2 = Req.merge(req, auth: {:bearer, "token"})
-    Req.get!(req2, url: with_userinfo)
+    resp = Req.stream!(req2, url: with_userinfo)
+    assert resp.status == 200
+    assert resp.body == "ok"
     assert_receive {:authorization, "Bearer token"}
 
     req2 = Req.new(url: with_userinfo)
@@ -121,17 +137,6 @@ defmodule ReqTest do
              body: nil,
              adapter: MyAdapter,
              private: %{}
-           )\
-           """
-
-    assert inspect(put_in(Req.new().halted, true), pretty: true) == """
-           Req.new(
-             url: nil,
-             method: :get,
-             headers: [],
-             body: nil,
-             private: %{},
-             halted: true
            )\
            """
   end
@@ -240,8 +245,10 @@ defmodule ReqTest do
         Plug.Conn.send_resp(conn, 200, body)
       end)
 
-    resp = Req.get!(origin, into: :self)
-    resp = Req.put!(echo, body: resp.body)
+    resp = Req.request!(origin, into: :self)
+    assert resp.status == 200
+
+    resp = Req.stream!(echo, method: :put, body: resp.body)
     assert resp.status == 200
     assert resp.body == "foobarbaz"
   end
@@ -267,10 +274,10 @@ defmodule ReqTest do
 
     if Req.Case.adapter() == :httpc do
       assert_raise ArgumentError, "httpc adapter does not support HTTP/2", fn ->
-        Req.request!(req)
+        Req.stream!(req)
       end
     else
-      resp = Req.request!(req)
+      resp = Req.stream!(req)
       assert resp.status == 200
       assert resp.body == "ok"
     end

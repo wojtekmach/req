@@ -39,7 +39,6 @@ defmodule Req.Request do
         )
         |> Req.Request.append_response_steps(
           # ...
-          decompress_body: &Req.Steps.decompress_body/1,
           decode_body: &Req.Steps.decode_body/1,
           # ...
         )
@@ -72,6 +71,21 @@ defmodule Req.Request do
         * `iodata` - eagerly send request body
 
         * `enumerable` - stream request body
+
+        * `req_body_fun` - stream request body chunks from a 1-arity function.
+          Only supported in `Req.stream/4`; the function receives the accumulator
+          passed to `Req.stream/4`.
+
+          It should return one of:
+
+            * `{:data, chunk, acc}` - emit request body `chunk`.
+
+            * `{:done, acc}` - request body is done. `acc` is passed to the response
+              streaming function.
+
+            * `{:halt, acc}` - cancel request. On HTTP/1, this closes the connection.
+
+          `req_body_fun` requires Finch main.
 
     * `:into` - where to send the response body. It can be one of:
 
@@ -286,65 +300,40 @@ defmodule Req.Request do
   """
 
   @typedoc """
+  A function for streaming request body chunks.
+
+  Only supported in `Req.stream/4`; the function receives the accumulator passed
+  to `Req.stream/4`.
+  """
+  @type req_body_fun(acc) ::
+          (acc -> {:data, binary(), acc} | {:done, acc} | {:halt, acc})
+
+  @typedoc """
   The request struct.
   """
   @type t() :: %Req.Request{
           method: atom(),
           url: URI.t(),
           headers: %{optional(binary()) => [binary()]},
-          body: iodata() | Enumerable.t() | nil,
+          body: iodata() | Enumerable.t() | req_body_fun(term()) | nil,
           into: nil | iodata() | Collectable.t(),
           options: options(),
-          halted: boolean(),
           adapter: module(),
-          request_steps: [{name :: atom(), request_step()}],
-          response_steps: [{name :: atom(), response_step()}],
-          error_steps: [{name :: atom(), error_step()}],
+          request_steps: [{name :: atom(), request_step() | module()}],
           private: map()
         }
 
   @typedoc """
-  A request step is a function that takes a request and returns a request or a tuple of request
-  and response/exception.
+  A transform step is a function that takes a request and returns a request.
 
   The function can be an anonymous function, or a `{module, function, args}` tuple. In the latter
   case, the step is invoked as `apply(module, function, [request | args])`.
 
-  See also the ["Request Steps"](#module-request-steps) section in the module documentation.
+  A step can also be a module implementing `stream(req, acc, fun, state, next)`. See the
+  ["Request Steps"](#module-request-steps) section in the module documentation.
   """
   @typedoc since: "0.5.1"
-  @type request_step() ::
-          (t() -> t() | {t(), Req.Response.t() | Exception.t()}) | {module(), atom(), [term()]}
-
-  @typedoc """
-  A response step is a function that takes a request/response tuple and returns a request/response
-  or a request/exception tuple.
-
-  The function can be an anonymous function, or a `{module, function, args}` tuple. In the latter
-  case, the step is invoked as `apply(module, function, [request | args])`.
-
-  See also the ["Response and Error Steps"](#module-response-and-error-steps) section in the
-  module documentation.
-  """
-  @typedoc since: "0.5.1"
-  @type response_step() ::
-          ({t(), Req.Response.t()} -> {t(), Req.Response.t() | Exception.t()})
-          | {module(), atom(), [term()]}
-
-  @typedoc """
-  An error step is a function that takes a request/exception tuple and returns a request/response
-  or a request/exception tuple.
-
-  The function can be an anonymous function, or a `{module, function, args}` tuple. In the latter
-  case, the step is invoked as `apply(module, function, [request | args])`.
-
-  See also the ["Response and Error Steps"](#module-response-and-error-steps) section in the
-  module documentation.
-  """
-  @typedoc since: "0.5.1"
-  @type error_step() ::
-          ({t(), Exception.t()} -> {t(), Req.Response.t() | Exception.t()})
-          | {module(), atom(), [term()]}
+  @type request_step() :: (t() -> t()) | {module(), atom(), [term()]}
 
   @typep options() :: term()
 
@@ -353,11 +342,8 @@ defmodule Req.Request do
             headers: Req.Fields.new([]),
             body: nil,
             options: %{},
-            halted: false,
             adapter: Req.Finch,
             request_steps: [],
-            response_steps: [],
-            error_steps: [],
             private: %{},
             registered_options: MapSet.new(),
             into: nil
@@ -380,7 +366,7 @@ defmodule Req.Request do
   ## Examples
 
       iex> req = Req.Request.new(url: "https://api.github.com/repos/wojtekmach/req")
-      iex> {req, resp} = Req.Request.run_request(req)
+      iex> {req, resp} = Req.run!(req)
       iex> req.url.host
       "api.github.com"
       iex> resp.status
@@ -609,45 +595,8 @@ defmodule Req.Request do
     put_in(request.private[key], value)
   end
 
-  @doc false
-  @deprecated "Use Req.Request.halt/2 instead"
-  def halt(request) do
-    %{request | halted: true}
-  end
-
   @doc """
-  Halts the request pipeline preventing any further steps from executing.
-
-  This function returns an updated request and the response or exception that caused the halt.
-  It's perfect when used in a request step to stop the pipeline.
-
-  See the ["Halting"](#module-halting) section in the module documentation for more information.
-
-  ## Examples
-
-      Req.Request.prepend_request_steps(request, circuit_breaker: fn request ->
-        if CircuitBreaker.open?() do
-          Req.Request.halt(request, RuntimeError.exception("circuit breaker is open"))
-        else
-          request
-        end
-      end)
-
-  """
-  @spec halt(t(), response_or_exception) :: {t(), response_or_exception}
-        when response_or_exception: Req.Response.t() | Exception.t()
-  def halt(request, response_or_exception)
-
-  def halt(%Req.Request{} = request, %Req.Response{} = response) do
-    {put_in(request.halted, true), response}
-  end
-
-  def halt(%Req.Request{} = request, %_{__exception__: true} = exception) do
-    {put_in(request.halted, true), exception}
-  end
-
-  @doc """
-  Appends **request steps** to the existing request steps.
+  Appends **steps** to the existing steps.
 
   See the ["Request Steps"](#module-request-steps) section in the module documentation
   for more information.
@@ -659,13 +608,13 @@ defmodule Req.Request do
         inspect: &IO.inspect/1
       )
   """
-  @spec append_request_steps(t(), keyword(request_step())) :: t()
+  @spec append_request_steps(t(), keyword(request_step() | module())) :: t()
   def append_request_steps(request, steps) do
     update_in(request.request_steps, &(&1 ++ steps))
   end
 
   @doc """
-  Prepends **request steps** to the existing request steps.
+  Prepends **steps** to the existing steps.
 
   See the ["Request Steps"](#module-request-steps) section in the module documentation
   for more information.
@@ -677,93 +626,9 @@ defmodule Req.Request do
         inspect: &IO.inspect/1
       )
   """
-  @spec prepend_request_steps(t(), keyword(request_step())) :: t()
+  @spec prepend_request_steps(t(), keyword(request_step() | module())) :: t()
   def prepend_request_steps(request, steps) do
     update_in(request.request_steps, &(steps ++ &1))
-  end
-
-  @doc """
-  Appends **response steps** to the existing response steps.
-
-  See the ["Response and Error Steps"](#module-response-and-error-steps) section in the
-  module documentation for more information.
-
-  ## Examples
-
-      Req.Request.append_response_steps(request,
-        noop: fn {request, response} -> {request, response} end,
-        inspect: &IO.inspect/1
-      )
-  """
-  @spec append_response_steps(t(), keyword(response_step())) :: t()
-  def append_response_steps(request, steps) do
-    %{
-      request
-      | response_steps: request.response_steps ++ steps
-    }
-  end
-
-  @doc """
-  Prepends **response steps** to the existing response steps.
-
-  See the ["Response and Error Steps"](#module-response-and-error-steps) section in the
-  module documentation for more information.
-
-  ## Examples
-
-      Req.Request.prepend_response_steps(request,
-        noop: fn {request, response} -> {request, response} end,
-        inspect: &IO.inspect/1
-      )
-  """
-  @spec prepend_response_steps(t(), keyword(response_step())) :: t()
-  def prepend_response_steps(request, steps) do
-    %{
-      request
-      | response_steps: steps ++ request.response_steps
-    }
-  end
-
-  @doc """
-  Appends **error steps** to the existing error steps.
-
-  See the ["Response and Error Steps"](#module-response-and-error-steps) section in the
-  module documentation for more information.
-
-  ## Examples
-
-      Req.Request.append_error_steps(request,
-        noop: fn {request, exception} -> {request, exception} end,
-        inspect: &IO.inspect/1
-      )
-  """
-  @spec append_error_steps(t(), keyword(error_step())) :: t()
-  def append_error_steps(request, steps) do
-    %{
-      request
-      | error_steps: request.error_steps ++ steps
-    }
-  end
-
-  @doc """
-  Prepends **error steps** to the existing error steps.
-
-  See the ["Response and Error Steps"](#module-response-and-error-steps) section in the
-  module documentation for more information.
-
-  ## Examples
-
-      Req.Request.prepend_error_steps(request,
-        noop: fn {request, exception} -> {request, exception} end,
-        inspect: &IO.inspect/1
-      )
-  """
-  @spec prepend_error_steps(t(), keyword(error_step())) :: t()
-  def prepend_error_steps(request, steps) do
-    %{
-      request
-      | error_steps: steps ++ request.error_steps
-    }
   end
 
   @doc """
@@ -960,134 +825,6 @@ defmodule Req.Request do
     update_in(request.registered_options, &MapSet.union(&1, MapSet.new(options)))
   end
 
-  @doc deprecated: "Use Req.Request.run_request/1 instead"
-  def run(request) do
-    case run_request(request) do
-      {_request, %Req.Response{} = response} ->
-        {:ok, response}
-
-      {_request, exception} ->
-        {:error, exception}
-    end
-  end
-
-  @doc deprecated: "Use Req.Request.run_request/1 instead"
-  def run!(request) do
-    case run_request(request) do
-      {_request, %Req.Response{} = response} ->
-        response
-
-      {_request, exception} ->
-        raise exception
-    end
-  end
-
-  @doc """
-  Runs the request pipeline.
-
-  Returns `{request, response}` or `{request, exception}`.
-
-  ## Examples
-
-      iex> req = Req.Request.new(url: "https://api.github.com/repos/wojtekmach/req")
-      iex> {request, response} = Req.Request.run_request(req)
-      iex> request.url.host
-      "api.github.com"
-      iex> response.status
-      200
-  """
-  @spec run_request(t()) :: {t(), Req.Response.t() | Exception.t()}
-  def run_request(request) do
-    run_request(request, request.request_steps)
-  end
-
-  # Module steps only run on the `Req.stream/4` pipeline.
-  defp run_request(request, [{_name, mod} | rest]) when is_atom(mod) do
-    run_request(request, rest)
-  end
-
-  defp run_request(request, [{_name, step} | rest]) do
-    case run_step(step, request) do
-      %Req.Request{} = request ->
-        run_request(request, rest)
-
-      {%Req.Request{halted: true} = request, %Req.Response{} = response} ->
-        {request, %{response | request: request}}
-
-      {%Req.Request{halted: true} = request, %{__exception__: true} = exception} ->
-        {request, exception}
-
-      {request, %Req.Response{} = response} ->
-        run_response(request, %{response | request: request})
-
-      {request, %{__exception__: true} = exception} ->
-        run_error(request, exception)
-    end
-  end
-
-  defp run_request(request, []) do
-    case run_step(adapter(request.adapter), request) do
-      {request, %Req.Response{} = response} ->
-        run_response(request, %{response | request: request})
-
-      {request, %{__exception__: true} = exception} ->
-        run_error(request, exception)
-
-      other ->
-        raise "expected adapter to return {request, response} or {request, exception}, " <>
-                "got: #{inspect(other)}"
-    end
-  end
-
-  defp adapter(mod) when is_atom(mod), do: &mod.run/1
-
-  defp adapter(fun) when is_function(fun, 1) do
-    IO.warn("setting `adapter` to a function is deprecated in favour of setting it to a module")
-    fun
-  end
-
-  defp run_response(request, response) do
-    steps = request.response_steps
-
-    Enum.reduce_while(steps, {request, response}, fn {_name, step}, {request, response} ->
-      case run_step(step, {request, response}) do
-        {%Req.Request{halted: true} = request, response_or_exception} ->
-          {:halt, {request, response_or_exception}}
-
-        {request, %Req.Response{} = response} ->
-          {:cont, {request, response}}
-
-        {request, %{__exception__: true} = exception} ->
-          {:halt, run_error(request, exception)}
-      end
-    end)
-  end
-
-  defp run_error(request, exception) do
-    steps = request.error_steps
-
-    Enum.reduce_while(steps, {request, exception}, fn {_name, step}, {request, exception} ->
-      case run_step(step, {request, exception}) do
-        {%Req.Request{halted: true} = request, response_or_exception} ->
-          {:halt, {request, response_or_exception}}
-
-        {request, %{__exception__: true} = exception} ->
-          {:cont, {request, exception}}
-
-        {request, %Req.Response{} = response} ->
-          {:halt, run_response(request, response)}
-      end
-    end)
-  end
-
-  defp run_step(step, state) when is_function(step, 1) do
-    step.(state)
-  end
-
-  defp run_step({mod, fun, args}, state) when is_atom(mod) and is_atom(fun) and is_list(args) do
-    apply(mod, fun, [state | args])
-  end
-
   @doc false
   def validate_options(%Req.Request{} = request, options) do
     validate_options(options, request.registered_options)
@@ -1135,8 +872,7 @@ defmodule Req.Request do
           body: request.body
         ] ++
           adapter_arg(request.adapter) ++
-          [private: request.private] ++
-          halted_arg(request.halted)
+          [private: request.private]
 
       url_doc =
         if request.url == nil or URI.to_string(request.url) == "" do
@@ -1171,9 +907,6 @@ defmodule Req.Request do
 
       force_unfit(concat(["Req.new(", nest(concat(line(), body), 2), line(), ")"]))
     end
-
-    defp halted_arg(true), do: [halted: true]
-    defp halted_arg(false), do: []
 
     defp adapter_arg(adapter) do
       if adapter == Req.Finch do

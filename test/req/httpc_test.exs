@@ -20,7 +20,7 @@ defmodule Req.HTTPCTest do
 
   describe "httpc" do
     test "request", %{req: req} do
-      resp = Req.get!(req)
+      resp = Req.stream!(req)
       assert resp.status == 200
       assert resp.body == "ok"
     end
@@ -34,7 +34,7 @@ defmodule Req.HTTPCTest do
 
       req = Req.new(adapter: Req.HTTPC, url: url)
 
-      resp = Req.post!(req, body: "foofoofoo")
+      resp = Req.stream!(req, method: :post, body: "foofoofoo")
       assert resp.status == 200
       assert resp.body == "foofoofoo"
     end
@@ -48,7 +48,9 @@ defmodule Req.HTTPCTest do
 
       req = Req.new(adapter: Req.HTTPC, url: url)
 
-      resp = Req.post!(req, body: {:stream, Stream.take(["foo", "foo", "foo"], 2)})
+      resp =
+        Req.stream!(req, method: :post, body: {:stream, Stream.take(["foo", "foo", "foo"], 2)})
+
       assert resp.status == 200
       assert resp.body == "foofoo"
     end
@@ -92,7 +94,7 @@ defmodule Req.HTTPCTest do
         end)
 
       req = Req.new(adapter: Req.HTTPC, url: url)
-      resp = Req.get!(req, into: :self)
+      resp = Req.request!(req, into: :self)
       assert resp.status == 200
 
       # httpc seems to randomly chunk things
@@ -118,7 +120,7 @@ defmodule Req.HTTPCTest do
         end)
 
       req = Req.new(adapter: Req.HTTPC, url: url)
-      resp = Req.get!(req, into: :self)
+      resp = Req.request!(req, into: :self)
       assert resp.status == 200
       assert :ok = Req.cancel_async_response(resp)
     end
