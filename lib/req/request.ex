@@ -369,8 +369,8 @@ defmodule Req.Request do
   ## Examples
 
       iex> req = Req.Request.new(url: "https://api.github.com/repos/wojtekmach/req")
-      iex> {req, resp} = Req.run!(req)
-      iex> req.url.host
+      iex> resp = Req.request!(req)
+      iex> resp.request.url.host
       "api.github.com"
       iex> resp.status
       200
