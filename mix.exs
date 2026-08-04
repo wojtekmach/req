@@ -201,6 +201,8 @@ defmodule Req.MixProject do
         "tmp/CHANGELOG.md"
       ],
       skip_code_autolink_to: [
+        "Req.Request.halt/2",
+        "Req.Request.run_request/1",
         "Req.Test.stub/1",
         "Req.Utils.aws_sigv4_url/1",
         "Req.update/2"

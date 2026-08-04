@@ -141,6 +141,7 @@ if Code.ensure_loaded?(Plug) do
 
     def stream(request, acc, fun, state) when is_function(fun, 4) do
       resp = Req.Response.new(status: nil, body: nil)
+
       {:ok, req_body, acc} = prepare_body(request, acc)
       stream(request, req_body, resp, acc, fun, state)
     end
@@ -322,204 +323,6 @@ if Code.ensure_loaded?(Plug) do
       chunks
     end
 
-    def run(request) do
-      result =
-        case request.body do
-          iodata when is_binary(iodata) or is_list(iodata) ->
-            {:ok, IO.iodata_to_binary(iodata), request}
-
-          nil ->
-            {:ok, "", request}
-
-          req_body_fun when is_function(req_body_fun, 1) ->
-            drain_req_body_fun(req_body_fun, request, [])
-
-          enumerable ->
-            {:ok, enumerable |> Enum.to_list() |> IO.iodata_to_binary(), request}
-        end
-
-      case result do
-        {:ok, req_body, request} ->
-          run(request, req_body)
-
-        # Halting req_body_fun closes the connection without reading the
-        # response, so the plug is never called.
-        {:halt, request} ->
-          {request, Req.Response.new(status: nil)}
-      end
-    end
-
-    defp run(request, req_body) do
-      plug = request.options.plug
-
-      {req_body, request} =
-        case Req.Request.get_header(request, "content-encoding") do
-          [] ->
-            {req_body, request}
-
-          encoding_headers ->
-            case Req.Utils.decompress_with_encoding(encoding_headers, req_body) do
-              %Req.DecompressError{} = error ->
-                raise error
-
-              {decompressed_body, _unknown_codecs} ->
-                {decompressed_body, Req.Request.delete_header(request, "content-encoding")}
-            end
-        end
-
-      req_headers = Req.Fields.get_list(request.headers)
-
-      parser_opts =
-        Plug.Parsers.init(
-          parsers: [:urlencoded, :multipart, :json],
-          pass: ["*/*"],
-          json_decoder: Jason
-        )
-
-      conn =
-        Req.Plug.Adapter.conn(%Plug.Conn{}, request.method, request.url, req_body)
-        |> Map.replace!(:req_headers, req_headers)
-        |> Plug.Conn.fetch_query_params(validate_utf8: false)
-        |> Plug.Conn.put_private(:req_private, request.private)
-        |> Plug.Parsers.call(parser_opts)
-
-      # Handle cases where the body isn't read with Plug.Parsers
-      {mod, state} = conn.adapter
-      state = %{state | body_read: true}
-      conn = %{conn | adapter: {mod, state}}
-      conn = call_plug(conn, plug)
-
-      unless match?(%Plug.Conn{}, conn) do
-        raise ArgumentError, "expected to return %Plug.Conn{}, got: #{inspect(conn)}"
-      end
-
-      if exception = conn.private[:req_test_exception] do
-        {request, exception}
-      else
-        handle_plug_result(conn, request)
-      end
-    end
-
-    defp drain_req_body_fun(req_body_fun, request, chunks) do
-      case req_body_fun.(request) do
-        {:data, chunk, request} ->
-          drain_req_body_fun(req_body_fun, request, [chunk | chunks])
-
-        {:done, request} ->
-          {:ok, chunks |> Enum.reverse() |> IO.iodata_to_binary(), request}
-
-        {:halt, request} ->
-          {:halt, request}
-
-        other ->
-          raise "expected req_body_fun to return {:data, chunk, request}, {:done, request}, or {:halt, request}, got: #{inspect(other)}"
-      end
-    end
-
-    defp handle_plug_result(conn, request) do
-      # consume messages sent by Plug.Test adapter
-      {Req.Plug.Adapter, %{ref: ref, chunks: chunks}} = conn.adapter
-
-      if conn.state == :unset do
-        raise """
-        expected connection to have a response but no response was set/sent.
-
-        Please verify that you are using Plug.Conn.send_resp/3 in your plug:
-
-            Req.Test.stub(MyStub, fn conn ->
-              Plug.Conn.send_resp(conn, 200, "Hello, World!")
-            end)
-        """
-      end
-
-      receive do
-        {^ref, {_status, _headers, _body}} -> :ok
-      after
-        0 -> :ok
-      end
-
-      receive do
-        {:plug_conn, :sent} -> :ok
-      after
-        0 -> :ok
-      end
-
-      case request.into do
-        nil ->
-          response =
-            Req.Response.new(
-              status: conn.status,
-              headers: conn.resp_headers,
-              body: conn.resp_body
-            )
-
-          {request, response}
-
-        fun when is_function(fun, 2) ->
-          response =
-            Req.Response.new(
-              status: conn.status,
-              headers: conn.resp_headers
-            )
-
-          Enum.reduce_while(
-            chunks || [conn.resp_body],
-            {request, response},
-            fn chunk, acc ->
-              case fun.({:data, chunk}, acc) do
-                {:cont, acc} ->
-                  {:cont, acc}
-
-                {:halt, acc} ->
-                  {:halt, acc}
-
-                other ->
-                  raise ArgumentError,
-                        "expected {:cont, acc} or {:halt, acc}, got: #{inspect(other)}"
-              end
-            end
-          )
-
-        :self ->
-          async = %Req.Response.Async{
-            pid: self(),
-            ref: make_ref(),
-            stream_fun: &plug_parse_message/2,
-            cancel_fun: &plug_cancel/1
-          }
-
-          resp = Req.Response.new(status: conn.status, headers: conn.resp_headers, body: async)
-
-          for chunk <- chunks || [conn.resp_body] do
-            send(self(), {async.ref, {:data, chunk}})
-          end
-
-          send(self(), {async.ref, :done})
-          {request, resp}
-
-        collectable ->
-          response =
-            Req.Response.new(
-              status: conn.status,
-              headers: conn.resp_headers
-            )
-
-          if conn.status == 200 do
-            {acc, collector} = Collectable.into(collectable)
-
-            acc =
-              for chunk <- chunks || [conn.resp_body], chunk != "", reduce: acc do
-                acc -> collector.(acc, {:cont, chunk})
-              end
-
-            acc = collector.(acc, :done)
-            {request, %{response | body: acc}}
-          else
-            {request, put_in(response.body, conn.resp_body)}
-          end
-      end
-    end
-
     defp plug_parse_message(ref, {ref, {:data, data}}) do
       {:ok, [data: data]}
     end
@@ -567,7 +370,11 @@ else
 
     require Logger
 
-    def run(_request) do
+    def stream(_request, _acc, _fun, _state) do
+      missing_plug()
+    end
+
+    defp missing_plug do
       Logger.error("""
       Could not find plug dependency.
 

@@ -189,41 +189,4 @@ defmodule Req.Redirect do
       |> Req.Request.delete_option(:auth)
     end
   end
-
-  def redirect({request, response}) do
-    redirect? =
-      case Req.Request.fetch_option(request, :follow_redirects) do
-        {:ok, redirect?} ->
-          IO.warn(":follow_redirects option has been renamed to :redirect")
-          redirect?
-
-        :error ->
-          Req.Request.get_option(request, :redirect, true)
-      end
-
-    with true <- redirect? && response.status in [301, 302, 303, 307, 308],
-         [location | _] <- Req.Response.get_header(response, "location") do
-      max_redirects = Req.Request.get_option(request, :max_redirects, 10)
-      redirect_count = Req.Request.get_private(request, :req_redirect_count, 0)
-
-      if redirect_count < max_redirects do
-        with %Req.Response.Async{} <- response.body do
-          Req.cancel_async_response(response)
-        end
-
-        request =
-          request
-          |> build_redirect_request(response, location)
-          |> Req.Request.put_private(:req_redirect_count, redirect_count + 1)
-
-        {request, response_or_exception} = Req.Request.run_request(request)
-        Req.Request.halt(request, response_or_exception)
-      else
-        Req.Request.halt(request, %Req.TooManyRedirectsError{max_redirects: max_redirects})
-      end
-    else
-      _ ->
-        {request, response}
-    end
-  end
 end
