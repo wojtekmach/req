@@ -315,13 +315,8 @@ defmodule Req do
 
   Other response options:
 
-    * `:http_errors` - how to handle HTTP 4xx/5xx error responses (via
-      [`handle_http_errors`](`Req.Steps.handle_http_errors/1`) step).
-      Can be one of the following:
-
-      * `:return` (default) - return the response
-
-      * `:raise` - raise an error
+    * `:expect` - the expected HTTP response status (via `Req.Expect` step).
+      Can be an integer, a range, or a list of integers/ranges.
 
   Retry options ([`retry`](`Req.Steps.retry/1`) step):
 

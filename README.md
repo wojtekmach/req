@@ -57,7 +57,7 @@ write new ones.
 
   * Retries on errors (via [`Req.Retry`] step.)
 
-  * Raise on 4xx/5xx errors (via [`handle_http_errors`] step.)
+  * Raise on unexpected response status (via [`Req.Expect`] step.)
 
   * Verify response body against a checksum (via [`Req.Checksum`] step.)
 
@@ -262,6 +262,7 @@ limitations under the License.
 [`Req.Checksum`]:        https://hexdocs.pm/req/Req.Checksum.html
 [`Req.Decode`]:          https://hexdocs.pm/req/Req.Decode.html
 [`Req.Decompress`]:      https://hexdocs.pm/req/Req.Decompress.html
+[`Req.Expect`]:          https://hexdocs.pm/req/Req.Expect.html
 [`Req.Redirect`]:        https://hexdocs.pm/req/Req.Redirect.html
 [`Req.Retry`]:           https://hexdocs.pm/req/Req.Retry.html
 [`Req.Steps`]:           https://hexdocs.pm/req/Req.Steps.html
@@ -269,7 +270,6 @@ limitations under the License.
 
 [`compress_body`]:      https://hexdocs.pm/req/Req.Steps.html#compress_body/1
 [`encode_body`]:        https://hexdocs.pm/req/Req.Steps.html#encode_body/1
-[`handle_http_errors`]: https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
 [`put_base_url`]:       https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
 [`put_params`]:         https://hexdocs.pm/req/Req.Steps.html#put_params/1
 [`put_path_params`]:    https://hexdocs.pm/req/Req.Steps.html#put_path_params/1

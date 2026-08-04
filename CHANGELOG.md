@@ -342,7 +342,7 @@
 
   * [`put_aws_sigv4`]: Fix handling `?name` (no value)
 
-  * [`handle_http_errors`]: should run before `verify_checksum`
+  * `handle_http_errors`: should run before `verify_checksum`
 
   * [`encode_body`]: Support `%File.Stream{}` in `:form_multipart`
 
@@ -1380,7 +1380,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
   * New step: [`output`]
 
-  * New step: [`handle_http_errors`]
+  * New step: `handle_http_errors`
 
   * [`put_base_url`]: Ignore base URL if given URL contains scheme
 
@@ -1474,7 +1474,6 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`compress_body`]:       https://hexdocs.pm/req/Req.Steps.html#compress_body/1
 [`compress_body`]:       https://hexdocs.pm/req/Req.Steps.html#compress_body/1
 [`encode_body`]:         https://hexdocs.pm/req/Req.Steps.html#encode_body/1
-[`handle_http_errors`]:  https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
 [`put_base_url`]:        https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
 [`put_params`]:          https://hexdocs.pm/req/Req.Steps.html#put_params/1
 [`put_path_params`]:     https://hexdocs.pm/req/Req.Steps.html#put_path_params/1
