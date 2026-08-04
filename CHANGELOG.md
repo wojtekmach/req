@@ -633,7 +633,7 @@ If you wish to maximize request rate or have more control over how messages are 
 
   * `run_plug`: Automatically fetch query params.
 
-  * [`verify_checksum`]: Fix handling compressed responses.
+  * `verify_checksum`: Fix handling compressed responses.
 
 ## v0.4.14 (2024-03-15)
 
@@ -724,7 +724,7 @@ If you wish to maximize request rate or have more control over how messages are 
 
 ## v0.4.6 (2023-12-11)
 
-  * New step: [`checksum`]
+  * New step: `checksum`
   * `put_plug`: Fix response streaming when plug uses `send_resp` or `send_file`
   * [`retry`]: Retry on `:closed`
 
@@ -1483,8 +1483,6 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`put_user_agent`]:      https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
 [`put_range`]:           https://hexdocs.pm/req/Req.Steps.html#put_range/1
 [`retry`]:               https://hexdocs.pm/req/Req.Steps.html#retry/1
-[`checksum`]:            https://hexdocs.pm/req/Req.Steps.html#checksum/1
-[`verify_checksum`]:     https://hexdocs.pm/req/Req.Steps.html#verify_checksum/1
 [`put_aws_sigv4`]:       https://hexdocs.pm/req/Req.Steps.html#put_aws_sigv4/1
 
 [`Req`]:                        https://hexdocs.pm/req/Req.html

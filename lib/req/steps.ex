@@ -65,6 +65,7 @@ defmodule Req.Steps do
     ])
     |> Req.Request.prepend_request_steps(
       decode: Req.Decode,
+      checksum: Req.Checksum,
       decompress: Req.Decompress,
       put_user_agent: &Req.Steps.put_user_agent/1,
       compressed: &Req.Steps.compressed/1,

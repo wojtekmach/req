@@ -1,6 +1,7 @@
 defmodule Req.ChecksumMismatchError do
   @moduledoc """
-  Represents a checksum mismatch error returned by `Req.Steps.checksum/1`.
+  Represents a checksum mismatch error, returned when the response body does not match
+  the `:checksum` option. See `Req.Checksum`.
   """
 
   defexception [:expected, :actual]
