@@ -181,8 +181,8 @@
 ## v0.5.16 (2025-11-10)
 
   * [`Req.Test`]: Fix `verify_on_exit!` accidentally using Mox name
-  * [`auth`]: Support MFArgs
-  * [`auth`]: Support digest auth
+  * `auth`: Support MFArgs
+  * `auth`: Support digest auth
   * [`put_aws_sigv4`]: Support MFArgs
   * [`put_path_params`]: Encode `:path_params` even with reserved characters
   * [`put_path_params`]: Set `:path_params_template` on empty params
@@ -328,7 +328,7 @@
 
   * `retry`: Do not call `retry_delay` fun twice
 
-  * [`auth`]: Support passing a 0-arity function
+  * `auth`: Support passing a 0-arity function
 
 ## v0.5.6 (2024-08-01)
 
@@ -690,7 +690,7 @@ If you wish to maximize request rate or have more control over how messages are 
 
   * [`put_aws_sigv4`]: Support streaming request body.
 
-  * [`auth`]: Always update `authorization` header.
+  * `auth`: Always update `authorization` header.
 
   * `decode_body`: Gracefully handle multiple content-type values.
 
@@ -1043,7 +1043,7 @@ resp.body #=> %File.Stream{}
 ## v0.3.5 (2023-02-01)
 
   * New step: [`put_path_params`]
-  * [`auth`]: Accept string
+  * `auth`: Accept string
 
 ## v0.3.4 (2023-01-03)
 
@@ -1471,7 +1471,6 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
   * Initial release
 
-[`auth`]:                https://hexdocs.pm/req/Req.Steps.html#auth/1
 [`compress_body`]:       https://hexdocs.pm/req/Req.Steps.html#compress_body/1
 [`compress_body`]:       https://hexdocs.pm/req/Req.Steps.html#compress_body/1
 [`encode_body`]:         https://hexdocs.pm/req/Req.Steps.html#encode_body/1

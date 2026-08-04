@@ -43,7 +43,7 @@ write new ones.
 
   * Templated request paths (via [`put_path_params`] step.)
 
-  * Basic, Digest, Bearer, and `.netrc`-based authentication (via [`auth`] step.)
+  * Basic, Digest, Bearer, and `.netrc`-based authentication (via [`Req.Auth`] step.)
 
   * Range requests (via [`put_range`]) step.)
 
@@ -258,6 +258,7 @@ limitations under the License.
 [`Req.Request`]:         https://hexdocs.pm/req/Req.Request.html
 [`Req.Finch`]:           https://hexdocs.pm/req/Req.Finch.html
 [`Req.Plug`]:            https://hexdocs.pm/req/Req.Plug.html
+[`Req.Auth`]:            https://hexdocs.pm/req/Req.Auth.html
 [`Req.Checksum`]:        https://hexdocs.pm/req/Req.Checksum.html
 [`Req.Decode`]:          https://hexdocs.pm/req/Req.Decode.html
 [`Req.Decompress`]:      https://hexdocs.pm/req/Req.Decompress.html
@@ -266,7 +267,6 @@ limitations under the License.
 [`Req.Steps`]:           https://hexdocs.pm/req/Req.Steps.html
 [`Req.Test`]:            https://hexdocs.pm/req/Req.Test.html
 
-[`auth`]:               https://hexdocs.pm/req/Req.Steps.html#auth/1
 [`compress_body`]:      https://hexdocs.pm/req/Req.Steps.html#compress_body/1
 [`encode_body`]:        https://hexdocs.pm/req/Req.Steps.html#encode_body/1
 [`handle_http_errors`]: https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
