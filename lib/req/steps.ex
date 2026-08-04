@@ -64,6 +64,7 @@ defmodule Req.Steps do
       :redact_auth
     ])
     |> Req.Request.prepend_request_steps(
+      http_errors: Req.HTTPErrors,
       retry: Req.Retry,
       decode: Req.Decode,
       checksum: Req.Checksum,
