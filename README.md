@@ -59,7 +59,7 @@ write new ones.
 
   * Raise on 4xx/5xx errors (via [`handle_http_errors`] step.)
 
-  * Verify response body against a checksum (via [`checksum`] step.)
+  * Verify response body against a checksum (via [`Req.Checksum`] step.)
 
   * Easily create test stubs (see [`Req.Test`].)
 
@@ -258,6 +258,7 @@ limitations under the License.
 [`Req.Request`]:         https://hexdocs.pm/req/Req.Request.html
 [`Req.Finch`]:           https://hexdocs.pm/req/Req.Finch.html
 [`Req.Plug`]:            https://hexdocs.pm/req/Req.Plug.html
+[`Req.Checksum`]:        https://hexdocs.pm/req/Req.Checksum.html
 [`Req.Decode`]:          https://hexdocs.pm/req/Req.Decode.html
 [`Req.Decompress`]:      https://hexdocs.pm/req/Req.Decompress.html
 [`Req.Steps`]:           https://hexdocs.pm/req/Req.Steps.html
@@ -274,7 +275,6 @@ limitations under the License.
 [`put_range`]:          https://hexdocs.pm/req/Req.Steps.html#put_range/1
 [`put_user_agent`]:     https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
 [`retry`]:              https://hexdocs.pm/req/Req.Steps.html#retry/1
-[`checksum`]:           https://hexdocs.pm/req/Req.Steps.html#checksum/1
 [`put_aws_sigv4`]:       https://hexdocs.pm/req/Req.Steps.html#put_aws_sigv4/1
 
 [Finch]: https://github.com/sneako/finch
