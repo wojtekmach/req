@@ -31,11 +31,11 @@ write new ones.
 
   * Request body compression (via [`compress_body`] step)
 
-  * Opt-in response body decompression (via [`compressed`] and [`decompress_body`] steps). Supports gzip, brotli, and zstd.
+  * Opt-in response body decompression (via [`Req.Decompress`] step). Supports gzip, brotli, and zstd.
 
   * Request body encoding. Supports urlencoded and multipart forms, and JSON. See [`encode_body`].
 
-  * Automatic response body decoding (via [`decode_body`] step.)
+  * Automatic response body decoding (via [`Req.Decode`] step.)
 
   * Encode params as query string (via [`put_params`] step.)
 
@@ -43,7 +43,7 @@ write new ones.
 
   * Templated request paths (via [`put_path_params`] step.)
 
-  * Basic, Digest, Bearer, and `.netrc`-based authentication (via [`auth`] step.)
+  * Basic, Digest, Bearer, and `.netrc`-based authentication (via [`Req.Auth`] step.)
 
   * Range requests (via [`put_range`]) step.)
 
@@ -51,15 +51,15 @@ write new ones.
 
   * Request body streaming (by setting `body: enumerable`.)
 
-  * Response body streaming (by setting `into: fun | collectable | :self`.)
+  * Response body streaming (via `Req.stream/4` or by setting `into: collectable | :self`.)
 
-  * Follows redirects (via [`redirect`] step.)
+  * Follows redirects (via [`Req.Redirect`] step.)
 
-  * Retries on errors (via [`retry`] step.)
+  * Retries on errors (via [`Req.Retry`] step.)
 
-  * Raise on 4xx/5xx errors (via [`handle_http_errors`] step.)
+  * Raise on 4xx/5xx errors (via [`Req.HTTPErrors`] step.)
 
-  * Verify response body against a checksum (via [`checksum`] step.)
+  * Verify response body against a checksum (via [`Req.Checksum`] step.)
 
   * Easily create test stubs (see [`Req.Test`].)
 
@@ -258,24 +258,23 @@ limitations under the License.
 [`Req.Request`]:         https://hexdocs.pm/req/Req.Request.html
 [`Req.Finch`]:           https://hexdocs.pm/req/Req.Finch.html
 [`Req.Plug`]:            https://hexdocs.pm/req/Req.Plug.html
+[`Req.Auth`]:            https://hexdocs.pm/req/Req.Auth.html
+[`Req.Checksum`]:        https://hexdocs.pm/req/Req.Checksum.html
+[`Req.Decode`]:          https://hexdocs.pm/req/Req.Decode.html
+[`Req.Decompress`]:      https://hexdocs.pm/req/Req.Decompress.html
+[`Req.HTTPErrors`]:      https://hexdocs.pm/req/Req.HTTPErrors.html
+[`Req.Redirect`]:        https://hexdocs.pm/req/Req.Redirect.html
+[`Req.Retry`]:           https://hexdocs.pm/req/Req.Retry.html
 [`Req.Steps`]:           https://hexdocs.pm/req/Req.Steps.html
 [`Req.Test`]:            https://hexdocs.pm/req/Req.Test.html
 
-[`auth`]:               https://hexdocs.pm/req/Req.Steps.html#auth/1
 [`compress_body`]:      https://hexdocs.pm/req/Req.Steps.html#compress_body/1
-[`compressed`]:         https://hexdocs.pm/req/Req.Steps.html#compressed/1
-[`decode_body`]:        https://hexdocs.pm/req/Req.Steps.html#decode_body/1
-[`decompress_body`]:    https://hexdocs.pm/req/Req.Steps.html#decompress_body/1
 [`encode_body`]:        https://hexdocs.pm/req/Req.Steps.html#encode_body/1
-[`redirect`]:           https://hexdocs.pm/req/Req.Steps.html#redirect/1
-[`handle_http_errors`]: https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
 [`put_base_url`]:       https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
 [`put_params`]:         https://hexdocs.pm/req/Req.Steps.html#put_params/1
 [`put_path_params`]:    https://hexdocs.pm/req/Req.Steps.html#put_path_params/1
 [`put_range`]:          https://hexdocs.pm/req/Req.Steps.html#put_range/1
 [`put_user_agent`]:     https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
-[`retry`]:              https://hexdocs.pm/req/Req.Steps.html#retry/1
-[`checksum`]:           https://hexdocs.pm/req/Req.Steps.html#checksum/1
 [`put_aws_sigv4`]:       https://hexdocs.pm/req/Req.Steps.html#put_aws_sigv4/1
 
 [Finch]: https://github.com/sneako/finch

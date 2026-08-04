@@ -3,7 +3,7 @@ defmodule Req.RetryTest do
 
   @tag :capture_log
   test "eventually successful - function" do
-    %{req: req} =
+    %{req: req, url: url} =
       serve_sequence(
         "GET /": &send_resp(&1, 500, "oops"),
         "GET /": &send_resp(&1, 500, "oops"),
@@ -11,19 +11,15 @@ defmodule Req.RetryTest do
         "GET /": &send_resp(&1, 200, "ok")
       )
 
-    request =
-      Req.merge(req, retry_delay: &Integer.pow(2, &1))
-      |> Req.Request.prepend_response_steps(
-        foo: fn {request, response} ->
-          {request, update_in(response.body, &(&1 <> " - updated"))}
-        end
-      )
+    request = Req.merge(req, retry_delay: &Integer.pow(2, &1))
 
     log =
       ExUnit.CaptureLog.capture_log(fn ->
-        {request, response} = Req.Request.run_request(request)
-        assert request.private.req_retry_count == 3
-        assert response.body == "ok - updated"
+        {:ok, resp} = Req.stream(request)
+        assert resp.request.private.req_retry_count == 3
+        assert resp.status == 200
+        assert resp.body == "ok"
+        assert URI.to_string(resp.request.url) == "#{url}"
       end)
 
     assert log =~
@@ -49,7 +45,7 @@ defmodule Req.RetryTest do
     assert_raise ArgumentError,
                  "expected :retry_delay function to return non-negative integer, got: :ok",
                  fn ->
-                   Req.request!(req)
+                   Req.stream!(req)
                  end
   end
 
@@ -62,18 +58,14 @@ defmodule Req.RetryTest do
         "GET /": &send_resp(&1, 200, "ok")
       )
 
-    request =
-      Req.merge(req, retry_delay: 1)
-      |> Req.Request.prepend_response_steps(
-        foo: fn {request, response} ->
-          {request, update_in(response.body, &(&1 <> " - updated"))}
-        end
-      )
+    request = Req.merge(req, retry_delay: 1)
 
     log =
       ExUnit.CaptureLog.capture_log(fn ->
-        response = Req.get!(request)
-        assert response.body == "ok - updated"
+        {:ok, resp} = Req.stream(request)
+        assert resp.request.private.req_retry_count == 2
+        assert resp.status == 200
+        assert resp.body == "ok"
       end)
 
     assert log =~
@@ -92,7 +84,13 @@ defmodule Req.RetryTest do
       )
 
     request = Req.merge(req, retry_delay: 1)
-    log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
+
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        resp = Req.stream!(request)
+        assert resp.status == 200
+        assert resp.body == "ok"
+      end)
 
     assert log =~
              "[warning] retry: got response with status 500, will retry in 1ms, 3 attempts left\n"
@@ -108,7 +106,12 @@ defmodule Req.RetryTest do
 
     request = Req.merge(req, retry_delay: 1, retry_log_level: :info)
 
-    log = ExUnit.CaptureLog.capture_log(fn -> Req.get!(request) end)
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        resp = Req.stream!(request)
+        assert resp.status == 200
+        assert resp.body == "ok"
+      end)
 
     assert log =~
              "[info] retry: got response with status 500, will retry in 1ms, 3 attempts left\n"
@@ -122,24 +125,32 @@ defmodule Req.RetryTest do
       )
 
     request = Req.merge(req, retry_delay: 1, retry_log_level: false)
-    Req.get!(request)
+    resp = Req.stream!(request)
+    assert resp.status == 200
+    assert resp.body == "ok"
   end
 
-  @tag :capture_log
-  test "retries response with malformed compressed body" do
+  test "does not retry response with malformed compressed body" do
+    pid = self()
+
     %{req: req} =
-      serve_sequence(
+      serve(
         "GET /": fn conn ->
+          send(pid, :ping)
+
           conn
           |> put_resp_header("content-encoding", "gzip")
           |> send_resp(500, "bad gzip")
-        end,
-        "GET /": &send_resp(&1, 200, "ok")
+        end
       )
 
-    response = Req.get!(req, compressed: true, retry_delay: 1)
-    assert response.status == 200
-    assert response.body == "ok"
+    {:error, err, resp} = Req.stream(req, compressed: true, retry_delay: 1)
+    assert err == %Req.DecompressError{format: :gzip, data: "bad gzip", reason: :data_error}
+    assert resp.status == 500
+    assert resp.body == ""
+
+    assert_received :ping
+    refute_received _
   end
 
   @tag :capture_log
@@ -151,7 +162,7 @@ defmodule Req.RetryTest do
         "GET /": &send_resp(&1, 200, "ok")
       )
 
-    resp = Req.request!(req, max_retries: 5)
+    resp = Req.stream!(req, max_retries: 5)
     assert resp.status == 200
     assert resp.body == "ok"
   end
@@ -175,13 +186,42 @@ defmodule Req.RetryTest do
       0
     end
 
-    resp = Req.request!(req, retry_delay: retry_delay, max_retries: 5)
+    resp = Req.stream!(req, retry_delay: retry_delay, max_retries: 5)
     assert resp.status == 200
     assert resp.body == "ok"
+
     assert_received {:retry_delay, 0}
     assert_received {:retry_delay, 1}
     assert_received {:retry_delay, 2}
     assert_received {:retry_delay, 3}
+  end
+
+  @tag :capture_log
+  test "retry: fun sees req.private.req_retry_count" do
+    pid = self()
+
+    %{req: req} =
+      serve(
+        "GET /": fn conn ->
+          send_resp(conn, 500, "oops")
+        end
+      )
+
+    retry_fun = fn req, resp ->
+      send(pid, {:retry_count, req.private[:req_retry_count]})
+      resp.status == 500
+    end
+
+    {req, resp} = Req.run(req, retry: retry_fun, retry_delay: 1)
+    assert req.private.req_retry_count == 3
+    assert resp.status == 500
+    assert resp.body == "oops"
+
+    assert_received {:retry_count, nil}
+    assert_received {:retry_count, 1}
+    assert_received {:retry_count, 2}
+    assert_received {:retry_count, 3}
+    refute_received {:retry_count, _}
   end
 
   @tag :capture_log
@@ -196,18 +236,13 @@ defmodule Req.RetryTest do
         end
       )
 
-    request =
-      request
-      |> Req.merge(retry_delay: 1)
-      |> Req.Request.prepend_response_steps(
-        foo: fn {request, response} ->
-          {request, update_in(response.body, &(&1 <> " - updated"))}
-        end
-      )
+    request = Req.merge(request, retry_delay: 1)
 
-    resp = Req.get!(request)
+    {:ok, resp} = Req.stream(request)
+    assert resp.request.private.req_retry_count == 3
     assert resp.status == 500
-    assert resp.body == "oops - updated"
+    assert resp.body == "oops"
+
     assert_received :ping
     assert_received :ping
     assert_received :ping
@@ -229,8 +264,9 @@ defmodule Req.RetryTest do
 
     request = Req.merge(request, retry: :safe_transient, max_retries: 10)
 
-    resp = Req.post!(request)
+    resp = Req.stream!(request, method: :post)
     assert resp.status == 500
+    assert resp.body == "oops"
     assert_received :ping
     refute_received _
   end
@@ -249,8 +285,9 @@ defmodule Req.RetryTest do
 
     request = Req.merge(request, retry: :transient, retry_delay: 1, max_retries: 1)
 
-    resp = Req.post!(request)
+    resp = Req.stream!(request, method: :post)
     assert resp.status == 500
+    assert resp.body == "oops"
     assert_received :ping
     assert_received :ping
     refute_received _
@@ -269,8 +306,9 @@ defmodule Req.RetryTest do
 
     request = Req.merge(request, retry: false)
 
-    resp = Req.get!(request)
+    resp = Req.stream!(request)
     assert resp.status == 500
+    assert resp.body == "oops"
     assert_received :ping
     refute_received _
   end
@@ -294,12 +332,32 @@ defmodule Req.RetryTest do
 
     request = Req.merge(request, retry: fun, retry_delay: 1)
 
-    resp = Req.post!(request)
+    resp = Req.stream!(request, method: :post)
     assert resp.status == 500
+    assert resp.body == "oops"
     assert_received :ping
     assert_received :ping
     assert_received :ping
     assert_received :ping
+    refute_received _
+  end
+
+  test "custom function receives response without body" do
+    pid = self()
+
+    fun = fn _request, response ->
+      # TODO: decide whether to stuff acc into resp.body here (#413)
+      send(pid, {:retry, response.status, response.body})
+      false
+    end
+
+    %{req: req} = serve("GET /": &send_resp(&1, 500, "oops"))
+
+    {:ok, resp} = Req.stream(req, retry: fun)
+    assert resp.status == 500
+    assert resp.body == "oops"
+
+    assert_received {:retry, 500, nil}
     refute_received _
   end
 
@@ -322,8 +380,9 @@ defmodule Req.RetryTest do
 
     request = Req.merge(request, retry: fun)
 
-    resp = Req.get!(request)
+    resp = Req.stream!(request)
     assert resp.status == 500
+    assert resp.body == "oops"
     assert_received :ping
     assert_received :ping
     assert_received :ping
@@ -352,7 +411,7 @@ defmodule Req.RetryTest do
 
     assert_raise ArgumentError,
                  "expected :retry_delay not to be set when the :retry function is returning `{:delay, milliseconds}`",
-                 fn -> Req.get!(request) end
+                 fn -> Req.stream!(request) end
   end
 
   @tag :capture_log
@@ -368,8 +427,60 @@ defmodule Req.RetryTest do
         end
       )
 
-    resp = Req.get!(req, params: [a: 1, b: 2], retry_delay: 1)
+    resp = Req.stream!(req, params: [a: 1, b: 2], retry_delay: 1)
     assert resp.status == 500
+    assert resp.body == "oops"
+    assert_received :ping
+    assert_received :ping
+    assert_received :ping
+    assert_received :ping
+    refute_received _
+  end
+
+  @tag :capture_log
+  test "stream" do
+    %{req: req} =
+      serve_sequence(
+        "GET /": &send_resp(&1, 500, "oops"),
+        "GET /": &send_resp(&1, 200, "ok")
+      )
+
+    {:ok, resp, acc} =
+      Req.stream(
+        req,
+        [],
+        fn data, _resp, acc -> {:cont, [data | acc]} end,
+        retry_delay: 1
+      )
+
+    assert resp.status == 200
+    assert resp.body == nil
+    assert acc == ["ok"]
+  end
+
+  @tag :capture_log
+  test "stream always failing" do
+    pid = self()
+
+    %{req: req} =
+      serve(
+        "GET /": fn conn ->
+          send(pid, :ping)
+          send_resp(conn, 500, "oops")
+        end
+      )
+
+    {:ok, resp, acc} =
+      Req.stream(
+        req,
+        [],
+        fn data, _resp, acc -> {:cont, [data | acc]} end,
+        retry_delay: 1
+      )
+
+    assert resp.status == 500
+    assert acc == ["oops"]
+
     assert_received :ping
     assert_received :ping
     assert_received :ping
@@ -392,8 +503,9 @@ defmodule Req.RetryTest do
         end
       )
 
-    resp = Req.get!(req, retry_delay: 1, max_retries: 3)
+    resp = Req.stream!(req, retry_delay: 1, max_retries: 3)
     assert resp.status == 500
+    assert resp.body == "oops"
 
     # 1 initial attempt + 3 retries
     assert_received :step_ran

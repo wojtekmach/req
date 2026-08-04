@@ -1,14 +1,14 @@
 defmodule Req.MixProject do
   use Mix.Project
 
-  @version "0.7.2"
+  @version "0.8.0-dev"
   @source_url "https://github.com/wojtekmach/req"
 
   def project do
     [
       app: :req,
       version: @version,
-      elixir: "~> 1.15",
+      elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       package: package(),
@@ -103,6 +103,7 @@ defmodule Req.MixProject do
       {:mime, "~> 2.0.6 or ~> 2.1"},
       {:jason, "~> 1.0"},
       {:nimble_csv, "~> 1.0", optional: true},
+      {:server_sent_events, "~> 1.0"},
       {:plug, "~> 1.0", [optional: true] ++ plug_opts()},
       {:brotli, "~> 0.3.1", optional: true},
       {:aws_signature, "~> 0.3.2", only: :test},
@@ -162,6 +163,8 @@ defmodule Req.MixProject do
         Formats: [
           Req.Brotli,
           Req.Gzip,
+          Req.NDJSON,
+          Req.SSE,
           Req.Tar,
           Req.ZIP,
           Req.Zstd

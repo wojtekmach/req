@@ -54,19 +54,19 @@ defmodule Req do
       iex> Req.post!("https://httpbin.org/post", body: stream).body["data"]
       "foofoofoo"
 
-  Stream response body using a callback:
+  Stream response body using `Req.stream/4`:
 
-      iex> resp =
-      ...>   Req.get!("http://httpbin.org/stream/2", into: fn {:data, data}, {req, resp} ->
+      iex> {:ok, resp, acc} =
+      ...>   Req.stream("http://httpbin.org/stream/2", [], fn data, _resp, acc ->
       ...>     IO.puts(data)
-      ...>     {:cont, {req, resp}}
+      ...>     {:cont, acc}
       ...>   end)
       # output: {"url": "http://httpbin.org/stream/2", ...}
       # output: {"url": "http://httpbin.org/stream/2", ...}
       iex> resp.status
       200
       iex> resp.body
-      ""
+      nil
 
   Stream response body into a `Collectable`:
 
@@ -134,21 +134,6 @@ defmodule Req do
   > `Req.get_headers_list/1`.
   """
 
-  # Response streaming to caller:
-  #
-  #     iex> {req, resp} = Req.async_request!("http://httpbin.org/stream/2")
-  #     iex> resp.status
-  #     200
-  #     iex> resp.body
-  #     ""
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
-  #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [:done]
-  #     ""
-
   @type url() :: URI.t() | String.t()
 
   @req Req.Request.new()
@@ -200,6 +185,21 @@ defmodule Req do
 
         * `enumerable` - stream request body chunks emitted by the given `Enumerable`.
 
+        * `req_body_fun` - stream request body chunks from a 1-arity function.
+          Only supported in `Req.stream/4`.
+
+          The function receives the accumulator passed to `Req.stream/4` and should
+          return one of:
+
+            * `{:data, chunk, acc}` - Emit request body `chunk` and continue streaming.
+
+            * `{:done, acc}` - request body streaming is done. `acc` is passed to the
+              response streaming function.
+
+            * `{:halt, acc}` - cancel request. On HTTP/1, this closes the connection.
+
+    * `:private` - a map reserved for libraries and frameworks to use. The keys must be atoms.
+
   Additional URL options:
 
     * `:base_url` - if set, the request URL is prepended with this base URL (via
@@ -222,7 +222,7 @@ defmodule Req do
 
   Authentication options:
 
-    * `:auth` - sets request authentication (via [`auth`](`Req.Steps.auth/1`) step.)
+    * `:auth` - sets request authentication (via `Req.Auth` step.)
 
       Can be one of:
 
@@ -272,38 +272,27 @@ defmodule Req do
   Response body options:
 
     * `:compressed` - if set to `true`, asks the server to return a compressed response and
-      decompresses it (via the [`compressed`](`Req.Steps.compressed/1`) and
-      [`decompress_body`](`Req.Steps.decompress_body/1`) steps.) Defaults to `false`.
+      decompresses it. Defaults to `false`.
 
-    * `:raw` - if set to `true`, disables body decompression
-      ([`decompress_body`](`Req.Steps.decompress_body/1`) step) and automatic decoding
-      ([`decode_body`](`Req.Steps.decode_body/1`) step.) Defaults to `false`.
+      Note: the response body is decompressed with no size limit, so a small response can
+      expand into many gigabytes. A malicious or compromised server can exploit this to
+      exhaust memory and crash the client (a decompression bomb / denial of service), so
+      only set `compressed: true` for endpoints you trust.
+
+    * `:raw` - if set to `true`, disables body decompression and automatic decoding
+      (see `Req.Decompress` and `Req.Decode`). Defaults to `false`.
 
     * `:decode_body` - if set to `false`, disables automatic response body decoding.
       Defaults to `true`.
 
     * `:decoders` - the list of decoders to use for automatic response body decoding.
-      Defaults to `[:json, :json_api]`. See [`decode_body`](`Req.Steps.decode_body/1`) for
-      the supported formats and how to add custom decoders.
-
-    * `:decode_json` - (deprecated) options to pass to `Jason.decode/2`. Deprecated in favour
-      of passing a custom JSON decoder via the `:decoders` option, e.g.
-      `decoders: [json: &Jason.decode(&1, keys: :atoms)]`.
+      Defaults to `[:json, :json_api, :ndjson, :sse]`. See `Req.Decode` for the supported
+      formats and how to add custom decoders.
 
     * `:into` - where to send the response body. It can be one of:
 
         * `nil` - (default) read the whole response body and store it in the `response.body`
           field.
-
-        * `fun` - stream response body using a function. The first argument is a `{:data, data}`
-          tuple containing the chunk of the response body. The second argument is a
-          `{request, response}` tuple. To continue streaming chunks, return `{:cont, {req, resp}}`.
-          To cancel, return `{:halt, {req, resp}}`. For example:
-
-              into: fn {:data, data}, {req, resp} ->
-                IO.puts(data)
-                {:cont, {req, resp}}
-              end
 
         * `collectable` - stream response body into a `t:Collectable.t/0`. For example:
 
@@ -323,10 +312,10 @@ defmodule Req do
           If the request is sent using HTTP/1, an extra process is spawned to consume messages
           from the underlying socket. On both HTTP/1 and HTTP/2 the messages are sent to the
           current process as soon as they arrive, as a firehose. If you wish to maximize request
-          rate or have more control over how messages are streamed, use `into: fun` or
+          rate or have more control over how messages are streamed, use `Req.stream/4` or
           `into: collectable` instead.
 
-  Response redirect options ([`redirect`](`Req.Steps.redirect/1`) step):
+  Response redirect options (`Req.Redirect` step):
 
     * `:redirect` - if set to `false`, disables automatic response redirects. Defaults to `true`.
 
@@ -339,14 +328,14 @@ defmodule Req do
   Other response options:
 
     * `:http_errors` - how to handle HTTP 4xx/5xx error responses (via
-      [`handle_http_errors`](`Req.Steps.handle_http_errors/1`) step).
+      `Req.HTTPErrors` step).
       Can be one of the following:
 
       * `:return` (default) - return the response
 
       * `:raise` - raise an error
 
-  Retry options ([`retry`](`Req.Steps.retry/1`) step):
+  Retry options (`Req.Retry` step):
 
     * `:retry` - can be one of the following:
 
@@ -557,7 +546,12 @@ defmodule Req do
       )
     end
 
-    request_option_names = [:method, :url, :headers, :body, :adapter, :into]
+    if Keyword.has_key?(options, :decode_json) do
+      # TODO: mention in changelog
+      raise "setting `decode_json: opts` is removed in favour of `decoders: [json: &Jason.decode(&1, opts)`"
+    end
+
+    request_option_names = [:method, :url, :headers, :body, :adapter, :into, :private]
 
     {request_options, options} = Keyword.split(options, request_option_names)
 
@@ -583,6 +577,16 @@ defmodule Req do
 
         {:headers, new_headers}, acc ->
           update_in(acc.headers, &Req.Fields.merge(&1, new_headers))
+
+        {:private, private}, acc ->
+          update_in(acc.private, &Enum.into(private, &1))
+
+        {:into, into}, acc ->
+          if is_function(into) do
+            IO.warn("setting `into: fun` is deprecated in favour of `Req.stream/4`")
+          end
+
+          put_in(acc.into, into)
 
         {name, value}, acc ->
           %{acc | name => value}
@@ -1125,7 +1129,107 @@ defmodule Req do
   @spec request(request :: Req.Request.t() | keyword(), options :: keyword()) ::
           {:ok, Req.Response.t()} | {:error, Exception.t()}
   def request(request, options \\ []) do
-    Req.Request.run(new(request, options))
+    req = new(request, options)
+
+    if is_function(req.body, 1) do
+      raise ArgumentError, "body: fun is only supported in Req.stream/4"
+    end
+
+    case req.into do
+      nil ->
+        case stream(req) do
+          {:ok, resp} ->
+            {:ok, resp}
+
+          {:error, exception, _resp} ->
+            {:error, exception}
+        end
+
+      fun when is_function(fun, 2) ->
+        into_legacy_fun(req, fun)
+
+      :self ->
+        stream_fun = fn _event, resp, acc, state ->
+          {:cont, resp, acc, state}
+        end
+
+        case run_stream(req, nil, stream_fun) do
+          {:ok, resp, _acc} ->
+            {:ok, resp}
+
+          {:error, exception, _resp, _acc} ->
+            {:error, exception}
+        end
+
+      collectable ->
+        into_collectable(req, collectable)
+    end
+  end
+
+  defp into_legacy_fun(req, fun) do
+    stream_fun = fn
+      {:data, data}, resp, acc, state ->
+        resp = update_in(resp.body, &(&1 || ""))
+
+        case fun.({:data, data}, {resp.request, resp}) do
+          {:cont, {req, resp}} ->
+            resp = put_in(resp.request, req)
+            {:cont, resp, acc, state}
+
+          {:halt, {req, resp}} ->
+            resp = put_in(resp.request, req)
+            {:halt, resp, acc, state}
+
+          other ->
+            raise ArgumentError, "expected {:cont, acc} or {:halt, acc}, got: #{inspect(other)}"
+        end
+
+      _event, resp, acc, state ->
+        {:cont, resp, acc, state}
+    end
+
+    case run_stream(req, nil, stream_fun) do
+      {:ok, resp, _acc} ->
+        resp = update_in(resp.body, &(&1 || ""))
+        {:ok, resp}
+
+      {:error, exception, _resp, _acc} ->
+        {:error, exception}
+    end
+  end
+
+  defp into_collectable(req, collectable) do
+    stream_fun = fn
+      {:status, 200}, resp, %Req.Buffer{}, state ->
+        {:cont, resp, Collectable.into(collectable), state}
+
+      {:data, data}, resp, {acc, collector}, state ->
+        acc = collector.(acc, {:cont, data})
+        {:cont, resp, {acc, collector}, state}
+
+      {:data, data}, resp, %Req.Buffer{} = buffer, state ->
+        {:cont, resp, %{buffer | iodata: [buffer.iodata | data]}, state}
+
+      _event, resp, acc, state ->
+        {:cont, resp, acc, state}
+    end
+
+    case run_stream(req, %Req.Buffer{}, stream_fun) do
+      {:ok, resp, {acc, collector}} ->
+        resp = put_in(resp.body, collector.(acc, :done))
+        {:ok, resp}
+
+      {:ok, resp, %Req.Buffer{} = buffer} ->
+        resp = put_in(resp.body, Req.Buffer.body(buffer))
+        {:ok, resp}
+
+      {:error, exception, _resp, {acc, collector}} ->
+        collector.(acc, :halt)
+        {:error, exception}
+
+      {:error, exception, _resp, %Req.Buffer{}} ->
+        {:error, exception}
+    end
   end
 
   @doc """
@@ -1155,6 +1259,103 @@ defmodule Req do
       {:ok, response} -> response
       {:error, exception} -> raise exception
     end
+  end
+
+  def stream(req, acc, fun, options \\ []) when is_function(fun, 3) do
+    req = Req.new(req, options)
+
+    stream_fun = fn
+      {:data, data}, resp, acc, state ->
+        case fun.(data, resp, acc) do
+          {:cont, acc} ->
+            {:cont, resp, acc, state}
+
+          {:halt, acc} ->
+            {:halt, resp, acc, state}
+
+          other ->
+            raise ArgumentError, "expected {:cont, acc} or {:halt, acc}, got: #{inspect(other)}"
+        end
+
+      {tag, _value}, resp, acc, state when tag in [:status, :headers, :trailers] ->
+        {:cont, resp, acc, state}
+    end
+
+    run_stream(req, acc, stream_fun)
+  end
+
+  @doc false
+  def stream(req, options \\ []) do
+    req = Req.new(req, options)
+
+    stream_fun = fn
+      {:data, data}, resp, %Req.Buffer{} = buffer, state ->
+        {:cont, resp, %{buffer | iodata: [buffer.iodata | data]}, state}
+
+      {_tag, _value}, resp, acc, state ->
+        {:cont, resp, acc, state}
+    end
+
+    case run_stream(req, %Req.Buffer{}, stream_fun) do
+      {:ok, resp, %Req.Buffer{} = buffer} ->
+        resp = put_in(resp.body, Req.Buffer.body(buffer))
+        {:ok, resp}
+
+      {:error, exception, resp, %Req.Buffer{} = buffer} ->
+        resp = put_in(resp.body, Req.Buffer.body(buffer))
+        {:error, exception, resp}
+    end
+  end
+
+  @doc false
+  def stream!(req, options \\ []) do
+    case stream(req, options) do
+      {:ok, resp} ->
+        resp
+
+      {:error, exception, _resp} ->
+        raise exception
+    end
+  end
+
+  defp run_stream(req, acc, fun) when is_function(fun, 4) do
+    case do_stream(req, req.request_steps, acc, fun, []) do
+      {:ok, resp, acc, []} ->
+        {:ok, resp, acc}
+
+      {:halt, resp, acc, []} ->
+        {:ok, resp, acc}
+
+      {{:error, exception}, resp, acc, []} ->
+        {:error, exception, resp, acc}
+    end
+  end
+
+  defp do_stream(req, [{_name, mod} | rest], acc, fun, state) when is_atom(mod) do
+    mod.stream(req, acc, fun, state, &do_stream(&1, rest, &2, &3, &4))
+  end
+
+  defp do_stream(req, [{name, step} | rest], acc, fun, state) do
+    case run_step(step, req) do
+      %Req.Request{} = req ->
+        do_stream(req, rest, acc, fun, state)
+
+      other ->
+        raise "expected request step #{inspect(name)} to return %Req.Request{}, " <>
+                "got: #{inspect(other)}"
+    end
+  end
+
+  defp do_stream(req, [], acc, fun, state) do
+    req.adapter.stream(req, acc, fun, state)
+  end
+
+  defp run_step(step, req) when is_function(step, 1) do
+    step.(req)
+  end
+
+  defp run_step({mod, fun, args}, req) when is_atom(mod) and is_atom(fun) and is_list(args) do
+    apply(mod, fun, [req | args])
   end
 
   @doc """
@@ -1205,7 +1406,25 @@ defmodule Req do
   def run(request, options \\ [])
 
   def run(request, options) when is_list(options) do
-    Req.Request.run_request(new(request, options))
+    req = new(request, options)
+
+    if req.into == nil and not is_function(req.body, 1) do
+      case stream(req) do
+        {:ok, resp} ->
+          {resp.request, resp}
+
+        {:error, exception, resp} ->
+          {resp.request, exception}
+      end
+    else
+      case request(req) do
+        {:ok, resp} ->
+          {resp.request, resp}
+
+        {:error, exception} ->
+          {req, exception}
+      end
+    end
   end
 
   def run(_request, options) do
@@ -1265,24 +1484,6 @@ defmodule Req do
     end
   end
 
-  @doc false
-  @deprecated "use Req.request(into: self()) instead"
-  def async_request(request, options \\ []) do
-    Req.Request.run_request(%{new(request, options) | into: :legacy_self})
-  end
-
-  @deprecated "use Req.request!(into: self()) instead"
-  @doc false
-  def async_request!(request, options \\ []) do
-    case async_request(request, options) do
-      {request, %Req.Response{} = response} ->
-        {request, response}
-
-      {_request, exception} ->
-        raise exception
-    end
-  end
-
   @doc """
   Parses asynchronous response body message.
 
@@ -1319,14 +1520,6 @@ defmodule Req do
     fun.(ref, message)
   end
 
-  def parse_message(%Req.Request{} = request, message) do
-    IO.warn(
-      "passing %Req.Request{} to parse_message/2 is deprecated. Pass %Req.Response{} instead"
-    )
-
-    request.async.stream_fun.(request.async.ref, message)
-  end
-
   @doc """
   Cancels an asynchronous response.
 
@@ -1342,12 +1535,6 @@ defmodule Req do
   @doc type: :async
   def cancel_async_response(%Req.Response{body: %Req.Response.Async{cancel_fun: fun, ref: ref}}) do
     fun.(ref)
-  end
-
-  @deprecated "use Req.cancel_async_response(resp)) instead"
-  @doc false
-  def cancel_async_request(%Req.Request{} = request) do
-    request.async.cancel_fun.(request.async.ref)
   end
 
   @doc """

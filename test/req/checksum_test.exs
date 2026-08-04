@@ -9,13 +9,16 @@ defmodule Req.ChecksumTest do
     %{req: req} =
       serve("GET /": &send_resp(&1, 200, "foo"))
 
-    resp = Req.get!(req, checksum: @foo_md5)
+    resp = Req.stream!(req, checksum: @foo_md5)
+    assert resp.status == 200
     assert resp.body == "foo"
 
-    resp = Req.get!(req, checksum: @foo_sha1)
+    resp = Req.stream!(req, checksum: @foo_sha1)
+    assert resp.status == 200
     assert resp.body == "foo"
 
-    resp = Req.get!(req, checksum: @foo_sha256)
+    resp = Req.stream!(req, checksum: @foo_sha256)
+    assert resp.status == 200
     assert resp.body == "foo"
 
     assert_raise Req.ChecksumMismatchError,
@@ -25,7 +28,7 @@ defmodule Req.ChecksumTest do
                  actual:   #{@foo_sha1}\
                  """,
                  fn ->
-                   Req.get!(req, checksum: "sha1:bad")
+                   Req.stream!(req, checksum: "sha1:bad")
                  end
   end
 
@@ -45,7 +48,8 @@ defmodule Req.ChecksumTest do
 
     req = Req.merge(req, compressed: true)
 
-    resp = Req.get!(req, checksum: @foo_md5)
+    resp = Req.stream!(req, checksum: @foo_md5)
+    assert resp.status == 200
     assert resp.body == "foo"
 
     assert_raise Req.ChecksumMismatchError,
@@ -55,7 +59,7 @@ defmodule Req.ChecksumTest do
                  actual:   #{@foo_sha1}\
                  """,
                  fn ->
-                   Req.get!(req, checksum: "sha1:bad")
+                   Req.stream!(req, checksum: "sha1:bad")
                  end
   end
 
@@ -63,18 +67,21 @@ defmodule Req.ChecksumTest do
     %{req: req} =
       serve("GET /": &send_resp(&1, 200, "foo"))
 
-    req =
-      req
-      |> Req.merge(
-        into: fn {:data, chunk}, {req, resp} ->
-          {:cont, {req, update_in(resp.body, &(&1 <> chunk))}}
-        end
-      )
+    {req, _stderr} =
+      ExUnit.CaptureIO.with_io(:stderr, fn ->
+        Req.merge(req,
+          into: fn {:data, chunk}, {req, resp} ->
+            {:cont, {req, update_in(resp.body, &(&1 <> chunk))}}
+          end
+        )
+      end)
 
-    resp = Req.get!(req, checksum: @foo_sha1)
+    resp = Req.request!(req, checksum: @foo_sha1)
+    assert resp.status == 200
     assert resp.body == "foo"
 
-    resp = Req.get!(req, checksum: @foo_sha256)
+    resp = Req.request!(req, checksum: @foo_sha256)
+    assert resp.status == 200
     assert resp.body == "foo"
 
     assert_raise Req.ChecksumMismatchError,
@@ -84,7 +91,7 @@ defmodule Req.ChecksumTest do
                  actual:   #{@foo_sha1}\
                  """,
                  fn ->
-                   Req.get!(req, checksum: "sha1:bad")
+                   Req.request!(req, checksum: "sha1:bad")
                  end
   end
 
@@ -94,10 +101,12 @@ defmodule Req.ChecksumTest do
 
     req = Req.merge(req, into: [])
 
-    resp = Req.get!(req, checksum: @foo_sha1)
+    resp = Req.request!(req, checksum: @foo_sha1)
+    assert resp.status == 200
     assert resp.body == ["foo"]
 
-    resp = Req.get!(req, checksum: @foo_sha256)
+    resp = Req.request!(req, checksum: @foo_sha256)
+    assert resp.status == 200
     assert resp.body == ["foo"]
 
     assert_raise Req.ChecksumMismatchError,
@@ -107,7 +116,7 @@ defmodule Req.ChecksumTest do
                  actual:   #{@foo_sha1}\
                  """,
                  fn ->
-                   Req.get!(req, checksum: "sha1:bad")
+                   Req.request!(req, checksum: "sha1:bad")
                  end
   end
 
@@ -118,7 +127,89 @@ defmodule Req.ChecksumTest do
     req = Req.merge(req, into: :self)
 
     assert_raise ArgumentError, ":checksum cannot be used with `into: :self`", fn ->
-      Req.get!(req, checksum: @foo_sha1)
+      Req.request!(req, checksum: @foo_sha1)
     end
+  end
+
+  test "stream" do
+    %{req: req} =
+      serve("GET /": &send_resp(&1, 200, "foo"))
+
+    {:ok, resp, acc} =
+      Req.stream(
+        req,
+        [],
+        fn data, _resp, acc -> {:cont, [data | acc]} end,
+        checksum: @foo_sha1
+      )
+
+    assert resp.status == 200
+    assert resp.body == nil
+    assert acc == ["foo"]
+
+    {:error, err, resp, acc} =
+      Req.stream(
+        req,
+        [],
+        fn data, _resp, acc -> {:cont, [data | acc]} end,
+        checksum: "sha1:bad"
+      )
+
+    assert err ==
+             Req.ChecksumMismatchError.exception(expected: "sha1:bad", actual: @foo_sha1)
+
+    assert resp.status == 200
+    assert acc == ["foo"]
+  end
+
+  test "stream halt" do
+    %{req: req} =
+      serve("GET /": &send_resp(&1, 200, "foo"))
+
+    {:ok, resp, acc} =
+      Req.stream(
+        req,
+        [],
+        fn data, _resp, acc -> {:halt, [data | acc]} end,
+        checksum: "sha1:bad"
+      )
+
+    assert resp.status == 200
+    assert acc == ["foo"]
+  end
+
+  test "stream with gzip" do
+    %{req: req} =
+      serve("GET /": &send_resp_gzip(&1, "foo"))
+
+    {:ok, resp, acc} =
+      Req.stream(
+        req,
+        [],
+        fn data, _resp, acc -> {:cont, [data | acc]} end,
+        compressed: true,
+        checksum: @foo_sha1
+      )
+
+    assert resp.status == 200
+    assert IO.iodata_to_binary(Enum.reverse(acc)) == "foo"
+  end
+
+  test "verifies checksum before decoding" do
+    body = ~s|{"foo":"bar"}|
+    checksum = "sha256:" <> (:sha256 |> :crypto.hash(body) |> Base.encode16(case: :lower))
+
+    %{req: req} =
+      serve(
+        "GET /": fn conn ->
+          conn
+          |> put_resp_content_type("application/json")
+          |> send_resp(200, body)
+        end
+      )
+
+    resp = Req.stream!(req, checksum: checksum)
+    assert resp.status == 200
+    assert resp.body == %{"foo" => "bar"}
   end
 end

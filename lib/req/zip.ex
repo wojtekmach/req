@@ -2,10 +2,9 @@ defmodule Req.ZIP do
   @moduledoc """
   ZIP archive decoding using [`:zip`].
 
-  This module is used by [`decode_body`] on `.zip` and `application/zip`.
+  This module is used by `Req.Decode` on `.zip` and `application/zip`.
 
   [`:zip`]: `:zip`
-  [`decode_body`]: `Req.Steps.decode_body/1`
   """
 
   @doc """
@@ -23,5 +22,25 @@ defmodule Req.ZIP do
         # :zip surfaces an internal `{:badmatch, _}` term here, which is not useful.
         {:error, %Req.ArchiveError{format: :zip, data: binary}}
     end
+  end
+
+  @doc false
+  def decode_init do
+    nil
+  end
+
+  @doc false
+  def decode_chunk(state, data) do
+    {:ok, data, state}
+  end
+
+  @doc false
+  def decode_finish(_state) do
+    {:ok, nil}
+  end
+
+  @doc false
+  def decode_close(_state) do
+    :ok
   end
 end

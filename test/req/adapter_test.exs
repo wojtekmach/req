@@ -3,6 +3,23 @@ defmodule Req.AdapterTest do
 
   @adapter Req.Case.adapter()
 
+  defmodule StreamResponseStep do
+    def stream(req, acc, fun, state, next) do
+      fun = fn
+        {:headers, _headers} = event, resp, acc, state ->
+          resp = Req.Response.put_header(resp, "x-stream-step", "true")
+          request = Req.Request.put_private(resp.request, :stream_step, true)
+          resp = %{resp | request: request}
+          fun.(event, resp, acc, state)
+
+        event, resp, acc, state ->
+          fun.(event, resp, acc, state)
+      end
+
+      next.(req, acc, fun, state)
+    end
+  end
+
   describe "run" do
     @tag :transport
     test ":inet6" do
@@ -19,18 +36,20 @@ defmodule Req.AdapterTest do
           [:inet6, ip: {0, 0, 0, 0, 0, 0, 0, 1}]
         )
 
-      resp = Req.request!(adapter: adapter_fun(), url: ipv4_url)
+      resp = Req.stream!(adapter: adapter_fun(), url: ipv4_url)
       assert resp.status == 200
       assert resp.body == "ok"
-      resp = Req.request!(adapter: adapter_fun(), url: ipv4_url, inet6: true)
+
+      resp = Req.stream!(adapter: adapter_fun(), url: ipv4_url, inet6: true)
       assert resp.status == 200
       assert resp.body == "ok"
-      resp = Req.request!(adapter: adapter_fun(), url: ipv6_url, inet6: true)
+
+      resp = Req.stream!(adapter: adapter_fun(), url: ipv6_url, inet6: true)
       assert resp.status == 200
       assert resp.body == "ok"
 
       ipv6_url = %{ipv6_url | host: "::1"}
-      resp = Req.request!(adapter: adapter_fun(), url: ipv6_url)
+      resp = Req.stream!(adapter: adapter_fun(), url: ipv6_url)
       assert resp.status == 200
       assert resp.body == "ok"
     end
@@ -49,7 +68,11 @@ defmodule Req.AdapterTest do
       )
 
       resp =
-        Req.request!(adapter: adapter_fun(), url: "http://localhost", unix_socket: socket_path)
+        Req.stream!(
+          adapter: adapter_fun(),
+          url: "http://localhost",
+          unix_socket: socket_path
+        )
 
       assert resp.status == 200
       assert resp.body == "ok"
@@ -79,8 +102,10 @@ defmodule Req.AdapterTest do
         )
 
       assert_receive :accept_queue_filled
-      {:error, err} = Req.request(req)
+      {:error, err, resp} = Req.stream(req)
       assert err == %Req.TransportError{reason: :timeout}
+      assert resp.status == nil
+      assert resp.body == ""
     end
 
     @tag :capture_log
@@ -108,10 +133,10 @@ defmodule Req.AdapterTest do
 
       if @adapter == :httpc do
         assert_raise ArgumentError, "httpc adapter does not support HTTP/2", fn ->
-          Req.request!(req)
+          Req.stream!(req)
         end
       else
-        resp = Req.request!(req)
+        resp = Req.stream!(req)
         assert resp.status == 200
         assert resp.body == "ok"
       end
@@ -132,7 +157,7 @@ defmodule Req.AdapterTest do
         )
 
       assert_raise File.Error, ~r/could not read file "bad.pem"/, fn ->
-        Req.request!(req)
+        Req.stream!(req)
       end
     end
 
@@ -145,15 +170,20 @@ defmodule Req.AdapterTest do
         end)
 
       req = Req.new(adapter: adapter_fun(), url: url, retry: false)
-      {:error, err} = Req.request(req)
+
+      {:error, err, resp} = Req.stream(req)
       assert err == %Req.HTTPError{protocol: :http1, reason: :invalid_status_line}
+      assert resp.status == nil
+      assert resp.body == ""
     end
 
     @tag :transport
     test "Req.TransportError" do
       req = Req.new(adapter: adapter_fun(), url: "http://localhost:9999", retry: false)
-      {:error, err} = Req.request(req)
+      {:error, err, resp} = Req.stream(req)
       assert err == %Req.TransportError{reason: :econnrefused}
+      assert resp.status == nil
+      assert resp.body == ""
     end
 
     @tag :transport
@@ -161,8 +191,10 @@ defmodule Req.AdapterTest do
       req =
         Req.new(adapter: adapter_fun(), url: "http://localhost:9999", inet6: true, retry: false)
 
-      {:error, err} = Req.request(req)
+      {:error, err, resp} = Req.stream(req)
       assert err == %Req.TransportError{reason: :econnrefused}
+      assert resp.status == nil
+      assert resp.body == ""
     end
 
     @tag :transport
@@ -188,8 +220,10 @@ defmodule Req.AdapterTest do
         end)
 
       req = Req.new(adapter: adapter_fun(), url: url, receive_timeout: 50, retry: false)
-      {:error, err} = Req.request(req)
+      {:error, err, resp} = Req.stream(req)
       assert err == %Req.TransportError{reason: :timeout}
+      assert resp.status == nil
+      assert resp.body == ""
       assert_received :ping
     end
 
@@ -209,69 +243,11 @@ defmodule Req.AdapterTest do
         end)
 
       req = Req.new(adapter: adapter_fun(), url: url, request_timeout: 50, retry: false)
-      {:error, err} = Req.request(req)
+      {:error, err, resp} = Req.stream(req)
       assert err == %Req.TransportError{reason: :timeout}
-      assert_receive :ping
-    end
-
-    test "body: req_body_fun succeeded" do
-      %{req: req} =
-        serve(fn conn ->
-          assert {:ok, "foobar", conn} = Plug.Conn.read_body(conn)
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      req_body_fun = fn
-        %Req.Request{private: %{phase: :bar}} = request ->
-          request = Req.Request.put_private(request, :phase, :done)
-          {:data, "bar", request}
-
-        %Req.Request{private: %{phase: :done}} = request ->
-          {:done, request}
-
-        %Req.Request{} = request ->
-          request = Req.Request.put_private(request, :phase, :bar)
-          {:data, "foo", request}
-      end
-
-      {req, resp} = Req.run!(req, method: :post, body: req_body_fun)
-      assert req.private[:phase] == :done
       assert resp.status == 200
-      assert resp.body == "ok"
-    end
-
-    test "body: req_body_fun halted" do
-      %{req: req} =
-        serve(fn conn ->
-          assert {:ok, "", conn} = Plug.Conn.read_body(conn)
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      req_body_fun = fn
-        %Req.Request{} = request ->
-          request = Req.Request.put_private(request, :phase, :halted)
-          {:halt, request}
-      end
-
-      {req, resp} = Req.run!(req, method: :post, body: req_body_fun)
-      assert req.private[:phase] == :halted
-      assert resp.status == nil
       assert resp.body == ""
-    end
-
-    test "body: req_body_fun errored" do
-      %{req: req} =
-        serve(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      req_body_fun = fn %Req.Request{} -> :oops end
-
-      assert_raise RuntimeError,
-                   "expected req_body_fun to return {:data, chunk, request}, {:done, request}, or {:halt, request}, got: :oops",
-                   fn ->
-                     Req.post!(req, body: req_body_fun)
-                   end
+      assert_receive :ping
     end
 
     @tag :transport
@@ -302,15 +278,19 @@ defmodule Req.AdapterTest do
 
       pid = self()
 
-      resp =
-        Req.get!(
-          adapter: adapter_fun(),
-          url: url,
-          into: fn {:data, data}, acc ->
-            send(pid, {:data, data})
-            {:cont, acc}
-          end
-        )
+      {resp, stderr} =
+        ExUnit.CaptureIO.with_io(:stderr, fn ->
+          Req.request!(
+            adapter: adapter_fun(),
+            url: url,
+            into: fn {:data, data}, acc ->
+              send(pid, {:data, data})
+              {:cont, acc}
+            end
+          )
+        end)
+
+      assert stderr =~ "setting `into: fun` is deprecated in favour of `Req.stream/4`"
 
       assert resp.status == 200
       assert resp.headers["transfer-encoding"] == ["chunked"]
@@ -352,15 +332,17 @@ defmodule Req.AdapterTest do
           []
         end
 
-      resp =
-        Req.get!(
-          req,
-          connect_options: connect_options,
-          into: fn {:data, data}, {req, resp} ->
-            resp = update_in(resp.body, &(&1 <> data))
-            {:halt, {req, resp}}
-          end
-        )
+      {resp, _stderr} =
+        ExUnit.CaptureIO.with_io(:stderr, fn ->
+          Req.request!(
+            req,
+            connect_options: connect_options,
+            into: fn {:data, data}, {req, resp} ->
+              resp = update_in(resp.body, &(&1 <> data))
+              {:halt, {req, resp}}
+            end
+          )
+        end)
 
       assert resp.status == 200
       assert resp.body == "foo"
@@ -368,18 +350,39 @@ defmodule Req.AdapterTest do
 
     @tag :transport
     test "into: fun handle error" do
-      {:error, err} =
-        Req.get(
-          adapter: adapter_fun(),
-          url: "http://localhost:9999",
-          retry: false,
-          into: fn {:data, data}, {req, resp} ->
-            resp = update_in(resp.body, &(&1 <> data))
-            {:halt, {req, resp}}
-          end
-        )
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        {:error, err} =
+          Req.request(
+            adapter: adapter_fun(),
+            url: "http://localhost:9999",
+            retry: false,
+            into: fn {:data, data}, {req, resp} ->
+              resp = update_in(resp.body, &(&1 <> data))
+              {:halt, {req, resp}}
+            end
+          )
 
-      assert err == %Req.TransportError{reason: :econnrefused}
+        assert err == %Req.TransportError{reason: :econnrefused}
+      end)
+    end
+
+    test "into: fun with empty body" do
+      %{req: req} =
+        serve(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "")
+        end)
+
+      {resp, _stderr} =
+        ExUnit.CaptureIO.with_io(:stderr, fn ->
+          Req.request!(req,
+            into: fn {:data, _data}, _acc ->
+              flunk("into: fun called for empty body")
+            end
+          )
+        end)
+
+      assert resp.status == 200
+      assert resp.body == ""
     end
 
     @tag :transport
@@ -409,7 +412,7 @@ defmodule Req.AdapterTest do
         end)
 
       resp =
-        Req.get!(
+        Req.request!(
           adapter: adapter_fun(),
           url: url,
           into: []
@@ -435,7 +438,7 @@ defmodule Req.AdapterTest do
           Req.Test.json(%{conn | status: 404}, %{error: "not found"})
         end)
 
-      resp = Req.get!(req, into: :not_a_collectable)
+      resp = Req.request!(req, into: :not_a_collectable)
 
       assert resp.status == 404
       assert resp.body == %{"error" => "not found"}
@@ -444,7 +447,7 @@ defmodule Req.AdapterTest do
     @tag :transport
     test "into: collectable handle error" do
       {:error, err} =
-        Req.get(
+        Req.request(
           adapter: adapter_fun(),
           url: "http://localhost:9999",
           retry: false,
@@ -471,12 +474,24 @@ defmodule Req.AdapterTest do
           []
         end
 
-      resp = Req.get!(req, connect_options: connect_options, into: :self)
+      resp = Req.request!(req, connect_options: connect_options, into: :self)
       assert resp.status == 200
       assert {:ok, [data: "foo"]} = Req.parse_message(resp, assert_receive(_))
       assert {:ok, [data: "bar"]} = Req.parse_message(resp, assert_receive(_))
       assert {:ok, [:done]} = Req.parse_message(resp, assert_receive(_))
       assert :unknown = Req.parse_message(resp, :other)
+      refute_receive _
+    end
+
+    test "into: :self with empty body" do
+      %{req: req} =
+        serve(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "")
+        end)
+
+      resp = Req.request!(req, into: :self)
+      assert resp.status == 200
+      assert {:ok, [:done]} = Req.parse_message(resp, assert_receive(_))
       refute_receive _
     end
 
@@ -489,7 +504,7 @@ defmodule Req.AdapterTest do
           conn
         end)
 
-      resp = Req.get!(req, into: :self)
+      resp = Req.request!(req, into: :self)
       assert resp.status == 200
       assert :ok = Req.cancel_async_response(resp)
     end
@@ -508,7 +523,7 @@ defmodule Req.AdapterTest do
 
       req = Req.merge(req, url: %{url | path: "/redirect"}, into: :self)
 
-      resp = Req.get!(req)
+      resp = Req.request!(req)
       assert resp.status == 200
       assert Enum.to_list(resp.body) == ["ok"]
     end
@@ -520,7 +535,8 @@ defmodule Req.AdapterTest do
         end)
 
       send(self(), :other)
-      resp = Req.get!(req, into: :self)
+      resp = Req.request!(req, into: :self)
+      assert resp.status == 200
       assert Enum.to_list(resp.body) == ["ok"]
       assert_received :other
     end
@@ -534,7 +550,7 @@ defmodule Req.AdapterTest do
         end)
 
       {:error, err} =
-        Req.get(
+        Req.request(
           adapter: adapter_fun(),
           url: url,
           into: :self,
@@ -544,5 +560,171 @@ defmodule Req.AdapterTest do
 
       assert err == %Req.TransportError{reason: :timeout}
     end
+  end
+
+  describe "body: req_body_fun" do
+    test "Req.request - raise" do
+      assert_raise ArgumentError, "body: fun is only supported in Req.stream/4", fn ->
+        Req.request!(url: "http://localhost", body: fn acc -> {:done, acc} end)
+      end
+    end
+
+    test "Req.stream - success" do
+      %{req: req} =
+        serve(fn conn ->
+          assert {:ok, "foobar", conn} = Plug.Conn.read_body(conn)
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      {:ok, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+          method: :post,
+          body: req_body_fun()
+        )
+
+      assert resp.status == 200
+      assert resp.body == nil
+      assert acc == ["ok", :done, "bar", "foo"]
+    end
+
+    test "Req.stream - response changes from steps" do
+      %{req: req} = serve(fn conn -> Plug.Conn.send_resp(conn, 200, "ok") end)
+
+      req =
+        Req.Request.prepend_request_steps(req,
+          stream_response: StreamResponseStep
+        )
+
+      {:ok, resp, acc} =
+        Req.stream(req, [], fn data, resp, acc ->
+          assert Req.Response.get_header(resp, "x-stream-step") == ["true"]
+          assert resp.request.private[:stream_step]
+          {:cont, [data | acc]}
+        end)
+
+      assert Req.Response.get_header(resp, "x-stream-step") == ["true"]
+      assert resp.request.private[:stream_step]
+      assert acc == ["ok"]
+    end
+
+    test "Req.stream - response changes from steps survive halt" do
+      %{req: req} = serve(fn conn -> Plug.Conn.send_resp(conn, 200, "ok") end)
+
+      req =
+        Req.Request.prepend_request_steps(req,
+          stream_response: StreamResponseStep
+        )
+
+      {:ok, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc -> {:halt, [data | acc]} end)
+
+      assert Req.Response.get_header(resp, "x-stream-step") == ["true"]
+      assert resp.request.private[:stream_step]
+      assert acc == ["ok"]
+    end
+
+    test "Req.stream - halt" do
+      %{req: req} =
+        serve(fn conn ->
+          assert {:ok, "", conn} = Plug.Conn.read_body(conn)
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      {:ok, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+          method: :post,
+          body: halting_req_body_fun()
+        )
+
+      assert resp.status == nil
+      assert resp.body == nil
+      assert acc == [:halted]
+    end
+
+    @tag :transport
+    test "Req.stream - transport error" do
+      %{url: url} =
+        start_tcp_server(fn _socket ->
+          nil
+        end)
+
+      req = Req.new(adapter: adapter_fun(), url: url)
+
+      {:error, err, resp, _acc} =
+        Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+          method: :post,
+          body: req_body_fun()
+        )
+
+      assert err == %Req.TransportError{reason: :closed}
+      assert resp.status == nil
+    end
+
+    @tag :transport
+    @tag :capture_log
+    @tag skip: @adapter == :httpc
+    test "Req.stream - mid-stream transport error" do
+      %{req: req} =
+        serve(fn conn ->
+          assert {:ok, "foobar", conn} = Plug.Conn.read_body(conn)
+          conn = Plug.Conn.send_chunked(conn, 200)
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk1")
+          raise "oops"
+          conn
+        end)
+
+      req =
+        Req.Request.prepend_request_steps(req,
+          stream_response: StreamResponseStep
+        )
+
+      {:error, err, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+          method: :post,
+          body: req_body_fun()
+        )
+
+      assert err == %Req.TransportError{reason: :closed}
+      assert resp.status == 200
+      assert Req.Response.get_header(resp, "x-stream-step") == ["true"]
+      assert resp.request.private[:stream_step]
+      assert acc == ["chunk1", :done, "bar", "foo"]
+    end
+
+    test "Req.stream - errored" do
+      %{req: req} =
+        serve(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      req_body_fun = fn [] -> :oops end
+
+      assert_raise RuntimeError,
+                   "expected req_body_fun to return {:data, chunk, acc}, {:done, chunk, acc}, " <>
+                     "{:done, acc}, or {:halt, acc}, got: :oops",
+                   fn ->
+                     Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+                       method: :post,
+                       body: req_body_fun
+                     )
+                   end
+    end
+  end
+
+  defp req_body_fun do
+    fn
+      [] ->
+        {:data, "foo", ["foo"]}
+
+      ["foo"] ->
+        {:data, "bar", ["bar", "foo"]}
+
+      ["bar", "foo"] = acc ->
+        {:done, [:done | acc]}
+    end
+  end
+
+  defp halting_req_body_fun do
+    fn [] -> {:halt, [:halted]} end
   end
 end

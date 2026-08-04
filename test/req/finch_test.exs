@@ -5,51 +5,6 @@ defmodule Req.FinchTest do
   @moduletag :adapter_finch
 
   describe "run" do
-    test ":finch_request" do
-      %{url: url} =
-        start_http_server(fn conn ->
-          Plug.Conn.send_resp(conn, 200, "ok")
-        end)
-
-      pid = self()
-
-      fun = fn req, finch_request, finch_name, finch_opts ->
-        {:ok, resp} = Finch.request(finch_request, finch_name, finch_opts)
-        send(pid, resp)
-        {req, Req.Response.new(status: resp.status, headers: resp.headers, body: "finch_request")}
-      end
-
-      assert ExUnit.CaptureIO.capture_io(:stderr, fn ->
-               resp = Req.get!(url, finch_request: fun)
-               assert resp.status == 200
-               assert resp.body == "finch_request"
-             end) =~ "setting `:finch_request` is deprecated"
-
-      assert_received %Finch.Response{body: "ok"}
-    end
-
-    test ":finch_request error" do
-      fun = fn req, _finch_request, _finch_name, _finch_opts ->
-        {req, %ArgumentError{message: "exec error"}}
-      end
-
-      ExUnit.CaptureIO.capture_io(:stderr, fn ->
-        assert_raise ArgumentError, "exec error", fn ->
-          Req.get!("http://localhost", finch_request: fun, retry: false)
-        end
-      end)
-    end
-
-    test ":finch_request with invalid return" do
-      fun = fn _, _, _, _ -> :ok end
-
-      ExUnit.CaptureIO.capture_io(:stderr, fn ->
-        assert_raise RuntimeError, ~r"expected adapter to return \{request, response\}", fn ->
-          Req.get!("http://localhost", finch_request: fun)
-        end
-      end)
-    end
-
     test "pool timeout" do
       %{url: url} =
         start_http_server(fn conn ->
@@ -59,7 +14,7 @@ defmodule Req.FinchTest do
       options = [finch: [pool_timeout: 0]]
 
       assert_raise RuntimeError, ~r/unable to provide a connection within the timeout/, fn ->
-        Req.get!(url, options)
+        Req.stream!(url, options)
       end
     end
 
@@ -74,7 +29,7 @@ defmodule Req.FinchTest do
       proxy = {:http, "localhost", url.port, []}
 
       req = Req.new(base_url: url, connect_options: [proxy: proxy])
-      resp = Req.request!(req)
+      resp = Req.stream!(req)
       assert resp.status == 200
       assert resp.body == "ok"
     end
@@ -87,7 +42,7 @@ defmodule Req.FinchTest do
         end)
 
       req = Req.new(base_url: url, connect_options: [hostname: "example.com"])
-      resp = Req.request!(req)
+      resp = Req.stream!(req)
       assert resp.status == 200
       assert resp.body == "ok"
     end
@@ -102,19 +57,19 @@ defmodule Req.FinchTest do
 
     test ":connect_options bad option" do
       assert_raise ArgumentError, "unknown option :timeou. Did you mean :timeout?", fn ->
-        Req.get!("http://localhost", connect_options: [timeou: 0])
+        Req.stream!("http://localhost", connect_options: [timeou: 0])
       end
     end
 
     test ":finch option" do
       assert_raise ArgumentError, "unknown registry: MyFinch", fn ->
-        Req.get!("http://localhost", finch: [name: MyFinch])
+        Req.stream!("http://localhost", finch: [name: MyFinch])
       end
     end
 
     test ":finch and :connect_options" do
       assert_raise ArgumentError, "cannot set both :finch and :connect_options", fn ->
-        Req.request!(finch: [name: MyFinch], connect_options: [timeout: 0])
+        Req.stream!(finch: [name: MyFinch], connect_options: [timeout: 0])
       end
     end
 
@@ -146,11 +101,11 @@ defmodule Req.FinchTest do
 
       # :inet6 can be auto-set for IPv6 URLs; it should not conflict with :finch
       req = Req.new(url: "http://[::1]:#{ipv6_port}", finch: [name: finch_name])
-      resp = Req.request!(req)
+      resp = Req.stream!(req)
       assert resp.status == 200
       assert resp.body == "ok"
 
-      resp = Req.request!("http://localhost:#{ipv6_port}", finch: [name: finch_name], inet6: true)
+      resp = Req.stream!("http://localhost:#{ipv6_port}", finch: [name: finch_name], inet6: true)
       assert resp.status == 200
       assert resp.body == "ok"
     end
@@ -179,9 +134,10 @@ defmodule Req.FinchTest do
           Plug.Conn.send_resp(conn, 200, "finch_private")
         end)
 
-      resp = Req.get!(url, finch_private: %{pid: self()})
+      resp = Req.stream!(url, finch_private: %{pid: self()})
       assert resp.status == 200
       assert resp.body == "finch_private"
+
       assert_received :telemetry_private
     end
 
@@ -202,7 +158,7 @@ defmodule Req.FinchTest do
         {:cont, acc}
       end
 
-      resp = Req.get!(url: url, into: fun)
+      resp = Req.request!(url: url, into: fun)
       assert resp.status == 200
       assert resp.body == ""
       assert_received {:data, "foo"}
@@ -279,7 +235,7 @@ defmodule Req.FinchTest do
         end)
 
       resp =
-        Req.get!(url, finch: [name: Req.Finch, pool_tag: :bulk], finch_private: %{pid: self()})
+        Req.stream!(url, finch: [name: Req.Finch, pool_tag: :bulk], finch_private: %{pid: self()})
 
       assert resp.status == 200
       assert resp.body == "ok"
@@ -293,14 +249,14 @@ defmodule Req.FinchTest do
           Plug.Conn.send_resp(conn, 200, "ok")
         end)
 
-      resp = Req.get!(url, finch: [conn_max_idle_time: 10_000])
+      resp = Req.stream!(url, finch: [conn_max_idle_time: 10_000])
       assert resp.status == 200
       assert resp.body == "ok"
     end
 
     test "finch: pool options cannot be set together with :name" do
       assert_raise ArgumentError, ~r/cannot set Finch pool options together with :name/, fn ->
-        Req.request!(finch: [name: Req.Finch, conn_max_idle_time: 10_000])
+        Req.stream!(finch: [name: Req.Finch, conn_max_idle_time: 10_000])
       end
     end
   end

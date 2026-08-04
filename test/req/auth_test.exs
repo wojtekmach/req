@@ -10,7 +10,9 @@ defmodule Req.AuthTest do
         end
       )
 
-    Req.get!(req, auth: "foo")
+    resp = Req.stream!(req, auth: "foo")
+    assert resp.status == 200
+    assert resp.body == ""
   end
 
   test "basic" do
@@ -23,7 +25,9 @@ defmodule Req.AuthTest do
         end
       )
 
-    Req.get!(req, auth: {:basic, "foo:bar"})
+    resp = Req.stream!(req, auth: {:basic, "foo:bar"})
+    assert resp.status == 200
+    assert resp.body == ""
   end
 
   test "bearer" do
@@ -35,7 +39,9 @@ defmodule Req.AuthTest do
         end
       )
 
-    Req.get!(req, auth: {:bearer, "abcd"})
+    resp = Req.stream!(req, auth: {:bearer, "abcd"})
+    assert resp.status == 200
+    assert resp.body == ""
   end
 
   test "mfa" do
@@ -51,7 +57,9 @@ defmodule Req.AuthTest do
         end
       )
 
-    Req.get!(req, auth: {AuthToken, :generate, []})
+    resp = Req.stream!(req, auth: {AuthToken, :generate, []})
+    assert resp.status == 200
+    assert resp.body == ""
   end
 
   describe "digest" do
@@ -65,7 +73,9 @@ defmodule Req.AuthTest do
           end
         )
 
-      Req.get!(req, auth: {:digest, "foo:bar"})
+      resp = Req.stream!(req, auth: {:digest, "foo:bar"})
+      assert resp.status == 200
+      assert resp.body == ""
     end
 
     test "md5 challenge" do
@@ -99,8 +109,9 @@ defmodule Req.AuthTest do
           end
         )
 
-      resp = Req.get!(req, auth: {:digest, "foo:bar"})
+      resp = Req.stream!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 200
+      assert resp.body == "OK"
     end
 
     test "sha-256 challenge" do
@@ -135,8 +146,9 @@ defmodule Req.AuthTest do
           end
         )
 
-      resp = Req.get!(req, auth: {:digest, "foo:bar"})
+      resp = Req.stream!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 200
+      assert resp.body == "OK"
     end
 
     test "no challenge" do
@@ -147,8 +159,9 @@ defmodule Req.AuthTest do
           end
         )
 
-      resp = Req.get!(req, auth: {:digest, "foo:bar"})
+      resp = Req.stream!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 401
+      assert resp.body == "Unauthorized"
     end
 
     @tag :capture_log
@@ -165,8 +178,9 @@ defmodule Req.AuthTest do
           end
         )
 
-      resp = Req.get!(req, auth: {:digest, "foo:bar"})
+      resp = Req.stream!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 401
+      assert resp.body == "Unauthorized"
 
       assert Req.Response.get_header(resp, "www-authenticate") == [
                ~s|Digest realm="test", nonce="1234567890", algorithm=UNSUPPORTED|
@@ -186,8 +200,9 @@ defmodule Req.AuthTest do
           end
         )
 
-      resp = Req.get!(req, auth: {:digest, "foo:bar"})
+      resp = Req.stream!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 401
+      assert resp.body == "Unauthorized"
     end
 
     test "quoted values and paths" do
@@ -221,8 +236,9 @@ defmodule Req.AuthTest do
           end
         )
 
-      resp = Req.get!(req, url: "#{url}/some/path", auth: {:digest, "foo \"bar\":bar"})
+      resp = Req.stream!(req, url: "#{url}/some/path", auth: {:digest, "foo \"bar\":bar"})
       assert resp.status == 200
+      assert resp.body == "OK"
     end
 
     test "with qop" do
@@ -273,8 +289,9 @@ defmodule Req.AuthTest do
           end
         )
 
-      resp = Req.get!(req, auth: {:digest, "foo:bar"})
+      resp = Req.stream!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 200
+      assert resp.body == "OK"
     end
 
     test "with session" do
@@ -325,8 +342,38 @@ defmodule Req.AuthTest do
           end
         )
 
-      resp = Req.get!(req, auth: {:digest, "foo:bar"})
+      resp = Req.stream!(req, auth: {:digest, "foo:bar"})
       assert resp.status == 200
+      assert resp.body == "OK"
+    end
+
+    test "stream" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            case get_req_header(conn, "authorization") do
+              [] ->
+                conn
+                |> put_resp_header(
+                  "www-authenticate",
+                  ~s|Digest realm="test", nonce="1234567890"|
+                )
+                |> send_resp(401, "Unauthorized")
+
+              ["Digest " <> _ | _] ->
+                send_resp(conn, 200, "OK")
+            end
+          end
+        )
+
+      {:ok, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+          auth: {:digest, "foo:bar"}
+        )
+
+      assert resp.status == 200
+      assert resp.body == nil
+      assert acc == ["OK"]
     end
   end
 
@@ -358,8 +405,9 @@ defmodule Req.AuthTest do
       password bar
       """)
 
-      resp = Req.get!(req, auth: :netrc)
+      resp = Req.stream!(req, auth: :netrc)
       assert resp.status == 200
+      assert resp.body == "ok"
 
       System.put_env("NETRC", "#{c.tmp_dir}/tabs")
 
@@ -369,8 +417,9 @@ defmodule Req.AuthTest do
            password bar
       """)
 
-      resp = Req.get!(req, auth: :netrc)
+      resp = Req.stream!(req, auth: :netrc)
       assert resp.status == 200
+      assert resp.body == "ok"
 
       System.put_env("NETRC", "#{c.tmp_dir}/single_line")
 
@@ -381,8 +430,9 @@ defmodule Req.AuthTest do
       machine localhost login foo password bar
       """)
 
-      resp = Req.get!(req, auth: :netrc)
+      resp = Req.stream!(req, auth: :netrc)
       assert resp.status == 200
+      assert resp.body == "ok"
 
       if old_netrc, do: System.put_env("NETRC", old_netrc), else: System.delete_env("NETRC")
     end
@@ -405,7 +455,7 @@ defmodule Req.AuthTest do
         )
 
       assert_raise RuntimeError, "error reading .netrc file: no such file or directory", fn ->
-        Req.get!(req, auth: {:netrc, "non_existent_file"})
+        Req.stream!(req, auth: {:netrc, "non_existent_file"})
       end
 
       File.write!("#{c.tmp_dir}/custom_netrc", """
@@ -414,8 +464,9 @@ defmodule Req.AuthTest do
       password bar
       """)
 
-      resp = Req.get!(req, auth: {:netrc, c.tmp_dir <> "/custom_netrc"})
+      resp = Req.stream!(req, auth: {:netrc, c.tmp_dir <> "/custom_netrc"})
       assert resp.status == 200
+      assert resp.body == "ok"
 
       File.write!("#{c.tmp_dir}/wrong_netrc", """
       machine localhost
@@ -423,13 +474,14 @@ defmodule Req.AuthTest do
       password bad
       """)
 
-      resp = Req.get!(req, auth: {:netrc, "#{c.tmp_dir}/wrong_netrc"})
+      resp = Req.stream!(req, auth: {:netrc, "#{c.tmp_dir}/wrong_netrc"})
       assert resp.status == 401
+      assert resp.body == "unauthorized"
 
       File.write!("#{c.tmp_dir}/empty_netrc", "")
 
       assert_raise RuntimeError, ".netrc file is empty", fn ->
-        Req.get!(req, auth: {:netrc, "#{c.tmp_dir}/empty_netrc"})
+        Req.stream!(req, auth: {:netrc, "#{c.tmp_dir}/empty_netrc"})
       end
 
       File.write!("#{c.tmp_dir}/bad_netrc", """
@@ -437,7 +489,7 @@ defmodule Req.AuthTest do
       """)
 
       assert_raise RuntimeError, "error parsing .netrc file", fn ->
-        Req.get!(req, auth: {:netrc, "#{c.tmp_dir}/bad_netrc"})
+        Req.stream!(req, auth: {:netrc, "#{c.tmp_dir}/bad_netrc"})
       end
     end
   end

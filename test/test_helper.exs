@@ -203,6 +203,21 @@ defmodule Req.Case do
     if compressed, do: :zlib.gzip(data), else: data
   end
 
+  def send_resp_chunked(conn, enumerable) do
+    conn = Plug.Conn.send_chunked(conn, 200)
+
+    Enum.reduce(enumerable, conn, fn chunk, conn ->
+      {:ok, conn} = Plug.Conn.chunk(conn, chunk)
+      conn
+    end)
+  end
+
+  def send_resp_sse(conn, enumerable) do
+    conn
+    |> put_new_resp_header("content-type", "text/event-stream")
+    |> send_resp_chunked(enumerable)
+  end
+
   def send_resp_gzip(conn, body) when is_binary(body) do
     conn
     |> put_new_resp_header("content-encoding", "gzip")

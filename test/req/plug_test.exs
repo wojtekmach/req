@@ -10,7 +10,7 @@ defmodule Req.PlugTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end
 
-    resp = Req.post!(plug: plug, json: %{a: 1})
+    resp = Req.stream!(method: :post, plug: plug, json: %{a: 1})
     assert resp.status == 200
     assert resp.body == "ok"
   end
@@ -30,7 +30,7 @@ defmodule Req.PlugTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end
 
-    resp = Req.post!(plug: plug, json: %{a: 1})
+    resp = Req.stream!(method: :post, plug: plug, json: %{a: 1})
     assert resp.status == 200
     assert resp.body == "ok"
   end
@@ -53,7 +53,7 @@ defmodule Req.PlugTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end
 
-    resp = Req.post!(plug: plug, json: %{a: 1})
+    resp = Req.stream!(method: :post, plug: plug, json: %{a: 1})
     assert resp.status == 200
     assert resp.body == "ok"
   end
@@ -67,7 +67,7 @@ defmodule Req.PlugTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end
 
-    resp = Req.post!(plug: plug, body: "foo")
+    resp = Req.stream!(method: :post, plug: plug, body: "foo")
     assert resp.status == 200
     assert resp.body == "ok"
   end
@@ -91,7 +91,7 @@ defmodule Req.PlugTest do
       Plug.Conn.send_resp(conn, 200, "ok")
     end
 
-    resp = Req.post!(plug: plug, body: "foo")
+    resp = Req.stream!(method: :post, plug: plug, body: "foo")
     assert resp.status == 200
     assert resp.body == "ok"
   end
@@ -104,9 +104,20 @@ defmodule Req.PlugTest do
       send_resp(conn, 200, "ok")
     end
 
-    resp = Req.request!(plug: plug, json: %{a: 1}, params: %{foo: <<0xFF>>})
+    req = Req.new(plug: plug, json: %{a: 1}, params: %{foo: <<0xFF>>})
+
+    resp = Req.stream!(req)
     assert resp.status == 200
     assert resp.body == "ok"
+
+    {:ok, resp, acc} =
+      Req.stream(req, [], fn data, _resp, acc ->
+        {:cont, [data | acc]}
+      end)
+
+    assert resp.status == 200
+    assert acc == ["ok"]
+
     refute_receive _
   end
 
@@ -120,9 +131,18 @@ defmodule Req.PlugTest do
         body: Stream.take(~w[foo foo foo], 2)
       )
 
-    resp = Req.request!(req)
+    resp = Req.stream!(req)
     assert resp.status == 200
     assert resp.body == "foofoo"
+
+    {:ok, resp, acc} =
+      Req.stream(req, [], fn data, _resp, acc ->
+        {:cont, [data | acc]}
+      end)
+
+    assert resp.status == 200
+    assert acc == ["foofoo"]
+
     refute_receive _
   end
 
@@ -134,23 +154,25 @@ defmodule Req.PlugTest do
           send_resp(conn, 200, body)
         end,
         body: fn
-          %Req.Request{private: %{done: true}} = request ->
-            {:done, request}
+          [] ->
+            {:data, "chunk0", [0]}
 
-          %Req.Request{private: %{count: count}} = request ->
-            request = Req.Request.put_private(request, :count, count + 1)
-            request = Req.Request.put_private(request, :done, count + 1 >= 3)
-            {:data, "chunk#{count}", request}
+          [count | _] = acc when count < 2 ->
+            {:data, "chunk#{count + 1}", [count + 1 | acc]}
 
-          %Req.Request{} = request ->
-            request = Req.Request.put_private(request, :count, 1)
-            {:data, "chunk0", request}
+          [2 | _] = acc ->
+            {:done, acc}
         end
       )
 
-    {req, resp} = Req.run!(req)
-    assert resp.body == "chunk0chunk1chunk2"
-    assert req.private.count == 3
+    {:ok, resp, acc} =
+      Req.stream(req, [], fn data, _resp, acc ->
+        {:cont, [data | acc]}
+      end)
+
+    assert resp.status == 200
+    assert acc == ["chunk0chunk1chunk2", 2, 1, 0]
+
     refute_receive _
   end
 
@@ -160,9 +182,19 @@ defmodule Req.PlugTest do
       send_resp(conn, 200, "ok")
     end
 
-    resp = Req.request!(plug: plug, params: [a: 1])
+    req = Req.new(plug: plug, params: [a: 1])
+
+    resp = Req.stream!(req)
     assert resp.status == 200
     assert resp.body == "ok"
+
+    {:ok, resp, acc} =
+      Req.stream(req, [], fn data, _resp, acc ->
+        {:cont, [data | acc]}
+      end)
+
+    assert resp.status == 200
+    assert acc == ["ok"]
   end
 
   test "fetches request body" do
@@ -172,32 +204,42 @@ defmodule Req.PlugTest do
       send_resp(conn, 200, "ok")
     end
 
-    resp = Req.post!(plug: plug, json: %{a: 1})
+    req = Req.new(plug: plug, json: %{a: 1})
+
+    resp = Req.stream!(req, method: :post)
     assert resp.status == 200
     assert resp.body == "ok"
+
+    {:ok, resp, acc} =
+      Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end, method: :post)
+
+    assert resp.status == 200
+    assert acc == ["ok"]
   end
 
   test "into: fun" do
-    req =
-      Req.new(
-        plug: fn conn ->
-          conn = send_chunked(conn, 200)
-          {:ok, conn} = chunk(conn, "foo")
-          {:ok, conn} = chunk(conn, "bar")
-          {:ok, conn} = chunk(conn, "baz")
-          conn
-        end,
-        into: fn {:data, data}, {req, resp} ->
-          body =
-            if resp.body == "" do
-              [data]
-            else
-              resp.body ++ [data]
-            end
+    {req, _stderr} =
+      ExUnit.CaptureIO.with_io(:stderr, fn ->
+        Req.new(
+          plug: fn conn ->
+            conn = send_chunked(conn, 200)
+            {:ok, conn} = chunk(conn, "foo")
+            {:ok, conn} = chunk(conn, "bar")
+            {:ok, conn} = chunk(conn, "baz")
+            conn
+          end,
+          into: fn {:data, data}, {req, resp} ->
+            body =
+              if resp.body == "" do
+                [data]
+              else
+                resp.body ++ [data]
+              end
 
-          {:cont, {req, put_in(resp.body, body)}}
-        end
-      )
+            {:cont, {req, put_in(resp.body, body)}}
+          end
+        )
+      end)
 
     resp = Req.request!(req)
     assert resp.status == 200
@@ -206,18 +248,20 @@ defmodule Req.PlugTest do
   end
 
   test "into: fun with halt" do
-    req =
-      Req.new(
-        plug: fn conn ->
-          conn = send_chunked(conn, 200)
-          {:ok, conn} = chunk(conn, "foo")
-          {:ok, conn} = chunk(conn, "bar")
-          conn
-        end,
-        into: fn {:data, data}, {req, resp} ->
-          {:halt, {req, put_in(resp.body, [data])}}
-        end
-      )
+    {req, _stderr} =
+      ExUnit.CaptureIO.with_io(:stderr, fn ->
+        Req.new(
+          plug: fn conn ->
+            conn = send_chunked(conn, 200)
+            {:ok, conn} = chunk(conn, "foo")
+            {:ok, conn} = chunk(conn, "bar")
+            conn
+          end,
+          into: fn {:data, data}, {req, resp} ->
+            {:halt, {req, put_in(resp.body, [data])}}
+          end
+        )
+      end)
 
     resp = Req.request!(req)
     assert resp.status == 200
@@ -226,15 +270,17 @@ defmodule Req.PlugTest do
   end
 
   test "into: fun with send_resp" do
-    req =
-      Req.new(
-        plug: fn conn ->
-          send_resp(conn, 200, "foo")
-        end,
-        into: fn {:data, data}, {req, resp} ->
-          {:cont, {req, put_in(resp.body, [data])}}
-        end
-      )
+    {req, _stderr} =
+      ExUnit.CaptureIO.with_io(:stderr, fn ->
+        Req.new(
+          plug: fn conn ->
+            send_resp(conn, 200, "foo")
+          end,
+          into: fn {:data, data}, {req, resp} ->
+            {:cont, {req, put_in(resp.body, [data])}}
+          end
+        )
+      end)
 
     resp = Req.request!(req)
     assert resp.status == 200
@@ -243,15 +289,17 @@ defmodule Req.PlugTest do
   end
 
   test "into: fun with send_file" do
-    req =
-      Req.new(
-        plug: fn conn ->
-          send_file(conn, 200, "mix.exs")
-        end,
-        into: fn {:data, data}, {req, resp} ->
-          {:cont, {req, put_in(resp.body, [data])}}
-        end
-      )
+    {req, _stderr} =
+      ExUnit.CaptureIO.with_io(:stderr, fn ->
+        Req.new(
+          plug: fn conn ->
+            send_file(conn, 200, "mix.exs")
+          end,
+          into: fn {:data, data}, {req, resp} ->
+            {:cont, {req, put_in(resp.body, [data])}}
+          end
+        )
+      end)
 
     resp = Req.request!(req)
     assert resp.status == 200
@@ -361,8 +409,19 @@ defmodule Req.PlugTest do
         retry: false
       )
 
-    {:error, err} = Req.request(req)
+    {:error, err, resp} = Req.stream(req)
     assert err == %Req.TransportError{reason: :timeout}
+    assert resp.status == nil
+    assert resp.body == ""
+
+    {:error, err, resp, acc} =
+      Req.stream(req, [], fn data, _resp, acc ->
+        {:cont, [data | acc]}
+      end)
+
+    assert err == %Req.TransportError{reason: :timeout}
+    assert resp.status == nil
+    assert acc == []
   end
 
   test "compressed request body" do
@@ -372,8 +431,17 @@ defmodule Req.PlugTest do
       Req.Test.json(conn, %{success: true})
     end
 
-    resp = Req.post!(plug: plug, json: %{test: "data"}, compress_body: true)
+    req = Req.new(plug: plug, json: %{test: "data"}, compress_body: true)
+
+    resp = Req.stream!(req, method: :post)
+    assert resp.status == 200
     assert resp.body == %{"success" => true}
+
+    {:ok, resp, acc} =
+      Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end, method: :post)
+
+    assert resp.status == 200
+    assert acc == [~s|{"success":true}|]
   end
 
   test "bad return" do
@@ -382,7 +450,11 @@ defmodule Req.PlugTest do
     end
 
     assert_raise ArgumentError, "expected to return %Plug.Conn{}, got: :bad", fn ->
-      Req.request!(plug: plug)
+      Req.stream!(plug: plug)
+    end
+
+    assert_raise ArgumentError, "expected to return %Plug.Conn{}, got: :bad", fn ->
+      Req.stream([plug: plug], [], fn _data, _resp, acc -> {:cont, acc} end)
     end
   end
 
@@ -392,7 +464,11 @@ defmodule Req.PlugTest do
     end
 
     assert_raise RuntimeError, ~r"expected connection to have a response", fn ->
-      Req.request!(plug: plug)
+      Req.stream!(plug: plug)
+    end
+
+    assert_raise RuntimeError, ~r"expected connection to have a response", fn ->
+      Req.stream([plug: plug], [], fn _data, _resp, acc -> {:cont, acc} end)
     end
   end
 end

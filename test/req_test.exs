@@ -15,7 +15,9 @@ defmodule ReqTest do
         Plug.Conn.send_resp(conn, 200, user_agent)
       end)
 
-    assert "req/" <> _ = Req.get!(req).body
+    resp = Req.stream!(req)
+    assert resp.status == 200
+    assert "req/" <> _ = resp.body
   end
 
   test "headers" do
@@ -34,7 +36,10 @@ defmodule ReqTest do
         Plug.Conn.send_resp(conn, 200, "ok")
       end)
 
-    Req.get!(req, headers: [x_a: 1, x_b: ~U[2021-01-01 09:00:00Z]])
+    resp = Req.stream!(req, headers: [x_a: 1, x_b: ~U[2021-01-01 09:00:00Z]])
+    assert resp.status == 200
+    assert resp.body == "ok"
+
     assert_receive {:headers, headers}
     assert headers == [{"x-a", "1"}, {"x-b", "Fri, 01 Jan 2021 09:00:00 GMT"}]
 
@@ -44,12 +49,16 @@ defmodule ReqTest do
       assert req2.headers == %{"x-a" => ["1", "2"]}
     end
 
-    Req.get!(req2)
+    resp = Req.stream!(req2)
+    assert resp.status == 200
+    assert resp.body == "ok"
     assert_receive {:headers, headers}
     assert headers == [{"x-a", "1, 2"}]
 
     req2 = Req.merge(req, headers: [x_a: 1, x_b: 1])
-    Req.get!(req2, headers: [x_a: 2])
+    resp = Req.stream!(req2, headers: [x_a: 2])
+    assert resp.status == 200
+    assert resp.body == "ok"
     assert_receive {:headers, headers}
     assert headers == [{"x-a", "2"}, {"x-b", "1"}]
   end
@@ -68,15 +77,22 @@ defmodule ReqTest do
       end)
 
     with_userinfo = String.replace("#{url}", "http://", "http://foo:bar@")
-    Req.get!(req, url: with_userinfo)
+    resp = Req.stream!(req, url: with_userinfo)
+    assert resp.status == 200
+    assert resp.body == "ok"
     assert_receive {:authorization, "Basic " <> _}
 
     # explicit :auth option is favored over userinfo in URL
-    Req.get!(req, url: with_userinfo, auth: {:bearer, "token"})
+    resp = Req.stream!(req, url: with_userinfo, auth: {:bearer, "token"})
+    assert resp.status == 200
+    assert resp.body == "ok"
+
     assert_receive {:authorization, "Bearer token"}
 
     req2 = Req.merge(req, auth: {:bearer, "token"})
-    Req.get!(req2, url: with_userinfo)
+    resp = Req.stream!(req2, url: with_userinfo)
+    assert resp.status == 200
+    assert resp.body == "ok"
     assert_receive {:authorization, "Bearer token"}
 
     req2 = Req.new(url: with_userinfo)
@@ -84,10 +100,73 @@ defmodule ReqTest do
     assert inspect(req2) =~ "#{url}"
   end
 
-  test "redact" do
-    assert inspect(Req.new(auth: {:bearer, "foo"})) =~ ~s|auth: {:bearer, "***"}|
+  test "private" do
+    req = Req.new(private: %{a: 1})
+    assert req.private == %{a: 1}
 
-    assert inspect(Req.new(auth: {:basic, "foo:bar"})) =~ ~s|auth: {:basic, "foo****"}|
+    req = Req.merge(req, private: [b: 2])
+    assert req.private == %{a: 1, b: 2}
+  end
+
+  test "inspect" do
+    assert inspect(Req.new(), pretty: true) == """
+           Req.new(
+             url: nil,
+             method: :get,
+             headers: [],
+             body: nil,
+             private: %{}
+           )\
+           """
+
+    assert inspect(Req.new("https://elixir-lang.org"), pretty: true) == """
+           Req.new(
+             "https://elixir-lang.org",
+             method: :get,
+             headers: [],
+             body: nil,
+             private: %{}
+           )\
+           """
+
+    assert inspect(Req.new(adapter: MyAdapter), pretty: true) == """
+           Req.new(
+             url: nil,
+             method: :get,
+             headers: [],
+             body: nil,
+             adapter: MyAdapter,
+             private: %{}
+           )\
+           """
+  end
+
+  test "redact" do
+    assert inspect(Req.new(auth: {:bearer, "foo"}), pretty: true) == """
+           Req.new(
+             url: nil,
+             method: :get,
+             headers: [],
+             body: nil,
+             private: %{},
+
+             # options
+             auth: {:bearer, "***"}
+           )\
+           """
+
+    assert inspect(Req.new(auth: {:basic, "foo:bar"}), pretty: true) == """
+           Req.new(
+             url: nil,
+             method: :get,
+             headers: [],
+             body: nil,
+             private: %{},
+
+             # options
+             auth: {:basic, "foo****"}
+           )\
+           """
 
     assert inspect(Req.new(auth: {:digest, "alice:secret"})) =~
              ~s|auth: {:digest, "ali*********"}|
@@ -112,15 +191,32 @@ defmodule ReqTest do
       def generate, do: {:bearer, "some-value"}
     end
 
-    assert inspect(Req.new(auth: {AuthToken, :generate, []})) =~
-             ~s|auth: {ReqTest.AuthToken, :generate, []}|
+    assert inspect(Req.new(auth: {AuthToken, :generate, []}), pretty: true) == """
+           Req.new(
+             url: nil,
+             method: :get,
+             headers: [],
+             body: nil,
+             private: %{},
+
+             # options
+             auth: {ReqTest.AuthToken, :generate, []}
+           )\
+           """
 
     if Req.MixProject.legacy_headers_as_lists?() do
       assert inspect(Req.new(headers: [authorization: "bearer foobar"])) =~
                ~s|{"authorization", "bearer foo***"}|
     else
-      assert inspect(Req.new(headers: [authorization: "bearer foobar"])) =~
-               ~s|"authorization" => ["bearer foo***"]|
+      assert inspect(Req.new(headers: [authorization: "bearer foobar"]), pretty: true) == """
+             Req.new(
+               url: nil,
+               method: :get,
+               headers: [{"authorization", "bearer foo***"}],
+               body: nil,
+               private: %{}
+             )\
+             """
     end
   end
 
@@ -149,8 +245,10 @@ defmodule ReqTest do
         Plug.Conn.send_resp(conn, 200, body)
       end)
 
-    resp = Req.get!(origin, into: :self)
-    resp = Req.put!(echo, body: resp.body)
+    resp = Req.request!(origin, into: :self)
+    assert resp.status == 200
+
+    resp = Req.stream!(echo, method: :put, body: resp.body)
     assert resp.status == 200
     assert resp.body == "foobarbaz"
   end
@@ -176,12 +274,159 @@ defmodule ReqTest do
 
     if Req.Case.adapter() == :httpc do
       assert_raise ArgumentError, "httpc adapter does not support HTTP/2", fn ->
-        Req.request!(req)
+        Req.stream!(req)
       end
     else
-      resp = Req.request!(req)
+      resp = Req.stream!(req)
       assert resp.status == 200
       assert resp.body == "ok"
+    end
+  end
+
+  describe "stream" do
+    @tag skip: adapter() == :httpc
+    test "success" do
+      %{req: req} =
+        serve(fn conn ->
+          conn =
+            conn
+            |> Plug.Conn.put_resp_content_type("text/plain", nil)
+            |> Plug.Conn.send_chunked(200)
+
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk1")
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk2")
+          conn
+        end)
+
+      {:ok, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc ->
+          {:cont, [data | acc]}
+        end)
+
+      assert resp.status == 200
+      assert Req.Response.get_header(resp, "content-type") == ["text/plain"]
+      assert resp.body == nil
+      assert acc == ["chunk2", "chunk1"]
+    end
+
+    @tag skip: adapter() == :httpc
+    test "halt" do
+      %{req: req} =
+        serve(fn conn ->
+          conn = Plug.Conn.send_chunked(conn, 200)
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk1")
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk2")
+          conn
+        end)
+
+      {:ok, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc ->
+          {:halt, [data | acc]}
+        end)
+
+      assert resp.status == 200
+      assert resp.body == nil
+      assert acc == ["chunk1"]
+    end
+
+    @tag skip: adapter() == :httpc
+    test "invalid return" do
+      %{req: req} =
+        serve(fn conn ->
+          conn = Plug.Conn.send_chunked(conn, 200)
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk1")
+          conn
+        end)
+
+      assert_raise ArgumentError,
+                   ~s|expected {:cont, acc} or {:halt, acc}, got: ["chunk1"]|,
+                   fn ->
+                     Req.stream(req, [], fn data, _resp, acc ->
+                       [data | acc]
+                     end)
+                   end
+    end
+
+    @tag :transport
+    @tag skip: adapter() == :httpc
+    test "initial transport error" do
+      %{url: url} =
+        start_tcp_server(fn _socket ->
+          nil
+        end)
+
+      req = Req.new(adapter: adapter_fun(), url: url, retry: false)
+
+      {:error, err, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc ->
+          {:cont, [data | acc]}
+        end)
+
+      assert err == %Req.TransportError{reason: :closed}
+      assert resp.status == nil
+      assert resp.body == nil
+      assert resp.request.url == url
+      assert acc == []
+    end
+
+    @tag :transport
+    @tag :capture_log
+    @tag skip: adapter() == :httpc
+    test "mid-stream transport error" do
+      %{req: req} =
+        serve(fn conn ->
+          conn = Plug.Conn.send_chunked(conn, 200)
+          {:ok, conn} = Plug.Conn.chunk(conn, "chunk1")
+          raise "oops"
+          conn
+        end)
+
+      req = Req.new(req, retry: false)
+
+      {:error, err, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc ->
+          {:cont, [data | acc]}
+        end)
+
+      assert err == %Req.TransportError{reason: :closed}
+      assert resp.status == 200
+      assert resp.body == nil
+      assert resp.request.url == req.url
+      assert acc == ["chunk1"]
+    end
+
+    @tag :transport
+    test "trailers" do
+      %{url: url} =
+        start_tcp_server(fn socket ->
+          assert {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
+
+          data = """
+          HTTP/1.1 200 OK\r
+          transfer-encoding: chunked\r
+          trailer: x-foo, x-bar\r
+          \r
+          6\r
+          chunk1\r
+          0\r
+          x-foo: foo\r
+          x-bar: bar\r
+          \r
+          """
+
+          :ok = :gen_tcp.send(socket, data)
+        end)
+
+      req = Req.new(adapter: adapter_fun(), url: url)
+
+      assert {:ok, resp, :ok} =
+               Req.stream(req, :ok, fn _data, _resp, acc ->
+                 {:cont, acc}
+               end)
+
+      assert resp.status == 200
+      assert resp.trailers["x-foo"] == ["foo"]
+      assert resp.trailers["x-bar"] == ["bar"]
     end
   end
 end

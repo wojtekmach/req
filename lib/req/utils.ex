@@ -1,8 +1,6 @@
 defmodule Req.Utils do
   @moduledoc false
 
-  require Logger
-
   defmacrop iodata({:<<>>, _, parts}) do
     Enum.map(parts, &to_iodata/1)
   end
@@ -417,50 +415,6 @@ defmodule Req.Utils do
     end
   end
 
-  defmodule CollectWithHash do
-    @moduledoc false
-
-    defstruct [:collectable, :type]
-
-    defimpl Collectable do
-      def into(%{collectable: collectable, type: type}) do
-        {acc, collector} = Collectable.into(collectable)
-
-        new_collector = fn
-          {acc, hash}, {:cont, element} ->
-            hash = :crypto.hash_update(hash, element)
-            {collector.(acc, {:cont, element}), hash}
-
-          {acc, hash}, :done ->
-            hash = :crypto.hash_final(hash)
-            {collector.(acc, :done), hash}
-
-          {acc, hash}, :halt ->
-            {collector.(acc, :halt), hash}
-        end
-
-        hash = hash_init(type)
-        {{acc, hash}, new_collector}
-      end
-
-      defp hash_init(:sha1), do: :crypto.hash_init(:sha)
-      defp hash_init(type), do: :crypto.hash_init(type)
-    end
-  end
-
-  @doc """
-  Returns a collectable with hash.
-
-  ## Examples
-
-      iex> collectable = Req.Utils.collect_with_hash([], :md5)
-      iex> Enum.into(Stream.duplicate("foo", 2), collectable)
-      {~w[foo foo], :erlang.md5("foofoo")}
-  """
-  def collect_with_hash(collectable, type) do
-    %CollectWithHash{collectable: collectable, type: type}
-  end
-
   @crlf "\r\n"
 
   @doc """
@@ -819,79 +773,5 @@ defmodule Req.Utils do
 
   def zstd_available? do
     System.otp_release() >= "28"
-  end
-
-  def decompress_with_encoding([], body), do: {body, []}
-
-  def decompress_with_encoding(encoding_headers, body) do
-    codecs = compression_algorithms(encoding_headers)
-    decompress_body(codecs, body, [])
-  end
-
-  defp decompress_body([gzip | rest], body, acc) when gzip in ["gzip", "x-gzip"] do
-    case Req.Gzip.decode(body) do
-      {:ok, decompressed} ->
-        decompress_body(rest, decompressed, acc)
-
-      {:error, _reason} ->
-        %Req.DecompressError{format: :gzip, data: body}
-    end
-  end
-
-  defp decompress_body(["br" | rest], body, acc) do
-    if brotli_loaded?() do
-      case Req.Brotli.decode(body) do
-        {:ok, decompressed} ->
-          decompress_body(rest, decompressed, acc)
-
-        {:error, _reason} ->
-          %Req.DecompressError{format: :br, data: body}
-      end
-    else
-      Logger.debug(":brotli library not loaded, skipping brotli decompression")
-      decompress_body(rest, body, ["br" | acc])
-    end
-  end
-
-  defp decompress_body(["zstd" | rest], body, acc) do
-    if zstd_available?() do
-      case Req.Zstd.decode(body) do
-        {:ok, decompressed} ->
-          decompress_body(rest, decompressed, acc)
-
-        {:error, reason} ->
-          %Req.DecompressError{format: :zstd, data: body, reason: reason}
-      end
-    else
-      Logger.debug(
-        ":zstd module not available (requires Erlang/OTP 28+), skipping zstd decompression"
-      )
-
-      decompress_body(rest, body, ["zstd" | acc])
-    end
-  end
-
-  defp decompress_body(["identity" | rest], body, acc) do
-    decompress_body(rest, body, acc)
-  end
-
-  defp decompress_body([codec | rest], body, acc) do
-    Logger.debug("algorithm #{inspect(codec)} is not supported")
-    decompress_body(rest, body, [codec | acc])
-  end
-
-  defp decompress_body([], body, acc) do
-    {body, acc}
-  end
-
-  defp compression_algorithms(values) do
-    values
-    |> Enum.flat_map(fn value ->
-      value
-      |> String.downcase()
-      |> String.split(",", trim: true)
-      |> Enum.map(&String.trim/1)
-    end)
-    |> Enum.reverse()
   end
 end

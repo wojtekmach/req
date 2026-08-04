@@ -95,7 +95,7 @@ defmodule Req.TestTest do
   describe "plug" do
     test "function" do
       Req.Test.stub(:foo, &Plug.Conn.send_resp(&1, 200, "1"))
-      resp = Req.get!(plug: {Req.Test, :foo})
+      resp = Req.stream!(plug: {Req.Test, :foo})
       assert resp.status == 200
       assert resp.body == "1"
 
@@ -103,28 +103,28 @@ defmodule Req.TestTest do
         Plug.Conn.send_resp(conn, 200, "2")
       end)
 
-      resp = Req.get!(plug: {Req.Test, :foo})
+      resp = Req.stream!(plug: {Req.Test, :foo})
       assert resp.status == 200
       assert resp.body == "2"
 
       Task.async(fn ->
-        resp = Req.get!(plug: {Req.Test, :foo})
+        resp = Req.stream!(plug: {Req.Test, :foo})
         assert resp.status == 200
         assert resp.body == "2"
 
         Req.Test.stub(:foo, &Plug.Conn.send_resp(&1, 200, "3"))
-        resp = Req.get!(plug: {Req.Test, :foo})
+        resp = Req.stream!(plug: {Req.Test, :foo})
         assert resp.status == 200
         assert resp.body == "3"
       end)
       |> Task.await()
 
-      resp = Req.get!(plug: {Req.Test, :foo})
+      resp = Req.stream!(plug: {Req.Test, :foo})
       assert resp.status == 200
       assert resp.body == "2"
 
       assert_raise RuntimeError, ~r/cannot find mock/, fn ->
-        Req.get(plug: {Req.Test, :bad})
+        Req.stream(plug: {Req.Test, :bad})
       end
     end
 
@@ -136,12 +136,12 @@ defmodule Req.TestTest do
       end
 
       Req.Test.stub(:foo, Foo)
-      resp = Req.get!(plug: {Req.Test, :foo})
+      resp = Req.stream!(plug: {Req.Test, :foo})
       assert resp.status == 200
       assert resp.body == "default"
 
       Req.Test.stub(:foo, {Foo, "hi"})
-      resp = Req.get!(plug: {Req.Test, :foo})
+      resp = Req.stream!(plug: {Req.Test, :foo})
       assert resp.status == 200
       assert resp.body == "hi"
     end
@@ -213,15 +213,21 @@ defmodule Req.TestTest do
       assert error.message =~ "* expected :foo to be still used 2 more times"
       assert error.message =~ "* expected :bar to be still used 1 more times"
 
-      Req.request!(plug: {Req.Test, :foo})
+      resp = Req.stream!(plug: {Req.Test, :foo})
+      assert resp.status == 200
+      assert resp.body == %{}
 
       error = assert_raise(RuntimeError, &Req.Test.verify!/0)
       assert error.message =~ "error while verifying Req.Test expectations for"
       assert error.message =~ "* expected :foo to be still used 1 more times"
       assert error.message =~ "* expected :bar to be still used 1 more times"
 
-      Req.request!(plug: {Req.Test, :foo})
-      Req.request!(plug: {Req.Test, :bar})
+      resp = Req.stream!(plug: {Req.Test, :foo})
+      assert resp.status == 200
+      assert resp.body == %{}
+      resp = Req.stream!(plug: {Req.Test, :bar})
+      assert resp.status == 200
+      assert resp.body == %{}
       Req.Test.verify!()
     end
   end
@@ -240,13 +246,17 @@ defmodule Req.TestTest do
       assert error.message =~ "error while verifying Req.Test expectations for"
       assert error.message =~ "* expected :foo to be still used 2 more times"
 
-      Req.request!(plug: {Req.Test, :foo})
+      resp = Req.stream!(plug: {Req.Test, :foo})
+      assert resp.status == 200
+      assert resp.body == %{}
 
       error = assert_raise(RuntimeError, fn -> Req.Test.verify!(:foo) end)
       assert error.message =~ "error while verifying Req.Test expectations for"
       assert error.message =~ "* expected :foo to be still used 1 more times"
 
-      Req.request!(plug: {Req.Test, :foo})
+      resp = Req.stream!(plug: {Req.Test, :foo})
+      assert resp.status == 200
+      assert resp.body == %{}
       Req.Test.verify!(:foo)
     end
   end

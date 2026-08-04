@@ -153,30 +153,6 @@ defmodule Req.Fields do
   end
 
   @doc """
-  Maps field values using `fun`, preserving field names.
-
-  ## Examples
-
-      iex> Req.Fields.map(%{"a" => ["1", "2"]}, fn _name, value -> value <> "0" end)
-      %{"a" => ["10", "20"]}
-  """
-  def map(fields, fun)
-
-  if @legacy? do
-    def map(fields, fun) do
-      for {name, value} <- fields do
-        {name, fun.(name, value)}
-      end
-    end
-  else
-    def map(fields, fun) do
-      Map.new(fields, fn {name, values} ->
-        {name, Enum.map(values, &fun.(name, &1))}
-      end)
-    end
-  end
-
-  @doc """
   Prepends `new_fields` before `fields`, keeping any existing values.
 
   ## Examples

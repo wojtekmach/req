@@ -2,10 +2,9 @@ defmodule Req.Tar do
   @moduledoc """
   Tar archive decoding using [`:erl_tar`].
 
-  This module is used by [`decode_body`] on `.tar`, `.tgz`, `.tar.gz`, and `application/x-tar`.
+  This module is used by `Req.Decode` on `.tar`, `.tgz`, `.tar.gz`, and `application/x-tar`.
 
   [`:erl_tar`]: `:erl_tar`
-  [`decode_body`]: `Req.Steps.decode_body/1`
   """
 
   @doc """
@@ -30,4 +29,24 @@ defmodule Req.Tar do
   # gzip magic bytes
   defp modes(<<0x1F, 0x8B, _::binary>>), do: [:compressed]
   defp modes(_binary), do: []
+
+  @doc false
+  def decode_init do
+    nil
+  end
+
+  @doc false
+  def decode_chunk(state, data) do
+    {:ok, data, state}
+  end
+
+  @doc false
+  def decode_finish(_state) do
+    {:ok, nil}
+  end
+
+  @doc false
+  def decode_close(_state) do
+    :ok
+  end
 end
