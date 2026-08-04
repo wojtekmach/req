@@ -174,15 +174,6 @@ defmodule Req.Finch do
 
     {finch_name, build_options, request_options} = finch_name_options(request)
 
-    # TODO: Remove when :finch_request is removed
-    if match?(
-         %{body: req_body_fun, options: %{finch_request: finch_request_fun}}
-         when is_function(req_body_fun, 1) and is_function(finch_request_fun),
-         request
-       ) do
-      raise ArgumentError, ":finch_request does not support body set to req_body_fun"
-    end
-
     if is_function(request.body, 1) and request.options[:into] == :self do
       raise ArgumentError, "into: :self does not support body set to req_body_fun"
     end
@@ -250,29 +241,18 @@ defmodule Req.Finch do
   end
 
   defp run(req, finch_req, finch_name, finch_options) do
-    case req.options[:finch_request] do
-      fun when is_function(fun, 4) ->
-        IO.warn("setting `:finch_request` is deprecated")
-        fun.(req, finch_req, finch_name, finch_options)
-
-      deprecated_fun when is_function(deprecated_fun, 1) ->
-        IO.warn("setting `:finch_request` is deprecated")
-        run_finch_request(req, deprecated_fun.(finch_req), finch_name, finch_options)
-
+    case req.into do
       nil ->
-        case req.into do
-          nil ->
-            run_finch_request(req, finch_req, finch_name, finch_options)
+        run_finch_request(req, finch_req, finch_name, finch_options)
 
-          fun when is_function(fun, 2) ->
-            finch_stream_into_fun(req, finch_req, finch_name, finch_options, fun)
+      fun when is_function(fun, 2) ->
+        finch_stream_into_fun(req, finch_req, finch_name, finch_options, fun)
 
-          :self ->
-            finch_stream_into_self(req, finch_req, finch_name, finch_options)
+      :self ->
+        finch_stream_into_self(req, finch_req, finch_name, finch_options)
 
-          collectable ->
-            finch_stream_into_collectable(req, finch_req, finch_name, finch_options, collectable)
-        end
+      collectable ->
+        finch_stream_into_collectable(req, finch_req, finch_name, finch_options, collectable)
     end
   end
 
