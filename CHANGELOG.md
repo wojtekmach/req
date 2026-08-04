@@ -76,13 +76,13 @@
 
   * [`put_path_params`]: Preserve the path template when re-running the step.
 
-  * [`redirect`]: Strip userinfo from redirect locations and log a warning.
+  * `redirect`: Strip userinfo from redirect locations and log a warning.
 
     Previously, redirecting to a URL with userinfo (e.g. `http://user:pass@host`)
     kept the userinfo in the request URL (without converting it to auth). It is
     now dropped so credentials supplied by the redirecting server aren't sent.
 
-  * [`redirect`]: Clear the request body, body options, and content headers when
+  * `redirect`: Clear the request body, body options, and content headers when
     changing POST to GET after a 301, 302, or 303 response.
 
   * `retry`: Use jitter by default.
@@ -369,7 +369,7 @@
 
   * [`put_aws_sigv4`]: Add `:token` option
 
-  * [`redirect`]: Cancel async request before redirecting
+  * `redirect`: Cancel async request before redirecting
 
   * `decode_body`: Support `application/zstd` and `.zst`
 
@@ -637,7 +637,7 @@ If you wish to maximize request rate or have more control over how messages are 
 
 ## v0.4.14 (2024-03-15)
 
-  * [`redirect`]: Return [`Req.TooManyRedirectsError`] exception.
+  * `redirect`: Return [`Req.TooManyRedirectsError`] exception.
 
     Previously we _always_ raised a `RuntimeError`. Besides changing the exception struct, now
     it is _returned_:
@@ -929,13 +929,13 @@ resp.body #=> %File.Stream{}
 
   * Deprecate `output` step in favour of `into: File.stream!(path)`.
 
-  * Rename `follow_redirects` step to [`redirect`]
+  * Rename `follow_redirects` step to `redirect`
 
-  * [`redirect`]: Rename `:follow_redirects` option to `:redirect`.
+  * `redirect`: Rename `:follow_redirects` option to `:redirect`.
 
-  * [`redirect`]: Rename `:location_trusted` option to `:redirect_trusted`.
+  * `redirect`: Rename `:location_trusted` option to `:redirect_trusted`.
 
-  * [`redirect`]: Change HTTP request method to GET only on POST requests that result in 301..303.
+  * `redirect`: Change HTTP request method to GET only on POST requests that result in 301..303.
 
     Previously we were changing the method to GET for all 3xx except 307 and 308.
 
@@ -1475,7 +1475,6 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`compress_body`]:       https://hexdocs.pm/req/Req.Steps.html#compress_body/1
 [`compress_body`]:       https://hexdocs.pm/req/Req.Steps.html#compress_body/1
 [`encode_body`]:         https://hexdocs.pm/req/Req.Steps.html#encode_body/1
-[`redirect`]:            https://hexdocs.pm/req/Req.Steps.html#redirect/1
 [`handle_http_errors`]:  https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
 [`put_base_url`]:        https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
 [`put_params`]:          https://hexdocs.pm/req/Req.Steps.html#put_params/1

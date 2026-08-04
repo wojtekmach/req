@@ -5,8 +5,9 @@ defmodule Req.RedirectTest do
     %{req: req, url: url} =
       serve("GET /redirect": &send_redirect(&1, 302, "/ok"))
 
-    resp = Req.get!(req, url: "#{url}/redirect", redirect: false)
+    resp = Req.stream!(req, url: "#{url}/redirect", redirect: false)
     assert resp.status == 302
+    assert resp.body == "redirecting to /ok"
   end
 
   test "absolute" do
@@ -21,9 +22,10 @@ defmodule Req.RedirectTest do
       )
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             {req, resp} = Req.run(req, url: "#{url}/redirect", retry: false)
-             assert req.private.req_redirect_count == 1
+             resp = Req.stream!(req, url: "#{url}/redirect", retry: false)
+             assert resp.request.private.req_redirect_count == 1
              assert resp.status == 200
+             assert resp.body == "redirecting to /ok"
            end) =~ "[debug] redirecting to #{url}/ok\n"
   end
 
@@ -45,8 +47,9 @@ defmodule Req.RedirectTest do
       )
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             resp = Req.get!(req, url: "#{url}/redirect")
+             resp = Req.stream!(req, url: "#{url}/redirect")
              assert resp.status == 200
+             assert resp.body == "ok"
            end) =~ "[debug] redirecting to /ok\n"
 
     # 1 initial request + 1 redirect hop
@@ -68,7 +71,7 @@ defmodule Req.RedirectTest do
       )
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             response = Req.get!(req, url: "#{url}/redirect", compressed: true)
+             response = Req.stream!(req, url: "#{url}/redirect", compressed: true)
              assert response.status == 200
              assert response.body == "ok"
            end) =~ "[debug] redirecting to /ok\n"
@@ -90,13 +93,13 @@ defmodule Req.RedirectTest do
       )
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             response = Req.get!(req, url: "#{url}/redirect")
+             response = Req.stream!(req, url: "#{url}/redirect")
              assert response.status == 200
              assert response.body == ""
            end) =~ "[debug] redirecting to /ok\n"
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             response = Req.get!(req, url: "#{url}/redirect?a=1")
+             response = Req.stream!(req, url: "#{url}/redirect?a=1")
              assert response.status == 200
              assert response.body == "a=1"
            end) =~ "[debug] redirecting to /ok?a=1\n"
@@ -113,8 +116,11 @@ defmodule Req.RedirectTest do
         )
 
       assert ExUnit.CaptureLog.capture_log(fn ->
-               resp = Req.post!(req, url: "#{url}/redirect", body: "body")
+               {:ok, resp} = Req.stream(req, url: "#{url}/redirect", method: :post, body: "body")
                assert resp.status == 200
+               assert resp.body == "ok"
+               assert resp.request.method == :get
+               assert URI.to_string(resp.request.url) == "#{url}/ok"
              end) =~ "[debug] redirecting to #{url}/ok\n"
     end
   end
@@ -134,8 +140,9 @@ defmodule Req.RedirectTest do
         end
       )
 
-    resp = Req.post!(req, url: "#{url}/redirect", json: %{a: 1})
+    resp = Req.stream!(req, url: "#{url}/redirect", method: :post, json: %{a: 1})
     assert resp.status == 200
+    assert resp.body == "ok"
   end
 
   test "do not change method on 307 and 308" do
@@ -149,8 +156,11 @@ defmodule Req.RedirectTest do
         )
 
       assert ExUnit.CaptureLog.capture_log(fn ->
-               resp = Req.post!(req, url: "#{url}/redirect", body: "body")
+               {:ok, resp} = Req.stream(req, url: "#{url}/redirect", method: :post, body: "body")
                assert resp.status == 200
+               assert resp.body == "ok"
+               assert resp.request.method == :post
+               assert URI.to_string(resp.request.url) == "#{url}/ok"
              end) =~ "[debug] redirecting to #{url}/ok\n"
     end
   end
@@ -166,8 +176,9 @@ defmodule Req.RedirectTest do
         )
 
       assert ExUnit.CaptureLog.capture_log(fn ->
-               resp = Req.head!(req, url: "#{url}/redirect")
+               resp = Req.stream!(req, url: "#{url}/redirect", method: :head)
                assert resp.status == 200
+               assert resp.body == ""
              end) =~ "[debug] redirecting to #{url}/ok\n"
     end
   end
@@ -180,8 +191,31 @@ defmodule Req.RedirectTest do
         end
       )
 
-    resp = Req.post!(req, url: "#{url}/redirect")
+    resp = Req.stream!(req, url: "#{url}/redirect", method: :post)
     assert resp.status == 303
+    assert resp.body == ""
+  end
+
+  test "relative location with base_url" do
+    auth_header = {"authorization", "Basic " <> Base.encode64("foo:bar")}
+
+    %{req: req, url: url} =
+      serve(fn
+        conn when conn.request_path == "/redirect" ->
+          assert auth_header in conn.req_headers
+          send_redirect(conn, 302, "/ok")
+
+        conn when conn.request_path == "/ok" ->
+          assert auth_header in conn.req_headers
+          send_resp(conn, 200, "ok")
+      end)
+
+    assert ExUnit.CaptureLog.capture_log(fn ->
+             resp = Req.stream!(req, base_url: url, url: "/redirect", auth: {:basic, "foo:bar"})
+             assert resp.status == 200
+             assert resp.body == "ok"
+             assert URI.to_string(resp.request.url) == "#{url}/ok"
+           end) =~ "[debug] redirecting to /ok\n"
   end
 
   test "auth same host" do
@@ -199,8 +233,9 @@ defmodule Req.RedirectTest do
       end)
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             resp = Req.get!(req, url: "#{url}/redirect", auth: {:basic, "foo:bar"})
+             resp = Req.stream!(req, url: "#{url}/redirect", auth: {:basic, "foo:bar"})
              assert resp.status == 200
+             assert resp.body == "ok"
            end) =~ "[debug] redirecting to #{url}/auth\n"
   end
 
@@ -218,9 +253,13 @@ defmodule Req.RedirectTest do
 
     assert ExUnit.CaptureLog.capture_log(fn ->
              resp =
-               Req.get!(req, auth: {:basic, "authorization:credentials"}, redirect_trusted: true)
+               Req.stream!(req,
+                 auth: {:basic, "authorization:credentials"},
+                 redirect_trusted: true
+               )
 
              assert resp.status == 200
+             assert resp.body == "ok"
            end) =~ "[debug] redirecting to http://127.0.0.1:#{url.port}/ok\n"
   end
 
@@ -237,8 +276,9 @@ defmodule Req.RedirectTest do
       end)
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             resp = Req.get!(req, auth: {:basic, "foo:bar"})
+             resp = Req.stream!(req, auth: {:basic, "foo:bar"})
              assert resp.status == 200
+             assert resp.body == "ok"
            end) =~ "[debug] redirecting to http://127.0.0.1:#{url.port}/ok\n"
   end
 
@@ -259,8 +299,9 @@ defmodule Req.RedirectTest do
     req = Req.new(url: trusted_url, adapter: adapter_fun())
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             resp = Req.get!(req, auth: {:basic, "foo:bar"})
+             resp = Req.stream!(req, auth: {:basic, "foo:bar"})
              assert resp.status == 200
+             assert resp.body == "ok"
            end) =~ "[debug] redirecting to #{untrusted_url}/ok\n"
   end
 
@@ -286,8 +327,9 @@ defmodule Req.RedirectTest do
       )
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             resp = Req.get!(req, auth: {:basic, "authorization:credentials"})
+             resp = Req.stream!(req, auth: {:basic, "authorization:credentials"})
              assert resp.status == 200
+             assert resp.body == "ok"
            end) =~ "[debug] redirecting to #{untrusted_url}/ok\n"
   end
 
@@ -313,8 +355,9 @@ defmodule Req.RedirectTest do
 
     log =
       ExUnit.CaptureLog.capture_log(fn ->
-        resp = Req.get!(req)
+        resp = Req.stream!(req)
         assert resp.status == 200
+        assert resp.body == "ok"
       end)
 
     assert log =~ "[warning] stripping userinfo from redirect location\n"
@@ -334,15 +377,16 @@ defmodule Req.RedirectTest do
       )
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             resp = Req.get!(req, url: "#{url}/redirect", params: [a: 1])
+             resp = Req.stream!(req, url: "#{url}/redirect", params: [a: 1])
              assert resp.status == 200
+             assert resp.body == "ok"
            end) =~ "[debug] redirecting to #{url}/ok\n"
   end
 
   test "max redirects" do
     pid = self()
 
-    %{req: req} =
+    %{req: req, url: url} =
       serve(
         "GET /": fn conn ->
           send(pid, :ping)
@@ -352,7 +396,7 @@ defmodule Req.RedirectTest do
 
     req = Req.merge(req, max_redirects: 3, redirect_log_level: false)
 
-    {req, e} = Req.Request.run_request(req)
+    {:error, err, resp} = Req.stream(req)
 
     assert_receive :ping
     assert_receive :ping
@@ -360,8 +404,11 @@ defmodule Req.RedirectTest do
     assert_receive :ping
     refute_receive _
 
-    assert req.private == %{req_redirect_count: 3}
-    assert Exception.message(e) == "too many redirects (3)"
+    assert err == %Req.TooManyRedirectsError{max_redirects: 3}
+    assert Exception.message(err) == "too many redirects (3)"
+    assert resp.status == 302
+    assert resp.body == ""
+    assert URI.to_string(resp.request.url) == "#{url}/"
   end
 
   test "redirect_log_level, default to :debug" do
@@ -372,8 +419,9 @@ defmodule Req.RedirectTest do
       )
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             resp = Req.get!(req, url: "#{url}/redirect")
+             resp = Req.stream!(req, url: "#{url}/redirect")
              assert resp.status == 200
+             assert resp.body == "ok"
            end) =~ "[debug] redirecting to /ok\n"
   end
 
@@ -385,8 +433,9 @@ defmodule Req.RedirectTest do
       )
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             resp = Req.get!(req, url: "#{url}/redirect", redirect_log_level: :error)
+             resp = Req.stream!(req, url: "#{url}/redirect", redirect_log_level: :error)
              assert resp.status == 200
+             assert resp.body == "ok"
            end) =~ "[error] redirecting to /ok\n"
   end
 
@@ -397,8 +446,9 @@ defmodule Req.RedirectTest do
         "GET /ok": &send_resp(&1, 200, "ok")
       )
 
-    resp = Req.get!(req, url: "#{url}/redirect", redirect_log_level: false)
+    resp = Req.stream!(req, url: "#{url}/redirect", redirect_log_level: false)
     assert resp.status == 200
+    assert resp.body == "ok"
   end
 
   test "inherit scheme" do
@@ -413,8 +463,98 @@ defmodule Req.RedirectTest do
     "http:" <> no_scheme = "#{url}"
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             resp = Req.get!(req, url: "#{url}/redirect")
+             resp = Req.stream!(req, url: "#{url}/redirect")
              assert resp.status == 200
+             assert resp.body == "ok"
            end) =~ "[debug] redirecting to #{no_scheme}/ok\n"
+  end
+
+  @tag :capture_log
+  test "stream" do
+    %{req: req, url: url} =
+      serve(
+        "GET /redirect": &send_redirect(&1, 302, "/ok"),
+        "GET /ok": &send_resp(&1, 200, "ok")
+      )
+
+    {:ok, resp, acc} =
+      Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+        url: "#{url}/redirect"
+      )
+
+    assert resp.status == 200
+    assert resp.body == nil
+    assert URI.to_string(resp.request.url) == "#{url}/ok"
+    assert acc == ["ok"]
+  end
+
+  @tag :capture_log
+  test "stream max redirects" do
+    %{req: req, url: url} =
+      serve("GET /redirect": &send_redirect(&1, 302, "/redirect"))
+
+    {:error, err, resp, acc} =
+      Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+        url: "#{url}/redirect",
+        max_redirects: 2
+      )
+
+    assert err == %Req.TooManyRedirectsError{max_redirects: 2}
+    assert resp.status == 302
+    assert URI.to_string(resp.request.url) == "#{url}/redirect"
+    assert acc == []
+  end
+
+  @tag :capture_log
+  test "aws sigv4 is recomputed on S3 TemporaryRedirect" do
+    secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+    %{req: req, url: url} =
+      serve(fn
+        conn when conn.host == "localhost" ->
+          location = "http://127.0.0.1:#{conn.port}#{conn.request_path}"
+
+          conn
+          |> put_resp_content_type("application/xml")
+          |> put_resp_header("x-amz-bucket-region", "us-west-2")
+          |> put_resp_header("location", location)
+          |> send_resp(307, """
+          <?xml version="1.0" encoding="UTF-8"?>
+          <Error><Code>TemporaryRedirect</Code><Message>Please re-send this request to the specified temporary endpoint. Continue to use the original request endpoint for future requests.</Message><Endpoint>127.0.0.1:#{conn.port}</Endpoint><Bucket>bucket</Bucket></Error>
+          """)
+
+        conn when conn.host == "127.0.0.1" ->
+          verified? =
+            Req.Utils.aws_sigv4_valid?(
+              secret_access_key: secret_access_key,
+              method: :get,
+              url: "http://#{conn.host}:#{conn.port}#{conn.request_path}",
+              headers: conn.req_headers,
+              body: ""
+            )
+
+          if verified? do
+            send_resp(conn, 200, "object")
+          else
+            conn
+            |> put_resp_content_type("application/xml")
+            |> send_resp(403, "<Error><Code>SignatureDoesNotMatch</Code></Error>")
+          end
+      end)
+
+    resp =
+      Req.stream!(req,
+        url: "#{url}/bucket/key",
+        aws_sigv4: [
+          access_key_id: "AKIAIOSFODNN7EXAMPLE",
+          secret_access_key: secret_access_key,
+          service: :s3,
+          region: "us-west-2"
+        ]
+      )
+
+    assert resp.status == 200
+    assert resp.body == "object"
+    assert URI.to_string(resp.request.url) == "http://127.0.0.1:#{url.port}/bucket/key"
   end
 end
