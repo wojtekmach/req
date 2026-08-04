@@ -129,6 +129,58 @@ defmodule Req.Utils do
     |> Enum.intersperse("&")
   end
 
+  @doc false
+  def aws_sigv4_valid?(options) do
+    {secret_access_key, options} = Keyword.pop!(options, :secret_access_key)
+    {method, options} = Keyword.pop!(options, :method)
+    {url, options} = Keyword.pop!(options, :url)
+    {headers, options} = Keyword.pop!(options, :headers)
+    {body, options} = Keyword.pop!(options, :body)
+    Keyword.validate!(options, [:body_digest])
+
+    headers = Enum.map(headers, fn {name, value} -> {String.downcase(name, :ascii), value} end)
+
+    with {_, "AWS4-HMAC-SHA256 " <> params = authorization} <-
+           List.keyfind(headers, "authorization", 0),
+         %{"credential" => credential, "signed_headers" => signed_headers} <-
+           Regex.named_captures(
+             ~r/^Credential=(?<credential>[^,]+),\s*SignedHeaders=(?<signed_headers>[^,]+),\s*Signature=/,
+             params
+           ),
+         [access_key_id, _date, region, service, "aws4_request"] <- String.split(credential, "/"),
+         {_, x_amz_date} <- List.keyfind(headers, "x-amz-date", 0),
+         {:ok, datetime, 0} <- DateTime.from_iso8601(x_amz_date, :basic) do
+      signed_headers = String.split(signed_headers, ";")
+      token = List.keyfind(headers, "x-amz-security-token", 0)
+
+      headers =
+        for {name, _} = header <- headers,
+            name in signed_headers,
+            name not in ["x-amz-date", "x-amz-content-sha256", "x-amz-security-token"],
+            do: header
+
+      expected =
+        aws_sigv4_headers(
+          [
+            access_key_id: access_key_id,
+            secret_access_key: secret_access_key,
+            token: token && elem(token, 1),
+            region: region,
+            service: service,
+            datetime: datetime,
+            method: method,
+            url: url,
+            headers: headers,
+            body: body
+          ] ++ options
+        )
+
+      List.keyfind(expected, "authorization", 0) == {"authorization", authorization}
+    else
+      _ -> false
+    end
+  end
+
   @doc """
   Create AWS Signature v4 URL.
 

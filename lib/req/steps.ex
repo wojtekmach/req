@@ -68,6 +68,7 @@ defmodule Req.Steps do
       decode: Req.Decode,
       checksum: Req.Checksum,
       decompress: Req.Decompress,
+      redirect: Req.Redirect,
       put_user_agent: &Req.Steps.put_user_agent/1,
       compressed: &Req.Steps.compressed/1,
       encode_body: &Req.Steps.encode_body/1,
