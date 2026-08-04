@@ -21,7 +21,8 @@ defmodule Req.RedirectTest do
       )
 
     assert ExUnit.CaptureLog.capture_log(fn ->
-             resp = Req.get!(req, url: "#{url}/redirect", retry: false)
+             {req, resp} = Req.run(req, url: "#{url}/redirect", retry: false)
+             assert req.private.req_redirect_count == 1
              assert resp.status == 200
            end) =~ "[debug] redirecting to #{url}/ok\n"
   end
