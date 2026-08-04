@@ -53,7 +53,7 @@ write new ones.
 
   * Response body streaming (via `Req.stream/4` or by setting `into: collectable | :self`.)
 
-  * Follows redirects (via [`redirect`] step.)
+  * Follows redirects (via [`Req.Redirect`] step.)
 
   * Retries on errors (via [`Req.Retry`] step.)
 
@@ -261,6 +261,7 @@ limitations under the License.
 [`Req.Checksum`]:        https://hexdocs.pm/req/Req.Checksum.html
 [`Req.Decode`]:          https://hexdocs.pm/req/Req.Decode.html
 [`Req.Decompress`]:      https://hexdocs.pm/req/Req.Decompress.html
+[`Req.Redirect`]:        https://hexdocs.pm/req/Req.Redirect.html
 [`Req.Retry`]:           https://hexdocs.pm/req/Req.Retry.html
 [`Req.Steps`]:           https://hexdocs.pm/req/Req.Steps.html
 [`Req.Test`]:            https://hexdocs.pm/req/Req.Test.html
@@ -268,7 +269,6 @@ limitations under the License.
 [`auth`]:               https://hexdocs.pm/req/Req.Steps.html#auth/1
 [`compress_body`]:      https://hexdocs.pm/req/Req.Steps.html#compress_body/1
 [`encode_body`]:        https://hexdocs.pm/req/Req.Steps.html#encode_body/1
-[`redirect`]:           https://hexdocs.pm/req/Req.Steps.html#redirect/1
 [`handle_http_errors`]: https://hexdocs.pm/req/Req.Steps.html#handle_http_errors/1
 [`put_base_url`]:       https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
 [`put_params`]:         https://hexdocs.pm/req/Req.Steps.html#put_params/1

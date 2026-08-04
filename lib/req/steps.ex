@@ -78,7 +78,8 @@ defmodule Req.Steps do
       put_range: &Req.Steps.put_range/1,
       compress_body: &Req.Steps.compress_body/1,
       checksum: &Req.Steps.checksum/1,
-      put_aws_sigv4: &Req.Steps.put_aws_sigv4/1
+      put_aws_sigv4: &Req.Steps.put_aws_sigv4/1,
+      redirect: Req.Redirect
     )
     |> Req.Request.prepend_response_steps(
       retry: &Req.Steps.retry/1,

@@ -406,6 +406,21 @@ defmodule Req.DecompressTest do
   end
 
   @tag :capture_log
+  test "redirect" do
+    %{req: req, url: url} =
+      serve(
+        "GET /redirect": &send_redirect(&1, 302, "/"),
+        "GET /": fn conn ->
+          conn
+          |> put_resp_content_type("application/gzip")
+          |> send_resp(200, :zlib.gzip("foo"))
+        end
+      )
+
+    resp = Req.stream!(req, url: "#{url}/redirect", compressed: true, decoders: [:gz])
+    assert resp.status == 200
+    assert resp.body == "foo"
+  end
 
   test "identity" do
     %{req: req} =
