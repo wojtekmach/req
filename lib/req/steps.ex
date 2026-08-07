@@ -109,7 +109,7 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> req = Req.new(base_url: "https://httpbin.org")
+      iex> req = Req.new(base_url: "https://httpbingo.org")
       iex> Req.get!(req, url: "/status/200").status
       200
       iex> Req.get!(req, url: "/status/201").status
@@ -194,32 +194,32 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:basic, "foo:foo"}).status
+      iex> Req.get!("https://httpbingo.org/basic-auth/foo/bar", auth: {:basic, "foo:foo"}).status
       401
-      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:basic, "foo:bar"}).status
+      iex> Req.get!("https://httpbingo.org/basic-auth/foo/bar", auth: {:basic, "foo:bar"}).status
       200
-      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: fn -> {:basic, "foo:bar"} end).status
+      iex> Req.get!("https://httpbingo.org/basic-auth/foo/bar", auth: fn -> {:basic, "foo:bar"} end).status
       200
-      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {Authentication, :fetch_token, []}).status
+      iex> Req.get!("https://httpbingo.org/basic-auth/foo/bar", auth: {Authentication, :fetch_token, []}).status
       200
 
-      iex> Req.get!("https://httpbin.org/digest-auth/auth/user/pass", auth: {:digest, "user:pass"}).status
+      iex> Req.get!("https://httpbingo.org/digest-auth/auth/user/pass", auth: {:digest, "user:pass"}).status
       200
 
-      iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, ""}).status
+      iex> Req.get!("https://httpbingo.org/bearer", auth: {:bearer, ""}).status
       401
-      iex> Req.get!("https://httpbin.org/bearer", auth: {:bearer, "foo"}).status
+      iex> Req.get!("https://httpbingo.org/bearer", auth: {:bearer, "foo"}).status
       200
-      iex> Req.get!("https://httpbin.org/bearer", auth: fn -> {:bearer, "foo"} end).status
+      iex> Req.get!("https://httpbingo.org/bearer", auth: fn -> {:bearer, "foo"} end).status
       200
 
       iex> System.put_env("NETRC", "./test/my_netrc")
-      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: :netrc).status
+      iex> Req.get!("https://httpbingo.org/basic-auth/foo/bar", auth: :netrc).status
       200
 
-      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: {:netrc, "./test/my_netrc"}).status
+      iex> Req.get!("https://httpbingo.org/basic-auth/foo/bar", auth: {:netrc, "./test/my_netrc"}).status
       200
-      iex> Req.get!("https://httpbin.org/basic-auth/foo/bar", auth: fn -> {:netrc, "./test/my_netrc"} end).status
+      iex> Req.get!("https://httpbingo.org/basic-auth/foo/bar", auth: fn -> {:netrc, "./test/my_netrc"} end).status
       200
 
   """
@@ -306,10 +306,10 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> Req.get!("https://httpbin.org/user-agent").body
+      iex> Req.get!("https://httpbingo.org/user-agent").body
       %{"user-agent" => "#{@user_agent}"}
 
-      iex> Req.get!("https://httpbin.org/user-agent", user_agent: "foo").body
+      iex> Req.get!("https://httpbingo.org/user-agent", user_agent: "foo").body
       %{"user-agent" => "foo"}
   """
   @doc step: :request
@@ -374,9 +374,9 @@ defmodule Req.Steps do
         {:brotli, "~> 0.3.0"}
       ])
 
-      response = Req.get!("https://httpbin.org/anything", compressed: true)
+      response = Req.get!("https://httpbingo.org/anything", compressed: true)
       response.body["headers"]["Accept-Encoding"]
-      #=> "zstd, br, gzip"
+      #=> ["zstd, br, gzip"]
 
   [brotli]: https://hex.pm/packages/brotli
   """
@@ -443,41 +443,41 @@ defmodule Req.Steps do
 
   Encoding form (`application/x-www-form-urlencoded`):
 
-      iex> Req.post!("https://httpbin.org/anything", form: [a: 1]).body["form"]
-      %{"a" => "1"}
+      iex> Req.post!("https://httpbingo.org/anything", form: [a: 1]).body["form"]
+      %{"a" => ["1"]}
 
   Encoding form (`multipart/form-data`):
 
       iex> fields = [a: 1, b: {"2", filename: "b.txt"}]
-      iex> resp = Req.post!("https://httpbin.org/anything", form_multipart: fields)
+      iex> resp = Req.post!("https://httpbingo.org/anything", form_multipart: fields)
       iex> resp.body["form"]
-      %{"a" => "1"}
+      %{"a" => ["1"]}
       iex> resp.body["files"]
-      %{"b" => "2"}
+      %{"b" => ["2"]}
 
   Encoding streaming form (`multipart/form-data`):
 
       iex> stream = Stream.cycle(["abc"]) |> Stream.take(3)
       iex> fields = [file: {stream, filename: "b.txt"}]
-      iex> resp = Req.post!("https://httpbin.org/anything", form_multipart: fields)
+      iex> resp = Req.post!("https://httpbingo.org/anything", form_multipart: fields)
       iex> resp.body["files"]
-      %{"file" => "abcabcabc"}
+      %{"file" => ["abcabcabc"]}
 
       # with explicit :size
       iex> stream = Stream.cycle(["abc"]) |> Stream.take(3)
       iex> fields = [file: {stream, filename: "b.txt", size: 9}]
-      iex> resp = Req.post!("https://httpbin.org/anything", form_multipart: fields)
+      iex> resp = Req.post!("https://httpbingo.org/anything", form_multipart: fields)
       iex> resp.body["files"]
-      %{"file" => "abcabcabc"}
+      %{"file" => ["abcabcabc"]}
 
   Encoding JSON:
 
-      iex> Req.post!("https://httpbin.org/post", json: %{a: 1}).body["json"]
+      iex> Req.post!("https://httpbingo.org/post", json: %{a: 1}).body["json"]
       %{"a" => 1}
 
   Automatically change GET to POST when body is set:
 
-      iex> Req.request!("https://httpbin.org/post", json: %{a: 1}).body["json"]
+      iex> Req.request!("https://httpbingo.org/post", json: %{a: 1}).body["json"]
       %{"a" => 1}
   """
   @doc step: :request
@@ -523,7 +523,7 @@ defmodule Req.Steps do
   Uses a templated request path.
 
   By default, params in the URL path are expressed as strings prefixed with `:`. For example,
-  `:code` in `https://httpbin.org/status/:code`. If you want to use the `{code}` syntax,
+  `:code` in `https://httpbingo.org/status/:code`. If you want to use the `{code}` syntax,
   set `path_params_style: :curly`. Param names must start with a letter and can contain letters,
   digits, and underscores; this is true both for `:colon_params` as well as `{curly_params}`.
 
@@ -538,17 +538,17 @@ defmodule Req.Steps do
     * `:path_params_style` (*available since v0.5.1*) - how path params are expressed. Can be one of:
 
          * `:colon` - (default) for Plug-style parameters, such as `:code` in
-           `https://httpbin.org/status/:code`.
+           `https://httpbingo.org/status/:code`.
 
          * `:curly` - for [OpenAPI](https://swagger.io/specification/)-style parameters, such as
-           `{code}` in `https://httpbin.org/status/{code}`.
+           `{code}` in `https://httpbingo.org/status/{code}`.
 
   ## Examples
 
-      iex> Req.get!("https://httpbin.org/status/:code", path_params: [code: 201]).status
+      iex> Req.get!("https://httpbingo.org/status/:code", path_params: [code: 201]).status
       201
 
-      iex> Req.get!("https://httpbin.org/status/{code}", path_params: [code: 201], path_params_style: :curly).status
+      iex> Req.get!("https://httpbingo.org/status/{code}", path_params: [code: 201], path_params_style: :curly).status
       201
 
   """
@@ -600,8 +600,8 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> Req.get!("https://httpbin.org/anything/query", params: [x: 1, y: 2]).body["args"]
-      %{"x" => "1", "y" => "2"}
+      iex> Req.get!("https://httpbingo.org/anything/query", params: [x: 1, y: 2]).body["args"]
+      %{"x" => ["1"], "y" => ["2"]}
 
   """
   @doc step: :request
@@ -639,7 +639,7 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> response = Req.get!("https://httpbin.org/range/100", range: 0..3)
+      iex> response = Req.get!("https://httpbingo.org/range/100", range: 0..3)
       iex> response.status
       206
       iex> response.body
@@ -756,14 +756,14 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> resp = Req.get!("https://httpbin.org/json", checksum: "sha1:9274ffd9cf273d4a008750f44540c4c5d4c8227c")
+      iex> resp = Req.get!("https://httpbingo.org/json", checksum: "sha1:ae5891fe71e8c6432b552b0c3b4394e43f151493")
       iex> resp.status
       200
 
-      iex> Req.get!("https://httpbin.org/json", checksum: "sha1:bad")
+      iex> Req.get!("https://httpbingo.org/json", checksum: "sha1:bad")
       ** (Req.ChecksumMismatchError) checksum mismatch
       expected: sha1:bad
-      actual:   sha1:9274ffd9cf273d4a008750f44540c4c5d4c8227c
+      actual:   sha1:ae5891fe71e8c6432b552b0c3b4394e43f151493
   """
   @doc step: :request
   def checksum(request) do
@@ -1101,7 +1101,7 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> response = Req.get!("https://httpbin.org/gzip", compressed: true)
+      iex> response = Req.get!("https://httpbingo.org/gzip", compressed: true)
       iex> response.body["gzipped"]
       true
 
@@ -1112,7 +1112,7 @@ defmodule Req.Steps do
         {:brotli, "~> 0.3.0"}
       ])
 
-      response = Req.get!("https://httpbin.org/brotli", compressed: true)
+      response = Req.get!("https://httpbingo.org/brotli", compressed: true)
       Req.Response.get_header(response, "content-encoding")
       #=> ["br"]
       response.body["brotli"]
@@ -1236,7 +1236,7 @@ defmodule Req.Steps do
 
   Decode JSON:
 
-      iex> response = Req.get!("https://httpbin.org/json")
+      iex> response = Req.get!("https://httpbingo.org/json")
       ...> response.body["slideshow"]["title"]
       "Sample Slide Show"
 
@@ -1444,7 +1444,7 @@ defmodule Req.Steps do
       # 23:24:11.670 [debug] redirecting to https://api.github.com/
       200
 
-      iex> Req.get!("https://httpbin.org/redirect/4", max_redirects: 3)
+      iex> Req.get!("https://httpbingo.org/redirect/4", max_redirects: 3)
       # 23:07:59.570 [debug] redirecting to /relative-redirect/3
       # 23:08:00.068 [debug] redirecting to /relative-redirect/2
       # 23:08:00.206 [debug] redirecting to /relative-redirect/1
@@ -1594,10 +1594,10 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> Req.get!("https://httpbin.org/status/404").status
+      iex> Req.get!("https://httpbingo.org/status/404").status
       404
 
-      iex> Req.get!("https://httpbin.org/status/404", http_errors: :raise)
+      iex> Req.get!("https://httpbingo.org/status/404", http_errors: :raise)
       ** (RuntimeError) The requested URL returned error: 404
       Response body: ""
   """
@@ -1631,7 +1631,7 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> resp = Req.get!("https://httpbin.org/digest-auth/auth/user/pass", auth: {:digest, "user:pass"})
+      iex> resp = Req.get!("https://httpbingo.org/digest-auth/auth/user/pass", auth: {:digest, "user:pass"})
       iex> resp.status
       200
   """
@@ -1715,7 +1715,7 @@ defmodule Req.Steps do
 
   ## Examples
 
-      iex> Req.get!("https://httpbin.org/status/500,200").status
+      iex> Req.get!("https://httpbingo.org/status/500,200").status
       # 08:43:19.101 [warning] retry: got response with status 500, will retry in 941ms, 2 attempts left
       # 08:43:22.958 [warning] retry: got response with status 500, will retry in 1877ms, 1 attempt left
       200

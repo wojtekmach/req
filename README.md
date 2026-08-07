@@ -85,7 +85,7 @@ If you want to use Req in a Mix project, you can add the above dependency to you
 Here's an example POST with JSON data:
 
 ```elixir
-iex> Req.post!("https://httpbin.org/post", json: %{x: 1, y: 2}).body["json"]
+iex> Req.post!("https://httpbingo.org/post", json: %{x: 1, y: 2}).body["json"]
 %{"x" => 1, "y" => 2}
 ```
 
@@ -93,16 +93,16 @@ You can stream request body:
 
 ```elixir
 iex> stream = Stream.duplicate("foo", 3)
-iex> Req.post!("https://httpbin.org/post", body: stream).body["data"]
+iex> Req.post!("https://httpbingo.org/post", body: stream, headers: [content_type: "text/plain"]).body["data"]
 "foofoofoo"
 ```
 
 and stream the response body:
 
 ```elixir
-iex> resp = Req.get!("http://httpbin.org/stream/2", into: IO.stream())
-# output: {"url": "http://httpbin.org/stream/2", ...}
-# output: {"url": "http://httpbin.org/stream/2", ...}
+iex> resp = Req.get!("http://httpbingo.org/stream/2", into: IO.stream())
+# output: {"url": "http://httpbingo.org/stream/2", ...}
+# output: {"url": "http://httpbingo.org/stream/2", ...}
 iex> resp.status
 200
 iex> resp.body

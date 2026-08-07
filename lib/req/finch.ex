@@ -29,7 +29,7 @@ defmodule Req.Finch do
           }
         )
 
-      Req.get!("https://httpbin.org/json", finch: [name: MyFinch])
+      Req.get!("https://httpbingo.org/json", finch: [name: MyFinch])
 
   More commonly you'd add the custom Finch pool as part of your supervision tree in your
   `application.ex`:
@@ -66,9 +66,9 @@ defmodule Req.Finch do
 
       Examples:
 
-          Req.get!("https://httpbin.org/json", finch: [name: MyFinch])
-          Req.get!("https://httpbin.org/json", finch: [name: MyFinch, pool_tag: :bulk])
-          Req.get!("https://httpbin.org/json", finch: [conn_max_idle_time: 10_000])
+          Req.get!("https://httpbingo.org/json", finch: [name: MyFinch])
+          Req.get!("https://httpbingo.org/json", finch: [name: MyFinch, pool_tag: :bulk])
+          Req.get!("https://httpbingo.org/json", finch: [conn_max_idle_time: 10_000])
 
     * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
       the given connection options:
@@ -145,7 +145,7 @@ defmodule Req.Finch do
 
   Transport errors are represented as `Req.TransportError` exceptions:
 
-      iex> Req.get("https://httpbin.org/delay/1", receive_timeout: 0, retry: false)
+      iex> Req.get("https://httpbingo.org/delay/1", receive_timeout: 0, retry: false)
       {:error, %Req.TransportError{reason: :timeout}}
 
   """

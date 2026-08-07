@@ -2,6 +2,6 @@ machine localhost
     login foo
     password bar
 
-machine httpbin.org
+machine httpbingo.org
     login foo
     password bar

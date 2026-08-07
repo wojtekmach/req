@@ -29,7 +29,7 @@ defmodule Req do
 
   Return the request that was sent using `Req.run!/2`:
 
-      iex> {req, resp} = Req.run!("https://httpbin.org/basic-auth/foo/bar", auth: {:basic, "foo:bar"})
+      iex> {req, resp} = Req.run!("https://httpbingo.org/basic-auth/foo/bar", auth: {:basic, "foo:bar"})
       iex> req.headers["authorization"]
       ["Basic Zm9vOmJhcg=="]
       iex> resp.status
@@ -37,12 +37,12 @@ defmodule Req do
 
   Making a POST request with `Req.post!/2`:
 
-      iex> Req.post!("https://httpbin.org/post", form: [comments: "hello!"]).body["form"]
-      %{"comments" => "hello!"}
+      iex> Req.post!("https://httpbingo.org/post", form: [comments: "hello!"]).body["form"]
+      %{"comments" => ["hello!"]}
 
   Set connection timeout:
 
-      iex> resp = Req.get!("https://httpbin.org", connect_options: [timeout: 100])
+      iex> resp = Req.get!("https://httpbingo.org", connect_options: [timeout: 100])
       iex> resp.status
       200
 
@@ -51,18 +51,18 @@ defmodule Req do
   Stream request body:
 
       iex> stream = Stream.duplicate("foo", 3)
-      iex> Req.post!("https://httpbin.org/post", body: stream).body["data"]
+      iex> Req.post!("https://httpbingo.org/post", body: stream, headers: [content_type: "text/plain"]).body["data"]
       "foofoofoo"
 
   Stream response body using a callback:
 
       iex> resp =
-      ...>   Req.get!("http://httpbin.org/stream/2", into: fn {:data, data}, {req, resp} ->
+      ...>   Req.get!("http://httpbingo.org/stream/2", into: fn {:data, data}, {req, resp} ->
       ...>     IO.puts(data)
       ...>     {:cont, {req, resp}}
       ...>   end)
-      # output: {"url": "http://httpbin.org/stream/2", ...}
-      # output: {"url": "http://httpbin.org/stream/2", ...}
+      # output: {"url": "http://httpbingo.org/stream/2", ...}
+      # output: {"url": "http://httpbingo.org/stream/2", ...}
       iex> resp.status
       200
       iex> resp.body
@@ -70,9 +70,9 @@ defmodule Req do
 
   Stream response body into a `Collectable`:
 
-      iex> resp = Req.get!("http://httpbin.org/stream/2", into: IO.stream())
-      # output: {"url": "http://httpbin.org/stream/2", ...}
-      # output: {"url": "http://httpbin.org/stream/2", ...}
+      iex> resp = Req.get!("http://httpbingo.org/stream/2", into: IO.stream())
+      # output: {"url": "http://httpbingo.org/stream/2", ...}
+      # output: {"url": "http://httpbingo.org/stream/2", ...}
       iex> resp.status
       200
       iex> resp.body
@@ -80,23 +80,23 @@ defmodule Req do
 
   Stream response body to the current process and parse incoming messages using `Req.parse_message/2`.
 
-      iex> resp = Req.get!("http://httpbin.org/stream/2", into: :self)
+      iex> resp = Req.get!("http://httpbingo.org/stream/2", into: :self)
       iex> Req.parse_message(resp, receive do message -> message end)
-      {:ok, [data: "{\"url\": \"http://httpbin.org/stream/2\", ..., \"id\": 0}\n"]}
+      {:ok, [data: "{\"url\": \"http://httpbingo.org/stream/2\", ..., \"id\": 0}\n"]}
       iex> Req.parse_message(resp, receive do message -> message end)
-      {:ok, [data: "{\"url\": \"http://httpbin.org/stream/2\", ..., \"id\": 1}\n"]}
+      {:ok, [data: "{\"url\": \"http://httpbingo.org/stream/2\", ..., \"id\": 1}\n"]}
       iex> Req.parse_message(resp, receive do message -> message end)
       {:ok, [:done]}
       ""
 
   Same as above, using enumerable API:
 
-      iex> resp = Req.get!("http://httpbin.org/stream/2", into: :self)
+      iex> resp = Req.get!("http://httpbingo.org/stream/2", into: :self)
       iex> resp.body
       #Req.Response.Async<...>
       iex> Enum.each(resp.body, &IO.puts/1)
-      # {"url": "http://httpbin.org/stream/2", ..., "id": 0}
-      # {"url": "http://httpbin.org/stream/2", ..., "id": 1}
+      # {"url": "http://httpbingo.org/stream/2", ..., "id": 0}
+      # {"url": "http://httpbingo.org/stream/2", ..., "id": 1}
       :ok
 
   See `:into` option in `Req.new/1` documentation for more information on response body streaming.
@@ -136,15 +136,15 @@ defmodule Req do
 
   # Response streaming to caller:
   #
-  #     iex> {req, resp} = Req.async_request!("http://httpbin.org/stream/2")
+  #     iex> {req, resp} = Req.async_request!("http://httpbingo.org/stream/2")
   #     iex> resp.status
   #     200
   #     iex> resp.body
   #     ""
   #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
+  #     [{:data, "{\"url\": \"http://httpbingo.org/stream/2\"" <> ...}]
   #     iex> Req.parse_message(req, receive do message -> message end)
-  #     [{:data, "{\"url\": \"http://httpbin.org/stream/2\"" <> ...}]
+  #     [{:data, "{\"url\": \"http://httpbingo.org/stream/2\"" <> ...}]
   #     iex> Req.parse_message(req, receive do message -> message end)
   #     [:done]
   #     ""
@@ -215,10 +215,10 @@ defmodule Req do
       [`put_path_params`](`Req.Steps.put_path_params/1`) step). Can be one of:
 
          * `:colon` - (default) for Plug-style parameters, such as `:code` in
-           `https://httpbin.org/status/:code`.
+           `https://httpbingo.org/status/:code`.
 
          * `:curly` - for [OpenAPI](https://swagger.io/specification/)-style parameters, such as
-           `{code}` in `https://httpbin.org/status/{code}`.
+           `{code}` in `https://httpbingo.org/status/{code}`.
 
   Authentication options:
 
@@ -418,9 +418,9 @@ defmodule Req do
 
       Examples:
 
-          Req.get!("https://httpbin.org/json", finch: [name: MyFinch])
-          Req.get!("https://httpbin.org/json", finch: [name: MyFinch, pool_tag: :bulk])
-          Req.get!("https://httpbin.org/json", finch: [conn_max_idle_time: 10_000])
+          Req.get!("https://httpbingo.org/json", finch: [name: MyFinch])
+          Req.get!("https://httpbingo.org/json", finch: [name: MyFinch, pool_tag: :bulk])
+          Req.get!("https://httpbingo.org/json", finch: [conn_max_idle_time: 10_000])
 
     * `:connect_options` - dynamically starts (or re-uses already started) Finch pool with
       the given connection options (see `Mint.HTTP.connect/4` for options):
@@ -512,10 +512,10 @@ defmodule Req do
 
   ## Examples
 
-      iex> req = Req.new(base_url: "https://httpbin.org")
+      iex> req = Req.new(base_url: "https://httpbingo.org")
       iex> req = Req.merge(req, auth: {:basic, "alice:secret"})
       iex> req.options[:base_url]
-      "https://httpbin.org"
+      "https://httpbingo.org"
       iex> req.options[:auth]
       {:basic, "alice:secret"}
 
@@ -535,10 +535,10 @@ defmodule Req do
 
   Similarly to headers, `:params` are merged too:
 
-      req = Req.new(url: "https://httpbin.org/anything", params: [a: 1, b: 1])
+      req = Req.new(url: "https://httpbingo.org/anything", params: [a: 1, b: 1])
       req = Req.merge(req, params: [a: 2])
       Req.get!(req).body["args"]
-      #=> %{"a" => "2", "b" => "1"}
+      #=> %{"a" => ["2"], "b" => ["1"]}
   """
   @spec merge(Req.Request.t(), options :: keyword()) :: Req.Request.t()
   def merge(%Req.Request{} = request, options) when is_list(options) do
@@ -704,19 +704,19 @@ defmodule Req do
 
   With URL:
 
-      iex> {:ok, resp} = Req.head("https://httpbin.org/status/201")
+      iex> {:ok, resp} = Req.head("https://httpbingo.org/status/201")
       iex> resp.status
       201
 
   With options:
 
-      iex> {:ok, resp} = Req.head(url: "https://httpbin.org/status/201")
+      iex> {:ok, resp} = Req.head(url: "https://httpbingo.org/status/201")
       iex> resp.status
       201
 
   With request struct:
 
-      iex> req = Req.new(base_url: "https://httpbin.org")
+      iex> req = Req.new(base_url: "https://httpbingo.org")
       iex> {:ok, resp} = Req.head(req, url: "/status/201")
       iex> resp.status
       201
@@ -746,17 +746,17 @@ defmodule Req do
 
   With URL:
 
-      iex> Req.head!("https://httpbin.org/status/201").status
+      iex> Req.head!("https://httpbingo.org/status/201").status
       201
 
   With options:
 
-      iex> Req.head!(url: "https://httpbin.org/status/201").status
+      iex> Req.head!(url: "https://httpbingo.org/status/201").status
       201
 
   With request struct:
 
-      iex> req = Req.new(base_url: "https://httpbin.org")
+      iex> req = Req.new(base_url: "https://httpbingo.org")
       iex> Req.head!(req, url: "/status/201").status
       201
   """
@@ -783,27 +783,27 @@ defmodule Req do
 
   With URL:
 
-      iex> {:ok, resp} = Req.post("https://httpbin.org/anything", body: "hello!")
+      iex> {:ok, resp} = Req.post("https://httpbingo.org/anything", body: "hello!", headers: [content_type: "text/plain"])
       iex> resp.body["data"]
       "hello!"
 
-      iex> {:ok, resp} = Req.post("https://httpbin.org/anything", form: [x: 1])
+      iex> {:ok, resp} = Req.post("https://httpbingo.org/anything", form: [x: 1])
       iex> resp.body["form"]
-      %{"x" => "1"}
+      %{"x" => ["1"]}
 
-      iex> {:ok, resp} = Req.post("https://httpbin.org/anything", json: %{x: 2})
+      iex> {:ok, resp} = Req.post("https://httpbingo.org/anything", json: %{x: 2})
       iex> resp.body["json"]
       %{"x" => 2}
 
   With options:
 
-      iex> {:ok, resp} = Req.post(url: "https://httpbin.org/anything", body: "hello!")
+      iex> {:ok, resp} = Req.post(url: "https://httpbingo.org/anything", body: "hello!", headers: [content_type: "text/plain"])
       iex> resp.body["data"]
       "hello!"
 
   With request struct:
 
-      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> req = Req.new(url: "https://httpbingo.org/anything", headers: [content_type: "text/plain"])
       iex> {:ok, resp} = Req.post(req, body: "hello!")
       iex> resp.body["data"]
       "hello!"
@@ -832,23 +832,23 @@ defmodule Req do
 
   With URL:
 
-      iex> Req.post!("https://httpbin.org/anything", body: "hello!").body["data"]
+      iex> Req.post!("https://httpbingo.org/anything", body: "hello!", headers: [content_type: "text/plain"]).body["data"]
       "hello!"
 
-      iex> Req.post!("https://httpbin.org/anything", form: [x: 1]).body["form"]
-      %{"x" => "1"}
+      iex> Req.post!("https://httpbingo.org/anything", form: [x: 1]).body["form"]
+      %{"x" => ["1"]}
 
-      iex> Req.post!("https://httpbin.org/anything", json: %{x: 2}).body["json"]
+      iex> Req.post!("https://httpbingo.org/anything", json: %{x: 2}).body["json"]
       %{"x" => 2}
 
   With options:
 
-      iex> Req.post!(url: "https://httpbin.org/anything", body: "hello!").body["data"]
+      iex> Req.post!(url: "https://httpbingo.org/anything", body: "hello!", headers: [content_type: "text/plain"]).body["data"]
       "hello!"
 
   With request struct:
 
-      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> req = Req.new(url: "https://httpbingo.org/anything", headers: [content_type: "text/plain"])
       iex> Req.post!(req, body: "hello!").body["data"]
       "hello!"
   """
@@ -875,19 +875,19 @@ defmodule Req do
 
   With URL:
 
-      iex> {:ok, resp} = Req.put("https://httpbin.org/anything", body: "hello!")
+      iex> {:ok, resp} = Req.put("https://httpbingo.org/anything", body: "hello!", headers: [content_type: "text/plain"])
       iex> resp.body["data"]
       "hello!"
 
   With options:
 
-      iex> {:ok, resp} = Req.put(url: "https://httpbin.org/anything", body: "hello!")
+      iex> {:ok, resp} = Req.put(url: "https://httpbingo.org/anything", body: "hello!", headers: [content_type: "text/plain"])
       iex> resp.body["data"]
       "hello!"
 
   With request struct:
 
-      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> req = Req.new(url: "https://httpbingo.org/anything", headers: [content_type: "text/plain"])
       iex> {:ok, resp} = Req.put(req, body: "hello!")
       iex> resp.body["data"]
       "hello!"
@@ -916,17 +916,17 @@ defmodule Req do
 
   With URL:
 
-      iex> Req.put!("https://httpbin.org/anything", body: "hello!").body["data"]
+      iex> Req.put!("https://httpbingo.org/anything", body: "hello!", headers: [content_type: "text/plain"]).body["data"]
       "hello!"
 
   With options:
 
-      iex> Req.put!(url: "https://httpbin.org/anything", body: "hello!").body["data"]
+      iex> Req.put!(url: "https://httpbingo.org/anything", body: "hello!", headers: [content_type: "text/plain"]).body["data"]
       "hello!"
 
   With request struct:
 
-      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> req = Req.new(url: "https://httpbingo.org/anything", headers: [content_type: "text/plain"])
       iex> Req.put!(req, body: "hello!").body["data"]
       "hello!"
   """
@@ -953,19 +953,19 @@ defmodule Req do
 
   With URL:
 
-      iex> {:ok, resp} = Req.patch("https://httpbin.org/anything", body: "hello!")
+      iex> {:ok, resp} = Req.patch("https://httpbingo.org/anything", body: "hello!", headers: [content_type: "text/plain"])
       iex> resp.body["data"]
       "hello!"
 
   With options:
 
-      iex> {:ok, resp} = Req.patch(url: "https://httpbin.org/anything", body: "hello!")
+      iex> {:ok, resp} = Req.patch(url: "https://httpbingo.org/anything", body: "hello!", headers: [content_type: "text/plain"])
       iex> resp.body["data"]
       "hello!"
 
   With request struct:
 
-      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> req = Req.new(url: "https://httpbingo.org/anything", headers: [content_type: "text/plain"])
       iex> {:ok, resp} = Req.patch(req, body: "hello!")
       iex> resp.body["data"]
       "hello!"
@@ -994,17 +994,17 @@ defmodule Req do
 
   With URL:
 
-      iex> Req.patch!("https://httpbin.org/anything", body: "hello!").body["data"]
+      iex> Req.patch!("https://httpbingo.org/anything", body: "hello!", headers: [content_type: "text/plain"]).body["data"]
       "hello!"
 
   With options:
 
-      iex> Req.patch!(url: "https://httpbin.org/anything", body: "hello!").body["data"]
+      iex> Req.patch!(url: "https://httpbingo.org/anything", body: "hello!", headers: [content_type: "text/plain"]).body["data"]
       "hello!"
 
   With request struct:
 
-      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> req = Req.new(url: "https://httpbingo.org/anything", headers: [content_type: "text/plain"])
       iex> Req.patch!(req, body: "hello!").body["data"]
       "hello!"
   """
@@ -1031,19 +1031,19 @@ defmodule Req do
 
   With URL:
 
-      iex> {:ok, resp} = Req.delete("https://httpbin.org/anything")
+      iex> {:ok, resp} = Req.delete("https://httpbingo.org/anything")
       iex> resp.body["method"]
       "DELETE"
 
   With options:
 
-      iex> {:ok, resp} = Req.delete(url: "https://httpbin.org/anything")
+      iex> {:ok, resp} = Req.delete(url: "https://httpbingo.org/anything")
       iex> resp.body["method"]
       "DELETE"
 
   With request struct:
 
-      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> req = Req.new(url: "https://httpbingo.org/anything", headers: [content_type: "text/plain"])
       iex> {:ok, resp} = Req.delete(req)
       iex> resp.body["method"]
       "DELETE"
@@ -1072,17 +1072,17 @@ defmodule Req do
 
   With URL:
 
-      iex> Req.delete!("https://httpbin.org/anything").body["method"]
+      iex> Req.delete!("https://httpbingo.org/anything").body["method"]
       "DELETE"
 
   With options:
 
-      iex> Req.delete!(url: "https://httpbin.org/anything").body["method"]
+      iex> Req.delete!(url: "https://httpbingo.org/anything").body["method"]
       "DELETE"
 
   With request struct:
 
-      iex> req = Req.new(url: "https://httpbin.org/anything")
+      iex> req = Req.new(url: "https://httpbingo.org/anything", headers: [content_type: "text/plain"])
       iex> Req.delete!(req).body["method"]
       "DELETE"
   """
@@ -1302,11 +1302,11 @@ defmodule Req do
 
   ## Examples
 
-      iex> resp = Req.get!("http://httpbin.org/stream/2", into: :self)
+      iex> resp = Req.get!("http://httpbingo.org/stream/2", into: :self)
       iex> Req.parse_message(resp, receive do message -> message end)
-      {:ok, [data: "{\"url\": \"http://httpbin.org/stream/2\", ..., \"id\": 0}\\n"]}
+      {:ok, [data: "{\"url\": \"http://httpbingo.org/stream/2\", ..., \"id\": 0}\\n"]}
       iex> Req.parse_message(resp, receive do message -> message end)
-      {:ok, [data: "{\"url\": \"http://httpbin.org/stream/2\", ..., \"id\": 1}\\n"]}
+      {:ok, [data: "{\"url\": \"http://httpbingo.org/stream/2\", ..., \"id\": 1}\\n"]}
       iex> Req.parse_message(resp, receive do message -> message end)
       {:ok, [:done]}
       iex> Req.parse_message(resp, :other)
@@ -1335,7 +1335,7 @@ defmodule Req do
 
   ## Examples
 
-      iex> resp = Req.get!("http://httpbin.org/stream/2", into: :self)
+      iex> resp = Req.get!("http://httpbingo.org/stream/2", into: :self)
       iex> Req.cancel_async_response(resp)
       :ok
   """
@@ -1367,7 +1367,7 @@ defmodule Req do
 
   ## Examples
 
-      iex> Req.default_options(base_url: "https://httpbin.org")
+      iex> Req.default_options(base_url: "https://httpbingo.org")
       iex> Req.get!("/statuses/201").status
       201
       iex> Req.new() |> Req.get!(url: "/statuses/201").status

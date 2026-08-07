@@ -496,12 +496,12 @@ mailbox using the `into: :self` option. When such is used, the `response.body` i
 Here's a quick example:
 
 ```elixir
-resp = Req.get!("http://httpbin.org/stream/2", into: :self)
+resp = Req.get!("http://httpbingo.org/stream/2", into: :self)
 resp.body
 #=> #Req.Response.Async<...>
 Enum.each(resp.body, &IO.puts/1)
-# {"url": "http://httpbin.org/stream/2", ..., "id": 0}
-# {"url": "http://httpbin.org/stream/2", ..., "id": 1}
+# {"url": "http://httpbingo.org/stream/2", ..., "id": 0}
+# {"url": "http://httpbingo.org/stream/2", ..., "id": 1}
 ```
 
 Here is another example where we use Req to talk to two different servers. The first server
@@ -642,7 +642,7 @@ If you wish to maximize request rate or have more control over how messages are 
     Previously we _always_ raised a `RuntimeError`. Besides changing the exception struct, now
     it is _returned_:
 
-        iex> Req.get("https://httpbin.org/redirect/4", max_redirects: 3)
+        iex> Req.get("https://httpbingo.org/redirect/4", max_redirects: 3)
         # 07:08:06.868 [debug] redirecting to /relative-redirect/3
         # 07:08:06.988 [debug] redirecting to /relative-redirect/2
         # 07:08:07.109 [debug] redirecting to /relative-redirect/1
@@ -833,7 +833,7 @@ Req v0.4 adds official support for request body streaming by setting the request
 
 ```elixir
 iex> stream = Stream.duplicate("foo", 3)
-iex> Req.post!("https://httpbin.org/post", body: stream).body["data"]
+iex> Req.post!("https://httpbingo.org/post", body: stream).body["data"]
 "foofoofoo"
 ```
 
@@ -1093,10 +1093,10 @@ iex> req |> Req.get(url: "/repos/elixir-mint/mint") |> then(& &1.body["descripti
 Setting body and encoding it to form/JSON is now done through `:body/:form/:json` options:
 
 ```elixir
-iex> Req.post!("https://httpbin.org/anything", body: "hello!").body["data"]
+iex> Req.post!("https://httpbingo.org/anything", body: "hello!").body["data"]
 "hello!"
 
-iex> req = Req.new(url: "https://httpbin.org/anything")
+iex> req = Req.new(url: "https://httpbingo.org/anything")
 iex> Req.post!(req, form: [x: 1]).body["form"]
 %{"x" => "1"}
 iex> Req.post!(req, json: %{x: 2}).body["form"]
@@ -1109,10 +1109,10 @@ Req now validates option names ensuring users didn't accidentally mistyped them.
 If they did, it will try to give a helpful error message. Here are some examples:
 
 ```elixir
-Req.request!(urll: "https://httpbin.org")
+Req.request!(urll: "https://httpbingo.org")
 ** (ArgumentError) unknown option :urll. Did you mean :url?
 
-Req.new(bas_url: "https://httpbin.org")
+Req.new(bas_url: "https://httpbingo.org")
 ** (ArgumentError) unknown option :bas_url. Did you mean :base_url?
 ```
 
@@ -1120,14 +1120,14 @@ Req also has a new option to handle HTTP errors (4xx/5xx). By default it will co
 return the error responses:
 
 ```elixir
-Req.get!("https://httpbin.org/status/404")
+Req.get!("https://httpbingo.org/status/404")
 #=> %Req.Response{status: 404, ...}
 ```
 
 but users can now pass `http_errors: :raise` to raise an exception instead:
 
 ```elixir
-Req.get!("https://httpbin.org/status/404", http_errors: :raise)
+Req.get!("https://httpbingo.org/status/404", http_errors: :raise)
 ** (RuntimeError) The requested URL returned error: 404
 Response body: ""
 ```

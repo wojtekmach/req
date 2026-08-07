@@ -255,10 +255,10 @@ defmodule Req.Request do
 
       req = Req.new() |> PrintHeaders.attach()
 
-      Req.get!(req, url: "https://httpbin.org/json").status
+      Req.get!(req, url: "https://httpbingo.org/json").status
       200
 
-      Req.get!(req, url: "https://httpbin.org/json", print_headers: true).status
+      Req.get!(req, url: "https://httpbingo.org/json", print_headers: true).status
       # Outputs:
       # > accept-encoding: br, gzip
       # > user-agent: req/0.3.0-dev
@@ -268,7 +268,7 @@ defmodule Req.Request do
       200
 
       req = Req.new() |> PrintHeaders.attach(print_headers: true)
-      Req.get!(req, url: "https://httpbin.org/json").status
+      Req.get!(req, url: "https://httpbingo.org/json").status
       # Outputs:
       # > accept-encoding: br, gzip
       # ...
@@ -974,14 +974,14 @@ defmodule Req.Request do
 
   ## Examples
 
-      iex> Req.request!(urll: "https://httpbin.org")
+      iex> Req.request!(urll: "https://httpbingo.org")
       ** (ArgumentError) unknown option :urll. Did you mean :url?
 
-      iex> Req.new(bas_url: "https://httpbin.org")
+      iex> Req.new(bas_url: "https://httpbingo.org")
       ** (ArgumentError) unknown option :bas_url. Did you mean :base_url?
 
       req =
-        Req.new(base_url: "https://httpbin.org")
+        Req.new(base_url: "https://httpbingo.org")
         |> Req.Request.register_options([:foo])
 
       Req.get!(req, url: "/status/201", foo: :bar).status
