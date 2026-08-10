@@ -1304,6 +1304,40 @@ defmodule Req do
     end
   end
 
+  @doc false
+  def prepare(request, options \\ []) do
+    req = new(request, options)
+    adapter = req.adapter
+    into = req.into
+
+    req =
+      case stream(%{req | adapter: &prepare_stream/4, into: nil}) do
+        {:ok, resp} ->
+          resp.request
+
+        {:error, _err, resp} ->
+          resp.request
+      end
+
+    %{req | adapter: adapter, into: into}
+  end
+
+  defp prepare_stream(req, acc, fun, state) do
+    resp = Req.Response.new(status: 200)
+    resp = put_in(resp.request, req)
+
+    with {:cont, resp, acc, state} <- fun.({:status, 200}, resp, acc, state),
+         {:cont, resp, acc, state} <- fun.({:headers, resp.headers}, resp, acc, state) do
+      {:ok, resp, acc, state}
+    else
+      {:halt, resp, acc, state} ->
+        {:halt, resp, acc, state}
+
+      {{:error, err}, resp, acc, state} ->
+        {{:error, err}, resp, acc, state}
+    end
+  end
+
   def stream(req, acc, fun, options \\ []) when is_function(fun, 3) do
     req = Req.new(req, options)
 
