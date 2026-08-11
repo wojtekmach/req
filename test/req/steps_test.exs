@@ -317,7 +317,8 @@ defmodule Req.StepsTest do
     assert resp.body == "/abc%7Cdef:bar"
   end
 
-  @tag skip: Req.Case.adapter() in [:httpc, :plug]
+  @tag :transport
+  @tag skip: adapter() == :httpc
   test "put_path_params does not expand curly segments in :colon style" do
     %{req: req, url: url} = serve("GET /": &send_resp(&1, 200, ""))
 

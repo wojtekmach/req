@@ -286,7 +286,7 @@ defmodule ReqTest do
         retry: false
       )
 
-    if Req.Case.adapter() == :httpc do
+    if adapter() == :httpc do
       assert_raise ArgumentError, "httpc adapter does not support HTTP/2", fn ->
         Req.stream!(req)
       end

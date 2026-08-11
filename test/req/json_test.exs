@@ -1,7 +1,7 @@
 defmodule Req.JSONTest do
   use Req.Case, async: true
 
-  @tag skip: Req.Case.adapter() == :httpc
+  @tag skip: adapter() == :httpc
   test "success" do
     %{req: req} =
       serve(fn conn ->
@@ -26,7 +26,7 @@ defmodule Req.JSONTest do
     assert acc == ["\"Hello, World!\"}", "{\"message\":"]
   end
 
-  @tag skip: Req.Case.adapter() == :httpc
+  @tag skip: adapter() == :httpc
   test "bad json - unexpected end" do
     %{req: req} =
       serve(fn conn ->
