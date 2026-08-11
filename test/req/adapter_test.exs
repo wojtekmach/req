@@ -1,7 +1,7 @@
 defmodule Req.AdapterTest do
   use Req.Case, async: true
 
-  @adapter Req.Case.adapter()
+  @adapter adapter()
 
   describe "run" do
     @tag :transport
