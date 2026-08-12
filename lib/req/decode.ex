@@ -37,21 +37,15 @@ defmodule Req.Decode do
         * a format (atom) handled by a [built-in decoder](#module-built-in-decoders),
           e.g. `:json` or `:zip`;
 
-        * a `{format, codec}` tuple, where `format` is an atom and `codec` is one of:
+        * a `{format, decoder}` or `{content_type, decoder}` tuple, where `format` is an atom e.g.:
+          `:json`, `content_type` is a binary e.g.: `application/x-amz-json-1.0`, and `decoder` is
+          one of:
 
-            * another format (atom), to reuse a built-in decoder, e.g. `{:json5, :json}`;
-
-            * a module exporting `decode/1` that returns `{:ok, term}` or `{:error, exception}`.
-
-              On response body streaming (`Req.stream/4`), the module must also export
-              `decode_init/0`, `decode_chunk/2`, `decode_finish/1`, and `decode_close/1`:
-              `decode_chunk(state, data)` returns `{:ok, output, state}` where `output` is a
-              value or list of values, each delivered as its own data event (`nil` for none),
-              and `decode_finish(state)` returns `{:ok, output}` for the remaining tail.
-              Return the input unchanged from `decode_chunk` if the format cannot be
-              decoded incrementally;
+            * another format (atom), to reuse a built-in decoder, e.g. `decoders: [json5: :json]`.
 
             * a 1-arity function that returns `{:ok, term}` or `{:error, exception}`.
+
+            * 
 
       Setting `:decoders` replaces the default, so include `:json` if you still want JSON decoded:
 
@@ -268,6 +262,7 @@ defmodule Req.Decode do
         end
 
       extensions = extensions(content_type, path)
+      media_type = content_type |> String.split(";", parts: 2) |> hd() |> String.trim()
 
       decoders =
         Enum.map(resp.request.options[:decoders] || @default, fn
@@ -278,10 +273,10 @@ defmodule Req.Decode do
 
             {format, decoder}
 
-          {format, decoder} when is_atom(format) and is_atom(decoder) ->
+          {format, decoder} when (is_atom(format) or is_binary(format)) and is_atom(decoder) ->
             {format, format_module(decoder) || decoder}
 
-          {format, fun} when is_atom(format) and is_function(fun, 1) ->
+          {format, fun} when (is_atom(format) or is_binary(format)) and is_function(fun, 1) ->
             {format, fun}
 
           other ->
@@ -289,9 +284,13 @@ defmodule Req.Decode do
                   "expected decoders: format or {format, decoder}, got: #{inspect(other)}"
         end)
 
-      Enum.find_value(decoders, fn {format_atom, decoder} ->
-        format_string = format_atom |> Atom.to_string() |> String.replace("_", "-")
-        format_string in extensions && decoder
+      Enum.find_value(decoders, fn
+        {format_atom, decoder} when is_atom(format_atom) ->
+          format_string = format_atom |> Atom.to_string() |> String.replace("_", "-")
+          format_string in extensions && decoder
+
+        {content_type, decoder} when is_binary(content_type) ->
+          content_type == media_type && decoder
       end)
     end
   end

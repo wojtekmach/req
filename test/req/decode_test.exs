@@ -244,6 +244,21 @@ defmodule Req.DecodeTest do
     assert resp.body == "RAW-ICS"
   end
 
+  test "custom decoder (content-type string)" do
+    %{req: req} =
+      serve(
+        "GET /": fn conn ->
+          conn
+          |> Plug.Conn.put_resp_content_type("application/x-amz-json-1.0")
+          |> Plug.Conn.send_resp(200, ~s|{"a":1}|)
+        end
+      )
+
+    resp = Req.stream!(req, decoders: [{"application/x-amz-json-1.0", :json}])
+    assert resp.status == 200
+    assert resp.body == %{"a" => 1}
+  end
+
   defmodule UpcaseDecoder do
     def decode_init(:buffer), do: {:buffer, ""}
 
