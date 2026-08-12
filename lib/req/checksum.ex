@@ -24,6 +24,7 @@ defmodule Req.Checksum do
       actual:   sha1:ae5891fe71e8c6432b552b0c3b4394e43f151493
   """
 
+  @doc false
   def stream(%Req.Request{} = req, acc, fun, state, next) do
     case req.options[:checksum] do
       nil ->

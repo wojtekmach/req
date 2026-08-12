@@ -82,7 +82,7 @@ defmodule Req.Response do
   @doc """
   Converts response to a map for interoperability with other libraries.
 
-  The resulting map has the folowing fields:
+  The resulting map has the following fields:
 
     * `:status`
     * `:headers`
@@ -132,7 +132,7 @@ defmodule Req.Response do
         body: ~s|{"hello":42}|
       }
 
-  If the request already contains a 'content-type' header, it is kept as is:
+  If the response already contains a 'content-type' header, it is kept as is:
 
       iex> Req.Response.new()
       iex> |> Req.Response.put_header("content-type", "application/vnd.api+json; charset=utf-8")
@@ -170,7 +170,7 @@ defmodule Req.Response do
   @doc """
   Updates private `key` with the given function.
 
-  If `key` is present in request private map then the existing value is passed to `fun` and its
+  If `key` is present in the response private map then the existing value is passed to `fun` and its
   result is used as the updated value of `key`. If `key` is not present, `default` is inserted
   as the value of `key`. The default value will not be passed through the update function.
 
@@ -182,7 +182,7 @@ defmodule Req.Response do
       iex> Req.Response.update_private(resp, :b, 11, & &1 + 1).private
       %{a: 1, b: 11}
   """
-  @spec update_private(t(), key :: atom(), default :: term(), (atom() -> term())) :: t()
+  @spec update_private(t(), key :: atom(), default :: term(), (term() -> term())) :: t()
   def update_private(%Req.Response{} = response, key, initial, fun)
       when is_atom(key) and is_function(fun, 1) do
     update_in(response.private, &Map.update(&1, key, initial, fun))

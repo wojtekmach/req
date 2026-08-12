@@ -1,12 +1,28 @@
 defmodule Req.SSE do
-  @moduledoc """
+  @moduledoc ~S"""
   [Server-sent events][SSE] decoding using `ServerSentEvents`.
 
   Each event is decoded as a map, e.g. `%{event: "msg", data: "foo"}`. This module is used by
-  `Req.Decode` on `text/event-stream`. With `Req.stream/4`, each event is delivered as its own
-  data event; per the SSE spec, an incomplete event at the end of the stream is discarded.
+  `Req.Decode` on `text/event-stream`.
+
+  Per the SSE spec, an incomplete event at the end of the stream is discarded.
 
   [SSE]: https://html.spec.whatwg.org/multipage/server-sent-events.html
+
+  ## Examples
+
+      iex> Req.stream(
+      ...>   "https://stream.wikimedia.org/v2/stream/recentchange",
+      ...>   nil,
+      ...>   fn event, _resp, acc ->
+      ...>     %{"type" => type, "title" => title} = JSON.decode!(event.data)
+      ...>     IO.puts("#{type}: #{title}")
+      ...>     {:cont, acc}
+      ...>   end
+      ...> )
+      # Output: edit: File:Glacier National Park (GeoDIL number - 2068).jpg
+      # Output: categorize: Category:Coins of Merovingian dynasty from Gallica
+      # ...
   """
 
   @doc false

@@ -11,7 +11,7 @@ With just a couple lines of code:
 
 ```elixir
 Mix.install([
-  {:req, "~> 0.7.0"}
+  {:req, "~> 0.8.0"}
 ])
 
 Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
@@ -19,68 +19,73 @@ Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
 ```
 
 we get automatic response body decoding, following redirects, retrying on errors,
-and much more. Virtually all of the features are broken down into individual functions called
-_steps_. You can easily re-use and re-arrange built-in steps (see [`Req.Steps`] module) and
-write new ones.
+and much more. Virtually all of the features are broken down into individual pieces called
+_steps_. You can easily re-use and re-arrange built-in steps and write new ones.
+
+> #### New Internals in Req v0.8 {: .info}
+>
+> Req v0.8 contains revamped internals. Most end-users should be unaffected,
+> but if you're using custom steps or plugins, response and error steps are now
+> deprecated in favour of step _wrappers_. Check out
+> ["Steps & Step Wrappers" section](`Req.Request#module-steps-step-wrappers`) in
+> [`Req.Request`] module documentation for more information.
 
 ## Features
 
-  * An easy to use high-level API: [`Req.request/1`], [`Req.new/1`], [`Req.get!/2`], [`Req.post!/2`], etc.
+  * An easy to use high-level API: [`Req.request/1`], [`Req.stream/4`], [`Req.new/1`], [`Req.get!/2`], [`Req.post!/2`], etc.
 
-  * Extensibility via request, response, and error steps.
+  * Extensibility via steps.
 
-  * Request body compression (via [`compress_body`] step)
+  * Request body compression, see [`compress_body`].
 
-  * Opt-in response body decompression (via [`Req.Decompress`] step). Supports gzip, brotli, and zstd.
+  * Opt-in response body decompression, see [`Req.Decompress`]. Supports gzip, brotli, and zstd.
 
-  * Request body encoding. Supports urlencoded and multipart forms, and JSON. See [`encode_body`].
+  * Request body encoding. Supports urlencoded/multipart forms, and JSON, see [`encode_body`].
 
-  * Automatic response body decoding (via [`Req.Decode`] step.)
+  * Automatic response body decoding, see [`Req.Decode`].
 
-  * Encode params as query string (via [`put_params`] step.)
+  * Encode params as query string, see [`put_params`].
 
-  * Setting base URL (via [`put_base_url`] step.
+  * Setting base URL, see [`put_base_url`].
 
-  * Templated request paths (via [`put_path_params`] step.)
+  * Templated request paths, see [`put_path_params`].
 
-  * Basic, Digest, Bearer, and `.netrc`-based authentication (via [`Req.Auth`] step.)
+  * Basic, Digest, Bearer, and `.netrc`-based authentication, see [`Req.Auth`].
 
-  * Range requests (via [`put_range`]) step.)
+  * Range requests, see [`put_range`].
 
-  * Use AWS V4 Signature (via [`put_aws_sigv4`]) step.)
+  * Use AWS V4 Signature, see [`put_aws_sigv4`].
 
-  * Request body streaming (by setting `body: enumerable`.)
+  * Request body streaming by setting `body: enumerable` or `body: fun`.
 
-  * Response body streaming (via `Req.stream/4` or by setting `into: collectable | :self`.)
+  * Response body streaming via `Req.stream/4` or by setting `into: collectable` or `into: :self`.
 
-  * Follows redirects (via [`Req.Redirect`] step.)
+  * Follows redirects, see [`Req.Redirect`].
 
-  * Retries on errors (via [`Req.Retry`] step.)
+  * Retries on errors, see [`Req.Retry`].
 
-  * Raise on unexpected response status (via [`Req.Expect`] step.)
+  * Raise on unexpected response status, see [`Req.Expect`].
 
-  * Verify response body against a checksum (via [`Req.Checksum`] step.)
+  * Verify response body against a checksum, see [`Req.Checksum`].
 
-  * Easily create test stubs (see [`Req.Test`].)
+  * Plug-based HTTP mocks and stubs, see [`Req.Test`].
 
-  * Running against a plug (via [`Req.Plug`] adapter.)
+  * Running against a plug, see [`Req.Plug`].
 
-  * Pluggable adapters. By default, Req uses [Finch] (via [`Req.Finch`] adapter.)
+  * Pluggable adapters. By default, Req uses [Finch], see [`Req.Finch`] adapter.
 
 ## Usage
 
-The easiest way to use Req is with [`Mix.install/2`] (requires Elixir v1.12+):
+The easiest way to use Req is with [`Mix.install/2`]:
 
 ```elixir
 Mix.install([
-  {:req, "~> 0.7.0"}
+  {:req, "~> 0.8.0"}
 ])
 
 Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
 #=> "Req is a batteries-included HTTP client for Elixir."
 ```
-
-If you want to use Req in a Mix project, you can add the above dependency to your `mix.exs`.
 
 Here's an example POST with JSON data:
 
@@ -97,16 +102,33 @@ iex> Req.post!("https://httpbingo.org/post", body: stream, headers: [content_typ
 "foofoofoo"
 ```
 
-and stream the response body:
+and stream the response with a callback function:
+
+```elixir
+iex> Req.stream(
+...>   "https://stream.wikimedia.org/v2/stream/recentchange",
+...>   nil,
+...>   fn event, _resp, acc ->
+...>     %{"type" => type, "title" => title} = JSON.decode!(event.data)
+...>     IO.puts("#{type}: #{title}")
+...>     {:cont, acc}
+...>   end
+...> )
+# Output: edit: File:Glacier National Park (GeoDIL number - 2068).jpg
+# Output: categorize: Category:Coins of Merovingian dynasty from Gallica
+# ...
+```
+
+Or into a `Collectable`:
 
 ```elixir
 iex> resp = Req.get!("http://httpbingo.org/stream/2", into: IO.stream())
-# output: {"url": "http://httpbingo.org/stream/2", ...}
-# output: {"url": "http://httpbingo.org/stream/2", ...}
+# Output: {"url": "http://httpbingo.org/stream/2", ...}
+# Output: {"url": "http://httpbingo.org/stream/2", ...}
 iex> resp.status
 200
 iex> resp.body
-%IO.Stream{}
+%IO.Stream{...}
 ```
 
 (See [`Req`] module documentation for more examples of response body streaming.)
@@ -126,10 +148,10 @@ Req.get!(req, url: "/repos/elixir-mint/mint").body["description"]
 
 See [`Req.new/1`] for more information on available options.
 
-Virtually all of Req's features are broken down into individual pieces - steps. Req works by running
-the request struct through these steps. You can easily reuse or rearrange built-in steps or write new
-ones. Importantly, steps are just regular functions. Here is another example where we append a request
-step that inspects the URL just before requesting it:
+Virtually all of Req's features are broken down into individual pieces --
+steps. You can easily reuse or rearrange built-in steps or write new ones.
+Here is another example where we append a request step that inspects the URL
+just before requesting it:
 
 ```elixir
 req =
@@ -142,7 +164,7 @@ req =
   )
 
 Req.get!(req, url: "/repos/wojtekmach/req").body["description"]
-# output: "https://api.github.com/repos/wojtekmach/req"
+# Output: "https://api.github.com/repos/wojtekmach/req"
 #=> "Req is a batteries-included HTTP client for Elixir."
 ```
 
@@ -152,7 +174,7 @@ Here is how they can be used:
 
 ```elixir
 Mix.install([
-  {:req, "~> 0.7.0"},
+  {:req, "~> 0.8.0"},
   {:req_easyhtml, "~> 0.2.0"},
   {:req_s3, "~> 0.2.3"},
   {:req_hex, "~> 0.2.0"},
@@ -251,6 +273,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 [`Req.request/1`]:       https://hexdocs.pm/req/Req.html#request/1
+[`Req.stream/4`]:       https://hexdocs.pm/req/Req.html#stream/4
 [`Req.new/1`]:           https://hexdocs.pm/req/Req.html#new/1
 [`Req.get!/2`]:          https://hexdocs.pm/req/Req.html#get!/2
 [`Req.post!/2`]:         https://hexdocs.pm/req/Req.html#post!/2

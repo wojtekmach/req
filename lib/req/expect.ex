@@ -31,16 +31,11 @@ defmodule Req.Expect do
       iex> resp.status
       200
 
-      iex> Req.get!("https://httpbingo.org/status/404", expect: 200..299)
-      ** (Req.UnexpectedStatusError) expected response status 200..299, got: 404
-
-      iex> {:error, err} = Req.get("https://httpbingo.org/status/404", expect: 200..299)
-      iex> err.expected_status
-      200..299
-      iex> err.actual_status
-      404
+      iex> Req.get!("https://httpbingo.org/status/404", expect: :successful)
+      ** (Req.UnexpectedStatusError) expected response status :successful (200..299), got: 404
   """
 
+  @doc false
   def stream(%Req.Request{} = req, acc, fun, state, next) do
     case next.(req, acc, fun, state) do
       {:ok, resp, acc, state} ->

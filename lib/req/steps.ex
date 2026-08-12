@@ -1,6 +1,6 @@
 defmodule Req.Steps do
   @moduledoc """
-  The collection of built-in steps.
+  A collection of built-in steps.
 
   Req is composed of:
 
@@ -8,10 +8,47 @@ defmodule Req.Steps do
 
     * `Req.Request` - the low-level API and the request struct
 
-    * `Req.Steps` - the collection of built-in steps (you're here!)
+    * `Req.Auth`, …, `Req.Steps` - a collection of built-in steps (you're here!)
 
     * `Req.Test` - the testing conveniences
+
+  See also step modules:
+
+    * `Req.Auth`
+
+    * `Req.Checksum`
+
+    * `Req.Decode`
+
+    * `Req.Decompress`
+
+    * `Req.Expect`
+
+    * `Req.Redirect`
+
+    * `Req.Retry`
   """
+
+  @doc false
+  def __default__ do
+    [
+      expect: Req.Expect,
+      retry: Req.Retry,
+      decode: Req.Decode,
+      checksum: Req.Checksum,
+      decompress: Req.Decompress,
+      redirect: Req.Redirect,
+      put_user_agent: &Req.Steps.put_user_agent/1,
+      encode_body: &Req.Steps.encode_body/1,
+      put_base_url: &Req.Steps.put_base_url/1,
+      auth: Req.Auth,
+      put_params: &Req.Steps.put_params/1,
+      put_path_params: &Req.Steps.put_path_params/1,
+      put_range: &Req.Steps.put_range/1,
+      compress_body: &Req.Steps.compress_body/1,
+      put_aws_sigv4: &Req.Steps.put_aws_sigv4/1
+    ]
+  end
 
   @doc false
   def attach(req) do
@@ -64,23 +101,7 @@ defmodule Req.Steps do
       :location_trusted,
       :redact_auth
     ])
-    |> Req.Request.prepend_request_steps(
-      expect: Req.Expect,
-      retry: Req.Retry,
-      decode: Req.Decode,
-      checksum: Req.Checksum,
-      decompress: Req.Decompress,
-      redirect: Req.Redirect,
-      put_user_agent: &Req.Steps.put_user_agent/1,
-      encode_body: &Req.Steps.encode_body/1,
-      put_base_url: &Req.Steps.put_base_url/1,
-      auth: Req.Auth,
-      put_params: &Req.Steps.put_params/1,
-      put_path_params: &Req.Steps.put_path_params/1,
-      put_range: &Req.Steps.put_range/1,
-      compress_body: &Req.Steps.compress_body/1,
-      put_aws_sigv4: &Req.Steps.put_aws_sigv4/1
-    )
+    |> Req.Request.prepend_request_steps(__default__())
   end
 
   ## Request steps
@@ -547,8 +568,8 @@ defmodule Req.Steps do
       iex> size = File.stat!(path).size
       iex> chunk_size = 10 * 1024
       iex> stream = File.stream!(path, chunk_size)
-      iex> %{status: 200} = Req.put!(req, url: "/key1", headers: [content_length: size], body: stream)
-      iex> byte_size(Req.get!(req, "/bucket1/key1").body)
+      iex> %{status: 200} = Req.put!(req, url: "/bucket1/key1", headers: [content_length: size], body: stream)
+      iex> byte_size(Req.get!(req, url: "/bucket1/key1").body)
       100_000
   """
   @doc step: :request

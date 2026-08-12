@@ -86,7 +86,7 @@ if Code.ensure_loaded?(Plug) do
 
     ## Examples
 
-    This step is particularly useful to test plugs:
+    This adapter is particularly useful for testing plugs:
 
         defmodule Echo do
           def call(conn, _) do
@@ -139,6 +139,9 @@ if Code.ensure_loaded?(Plug) do
         end
     """
 
+    @behaviour Req.Adapter
+
+    @impl true
     def stream(request, acc, fun, state) when is_function(fun, 4) do
       resp = Req.Response.new(status: nil, body: nil)
 

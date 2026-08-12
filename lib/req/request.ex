@@ -8,50 +8,16 @@ defmodule Req.Request do
 
     * `Req.Request` - the low-level API and the request struct (you're here!)
 
-    * `Req.Steps` - the collection of built-in steps
+    * `Req.Auth`, …, `Req.Steps` - a collection of built-in steps.
 
     * `Req.Test` - the testing conveniences
 
   The low-level API and the request struct is the foundation of Req's extensibility. Virtually all
-  of the functionality is broken down into individual pieces - steps. Req works by running the
-  request struct through these steps. You can easily reuse or rearrange built-in steps or write new
-  ones.
+  of the functionality is broken down into individual pieces - steps. See
+  ["Steps & Step Wrappers"](#module-writing-plugins) section for more information.
 
   To make using custom steps by others even easier, they can be packaged up into plugins.
   See ["Writing Plugins"](#module-writing-plugins) section for more information.
-
-  ## The Low-level API
-
-  Most Req users would use it like this:
-
-      Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
-      #=> "Req is a batteries-included HTTP client for Elixir."
-
-  Here is the equivalent using the low-level API:
-
-      url = "https://api.github.com/repos/wojtekmach/req"
-
-      req =
-        Req.Request.new(method: :get, url: url)
-        |> Req.Request.append_request_steps(
-          put_user_agent: &Req.Steps.put_user_agent/1,
-          # ...
-        )
-        |> Req.Request.append_response_steps(
-          # ...
-          decode_body: &Req.Steps.decode_body/1,
-          # ...
-        )
-        |> Req.Request.append_error_steps(
-          retry: &Req.Steps.retry/1,
-          # ...
-        )
-
-      {req, resp} = Req.Request.run_request(req)
-      resp.body["description"]
-      #=> "Req is a batteries-included HTTP client for Elixir."
-
-  By putting the request pipeline yourself you have precise control of exactly what is running and in what order.
 
   ## The Request Struct
 
@@ -80,12 +46,13 @@ defmodule Req.Request do
 
             * `{:data, chunk, acc}` - emit request body `chunk`.
 
+            * `{:done, chunk, acc}` - emit the final request body `chunk`. `acc` is passed to the
+              response streaming function.
+
             * `{:done, acc}` - request body is done. `acc` is passed to the response
               streaming function.
 
             * `{:halt, acc}` - cancel request. On HTTP/1, this closes the connection.
-
-          `req_body_fun` requires Finch main.
 
     * `:into` - where to send the response body. It can be one of:
 
@@ -99,6 +66,11 @@ defmodule Req.Request do
           Note that the collectable is only used, if the response status is 200. In other cases,
           the body is accumulated and processed as usual.
 
+        * `:self` - stream response body into the current process mailbox. The response body is
+          set to a `Req.Response.Async` struct that consumes the messages.
+
+      **Note**: `Req.stream/4` does not support `:into` option.
+
     * `:options` - the options to be used by steps. The exact representation of options is private.
       Calling `request.options[key]`, `put_in(request.options[key], value)`, and
       `update_in(request.options[key], fun)` is allowed. `get_option/3` and `delete_option/2`
@@ -106,112 +78,229 @@ defmodule Req.Request do
 
     * `:halted` - whether the request pipeline is halted. See `halt/2`.
 
-    * `:adapter` - a request step that makes the actual HTTP request. Defaults to `Req.Finch`.
+    * `:adapter` - the adapter that makes the actual HTTP request. Defaults to `Req.Finch`.
 
     * `:request_steps` - the list of request steps
-
-    * `:response_steps` - the list of response steps
-
-    * `:error_steps` - the list of error steps
 
     * `:private` - a map reserved for libraries and frameworks to use.
       The keys must be atoms. Prefix the keys with the name of your project
       to avoid any future conflicts. The `req_` prefix is reserved for Req.
 
-  ## Steps
+  ## The Low-level API
 
-  Req has three types of steps: request, response, and error.
+  Most Req users would use it like this:
 
-  Request steps are used to refine the data that will be sent to the server.
+      Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
+      #=> "Req is a batteries-included HTTP client for Elixir."
 
-  After making the actual HTTP request, we'll either get a HTTP response or an error.
-  The request, along with the response or error, will go through response or
-  error steps, respectively.
+  Here is the equivalent using the low-level API:
 
-  Nothing is actually executed until we run the pipeline with `Req.Request.run_request/1`.
+      req =
+        Req.Request.new(
+          url: "https://api.github.com/repos/wojtekmach/req"
+        )
+        |> Req.Request.register_options(
+          # ...
+          :decoders,
+          # ...
+        )
+        |> Req.Request.prepend_request_steps(
+          # ...
+          decode: Req.Decode,
+          # ...
+        )
 
-  ### Request Steps
+      Req.get!(req).body["description"]
+      #=> "Req is a batteries-included HTTP client for Elixir."
 
-  A **request step** (`t:request_step/0`) is a function that accepts a `request` and returns one
-  of the following:
+  In other words, `Req.new/1`, `Req.get/1`, and friends start with all the built-in steps and
+  options but `Req.Request.new/1` starts with a blank slate!
 
-    * A `request`.
+  ## Steps & Step Wrappers
 
-    * A `{request, response_or_error}` tuple. In this case no further request steps are executed
-      and the return value goes through response or error steps.
+  The simplest building blocks are steps, functions that take and return a request. For example:
 
-  #### Examples
-
-  A request step that adds a `user-agent` header if it's not there already:
-
-      def put_default_headers(request) do
-        Req.Request.put_new_header(request, "user-agent", "req")
-      end
-
-  The next is a request step that reads the response from cache if available. Note how, if the
-  cached response is available, this step returns a `{request, response}` tuple so that the
-  request doesn't actually go through:
-
-      def read_from_cache(request) do
-        case ResponseCache.fetch(request) do
-          {:ok, response} -> {request, response}
-          :error -> request
+      defmodule MyApp do
+        def put_user_agent(%Req.Request{} = req) do
+          if user_agent = req.options[:user_agent] do
+            Req.Request.put_header(req, "user-agent", user_agent)
+          else
+            req
+          end
         end
       end
 
-  ### Response and Error Steps
+      req =
+        Req.Request.new()
+        |> Req.Request.register_options([:user_agent])
+        |> Req.Request.prepend_request_steps(
+          put_user_agent: &MyApp.put_user_agent/1,
+        )
 
-  A response step (`t:response_step/0`) is a function that accepts a `{request, response}` tuple
-  and returns one of the following:
+      resp =
+        Req.get!(
+          req,
+          url: "https://httpbingo.org/user-agent",
+          user_agent: "foo"
+        )
 
-    * A `{request, response}` tuple.
+      JSON.decode!(resp.body)      # We used Req.Request.new() so we're not using built-in decoding.
+      #=> %{"user-agent" => "foo"}
 
-    * A `{request, exception}` tuple. In that case, no further response steps are executed but the
-      exception goes through error steps.
+  Next up, we have step _wrappers_, they additionally take `acc`, `fun`, `state`, and `next`.
+  `next` is a function representing the _rest_ of the processing pipeline, including hitting the
+  network.
 
-  Similarly, an error step is a function that accepts a `{request, exception}` tuple and returns one
-  of the following:
+  The simplest possible wrapper just calls the next one:
 
-    * A `{request, exception}` tuple
+      fn req, acc, fun, state, next ->
+        next.(req, acc, fun, state)
+      end
 
-    * A `{request, response}` tuple. In that case, no further error steps are executed but the
-      response goes through response steps.
+  Here's another example:
 
-  Examples:
+      defmodule MyApp do
+        def expect_successful(req, acc, fun, state, next) do
+          fun = fn
+            {:status, status}, resp, acc, state when status in 200..299 ->
+              fun.({:status, status}, resp, acc, state)
 
-      def decode({request, response}) do
-        case Req.Response.get_header(response, "content-type") do
-          ["application/json" <> _] ->
-            {request, update_in(response.body, &Jason.decode!/1)}
+            {:status, status}, resp, acc, state ->
+              err = RuntimeError.exception("unexpected status #{status}")
+              {{:error, err}, resp, acc, state}
 
-          [] ->
-            {request, response}
+            event, resp, acc, state ->
+              fun.(event, resp, acc, state)
+          end
+
+          next.(req, acc, fun, state)
         end
       end
 
-      def log_error({request, exception}) do
-        Logger.error(["#{request.method} #{request.uri}: ", Exception.message(exception)])
-        {request, exception}
-      end
+      Req.new("https://httpbingo.org/status/404")
+      |> Req.Request.prepend_request_steps(expect: &MyApp.expect_successful/5)
+      |> Req.request!()
 
-  ### Halting
+  More complicated wrappers will maintain their `state`.
 
-  Any step can call `halt/2` to halt the pipeline. This prevents any further steps
-  from being invoked.
+  The contract for wrappers is:
 
-  Examples:
+      wrapper :: (req, acc, fun, state, next ->
+                   {:ok, resp, acc, state}
+                   | {:halt, resp, acc, state}
+                   | {{:error, err}, resp, acc, state})
 
-      def circuit_breaker(request) do
-        if CircuitBreaker.open?() do
-          Req.Request.halt(request, RuntimeError.exception("circuit breaker is open"))
-        else
-          request
+  `fun` is:
+
+      fun :: (event, resp, acc, state ->
+                {:ok, resp, acc, state}
+                | {:halt, resp, acc, state}
+                | {{:error, err}, resp, acc, state})
+      when req: Req.Request.t(),
+           resp: Req.Response.t(),
+           err: Exception.t(),
+           acc: term(),
+           state: term(),
+           event:
+             {:status, non_neg_integer()}
+             | {:headers, [{binary(), binary()}]}
+             | {:data, term()}
+             | {:trailers, [{binary(), binary()}]}
+
+
+  `next` is:
+
+      next :: (req, acc, fun, state ->
+                 {:ok, resp, acc, state}
+                 | {:halt, resp, acc, state}
+                 | {{:error, err}, resp, acc, state})
+      when req: Req.Request.t(),
+           resp: Req.Response.t(),
+           err: Exception.t(),
+           acc: term(),
+           state: term()
+
+  Here's another example, a simplistic redirect feature:
+
+      defmodule MyApp do
+        @redirect_statuses [301, 302, 307, 308]
+
+        def redirect(req, acc, fun, state, next) do
+          next.(req, acc, wrap(fun, next), state)
+        end
+
+        defp wrap(fun, next) do
+          fn
+            {:headers, _headers}, resp, acc, state
+            when resp.status in @redirect_statuses ->
+              [location] = Req.Response.get_header(resp, "location")
+              req = resp.request
+              req = update_in(req.url, &URI.merge(&1, location))
+
+              with {:ok, resp, acc, state} <- next.(req, acc, wrap(fun, next), state) do
+                {:halt, resp, acc, state}
+              end
+
+            event, resp, acc, state ->
+              fun.(event, resp, acc, state)
+          end
         end
       end
 
-  ## Writing Plugins
+      Req.Request.new(url: "https://httpbingo.org/redirect/3")
+      |> Req.Request.prepend_request_steps(redirect: &MyApp.redirect/5)
+      |> Req.request!()
+
+  `acc` and `fun` are the ones given to [`Req.stream(req, acc, fun, options \\ [])`](`Req.stream/4`).
+  Most steps usually just pass them through unchanged. However, if you want to process response as
+  it comes in, you'd want to maintain your own `state`. Here's a simplistic streaming NDJSON decoder:
+
+      defmodule MyApp do
+        def decode(%Req.Request{} = req, acc, fun, state, next) do
+          fun = fn
+            {:data, data}, resp, acc, [buffer | state] ->
+              {lines, [buffer]} = Enum.split(String.split(buffer <> data, "\n"), -1)
+              values = for line <- lines, line != "", do: JSON.decode!(line)
+              {tag, resp, acc, state} = fun.({:data, values}, resp, acc, state)
+              {tag, resp, acc, [buffer | state]}
+
+            event, resp, acc, [buffer | state] ->
+              {tag, resp, acc, state} = fun.(event, resp, acc, state)
+              {tag, resp, acc, [buffer | state]}
+          end
+
+          {tag, resp, acc, [_buffer | state]} = next.(req, acc, fun, ["" | state])
+          {tag, resp, acc, state}
+        end
+      end
+
+      req =
+        Req.Request.new()
+        |> Req.Request.prepend_request_steps(decode: &MyApp.decode/5)
+
+      Req.stream(
+        req,
+        nil,
+        fn values, _resp, acc ->
+          IO.inspect(Enum.map(values, &Map.take(&1, ["id"])))
+          {:cont, acc}
+        end,
+        url: "https://httpbingo.org/stream/3"
+      )
+      # Output: [%{"id" => 0}]
+      # Output: [%{"id" => 1}]
+      # Output: [%{"id" => 2}]
+
+  ## Adapters
+
+  By default Req uses `Finch` (via `Req.Finch`) and supports arbitrary adapters implementing
+  `Req.Adapter` behaviour. Req adapters are closely related to step wrappers described in previous
+  section.
+
+  ## Plugins
 
   Custom steps can be packaged into plugins so that they are even easier to use by others.
+  By convention, a plugin module exports a `def attach(%Req.Request{} = req)` function:
 
   Here's an example plugin:
 
@@ -224,33 +313,27 @@ defmodule Req.Request do
           * `:print_headers` - if `true`, prints the headers. Defaults to `false`.
 
         \"""
-        def attach(%Req.Request{} = request, options \\ []) do
-          request
+        def attach(%Req.Request{} = req) do
+          req
           |> Req.Request.register_options([:print_headers])
-          |> Req.Request.merge_options(options)
-          |> Req.Request.append_request_steps(print_headers: &print_request_headers/1)
-          |> Req.Request.prepend_response_steps(print_headers: &print_response_headers/1)
+          |> Req.Request.append_request_steps(print_headers: __MODULE__)
         end
 
-        defp print_request_headers(request) do
-          if request.options[:print_headers] do
-            print_headers("> ", request)
-          end
+        def stream(%Req.Request{} = req, acc, fun, state, next) do
+          if req.options[:print_headers] do
+            for {name, value} <- Req.get_headers_list(req) do
+              IO.puts(["> ", name, ": ", value])
+            end
 
-          request
-        end
+            with {:ok, resp, acc, state} <- next.(req, acc, fun, state) do
+              for {name, value} <- Req.get_headers_list(resp) do
+                IO.puts(["< ", name, ": ", value])
+              end
 
-        defp print_response_headers({request, response}) do
-          if request.options[:print_headers] do
-            print_headers("< ", response)
-          end
-
-          {request, response}
-        end
-
-        defp print_headers(prefix, request_or_response) do
-          for {name, value} <- Req.get_headers_list(request_or_response) do
-            IO.puts([prefix, name, ": ", value])
+              {:ok, resp, acc, state}
+            end
+          else
+            next.(req, acc, fun, state)
           end
         end
       end
@@ -259,24 +342,18 @@ defmodule Req.Request do
 
       req = Req.new() |> PrintHeaders.attach()
 
-      Req.get!(req, url: "https://httpbingo.org/json").status
-      200
+      resp = Req.get!(req, url: "https://httpbingo.org/json")
+      resp.status
+      #=> 200
 
-      Req.get!(req, url: "https://httpbingo.org/json", print_headers: true).status
-      # Outputs:
-      # > accept-encoding: br, gzip
-      # > user-agent: req/0.3.0-dev
-      # < date: Wed, 11 May 2022 11:10:47 GMT
-      # < content-type: application/json
+      resp = Req.get!(req, url: "https://httpbingo.org/json", print_headers: true)
+      # Output: > accept-encoding: br, gzip
+      # Output: > user-agent: req/0.3.0-dev
+      # Output: < date: Wed, 12 Aug 2026 09:07:49 GMT
+      # Output: < content-type: application/json
       # ...
-      200
-
-      req = Req.new() |> PrintHeaders.attach(print_headers: true)
-      Req.get!(req, url: "https://httpbingo.org/json").status
-      # Outputs:
-      # > accept-encoding: br, gzip
-      # ...
-      200
+      resp.status
+      #=> 200
 
   As you can see a plugin is simply a module. While this is not enforced, the plugin should follow
   these conventions:
@@ -299,6 +376,12 @@ defmodule Req.Request do
 
   """
 
+  @type acc() :: term()
+  @type state() :: term()
+  @type req() :: Req.Request.t()
+  @type resp() :: Req.Response.t()
+  @type err() :: Exception.t()
+
   @typedoc """
   A function for streaming request body chunks.
 
@@ -306,7 +389,13 @@ defmodule Req.Request do
   to `Req.stream/4`.
   """
   @type req_body_fun(acc) ::
-          (acc -> {:data, binary(), acc} | {:done, acc} | {:halt, acc})
+          (acc ->
+             {:data, binary(), acc}
+             | {:done, binary(), acc}
+             | {:done, acc}
+             | {:halt, acc})
+
+  @typep request_step() :: term()
 
   @typedoc """
   The request struct.
@@ -316,24 +405,12 @@ defmodule Req.Request do
           url: URI.t(),
           headers: %{optional(binary()) => [binary()]},
           body: iodata() | Enumerable.t() | req_body_fun(term()) | nil,
-          into: nil | iodata() | Collectable.t(),
+          into: nil | :self | Collectable.t(),
           options: options(),
           adapter: module(),
-          request_steps: [{name :: atom(), request_step() | module()}],
+          request_steps: [{name :: atom(), request_step()}],
           private: map()
         }
-
-  @typedoc """
-  A transform step is a function that takes a request and returns a request.
-
-  The function can be an anonymous function, or a `{module, function, args}` tuple. In the latter
-  case, the step is invoked as `apply(module, function, [request | args])`.
-
-  A step can also be a module implementing `stream(req, acc, fun, state, next)`. See the
-  ["Request Steps"](#module-request-steps) section in the module documentation.
-  """
-  @typedoc since: "0.5.1"
-  @type request_step() :: (t() -> t()) | {module(), atom(), [term()]}
 
   @typep options() :: term()
 
@@ -376,7 +453,7 @@ defmodule Req.Request do
       200
   """
   @spec new(keyword()) :: t()
-  def new(options \\ []) do
+  def new(options \\ []) when is_list(options) do
     options =
       options
       |> Keyword.validate!([:method, :url, :headers, :body, :adapter, :options])
@@ -608,15 +685,13 @@ defmodule Req.Request do
   end
 
   @doc """
-  Appends **steps** to the existing steps.
-
-  See the ["Request Steps"](#module-request-steps) section in the module documentation
-  for more information.
+  Appends `steps` to the existing steps.
 
   ## Examples
 
-      Req.Request.append_request_steps(request,
-        noop: fn request -> request end,
+      Req.Request.append_request_steps(
+        req,
+        noop: fn req -> req,
         inspect: &IO.inspect/1
       )
   """
@@ -626,15 +701,13 @@ defmodule Req.Request do
   end
 
   @doc """
-  Prepends **steps** to the existing steps.
-
-  See the ["Request Steps"](#module-request-steps) section in the module documentation
-  for more information.
+  Prepends `steps` to the existing steps.
 
   ## Examples
 
-      Req.Request.prepend_request_steps(request,
-        noop: fn request -> request end,
+      Req.Request.prepend_request_steps(
+        req,
+        noop: fn req -> req end,
         inspect: &IO.inspect/1
       )
   """
@@ -970,17 +1043,19 @@ defmodule Req.Request do
     end
 
     defp steps_args(req) do
-      default_req = Req.Request.new() |> Req.Steps.attach()
-
-      [:request_steps, :response_steps, :error_steps]
-      |> Enum.map(&steps_arg(&1, req, default_req))
+      [
+        request_steps: Req.Steps.__default__(),
+        response_steps: [],
+        error_steps: []
+      ]
+      |> Enum.map(fn {name, default} -> steps_arg(name, req, default) end)
       |> Enum.reject(&is_nil/1)
     end
 
-    defp steps_arg(name, req, default_req) do
+    defp steps_arg(name, req, default) do
       steps = Map.fetch!(req, name)
 
-      if steps == Map.fetch!(default_req, name) do
+      if steps == default do
         nil
       else
         {name, steps}

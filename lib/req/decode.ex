@@ -6,16 +6,16 @@ defmodule Req.Decode do
 
   ## Built-in decoders
 
-  | Format               | Decoder                                       | Enabled | Streaming |
-  | -------------------- | --------------------------------------------- | ------- | --------- |
-  | `:json`, `:json_api` | `Req.JSON`                                    | ✓       |           |
-  | `:ndjson`            | `Req.NDJSON`                                  | ✓       | ✓         |
-  | `:sse`               | `Req.SSE`                                     | ✓       | ✓         |
-  | `:zip`               | `Req.ZIP`                                     |         |           |
-  | `:tar`, `:tgz`       | `Req.Tar`                                     |         |           |
-  | `:gz`                | [`:zlib`](`:zlib`)                            |         | ✓         |
-  | `:zst`               | [`:zstd`](`:zstd`) (requires Erlang/OTP 28+)  |         | ✓         |
-  | `:csv`               | `NimbleCSV.RFC4180` (requires [nimble_csv])   |         |           |
+  | Format               | Decoder                              | Enabled | Streaming Decoding |
+  | -------------------- | ------------------------------------ | ------- | ------------------ |
+  | `:json`, `:json_api` | `Req.JSON`                           | ✓       |                    |
+  | `:ndjson`            | `Req.NDJSON`                         | ✓       | ✓                  |
+  | `:sse`               | `Req.SSE`                            | ✓       | ✓                  |
+  | `:zip`               | `Req.ZIP`                            |         |                    |
+  | `:tar`, `:tgz`       | `Req.Tar`                            |         |                    |
+  | `:gz`                | `Req.Gzip`                           |         | ✓                  |
+  | `:zst`               | `Req.Zstd` (requires Erlang/OTP 28+) |         | ✓                  |
+  | `:csv`               | `Req.CSV` (requires [nimble_csv])    |         |                    |
 
   The format is determined by the response `content-type` header. See `MIME` for registering
   content-type/format mapping.
@@ -43,18 +43,16 @@ defmodule Req.Decode do
 
             * another format (atom), to reuse a built-in decoder, e.g. `decoders: [json5: :json]`.
 
-            * a 1-arity function that returns `{:ok, term}` or `{:error, exception}`.
+            * a 1-arity function that returns `{:ok, term}` or `{:error, exception}`, e.g.:
 
-            * 
+                  decoders: [{"text/calendar", &{:ok, ICal.from_ics(&1)}}]
 
       Setting `:decoders` replaces the default, so include `:json` if you still want JSON decoded:
 
           # handles json, zip, and tar:
           Req.new(decoders: [:json, :zip, :tar])
 
-      Set `:decoders` to `false` to disable all decoding, including JSON. A custom decoder:
-
-          Req.get!(url, decoders: [ics: &{:ok, ICal.from_ics(&1)}])
+      Set `:decoders` to `false` to disable all decoding, including JSON.
 
     * `:decode_body` - if set to `false`, disables automatic response body decoding.
       Defaults to `true`.
@@ -101,6 +99,7 @@ defmodule Req.Decode do
     csv: Req.CSV
   ]
 
+  @doc false
   def stream(%Req.Request{} = req, acc, fun, state, next) do
     if req.options[:raw] == true or req.options[:decode_body] == false or
          req.options[:decoders] == false do

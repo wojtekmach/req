@@ -76,6 +76,7 @@ defmodule Req.Decompress do
   require Logger
   require Req.Utils
 
+  @doc false
   def stream(%Req.Request{} = req, acc, fun, state, next) do
     cond do
       req.into != nil ->
