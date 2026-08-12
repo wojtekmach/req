@@ -2,27 +2,11 @@ defmodule Req.ZIP do
   @moduledoc """
   ZIP archive decoding using [`:zip`].
 
-  This module is used by `Req.Decode` on `.zip` and `application/zip`.
+  `Req.Decode` can use this module for `.zip` and `application/zip` responses when the `:zip`
+  decoder is enabled via the `:decoders` option.
 
   [`:zip`]: `:zip`
   """
-
-  # @doc """
-  # Decodes a ZIP archive `binary` into a list of `{name, contents}` entries.
-
-  # Returns `{:ok, entries}` or `{:error, exception}`.
-  # """
-  # @spec decode(binary()) :: {:ok, [{charlist(), binary()}]} | {:error, %Req.ArchiveError{}}
-  # def decode(binary) when is_binary(binary) do
-  #   case :zip.extract(binary, [:memory]) do
-  #     {:ok, files} ->
-  #       {:ok, files}
-
-  #     {:error, _reason} ->
-  #       # :zip surfaces an internal `{:badmatch, _}` term here, which is not useful.
-  #       {:error, %Req.ArchiveError{format: :zip, data: binary}}
-  #   end
-  # end
 
   @doc false
   def encode!(files) do

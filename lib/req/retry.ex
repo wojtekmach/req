@@ -19,7 +19,7 @@ defmodule Req.Retry do
         * `fun` - a 2-arity function that accepts a `Req.Request` and either a `Req.Response` or an exception struct
           and returns one of the following:
 
-            * `true` - retry with the default delay controller by default delay option described below.
+            * `true` - retry using the default delay described under `:retry_delay` below.
 
             * `{:delay, milliseconds}` - retry with the given delay.
 
@@ -51,6 +51,7 @@ defmodule Req.Retry do
 
   require Logger
 
+  @doc false
   def stream(%Req.Request{} = req, acc, fun, state, next) do
     stream(req, acc, fun, state, next, _count = 0)
   end

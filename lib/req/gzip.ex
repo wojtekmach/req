@@ -2,8 +2,9 @@ defmodule Req.Gzip do
   @moduledoc """
   [gzip] decoding using [`:zlib`].
 
-  This module is used by `Req.Decode` on `.gz`, `application/gzip`, and `application/x-gzip`
-  and by `Req.Decompress` on `content-encoding: gzip`.
+  `Req.Decode` can use this module for `.gz`, `application/gzip`, and `application/x-gzip`
+  responses when the `:gz` decoder is enabled via the `:decoders` option. `Req.Decompress`
+  uses it on `content-encoding: gzip`.
 
   [gzip]: https://en.wikipedia.org/wiki/Gzip
   [`:zlib`]: `:zlib`

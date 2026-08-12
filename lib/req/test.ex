@@ -8,12 +8,11 @@ defmodule Req.Test do
 
     * `Req.Request` - the low-level API and the request struct
 
-    * `Req.Steps` - the collection of built-in steps
+    * `Req.Auth`, …, `Req.Steps` - a collection of built-in steps.
 
     * `Req.Test` - the testing conveniences (you're here!)
 
-  Req already has built-in support for different variants of stubs via `:plug`, `:adapter`,
-  and (indirectly) `:base_url` options. With this module you can:
+  `Req.Test` allows you to:
 
     * Create request stubs using [`Req.Test.stub(name, plug)`](`stub/2`) and mocks
       using [`Req.Test.expect(name, count, plug)`](`expect/3`). Both can be used in concurrent
@@ -551,9 +550,9 @@ defmodule Req.Test do
   Creates a request expectation with the given `name` and `plug`, expected to be fetched at
   most `n` times, **in order**.
 
-  This function allows you to expect a `n` number of request and handle them **in order** via the
-  given `plug`. It is safe to use in concurrent tests. If you fetch the value under `name` more
-  than `n` times, this function raises a `RuntimeError`.
+  This function allows you to expect `n` requests and handle them **in order** via the given
+  `plug`. It is safe to use in concurrent tests. Fetching the value under `name` more than `n`
+  times raises a `RuntimeError`.
 
   The `name` can be any term.
 
@@ -613,7 +612,7 @@ defmodule Req.Test do
   end
 
   @doc """
-  Sets the `Req.Test` mode to "global", meaning that the stubs are shared across all tests
+  Sets the `Req.Test` mode to "shared", meaning that the stubs are shared across all tests
   and cannot be used concurrently.
   """
   @doc since: "0.5.0"

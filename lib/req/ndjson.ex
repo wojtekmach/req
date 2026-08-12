@@ -1,13 +1,32 @@
 defmodule Req.NDJSON do
-  # @moduledoc """
-  # [NDJSON] decoding using `Req.JSON`.
+  @moduledoc """
+  [NDJSON] decoding.
 
-  # Each line is decoded as a separate JSON document. This module is used by `Req.Decode` on
-  # `application/x-ndjson` and `application/ndjson`. With `Req.stream/4`, each line is delivered
-  # as its own data event.
+  Each line is decoded as a separate JSON document. This module is used by `Req.Decode` on
+  `application/x-ndjson` and `application/ndjson`.
 
-  # [NDJSON]: https://github.com/ndjson/ndjson-spec
-  # """
+  [NDJSON]: https://github.com/ndjson/ndjson-spec
+
+  ## Examples
+
+      iex> {:ok, resp, acc} =
+      ...>   Req.stream(
+      ...>     "http://httpbingo.org/stream/2",
+      ...>     [],
+      ...>     fn data, _resp, acc ->
+      ...>       IO.inspect(data)
+      ...>       {:cont, acc}
+      ...>     end,
+      ...>     decoders: [text: :ndjson] # endpoint sends content-type: text/plain
+      ...>                               # so let's force ndjson.
+      ...>   )
+      # Output: %{"id" => 0, ...}
+      # Output: %{"id" => 1, ...}
+      iex> resp.status
+      200
+      iex> resp.body
+      nil
+  """
 
   @doc false
   def decode_init(:buffer) do

@@ -177,21 +177,32 @@ defmodule Req.MixProject do
         Types: &(&1[:kind] == :type),
         Callbacks: &(&1[:kind] == :callback),
         "Request Steps": &(&1[:step] == :request),
-        "Response Steps": &(&1[:step] == :response),
-        "Error Steps": &(&1[:step] == :error),
         Functions: &(&1[:kind] == :function and &1[:type] not in [:request, :mock, :async]),
         "Functions (Making Requests)": &(&1[:type] == :request),
         "Functions (Async Response)": &(&1[:type] == :async),
         "Functions (Mocks & Stubs)": &(&1[:type] == :mock)
       ],
       groups_for_modules: [
+        Steps: [
+          Req.Auth,
+          Req.Checksum,
+          Req.Decode,
+          Req.Decompress,
+          Req.Expect,
+          Req.Redirect,
+          Req.Retry,
+          Req.Steps
+        ],
         Adapters: [
+          Req.Adapter,
           Req.Finch,
           Req.Plug
         ],
         Formats: [
           Req.Brotli,
+          Req.CSV,
           Req.Gzip,
+          Req.JSON,
           Req.NDJSON,
           Req.SSE,
           Req.Tar,

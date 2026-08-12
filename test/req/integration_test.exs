@@ -29,9 +29,7 @@ defmodule Req.IntegrationTest do
       post!: 2,
       put!: 2,
       patch!: 2,
-      delete!: 2,
-      run: 2,
-      run!: 2
+      delete!: 2
     ]
 
   doctest Req.Request,

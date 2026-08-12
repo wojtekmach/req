@@ -3,6 +3,23 @@ defmodule DocsTest do
 
   @version Mix.Project.config()[:version]
 
+  test "Req.Steps moduledoc lists step modules" do
+    {:docs_v1, _, _, _, %{"en" => moduledoc}, _, _} = Code.fetch_docs(Req.Steps)
+    [_, section] = String.split(moduledoc, "step modules:", parts: 2)
+
+    listed =
+      for [_, name] <- Regex.scan(~r/\* `(Req\.\w+)`/, section) do
+        Module.concat([name])
+      end
+
+    steps =
+      Req.Steps.__default__()
+      |> Keyword.values()
+      |> Enum.filter(&is_atom/1)
+
+    assert Enum.sort(listed) == Enum.sort(steps)
+  end
+
   @tag skip: Version.parse!(@version).pre != []
   test "version" do
     requirements =

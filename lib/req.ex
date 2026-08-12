@@ -8,7 +8,7 @@ defmodule Req do
 
     * `Req.Request` - the low-level API and the request struct
 
-    * `Req.Steps` - the collection of built-in steps
+    * `Req.Auth`, …, `Req.Steps` - a collection of built-in steps.
 
     * `Req.Test` - the testing conveniences
 
@@ -57,12 +57,18 @@ defmodule Req do
   Stream response body using `Req.stream/4`:
 
       iex> {:ok, resp, acc} =
-      ...>   Req.stream("http://httpbingo.org/stream/2", [], fn data, _resp, acc ->
-      ...>     IO.puts(data)
+      ...> Req.stream(
+      ...>   "http://httpbingo.org/stream/2",
+      ...>   [],
+      ...>   fn data, _resp, acc ->
+      ...>     IO.inspect(data)
       ...>     {:cont, acc}
-      ...>   end)
-      # output: {"url": "http://httpbingo.org/stream/2", ...}
-      # output: {"url": "http://httpbingo.org/stream/2", ...}
+      ...>   end,
+      ...>   decoders: [text: :ndjson] # endpoint sends content-type: text/plain
+      ...>                             # so let's force ndjson.
+      ...> )
+      # Output: %{"id" => 0, ...}
+      # Output: %{"id" => 1, ...}
       iex> resp.status
       200
       iex> resp.body
@@ -127,10 +133,10 @@ defmodule Req do
   > Most Elixir/Erlang HTTP clients represent headers as lists of tuples like:
   >
   > ```elixir
-  > [{"content-type", "text/plain"}]`
+  > [{"content-type", "text/plain"}]
   > ```
   >
-  > For interopability with those, use
+  > For interoperability with those, use
   > `Req.get_headers_list/1`.
   """
 
@@ -192,6 +198,9 @@ defmodule Req do
           return one of:
 
             * `{:data, chunk, acc}` - Emit request body `chunk` and continue streaming.
+
+            * `{:done, chunk, acc}` - emit the final request body `chunk`. `acc` is passed to the
+              response streaming function.
 
             * `{:done, acc}` - request body streaming is done. `acc` is passed to the
               response streaming function.
@@ -255,6 +264,12 @@ defmodule Req do
     * `:compress_body` - if set to `true`, compresses the request body using gzip (via [`compress_body`](`Req.Steps.compress_body/1`) step.)
       Defaults to `false`.
 
+  Other request options:
+
+    * `:user_agent` - sets the `user-agent` request header, see `Req.Steps.put_user_agent/1`.
+
+    * `:range` - sets the `range` request header, see `Req.Steps.put_range/1`.
+
   AWS Signature Version 4 options ([`put_aws_sigv4`](`Req.Steps.put_aws_sigv4/1`) step):
 
     * `:aws_sigv4` - if set, the AWS options to sign request:
@@ -315,13 +330,18 @@ defmodule Req do
           rate or have more control over how messages are streamed, use `Req.stream/4` or
           `into: collectable` instead.
 
+      **Note**: `Req.stream/4` does not support `:into` option.
+
   Response redirect options (`Req.Redirect` step):
 
     * `:redirect` - if set to `false`, disables automatic response redirects. Defaults to `true`.
 
     * `:redirect_trusted` - by default, authorization credentials are only sent on redirects
       with the same host, scheme and port. If `:redirect_trusted` is set to `true`, credentials
-      will be sent to any host.
+      will be sent to any host. Defaults to `false`.
+
+    * `:redirect_log_level` - the log level to emit redirect logs at. Can also be set
+      to `false` to disable logging these messages. Defaults to `:debug`.
 
     * `:max_redirects` - the maximum number of redirects, defaults to `10`.
 
@@ -329,6 +349,8 @@ defmodule Req do
 
     * `:expect` - the expected HTTP response status (via `Req.Expect` step).
       Can be an integer, a range, or a list of integers/ranges.
+
+    * `:checksum` - if set, this is the expected response body checksum, see `Req.Checksum`.
 
   Retry options (`Req.Retry` step):
 
@@ -340,14 +362,15 @@ defmodule Req do
 
             * `Req.TransportError` with `reason: :timeout | :econnrefused | :closed`
 
-            * `Req.HTTPError` with `protocol: :http2, reason: :unprocessed`
+            * `Req.HTTPError` with
+              `protocol: :http2, reason: :unprocessed | :pool_not_available`
 
         * `:transient` - same as `:safe_transient` except retries all HTTP methods (POST, DELETE, etc.)
 
         * `fun` - a 2-arity function that accepts a `Req.Request` and either a `Req.Response` or an exception struct
           and returns one of the following:
 
-            * `true` - retry with the default delay controller by default delay option described below.
+            * `true` - retry using the default delay described under `:retry_delay` below.
 
             * `{:delay, milliseconds}` - retry with the given delay.
 
@@ -543,7 +566,7 @@ defmodule Req do
 
     if Keyword.has_key?(options, :decode_json) do
       # TODO: mention in changelog
-      raise "setting `decode_json: opts` is removed in favour of `decoders: [json: &Jason.decode(&1, opts)`"
+      raise "setting `decode_json: opts` is removed in favour of `decoders: [json: &Jason.decode(&1, opts)]`"
     end
 
     request_option_names = [:method, :url, :headers, :body, :adapter, :into, :private]
@@ -782,7 +805,12 @@ defmodule Req do
 
   With URL:
 
-      iex> {:ok, resp} = Req.post("https://httpbingo.org/anything", body: "hello!", headers: [content_type: "text/plain"])
+      iex> {:ok, resp} =
+      ...>   Req.post(
+      ...>     "https://httpbingo.org/anything",
+      ...>     body: "hello!",
+      ...>     headers: [content_type: "text/plain"]
+      ...>   )
       iex> resp.body["data"]
       "hello!"
 
@@ -1331,6 +1359,83 @@ defmodule Req do
     end
   end
 
+  @doc """
+  Streams an HTTP request.
+
+  `req` can be one of:
+
+    * an url (`String` or `URI`);
+    * a `Keyword` options;
+    * a `Req.Request` struct
+
+  `acc` is the initial accumulator. `fun` receives response body chunk, the response struct, and
+  accumulator. `fun` must return `{:cont, acc}` to continue streaming or `{:halt, acc}` to cancel
+  the request (on HTTP/1 cancelling the request closes the connection):
+
+      fn data, resp, acc ->
+        {:cont, acc} | {:halt, acc}
+      end
+
+  `data` is automatically decoded for some formats, including NDJSON and SSE (Server-Sent Events).
+  See `Req.Decode` for more information.
+
+  `Req.stream/4` returns `{:ok, resp, acc}` or `{:error, err, resp, acc}`.
+
+  See `new/1` for a list of available options.
+
+  ## Examples
+
+  Returns recent Wikipedia changes:
+
+      iex> {:ok, resp, acc} =
+      ...>   Req.stream(
+      ...>     "https://stream.wikimedia.org/v2/stream/recentchange",
+      ...>     [],
+      ...>     fn event, _resp, acc ->
+      ...>       %{"type" => type, "title" => title} = JSON.decode!(event.data)
+      ...>       event = {type, title}
+      ...> 
+      ...>       if length(acc) < 1 do
+      ...>         {:cont, [event | acc]}
+      ...>       else
+      ...>         {:halt, [event | acc]}
+      ...>       end
+      ...>     end
+      ...>   )
+      iex> resp.status
+      200
+      iex> resp.body
+      nil
+      iex> Enum.reverse(acc)
+      [
+        {"edit", "File:Glacier National Park (GeoDIL number - 2068).jpg"},
+        {"categorize", "Category:Coins of Merovingian dynasty from Gallica"}
+      ]
+
+  Returns an error:
+
+      iex> {:error, err, resp, acc} =
+      ...>   Req.stream(
+      ...>     "http://localhost:9999",
+      ...>     nil,
+      ...>     fn data, _resp, acc -> dbg(data); {:cont, acc} end,
+      ...>     retry: false
+      ...>   )
+      iex> err
+      %Req.TransportError{reason: :econnrefused}
+      iex> resp.status
+      nil
+      iex> to_string(resp.request.url)
+      "http://localhost:9999"
+  """
+  @doc type: :request
+  @spec stream(req, acc, fun, options) :: {:ok, resp, acc} | {:error, err, resp, acc}
+        when req: url() | keyword() | Req.Request.t(),
+             resp: Req.Response.t(),
+             err: Exception.t(),
+             acc: term(),
+             fun: (data :: term(), resp, acc -> {:cont, acc} | {:halt, acc}),
+             options: keyword()
   def stream(req, acc, fun, options \\ []) when is_function(fun, 3) do
     req = Req.new(req, options)
 
@@ -1519,49 +1624,7 @@ defmodule Req do
     end)
   end
 
-  @doc """
-  Makes an HTTP request and returns the request and response or error.
-
-  `request` can be one of:
-
-    * an url (`String` or `URI`);
-
-    * a `Keyword` options;
-
-    * a `Req.Request` struct
-
-  See `new/1` for a list of available options.
-
-  Also see `request/2` for a similar function that returns the response or error
-  (without the request).
-
-  ## Examples
-
-  With options keywords list:
-
-      iex> {:ok, resp} = Req.request(url: "https://api.github.com/repos/elixir-lang/elixir")
-      iex> resp.request.url.host
-      "api.github.com"
-      iex> resp.status
-      200
-
-  With request struct and options:
-
-      iex> req = Req.new(base_url: "https://api.github.com")
-      iex> {:ok, resp} = Req.request(req, url: "/repos/elixir-lang/elixir")
-      iex> resp.request.url.host
-      "api.github.com"
-      iex> resp.status
-      200
-
-  Returns an error:
-
-      iex> {:error, exception} = Req.request("http://localhost:9999", retry: false)
-      iex> exception
-      %Req.TransportError{reason: :econnrefused}
-
-  """
-  @doc type: :request
+  @doc false
   @deprecated "Use Req.request/2 and `resp.request` instead"
   @spec run(request :: url() | keyword() | Req.Request.t(), options :: keyword()) ::
           {Req.Request.t(), Req.Response.t() | Exception.t()}
@@ -1594,46 +1657,7 @@ defmodule Req do
           "expected 2nd argument to be an options keywords list, got: #{inspect(options)}"
   end
 
-  @doc """
-  Makes an HTTP request and returns the request and response or raises on errors.
-
-  `request` can be one of:
-
-    * an url (`String` or `URI`);
-
-    * a `Keyword` options;
-
-    * a `Req.Request` struct
-
-  See `new/1` for a list of available options.
-
-  Also see `request!/2` for a similar function that returns the response (without the request).
-
-  ## Examples
-
-  With options keywords list:
-
-      iex> resp = Req.request!(url: "https://api.github.com/repos/elixir-lang/elixir")
-      iex> resp.request.url.host
-      "api.github.com"
-      iex> resp.status
-      200
-
-  With request struct and options:
-
-      iex> req = Req.new(base_url: "https://api.github.com")
-      iex> resp = Req.request!(req, url: "/repos/elixir-lang/elixir")
-      iex> resp.request.url.host
-      "api.github.com"
-      iex> resp.status
-      200
-
-  Raises an error:
-
-      iex> Req.request!("http://localhost:9999", retry: false)
-      ** (Req.TransportError) connection refused
-  """
-  @doc type: :request
+  @doc false
   @deprecated "Use Req.request!/2 and `resp.request` instead"
   @spec run!(request :: url() | keyword() | Req.Request.t(), options :: keyword()) ::
           {Req.Request.t(), Req.Response.t()}

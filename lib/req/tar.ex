@@ -2,7 +2,8 @@ defmodule Req.Tar do
   @moduledoc """
   Tar archive decoding using [`:erl_tar`].
 
-  This module is used by `Req.Decode` on `.tar`, `.tgz`, `.tar.gz`, and `application/x-tar`.
+  `Req.Decode` can use this module for `.tar`, `.tgz`, `.tar.gz`, and `application/x-tar`
+  responses when the `:tar` or `:tgz` decoder is enabled via the `:decoders` option.
 
   [`:erl_tar`]: `:erl_tar`
   """

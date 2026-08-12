@@ -1,6 +1,6 @@
 defmodule Req.JSON do
   @moduledoc """
-  JSON decoding using `JSON`.
+  JSON decoding using Elixir's `JSON` module.
 
   This module is used by `Req.Decode` on `.json`, `application/json`,
   and `application/vnd.api+json`.

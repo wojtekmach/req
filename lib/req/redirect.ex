@@ -16,7 +16,7 @@ defmodule Req.Redirect do
 
     * `:redirect_trusted` - by default, authorization credentials are only sent
       on redirects with the same host, scheme and port. If `:redirect_trusted` is set
-      to `true`, credentials will be sent to any host.
+      to `true`, credentials will be sent to any host. Defaults to `false`.
 
     * `:redirect_log_level` - the log level to emit redirect logs at. Can also be set
       to `false` to disable logging these messages. Defaults to `:debug`.
@@ -34,7 +34,7 @@ defmodule Req.Redirect do
       # 23:07:59.570 [debug] redirecting to /relative-redirect/3
       # 23:08:00.068 [debug] redirecting to /relative-redirect/2
       # 23:08:00.206 [debug] redirecting to /relative-redirect/1
-      ** (RuntimeError) too many redirects (3)
+      ** (Req.TooManyRedirectsError) too many redirects (3)
 
       iex> Req.get!("http://api.github.com", redirect_log_level: false)
       200
@@ -46,6 +46,7 @@ defmodule Req.Redirect do
 
   require Logger
 
+  @doc false
   def stream(%Req.Request{} = req, acc, fun, state, next) do
     if redirect?(req) do
       wrapped = fn

@@ -562,7 +562,7 @@ If you wish to maximize request rate or have more control over how messages are 
   * [`Req`]: Deprecate setting `:headers` to values other than string/integer/`DateTime`.
     This is to potentially allow special handling of atom values in the future.
 
-  * [`Req`]: Add `Req.run/2` and `Req.run!/2`.
+  * [`Req`]: Add Req.run/2 and Req.run!/2.
 
   * [`Req`]: `into: :self` now sets `response.body` as `Req.Response.Async` which implements
     enumerable.

@@ -60,6 +60,7 @@ defmodule Req.Auth do
 
   require Logger
 
+  @doc false
   def stream(%Req.Request{} = req, acc, fun, state, next) do
     case next.(auth(req), acc, fun, state) do
       {:ok, resp, _acc, _state} = result ->

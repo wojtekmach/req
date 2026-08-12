@@ -150,6 +150,8 @@ defmodule Req.Finch do
 
   """
 
+  @behaviour Req.Adapter
+
   @finch_build_options [:pool_tag, :unix_socket]
   @finch_request_options [:pool_timeout, :receive_timeout, :request_timeout, :pool_strategy]
 
@@ -159,6 +161,7 @@ defmodule Req.Finch do
     Finch.child_spec(name: name, pools: %{default: pool_options(options)})
   end
 
+  @impl true
   def stream(req, acc, fun, state) when is_function(fun, 4) do
     case req.into do
       :self ->
@@ -539,6 +542,7 @@ defmodule Req.Finch do
     Module.concat(Req.FinchSupervisor, "Pool_#{hash}")
   end
 
+  # TODO: doc false?
   @doc """
   Returns Finch pool options for the given Req `options`.
   """

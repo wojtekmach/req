@@ -17,7 +17,7 @@ defmodule Req.Response.Async do
 
   ## Examples
 
-      iex> resp = Req.get!("https://reqbin.org/ndjson?delay=1000", into: :self)
+      iex> resp = Req.get!("https://httpbingo.org/stream/3", into: :self)
       iex> resp.body
       #Req.Response.Async<...>
       iex> Enum.each(resp.body, &IO.puts/1)
