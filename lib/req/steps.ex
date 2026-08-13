@@ -1245,6 +1245,16 @@ defmodule Req.Steps do
     end
   end
 
+  defp normalize_decoder(request, {format, options}) when is_atom(format) and is_list(options) do
+    if format in @builtin_decoders do
+      {format, builtin_codec(request, format, options)}
+    else
+      raise ArgumentError,
+            "unknown decoder format: #{inspect(format)}. Built-in formats are: " <>
+              Enum.map_join(@builtin_decoders, ", ", &inspect/1)
+    end
+  end
+
   defp normalize_decoder(request, {format, codec}) when is_atom(format) do
     {format, resolve_codec(request, codec)}
   end
@@ -1297,6 +1307,10 @@ defmodule Req.Steps do
 
   defp builtin_codec(_request, :csv) do
     &Req.CSV.decode/1
+  end
+
+  defp builtin_codec(_request, :csv, options) do
+    &Req.CSV.decode(&1, options)
   end
 
   defp run_decoder(request, response, codec) do
