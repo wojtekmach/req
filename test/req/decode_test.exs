@@ -489,7 +489,14 @@ defmodule Req.DecodeTest do
 
     resp = Req.get!(req, decoders: [:csv])
     assert resp.status == 200
-    assert resp.body == csv
+    assert resp.body == %Req.CSV{rows: csv}
+    assert resp.body[0] == ["1", "2"]
+    assert resp.body[0..1] == [["1", "2"], ["3", "4"]]
+    assert resp.body["x"] == ["1", "3"]
+    assert resp.body[{0..1, "x"}] == ["1", "3"]
+    assert resp.body[{1, "y"}] == "4"
+    assert Enum.to_list(resp.body) == csv
+    assert inspect(resp.body) == "#Req.CSV<\n  x,y\n  1,2\n  3,4\n>"
   end
 
   test "decompress and decode" do

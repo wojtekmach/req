@@ -1296,7 +1296,7 @@ defmodule Req.Steps do
   end
 
   defp builtin_codec(_request, :csv) do
-    fn body -> {:ok, NimbleCSV.RFC4180.parse_string(body, skip_headers: false)} end
+    &Req.CSV.decode/1
   end
 
   defp run_decoder(request, response, codec) do
