@@ -244,6 +244,23 @@ defmodule Req.DecodeTest do
       assert resp.body == files
     end
 
+    test "path, binary/octet-stream content-type" do
+      files = [{~c"foo.txt", "bar"}]
+
+      %{req: req, url: url} =
+        serve(
+          "GET /foo.tar": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("binary/octet-stream", nil)
+            |> send_resp_tar(files)
+          end
+        )
+
+      resp = Req.get!(req, url: "#{url}/foo.tar", decoders: [:tar])
+      assert resp.status == 200
+      assert resp.body == files
+    end
+
     test "path, no content-type" do
       files = [{~c"foo.txt", "bar"}]
 

@@ -1338,6 +1338,10 @@ defmodule Req.Steps do
     end
   end
 
+  defp extensions("binary/octet-stream" <> _, path) do
+    extensions("application/octet-stream", path)
+  end
+
   defp extensions("application/" <> subtype, path) when subtype in ~w(gzip x-gzip) do
     if tgz?(path) do
       ["tgz"]
