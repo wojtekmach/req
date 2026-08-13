@@ -145,22 +145,20 @@ defmodule Req.DecodeTest do
 
   test "custom decoder (module exporting decode/1)" do
     # An EPUB is a ZIP archive, so Req.ZIP doubles as its decoder.
-    files = [{~c"mimetype", "application/epub+zip"}]
+    files = [{"mimetype", "application/epub+zip"}]
 
     %{req: req} =
       serve(
         "GET /": fn conn ->
-          {:ok, {_name, zip}} = :zip.create(~c"a.zip", files, [:memory])
-
           conn
           |> Plug.Conn.put_resp_content_type("application/epub+zip", nil)
-          |> Plug.Conn.send_resp(200, zip)
+          |> send_resp_zip(files)
         end
       )
 
     resp = Req.get!(req, decoders: [epub: Req.ZIP])
     assert resp.status == 200
-    assert resp.body == files
+    assert resp.body == %Req.ZIP{files: files}
   end
 
   test "custom decoder error" do
@@ -316,23 +314,23 @@ defmodule Req.DecodeTest do
   describe "zip" do
     test "not decoded by default" do
       %{req: req} =
-        serve("GET /": &send_resp_zip(&1, [{~c"foo.txt", "bar"}]))
+        serve("GET /": &send_resp_zip(&1, [{"foo.txt", "bar"}]))
 
       body = Req.get!(req).body
       assert is_binary(body)
     end
 
     test "content-type" do
-      files = [{~c"foo.txt", "bar"}]
+      files = [{"foo.txt", "bar"}]
       %{req: req} = serve("GET /": &send_resp_zip(&1, files))
 
       resp = Req.get!(req, decoders: [:zip])
       assert resp.status == 200
-      assert resp.body == files
+      assert resp.body == %Req.ZIP{files: files}
     end
 
     test "path" do
-      files = [{~c"foo.txt", "bar"}]
+      files = [{"foo.txt", "bar"}]
 
       %{req: req, url: url} =
         serve(
@@ -345,7 +343,7 @@ defmodule Req.DecodeTest do
 
       resp = Req.get!(req, url: "#{url}/foo.zip", decoders: [:zip])
       assert resp.status == 200
-      assert resp.body == files
+      assert resp.body == %Req.ZIP{files: files}
     end
 
     test "invalid" do
