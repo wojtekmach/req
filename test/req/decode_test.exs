@@ -195,23 +195,27 @@ defmodule Req.DecodeTest do
   describe "tar" do
     test "not decoded by default" do
       %{req: req} =
-        serve("GET /": &send_resp_tar(&1, [{~c"foo.txt", "bar"}]))
+        serve("GET /": &send_resp_tar(&1, [{"foo.txt", "bar"}]))
 
       body = Req.get!(req).body
       assert is_binary(body)
     end
 
     test "content-type" do
-      files = [{~c"foo.txt", "bar"}]
+      files = [{"foo.txt", "bar"}]
       %{req: req} = serve("GET /": &send_resp_tar(&1, files))
 
       resp = Req.get!(req, decoders: [:tar])
       assert resp.status == 200
-      assert resp.body == files
+      assert resp.body == %Req.Tar{files: files}
+      assert resp.body["foo.txt"] == "bar"
+      assert Enum.to_list(resp.body) == files
+      assert inspect(resp.body) == ~s|#Req.Tar<[{"foo.txt", "bar"}]>|
+      assert inspect(resp.body, pretty: true) == ~s|#Req.Tar<[\n  {"foo.txt", "bar"}\n]>|
     end
 
     test "path" do
-      files = [{~c"foo.txt", "bar"}]
+      files = [{"foo.txt", "bar"}]
 
       %{req: req, url: url} =
         serve(
@@ -224,11 +228,11 @@ defmodule Req.DecodeTest do
 
       resp = Req.get!(req, url: "#{url}/foo.tar", decoders: [:tar])
       assert resp.status == 200
-      assert resp.body == files
+      assert resp.body == %Req.Tar{files: files}
     end
 
     test "path, content type with charset utf8" do
-      files = [{~c"foo.txt", "bar"}]
+      files = [{"foo.txt", "bar"}]
 
       %{req: req, url: url} =
         serve(
@@ -241,11 +245,11 @@ defmodule Req.DecodeTest do
 
       resp = Req.get!(req, url: "#{url}/foo.tar", decoders: [:tar])
       assert resp.headers["content-type"] == ["application/octet-stream; charset=utf-8"]
-      assert resp.body == files
+      assert resp.body == %Req.Tar{files: files}
     end
 
     test "path, binary/octet-stream content-type" do
-      files = [{~c"foo.txt", "bar"}]
+      files = [{"foo.txt", "bar"}]
 
       %{req: req, url: url} =
         serve(
@@ -258,11 +262,11 @@ defmodule Req.DecodeTest do
 
       resp = Req.get!(req, url: "#{url}/foo.tar", decoders: [:tar])
       assert resp.status == 200
-      assert resp.body == files
+      assert resp.body == %Req.Tar{files: files}
     end
 
     test "path, no content-type" do
-      files = [{~c"foo.txt", "bar"}]
+      files = [{"foo.txt", "bar"}]
 
       %{req: req, url: url} =
         serve(
@@ -273,11 +277,11 @@ defmodule Req.DecodeTest do
 
       resp = Req.get!(req, url: "#{url}/foo.tar.gz", decoders: [:tgz])
       assert resp.status == 200
-      assert resp.body == files
+      assert resp.body == %Req.Tar{files: files}
     end
 
     test "tar.gz (path)" do
-      files = [{~c"foo.txt", "bar"}]
+      files = [{"foo.txt", "bar"}]
 
       %{req: req, url: url} =
         serve(
@@ -290,7 +294,7 @@ defmodule Req.DecodeTest do
 
       resp = Req.get!(req, url: "#{url}/foo.tar.gz", decoders: [:tgz])
       assert resp.status == 200
-      assert resp.body == files
+      assert resp.body == %Req.Tar{files: files}
     end
 
     test "invalid" do
