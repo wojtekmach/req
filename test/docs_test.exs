@@ -1,4 +1,4 @@
-defmodule ReadmeTest do
+defmodule DocsTest do
   use Req.Case, async: true
 
   @version Mix.Project.config()[:version]
