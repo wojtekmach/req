@@ -224,7 +224,6 @@ defmodule Req.Case do
   end
 
   def send_resp_zip(conn, files) when is_list(files) do
-    files = Enum.map(files, fn {path, content} -> {to_charlist(path), content} end)
     {:ok, {_name, zip}} = :zip.create(~c"a.zip", files, [:memory])
 
     conn
