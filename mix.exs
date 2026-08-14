@@ -61,6 +61,7 @@ defmodule Req.MixProject do
 
   defp aliases do
     [
+      docs: [&tmp_extras/1, "docs"],
       "test.all": &test_all/1,
       "test.adapters": &test_adapters/1
     ]
@@ -71,6 +72,34 @@ defmodule Req.MixProject do
 
   defp extra_applications(:test), do: [:logger, :inets]
   defp extra_applications(_), do: [:logger]
+
+  defp tmp_extras(_args) do
+    File.mkdir_p!("tmp")
+
+    for path <- ["README.md", "CHANGELOG.md"] do
+      contents =
+        Regex.replace(
+          ~r|^(\[[^\]]+\]:[ \t]*)https://hexdocs\.pm/req(?:/([A-Z][\w.]*)\.html(?:#(\S+/\d+))?)?$|m,
+          File.read!(path),
+          fn _, prefix, mod, fun ->
+            cond do
+              fun != "" -> prefix <> "`#{mod}.#{fun}`"
+              mod != "" -> prefix <> "`#{mod}`"
+              true -> prefix <> "`Req`"
+            end
+          end
+        )
+
+      contents =
+        Regex.replace(
+          ~r|\[([^\]]+)\]\(https://hexdocs\.pm/req/([A-Z][\w.]*)\.html#(\S+/\d+)\)|,
+          contents,
+          fn _, text, mod, fun -> "[#{text}](`#{mod}.#{fun}`)" end
+        )
+
+      File.write!("tmp/#{path}", contents)
+    end
+  end
 
   defp test_all(args) do
     test_adapters(["--include", "integration" | args])
@@ -168,8 +197,8 @@ defmodule Req.MixProject do
         ]
       ],
       extras: [
-        "README.md",
-        "CHANGELOG.md"
+        "tmp/README.md",
+        "tmp/CHANGELOG.md"
       ],
       skip_code_autolink_to: [
         "Req.Test.stub/1",

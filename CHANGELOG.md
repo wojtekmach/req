@@ -7,7 +7,7 @@
 
 ## v0.7.1 (2026-07-28)
 
-  * Deprecate `cache: true`/[`cache`] step. It will be removed in Req v0.8. I plan a comprehensive cache solution for Req v1.0+.
+  * Deprecate `cache: true`/`cache` step. It will be removed in Req v0.8. I plan a comprehensive cache solution for Req v1.0+.
 
 ## v0.7.0 (2026-07-28)
 
@@ -159,9 +159,9 @@
 
 ## v0.5.18 (2026-05-20)
 
-  * [`run_finch`]: Allow :finch option with IPv6 URLs.
+  * `run_finch`: Allow :finch option with IPv6 URLs.
 
-  * [`run_finch`]: Normalize `Finch.TransportError` and `Finch.HTTPError`
+  * `run_finch`: Normalize `Finch.TransportError` and `Finch.HTTPError`
     (introduced in Finch v0.22.0) into `Req.TransportError` and `Req.HTTPError`.
 
   * [`retry`]: Automatically retry on `:pool_not_available`.
@@ -186,7 +186,7 @@
   * [`put_aws_sigv4`]: Support MFArgs
   * [`put_path_params`]: Encode `:path_params` even with reserved characters
   * [`put_path_params`]: Set `:path_params_template` on empty params
-  * [`run_plug`]: Handle compressed request body
+  * `run_plug`: Handle compressed request body
 
 ## v0.5.15 (2025-07-14)
 
@@ -194,14 +194,14 @@
 
 ## v0.5.14 (2025-07-02)
 
-  * [`run_plug`]: Remove warning about `into: fun` with `{:halt, acc}` result.
+  * `run_plug`: Remove warning about `into: fun` with `{:halt, acc}` result.
 
     The warning never been particularly useful because it's not like users
     can do anything about it.
 
 ## v0.5.13 (2025-07-02)
 
-  * [`run_plug`]: Ease transition to automatically parsing request body.
+  * `run_plug`: Ease transition to automatically parsing request body.
 
     Since v0.5.11, this code:
 
@@ -226,7 +226,7 @@
 
 ## v0.5.12 (2025-06-24)
 
-  * [`run_plug`]: Do not raise on unknown content types.
+  * `run_plug`: Do not raise on unknown content types.
 
   * [`Req.Test`]: Improve `Req.Test.transport_error/2` error message.
 
@@ -234,9 +234,9 @@
 
   * [`encode_body`]: Fix leading newline before multipart body.
 
-  * [`run_finch`]: Handle initial transport errors on `into: :self`.
+  * `run_finch`: Handle initial transport errors on `into: :self`.
 
-  * [`run_plug`]: Automatically parse request body.
+  * `run_plug`: Automatically parse request body.
 
     Prior to this change, users would typically write:
 
@@ -318,9 +318,9 @@
 
   * [`put_aws_sigv4`]: Fix encoding path
 
-  * [`run_finch`]: Add option to configure Finch `:pool_max_idle_time`
+  * `run_finch`: Add option to configure Finch `:pool_max_idle_time`
 
-  * [`run_finch`]: Prepare for upcoming Finch v0.20
+  * `run_finch`: Prepare for upcoming Finch v0.20
 
 ## v0.5.7 (2024-10-29)
 
@@ -350,7 +350,7 @@
 
 ## v0.5.4 (2024-07-18)
 
-  * [`run_finch`], [`Req.parse_message/2`]: Gracefully handle process messages not meant
+  * `run_finch`, [`Req.parse_message/2`]: Gracefully handle process messages not meant
     for the asynchronous response. In that case, `Req.parse_message/2` returns `:unknown`.
 
 ## v0.5.3 (2024-07-18)
@@ -361,7 +361,7 @@
 
   * [`put_aws_sigv4`]: Try detecting the service
 
-  * [`run_finch`]: Fix setting `:finch` option
+  * `run_finch`: Fix setting `:finch` option
 
 ## v0.5.2 (2024-07-08)
 
@@ -383,7 +383,7 @@
 
   * [`decode_body`]: Improve tar detection
 
-  * [`run_finch`]: Fix defaulting to using just HTTP/1
+  * `run_finch`: Fix defaulting to using just HTTP/1
 
 ## v0.5.0 (2024-05-28)
 
@@ -617,21 +617,21 @@ If you wish to maximize request rate or have more control over how messages are 
   * [`retry`]: **(BREAKING CHANGE)** Consider
     `%Req.HTTPError{protocol: :http2, reason: :unprocessed}` as transient.
 
-  * [`run_finch`]: **(BREAKING CHANGE)** Return [`Req.HTTPError`] instead of `Mint.HTTPError`.
+  * `run_finch`: **(BREAKING CHANGE)** Return [`Req.HTTPError`] instead of `Mint.HTTPError`.
 
-  * [`run_finch`]: **(BREAKING CHANGE)** Return [`Req.TransportError`] instead of `Mint.TransportError`.
+  * `run_finch`: **(BREAKING CHANGE)** Return [`Req.TransportError`] instead of `Mint.TransportError`.
 
-  * [`run_finch`]: Set `inet6: true` if URL looks like IPv6 address.
+  * `run_finch`: Set `inet6: true` if URL looks like IPv6 address.
 
-  * [`put_plug`]: Move most documentation to [`run_plug`].
+  * `put_plug`: Move most documentation to `run_plug`.
 
-  * [`run_plug`]: Make public.
+  * `run_plug`: Make public.
 
-  * [`run_plug`]: Add support for simulating network issues using [`Req.Test.transport_error/2`].
+  * `run_plug`: Add support for simulating network issues using [`Req.Test.transport_error/2`].
 
-  * [`run_plug`]: Support passing 2-arity functions as plugs.
+  * `run_plug`: Support passing 2-arity functions as plugs.
 
-  * [`run_plug`]: Automatically fetch query params.
+  * `run_plug`: Automatically fetch query params.
 
   * [`verify_checksum`]: Fix handling compressed responses.
 
@@ -659,7 +659,7 @@ If you wish to maximize request rate or have more control over how messages are 
 
 ## v0.4.13 (2024-03-07)
 
-  * [`run_finch`]: Default to `connect_options: [protocols: [:http1]]` due to regression
+  * `run_finch`: Default to `connect_options: [protocols: [:http1]]` due to regression
     with HTTP/2 requests over HTTP/1 connections (`protocols: [:http1, :http2]`) with request body
     size exceeding 64kib.
 
@@ -676,7 +676,7 @@ If you wish to maximize request rate or have more control over how messages are 
 
   * [`put_base_url`]: Allow `:base_url` to be a 0-arity function or MFArgs
 
-  * [`put_plug`]: Do not leak `Plug.Test` messages
+  * `put_plug`: Do not leak `Plug.Test` messages
 
 ## v0.4.11 (2024-02-19)
 
@@ -684,9 +684,9 @@ If you wish to maximize request rate or have more control over how messages are 
 
 ## v0.4.10 (2024-02-19)
 
-  * [`run_finch`]: Default to `connect_options: [protocols: [:http1, :http2]]`.
+  * `run_finch`: Default to `connect_options: [protocols: [:http1, :http2]]`.
 
-  * [`run_finch`]: Change version requirement to `~> 0.17`, that is all versions up to `1.0`.
+  * `run_finch`: Change version requirement to `~> 0.17`, that is all versions up to `1.0`.
 
   * [`put_aws_sigv4`]: Support streaming request body.
 
@@ -700,9 +700,9 @@ If you wish to maximize request rate or have more control over how messages are 
 
  * [`retry`]: Raise on invalid return from `:retry_delay` function
 
- * [`run_finch`]: Update to Finch 0.17
+ * `run_finch`: Update to Finch 0.17
 
- * [`run_finch`]: Deprecate `connect_options: [protocol: ...]` in favour of
+ * `run_finch`: Deprecate `connect_options: [protocol: ...]` in favour of
    `connect_options: [protocols: ...]]` which defaults to `[:http1, :http2]`, that is,
    make request using HTTP/1 but if negotiated switch to HTTP/2 over the HTTP/1 connection.
 
@@ -710,7 +710,7 @@ If you wish to maximize request rate or have more control over how messages are 
 
 ## v0.4.8 (2023-12-11)
 
-  * [`put_plug`]: Fix response streaming. Previously we were relying on unreleased
+  * `put_plug`: Fix response streaming. Previously we were relying on unreleased
     Plug features (which may never get released). Now, Plug adapter will emit the
     entire response body as one chunk. Thus,
     `plug: plug, into: fn ... -> {:halt, acc} end` is not yet supported as it
@@ -720,12 +720,12 @@ If you wish to maximize request rate or have more control over how messages are 
 
 ## v0.4.7 (2023-12-11)
 
-  * [`put_plug`]: Don't crash if plug is not installed and :plug is not used
+  * `put_plug`: Don't crash if plug is not installed and :plug is not used
 
 ## v0.4.6 (2023-12-11)
 
   * New step: [`checksum`]
-  * [`put_plug`]: Fix response streaming when plug uses `send_resp` or `send_file`
+  * `put_plug`: Fix response streaming when plug uses `send_resp` or `send_file`
   * [`retry`]: Retry on `:closed`
 
 ## v0.4.5 (2023-10-27)
@@ -756,7 +756,7 @@ If you wish to maximize request rate or have more control over how messages are 
 
 ## v0.4.2 (2023-09-04)
 
-  * [`put_plug`]: Handle response streaming on Plug 1.15+.
+  * `put_plug`: Handle response streaming on Plug 1.15+.
 
   * Don't warn on mixed-case header names
 
@@ -951,7 +951,7 @@ resp.body #=> %File.Stream{}
 
   * [`decode_body`]: Do not decode response with `content-encoding` header
 
-  * [`run_finch`]: Add `:inet6` option
+  * `run_finch`: Add `:inet6` option
 
   * [`retry`]: Support `retry: :safe_transient` which retries HTTP 408/429/500/502/503/504
     or exceptions with `reason` field set to `:timeout`/`:econnrefused`.
@@ -1031,13 +1031,13 @@ resp.body #=> %File.Stream{}
   * [`decode_body`]: Add `:decode_json` option
   * [`follow_redirects`]: Add `:redirect_log_level`
   * [`follow_redirects`]: Preserve HTTP method on 307/308 redirects
-  * [`run_finch`]: Allow `:finch_request` to perform the underlying request. This deprecates
+  * `run_finch`: Allow `:finch_request` to perform the underlying request. This deprecates
     passing 1-arity function `f(finch_request)` in favour of 4-arity
     `f(request, finch_request, finch_name, finch_options)`.
 
 ## v0.3.6 (2023-03-06)
 
-  * [`run_finch`]: Fix setting `:hostname` option
+  * `run_finch`: Fix setting `:hostname` option
   * [`decode_body`]: Add `:extract` option to automatically extract archives (zip, tar, etc)
 
 ## v0.3.5 (2023-02-01)
@@ -1052,8 +1052,8 @@ resp.body #=> %File.Stream{}
 ## v0.3.3 (2022-12-08)
 
   * [`follow_redirects`]: Inherit scheme from previous location
-  * [`run_finch`]: Fix setting connect timeout
-  * [`run_finch`]: Add `:finch_request` option
+  * `run_finch`: Fix setting connect timeout
+  * `run_finch`: Add `:finch_request` option
 
 ## v0.3.2 (2022-11-14)
 
@@ -1061,7 +1061,7 @@ resp.body #=> %File.Stream{}
   * [`put_params`]: Fix bug when params have been duplicated when retrying requeset
   * [`retry`]: Remove `retry: :always` option
   * [`retry`]: Soft-deprecate `retry: :never` in favour of `retry: false`
-  * [`run_finch`]: Add `:transport_opts`, `:proxy_headers`, `:proxy`, and `:client_settings` options
+  * `run_finch`: Add `:transport_opts`, `:proxy_headers`, `:proxy`, and `:client_settings` options
   * `Req.Response.json/2`: Do not override content-type
 
 ## v0.3.1 (2022-09-09)
@@ -1370,7 +1370,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
 ### Step changes
 
-  * New step: [`put_plug`]
+  * New step: `put_plug`
 
   * New step: [`put_user_agent`] (replaces part of removed `put_default_headers`)
 
@@ -1384,15 +1384,15 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
   * [`put_base_url`]: Ignore base URL if given URL contains scheme
 
-  * [`run_finch`]: Add `:connect_options` which dynamically starts (or re-uses already started)
+  * `run_finch`: Add `:connect_options` which dynamically starts (or re-uses already started)
     Finch pool with the given connection options.
 
-  * [`run_finch`]: Replace `:finch_options` with `:receive_timeout` and `:pool_timeout` options
+  * `run_finch`: Replace `:finch_options` with `:receive_timeout` and `:pool_timeout` options
 
   * [`encode_body`]: Add `:form` and `:json` options (previously used as `{:form, data}` and
     `{:json, data}`)
 
-  * [`cache`]: Include request method in cache key
+  * `cache`: Include request method in cache key
 
   * [`decompress_body`], [`compressed`]: Support Brotli
 
@@ -1472,7 +1472,6 @@ See "Adapter" section in `Req.Request` module documentation for more information
   * Initial release
 
 [`auth`]:                https://hexdocs.pm/req/Req.Steps.html#auth/1
-[`cache`]:               https://hexdocs.pm/req/Req.Steps.html#cache/1
 [`compress_body`]:       https://hexdocs.pm/req/Req.Steps.html#compress_body/1
 [`compressed`]:          https://hexdocs.pm/req/Req.Steps.html#compressed/1
 [`decode_body`]:         https://hexdocs.pm/req/Req.Steps.html#decode_body/1
@@ -1484,12 +1483,9 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`put_base_url`]:        https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
 [`put_params`]:          https://hexdocs.pm/req/Req.Steps.html#put_params/1
 [`put_path_params`]:     https://hexdocs.pm/req/Req.Steps.html#put_path_params/1
-[`put_plug`]:            https://hexdocs.pm/req/Req.Steps.html#put_plug/1
-[`run_plug`]:            https://hexdocs.pm/req/Req.Steps.html#run_plug/1
 [`put_user_agent`]:      https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
 [`put_range`]:           https://hexdocs.pm/req/Req.Steps.html#put_range/1
 [`retry`]:               https://hexdocs.pm/req/Req.Steps.html#retry/1
-[`run_finch`]:           https://hexdocs.pm/req/Req.Steps.html#run_finch/1
 [`checksum`]:            https://hexdocs.pm/req/Req.Steps.html#checksum/1
 [`verify_checksum`]:     https://hexdocs.pm/req/Req.Steps.html#verify_checksum/1
 [`put_aws_sigv4`]:       https://hexdocs.pm/req/Req.Steps.html#put_aws_sigv4/1
@@ -1512,7 +1508,6 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Request.merge_options/2`]:     https://hexdocs.pm/req/Req.Request.html#merge_options/2
 [`Req.Request.merge_new_options/2`]: https://hexdocs.pm/req/Req.Request.html#merge_new_options/2
 [`Req.Request.get_option/3`]:        https://hexdocs.pm/req/Req.Request.html#get_option/3
-[`Req.Request.get_option_lazy/2`]:   https://hexdocs.pm/req/Req.Request.html#get_option_lazy/2
 [`Req.Request.fetch_option/2`]:      https://hexdocs.pm/req/Req.Request.html#fetch_option/2
 [`Req.Request.fetch_option!/2`]:     https://hexdocs.pm/req/Req.Request.html#fetch_option!/2
 [`Req.Request.delete_option/2`]:     https://hexdocs.pm/req/Req.Request.html#delete_option/2
@@ -1520,7 +1515,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Request.update_private/4`]:    https://hexdocs.pm/req/Req.Request.html#update_private/4
 
 [`Req.Response`]:                  https://hexdocs.pm/req/Req.Response.html
-[`Req.Response.get_header/2`]:     https://hexdocs.pm/req/Req.Response.html#get_response/2
+[`Req.Response.get_header/2`]:     https://hexdocs.pm/req/Req.Response.html#get_header/2
 [`Req.Response.delete_header/2`]:  https://hexdocs.pm/req/Req.Response.html#delete_header/2
 [`Req.Response.update_private/4`]: https://hexdocs.pm/req/Req.Response.html#update_private/4
 [`Req.Response.to_map/1`]:         https://hexdocs.pm/req/Req.Response.html#to_map/1
