@@ -1438,6 +1438,11 @@ defmodule Req do
     mod.stream(req, acc, fun, state, &do_stream(&1, rest, &2, &3, &4))
   end
 
+  defp do_stream(req, [{_name, wrapper} | rest], acc, fun, state)
+       when is_function(wrapper, 5) do
+    wrapper.(req, acc, fun, state, &do_stream(&1, rest, &2, &3, &4))
+  end
+
   defp do_stream(req, [{name, step} | rest], acc, fun, state) do
     case run_step(step, req) do
       %Req.Request{} = req ->
