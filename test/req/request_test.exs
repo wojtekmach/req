@@ -47,6 +47,36 @@ defmodule Req.RequestTest do
     assert resp.body == "ok"
   end
 
+  test "step wrapper as function", c do
+    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
+      Plug.Conn.send_resp(conn, 200, "ok")
+    end)
+
+    caller = self()
+
+    wrapper = fn req, acc, fun, state, next ->
+      wrapped_fun = fn
+        {:status, status} = event, resp, acc, state ->
+          send(caller, {:wrapper, req.url.path, status})
+          fun.(event, resp, acc, state)
+
+        event, resp, acc, state ->
+          fun.(event, resp, acc, state)
+      end
+
+      next.(req, acc, wrapped_fun, state)
+    end
+
+    request =
+      new(url: c.url <> "/ok")
+      |> Req.Request.prepend_request_steps(wrapper: wrapper)
+
+    resp = Req.stream!(request)
+    assert resp.status == 200
+    assert resp.body == "ok"
+    assert_received {:wrapper, "/ok", 200}
+  end
+
   test "step as MFArgs", c do
     Bypass.expect(c.bypass, "GET", "/", fn conn ->
       Plug.Conn.send_resp(conn, 200, "ok")
