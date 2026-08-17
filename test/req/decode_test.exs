@@ -49,6 +49,25 @@ defmodule Req.DecodeTest do
       assert resp.body == ""
     end
 
+    test "empty body" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/json")
+            |> Plug.Conn.send_resp(200, "")
+          end
+        )
+
+      resp = Req.get!(req)
+      assert resp.status == 200
+      assert resp.body == ""
+
+      {:ok, resp, acc} = Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end)
+      assert resp.status == 200
+      assert acc == []
+    end
+
     test "success" do
       %{req: req} =
         serve(
@@ -160,6 +179,22 @@ defmodule Req.DecodeTest do
     resp = Req.stream!(req, decoders: [ics: &{:ok, String.upcase(&1)}])
     assert resp.status == 200
     assert resp.body == "RAW-ICS"
+  end
+
+  # TODO: double-check
+  test "custom decoder (function) with empty body" do
+    %{req: req} =
+      serve(
+        "GET /": fn conn ->
+          conn
+          |> Plug.Conn.put_resp_content_type("text/calendar")
+          |> Plug.Conn.send_resp(200, "")
+        end
+      )
+
+    resp = Req.stream!(req, decoders: [ics: fn _ -> raise "unreachable" end])
+    assert resp.status == 200
+    assert resp.body == ""
   end
 
   test "custom decoder (module exporting decode/1)" do
