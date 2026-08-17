@@ -116,11 +116,11 @@ defmodule Req.Decode do
 
   defp decode_stream(req, acc, fun, state, next) do
     wrapped = fn
-      {:headers, _headers} = event, resp, acc, [nil | state] ->
+      {:data, data}, resp, acc, [nil | state] ->
         decoder =
           case decoder(resp) do
             nil ->
-              nil
+              false
 
             fun when is_function(fun, 1) ->
               fun
@@ -134,26 +134,14 @@ defmodule Req.Decode do
                   decode_init(mod, :stream)
 
                 true ->
-                  nil
+                  false
               end
           end
 
-        {tag, resp, acc, state} = fun.(event, resp, acc, state)
-        {tag, resp, acc, [decoder | state]}
-
-      {:data, _data} = event, resp, acc, [nil | state] ->
-        {tag, resp, acc, state} = fun.(event, resp, acc, state)
-        {tag, resp, acc, [nil | state]}
+        decode_data(decoder, data, resp, acc, state, fun)
 
       {:data, data}, resp, acc, [decoder | state] ->
-        case decode(decoder, data) do
-          {:ok, output, decoder} ->
-            {tag, resp, acc, state} = emit(List.wrap(output), resp, acc, state, fun)
-            {tag, resp, acc, [decoder | state]}
-
-          {:error, err} ->
-            {{:error, err}, resp, acc, [decoder | state]}
-        end
+        decode_data(decoder, data, resp, acc, state, fun)
 
       event, resp, acc, [decoder | state] ->
         {tag, resp, acc, state} = fun.(event, resp, acc, state)
@@ -161,7 +149,7 @@ defmodule Req.Decode do
     end
 
     case next.(req, acc, wrapped, [nil | state]) do
-      {:ok, resp, acc, [nil | state]} ->
+      {:ok, resp, acc, [decoder | state]} when decoder in [nil, false] ->
         {:ok, resp, acc, state}
 
       {:ok, resp, %Req.Buffer{} = buffer, [{mod, decoder} | state]} ->
@@ -208,6 +196,22 @@ defmodule Req.Decode do
       {tag, resp, acc, [layer | state]} ->
         close(layer)
         {tag, resp, acc, state}
+    end
+  end
+
+  defp decode_data(false, data, resp, acc, state, fun) do
+    {tag, resp, acc, state} = fun.({:data, data}, resp, acc, state)
+    {tag, resp, acc, [false | state]}
+  end
+
+  defp decode_data(decoder, data, resp, acc, state, fun) do
+    case decode(decoder, data) do
+      {:ok, output, decoder} ->
+        {tag, resp, acc, state} = emit(List.wrap(output), resp, acc, state, fun)
+        {tag, resp, acc, [decoder | state]}
+
+      {:error, err} ->
+        {{:error, err}, resp, acc, [decoder | state]}
     end
   end
 
