@@ -1157,15 +1157,6 @@ defmodule Req do
     end
 
     case req.into do
-      nil ->
-        case stream(req) do
-          {:ok, resp} ->
-            {:ok, resp}
-
-          {:error, exception, _resp} ->
-            {:error, exception}
-        end
-
       fun when is_function(fun, 2) ->
         into_legacy_fun(req, fun)
 
@@ -1194,8 +1185,14 @@ defmodule Req do
             end
         end
 
-      collectable ->
-        into_collectable(req, collectable)
+      _ ->
+        case stream(req) do
+          {:ok, resp} ->
+            {:ok, resp}
+
+          {:error, exception, _resp} ->
+            {:error, exception}
+        end
     end
   end
 
@@ -1234,67 +1231,6 @@ defmodule Req do
         end
 
       {:error, exception, resp, _acc} ->
-        case run_error_steps(exception, resp) do
-          {:ok, resp} ->
-            {:ok, resp}
-
-          {:error, exception, _resp} ->
-            {:error, exception}
-        end
-    end
-  end
-
-  defp into_collectable(req, collectable) do
-    stream_fun = fn
-      {:status, 200}, resp, %Req.Buffer{}, state ->
-        {:ok, resp, Collectable.into(collectable), state}
-
-      {:data, data}, resp, {acc, collector}, state ->
-        acc = collector.(acc, {:cont, data})
-        {:ok, resp, {acc, collector}, state}
-
-      {:data, data}, resp, %Req.Buffer{} = buffer, state ->
-        {:ok, resp, %{buffer | iodata: [buffer.iodata | data]}, state}
-
-      _event, resp, acc, state ->
-        {:ok, resp, acc, state}
-    end
-
-    case run_stream(req, %Req.Buffer{}, stream_fun) do
-      {:ok, resp, {acc, collector}} ->
-        resp = put_in(resp.body, collector.(acc, :done))
-
-        case run_response_steps(resp) do
-          {:ok, resp} ->
-            {:ok, resp}
-
-          {:error, exception, _resp} ->
-            {:error, exception}
-        end
-
-      {:ok, resp, %Req.Buffer{} = buffer} ->
-        resp = put_in(resp.body, Req.Buffer.body(buffer))
-
-        case run_response_steps(resp) do
-          {:ok, resp} ->
-            {:ok, resp}
-
-          {:error, exception, _resp} ->
-            {:error, exception}
-        end
-
-      {:error, exception, resp, {acc, collector}} ->
-        collector.(acc, :halt)
-
-        case run_error_steps(exception, resp) do
-          {:ok, resp} ->
-            {:ok, resp}
-
-          {:error, exception, _resp} ->
-            {:error, exception}
-        end
-
-      {:error, exception, resp, %Req.Buffer{}} ->
         case run_error_steps(exception, resp) do
           {:ok, resp} ->
             {:ok, resp}

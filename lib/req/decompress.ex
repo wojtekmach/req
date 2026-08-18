@@ -31,8 +31,6 @@ defmodule Req.Decompress do
     * `:compressed` - if set to `true`, sets the `accept-encoding` header with compression
       algorithms that Req supports and decompresses the response body. Defaults to `false`.
 
-      This option has no effect when streaming the response body using `into: collectable`.
-
     * `:raw` - if set to `true`, disables response body decompression. Defaults to `false`.
 
       Note: setting `raw: true` also disables response body decoding.
@@ -79,7 +77,7 @@ defmodule Req.Decompress do
   @doc false
   def stream(%Req.Request{} = req, acc, fun, state, next) do
     cond do
-      req.into != nil ->
+      req.into == :self or is_function(req.into, 2) ->
         next.(req, acc, fun, state)
 
       req.options[:compressed] ->

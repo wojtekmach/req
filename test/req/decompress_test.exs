@@ -16,20 +16,6 @@ defmodule Req.DecompressTest do
     assert resp.body == :zlib.gzip("foo")
   end
 
-  test "does not set accept-encoding with into: collectable" do
-    %{req: req} =
-      serve(
-        "GET /": fn conn ->
-          assert get_req_header(conn, "accept-encoding") == []
-          send_resp(conn, 200, "")
-        end
-      )
-
-    resp = Req.request!(req, compressed: true, into: [])
-    assert resp.status == 200
-    assert resp.body == []
-  end
-
   test "does not set accept-encoding with into: fun" do
     %{req: req} =
       serve(

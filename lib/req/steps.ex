@@ -24,6 +24,8 @@ defmodule Req.Steps do
 
     * `Req.Expect`
 
+    * `Req.Into`
+
     * `Req.Redirect`
 
     * `Req.Retry`
@@ -35,6 +37,7 @@ defmodule Req.Steps do
       expect: Req.Expect,
       retry: Req.Retry,
       decode: Req.Decode,
+      into: Req.Into,
       checksum: Req.Checksum,
       decompress: Req.Decompress,
       redirect: Req.Redirect,
