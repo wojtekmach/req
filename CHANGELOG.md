@@ -13,13 +13,16 @@ Req v0.8 requires Elixir 1.18+.
 
   * [`Req`]: Add [`Req.stream/4`].
   * [`Req`]: Allow setting private through options, e.g.: `Req.new(private: %{foo: :bar})`.
-  * [`Req`]: Support request body streaming with `body: fun`
+  * [`Req`]: Support request body streaming with `body: fun`.
 
   * [`Req.Response`]: Add `resp.request`. This is useful to inspect the final request after all steps have executed.
 
-  * [`Req.Decode`]: Support NDJSON
-  * [`Req.Decode`]: Support SSE
-  * [`Req.Decode`]: Support `decoders: [{content_type, decoder}]`.
+  * [`Req.Decompress`]: Support `into: collectable`.
+
+  * [`Req.Decode`]: Support NDJSON.
+  * [`Req.Decode`]: Support SSE.
+  * [`Req.Decode`]: Support `decoders: [{content_type, decoder}]`, for example: `[{"application/x-amz-json-1.0", :json}]`.
+  * [`Req.Decode`]: JSON decoding is now using a streaming parser (Erlang/OTP [`:json.decode_start/3`], [`:json.decode_continue/2`]).
 
 ### Breaking Changes
 
@@ -1594,3 +1597,7 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`JSON.Encoder`]:                         https://hexdocs.pm/elixir/JSON.Encoder.html
 
 ["Steps & Step Wrappers" section]:        https://hexdocs.pm/elixir/Req.Request.html#module-steps-step-wrappers
+
+
+[`:json.decode_start/3`]:                 https://www.erlang.org/doc/apps/stdlib/json.html#decode_start/3
+[`:json.decode_continue/2`]:              https://www.erlang.org/doc/apps/stdlib/json.html#decode_continue/2
