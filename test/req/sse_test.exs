@@ -45,7 +45,7 @@ defmodule Req.SSETest do
 
     resp = Req.stream!(req, into: [])
     assert resp.status == 200
-    assert resp.body == [%{data: "event1"}, %{data: "event2"}]
+    assert IO.iodata_to_binary(resp.body) == "data: event1\n\ndata: event2\n\n"
   end
 
   @tag skip: adapter() == :httpc

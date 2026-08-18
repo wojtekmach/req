@@ -427,6 +427,83 @@ defmodule Req.AdapterTest do
       assert resp.body == %{"error" => "not found"}
     end
 
+    test "into: collectable + Decompress" do
+      %{req: req} =
+        serve(
+          "GET /": fn conn ->
+            assert get_req_header(conn, "accept-encoding") != []
+            send_resp_gzip(conn, "foo")
+          end
+        )
+
+      resp = Req.request!(req, compressed: true, into: [])
+      assert resp.status == 200
+      assert Req.Response.get_header(resp, "content-encoding") == []
+      assert IO.iodata_to_binary(resp.body) == "foo"
+    end
+
+    @tag :transport
+    @tag :capture_log
+    @tag skip: adapter() == :httpc
+    test "into: collectable + Retry" do
+      %{req: req} =
+        serve_sequence(
+          "GET /": fn conn ->
+            conn = send_chunked(conn, 200)
+            {:ok, _conn} = chunk(conn, "foo")
+            raise "oops"
+          end,
+          "GET /": &send_resp(&1, 200, "ok")
+        )
+
+      resp = Req.request!(req, into: %TestCollectable{}, retry_delay: 0)
+      assert resp.status == 200
+      assert resp.body == %TestCollectable{}
+
+      # attempt #1
+      assert_received :open
+      assert_received {:cont, "foo"}
+      assert_received :halt
+
+      # attempt #2
+      assert_received :open
+      assert_received {:cont, "ok"}
+      assert_received :done
+      refute_received _
+    end
+
+    @tag :capture_log
+    test "into: collectable + Redirect" do
+      %{req: req} =
+        serve_sequence(
+          "GET /": &send_redirect(&1, 302, "/ok"),
+          "GET /ok": &send_resp(&1, 200, "ok")
+        )
+
+      resp = Req.request!(req, into: %TestCollectable{})
+      assert resp.status == 200
+      assert resp.body == %TestCollectable{}
+
+      assert_received :open
+      assert_received {:cont, "ok"}
+      assert_received :done
+      refute_received _
+    end
+
+    test "into: collectable + Expect" do
+      %{req: req} = serve("GET /": &send_resp(&1, 200, "ok"))
+
+      {:error, err, resp} = Req.stream(req, into: %TestCollectable{}, expect: 201)
+      assert resp.status == 200
+      assert resp.body == %TestCollectable{}
+      assert err == %Req.UnexpectedStatusError{expected_status: 201, actual_status: 200}
+
+      assert_received :open
+      assert_received {:cont, "ok"}
+      assert_received :done
+      refute_received _
+    end
+
     @tag :transport
     test "into: collectable handle error" do
       {:error, err} =
