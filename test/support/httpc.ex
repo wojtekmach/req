@@ -202,7 +202,7 @@ defmodule Req.HTTPC do
       end
 
     case fun.(event, resp, acc, state) do
-      {:cont, resp, acc, state} ->
+      {:ok, resp, acc, state} ->
         stream_events(events, {resp, acc, state}, fun)
 
       {tag, resp, acc, state} ->

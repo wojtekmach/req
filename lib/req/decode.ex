@@ -164,16 +164,7 @@ defmodule Req.Decode do
       {:ok, resp, acc, [{mod, decoder} | state]} ->
         case mod.decode_finish(decoder) do
           {:ok, output} ->
-            case emit(List.wrap(output), resp, acc, state, fun) do
-              {:cont, resp, acc, state} ->
-                {:ok, resp, acc, state}
-
-              {:halt, resp, acc, state} ->
-                {:halt, resp, acc, state}
-
-              {{:error, err}, resp, acc, state} ->
-                {{:error, err}, resp, acc, state}
-            end
+            emit(List.wrap(output), resp, acc, state, fun)
 
           {:error, err} ->
             close({mod, decoder})
@@ -233,12 +224,12 @@ defmodule Req.Decode do
   defp close(_layer), do: :ok
 
   defp emit([], resp, acc, state, _fun) do
-    {:cont, resp, acc, state}
+    {:ok, resp, acc, state}
   end
 
   defp emit([data | rest], resp, acc, state, fun) do
     case fun.({:data, data}, resp, acc, state) do
-      {:cont, resp, acc, state} ->
+      {:ok, resp, acc, state} ->
         emit(rest, resp, acc, state, fun)
 
       result ->

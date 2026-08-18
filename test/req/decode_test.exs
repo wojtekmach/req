@@ -756,16 +756,16 @@ defmodule Req.DecodeTest do
         |> Map.replace!(:request, req)
         |> Req.Response.put_header("content-type", "application/x-ndjson")
 
-      {:cont, resp, acc, state} = fun.({:status, 200}, resp, acc, state)
-      {:cont, resp, acc, state} = fun.({:headers, resp.headers}, resp, acc, state)
-      {:cont, resp, acc, state} = fun.({:data, ~s|{"a":1}\n{"b|}, resp, acc, state)
-      {:cont, resp, acc, state} = fun.({:data, ~s|":2}\n|}, resp, acc, state)
-      {:cont, resp, acc, state} = fun.({:trailers, Req.Fields.new([])}, resp, acc, state)
+      {:ok, resp, acc, state} = fun.({:status, 200}, resp, acc, state)
+      {:ok, resp, acc, state} = fun.({:headers, resp.headers}, resp, acc, state)
+      {:ok, resp, acc, state} = fun.({:data, ~s|{"a":1}\n{"b|}, resp, acc, state)
+      {:ok, resp, acc, state} = fun.({:data, ~s|":2}\n|}, resp, acc, state)
+      {:ok, resp, acc, state} = fun.({:trailers, Req.Fields.new([])}, resp, acc, state)
       {:ok, resp, acc, state}
     end
 
     fun = fn event, resp, events, state ->
-      {:cont, resp, [event | events], state}
+      {:ok, resp, [event | events], state}
     end
 
     assert {:ok, resp, events, []} = Req.Decode.stream(req, [], fun, [], next)
