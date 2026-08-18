@@ -131,7 +131,7 @@ defmodule Req.MixProject do
       {:finch, "~> 0.21", finch_opts()},
       {:mime, "~> 2.0.6 or ~> 2.1"},
       {:nimble_csv, "~> 1.0", optional: true},
-      {:server_sent_events, "~> 1.0"},
+      {:server_sent_events, "~> 1.1"},
       {:plug, "~> 1.0", [optional: true] ++ plug_opts()},
       {:brotli, "~> 0.3.1", optional: true},
       {:aws_signature, "~> 0.3.2", only: :test},
