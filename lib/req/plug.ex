@@ -274,7 +274,7 @@ if Code.ensure_loaded?(Plug) do
         Plug.Parsers.init(
           parsers: [:urlencoded, :multipart, :json],
           pass: ["*/*"],
-          json_decoder: Jason
+          json_decoder: JSON
         )
 
       conn =

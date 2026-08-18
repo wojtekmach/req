@@ -108,7 +108,14 @@ defmodule Req.DecodeTest do
           end
         )
 
-      resp = Req.stream!(req, decoders: [json: &Jason.decode(&1, keys: :atoms)])
+      decoders = [object_push: fn key, value, acc -> [{String.to_atom(key), value} | acc] end]
+
+      json = fn body ->
+        {value, nil, ""} = JSON.decode(body, nil, decoders)
+        {:ok, value}
+      end
+
+      resp = Req.stream!(req, decoders: [json: json])
       assert resp.status == 200
       assert resp.body == %{a: 1}
     end
@@ -653,7 +660,7 @@ defmodule Req.DecodeTest do
         "GET /": fn conn ->
           body =
             %{a: 1}
-            |> Jason.encode_to_iodata!()
+            |> JSON.encode_to_iodata!()
             |> :zlib.gzip()
 
           conn
@@ -674,7 +681,7 @@ defmodule Req.DecodeTest do
         "GET /": fn conn ->
           body =
             %{a: 1}
-            |> Jason.encode_to_iodata!()
+            |> JSON.encode_to_iodata!()
             |> :zlib.gzip()
 
           conn
@@ -687,7 +694,7 @@ defmodule Req.DecodeTest do
     resp = Req.stream!(req, compressed: true, raw: true)
     assert resp.status == 200
     assert resp.headers["content-encoding"] == ["x-gzip"]
-    assert resp.body |> :zlib.gunzip() |> Jason.decode!() == %{"a" => 1}
+    assert resp.body |> :zlib.gunzip() |> JSON.decode!() == %{"a" => 1}
   end
 
   test "decode with unknown compression codec" do
@@ -696,7 +703,7 @@ defmodule Req.DecodeTest do
         "GET /": fn conn ->
           body =
             %{a: 1}
-            |> Jason.encode_to_iodata!()
+            |> JSON.encode_to_iodata!()
             |> :zlib.compress()
 
           conn
@@ -713,7 +720,7 @@ defmodule Req.DecodeTest do
 
     assert resp.status == 200
     assert resp.headers["content-encoding"] == ["deflate"]
-    assert resp.body |> :zlib.uncompress() |> Jason.decode!() == %{"a" => 1}
+    assert resp.body |> :zlib.uncompress() |> JSON.decode!() == %{"a" => 1}
     assert log =~ ~s|[debug] algorithm "deflate" is not supported\n|
   end
 

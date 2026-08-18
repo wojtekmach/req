@@ -148,7 +148,7 @@ defmodule Req.Response do
     response =
       update_in(response.headers, &Req.Fields.put_new(&1, "content-type", "application/json"))
 
-    Map.replace!(response, :body, Jason.encode!(body))
+    Map.replace!(response, :body, JSON.encode!(body))
   end
 
   @doc """

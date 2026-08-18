@@ -404,13 +404,13 @@ defmodule Req.StepsTest do
           "POST /": fn conn ->
             assert get_req_header(conn, "content-encoding") == []
             assert {:ok, body, conn} = read_body(conn)
-            assert Jason.decode!(body) == %{"a" => 1}
+            assert JSON.decode!(body) == %{"a" => 1}
             send_resp(conn, 200, "")
           end,
           "POST /": fn conn ->
             assert get_req_header(conn, "content-encoding") == ["gzip"]
             assert {:ok, body, conn} = read_body(conn)
-            assert body |> :zlib.gunzip() |> Jason.decode!() == %{"a" => 1}
+            assert body |> :zlib.gunzip() |> JSON.decode!() == %{"a" => 1}
             send_resp(conn, 200, "")
           end
         )

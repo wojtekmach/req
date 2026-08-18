@@ -41,7 +41,7 @@ defmodule Req.PlugTest do
         Plug.Parsers.init(
           parsers: [:urlencoded, :multipart, :json],
           pass: ["*/*"],
-          json_decoder: Jason
+          json_decoder: JSON
         )
 
       conn = Plug.Parsers.call(conn, parser_opts)
@@ -78,7 +78,7 @@ defmodule Req.PlugTest do
         Plug.Parsers.init(
           parsers: [:urlencoded, :multipart, :json],
           pass: ["*/*"],
-          json_decoder: Jason
+          json_decoder: JSON
         )
 
       conn = Plug.Parsers.call(conn, parser_opts)
