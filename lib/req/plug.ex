@@ -188,13 +188,7 @@ if Code.ensure_loaded?(Plug) do
               [status: conn.status, headers: conn.resp_headers] ++
                 for chunk <- chunks || [conn.resp_body], chunk != "", do: {:data, chunk}
 
-            case stream_events(events, resp, acc, state, fun) do
-              {:cont, resp, acc, state} ->
-                {:ok, resp, acc, state}
-
-              result ->
-                result
-            end
+            stream_events(events, resp, acc, state, fun)
         end
       end
     end
@@ -203,7 +197,7 @@ if Code.ensure_loaded?(Plug) do
       events = [status: conn.status, headers: conn.resp_headers]
 
       case stream_events(events, resp, acc, state, fun) do
-        {:cont, resp, acc, state} ->
+        {:ok, resp, acc, state} ->
           async = %Req.Response.Async{
             pid: self(),
             ref: make_ref(),
@@ -225,7 +219,7 @@ if Code.ensure_loaded?(Plug) do
     end
 
     defp stream_events([], resp, acc, state, _fun) do
-      {:cont, resp, acc, state}
+      {:ok, resp, acc, state}
     end
 
     defp stream_events([event | events], resp, acc, state, fun) do
@@ -242,7 +236,7 @@ if Code.ensure_loaded?(Plug) do
         end
 
       case fun.(event, resp, acc, state) do
-        {:cont, resp, acc, state} ->
+        {:ok, resp, acc, state} ->
           stream_events(events, resp, acc, state, fun)
 
         result ->

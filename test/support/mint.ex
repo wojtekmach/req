@@ -53,7 +53,7 @@ defmodule Req.Mint do
         resp = put_in(resp.status, status)
 
         case fun.({:status, status}, resp, acc, state) do
-          {:cont, resp, acc, state} ->
+          {:ok, resp, acc, state} ->
             {:cont, {resp, acc, state}}
 
           {:halt, resp, acc, state} ->
@@ -67,7 +67,7 @@ defmodule Req.Mint do
         resp = put_in(resp.headers, Req.Fields.new_without_normalize_with_duplicates(headers))
 
         case fun.({:headers, headers}, resp, acc, state) do
-          {:cont, resp, acc, state} ->
+          {:ok, resp, acc, state} ->
             {:cont, {resp, acc, state}}
 
           {:halt, resp, acc, state} ->
@@ -79,7 +79,7 @@ defmodule Req.Mint do
 
       {:data, data}, {resp, acc, state} ->
         case fun.({:data, data}, resp, acc, state) do
-          {:cont, resp, acc, state} ->
+          {:ok, resp, acc, state} ->
             {:cont, {resp, acc, state}}
 
           {:halt, resp, acc, state} ->
@@ -94,7 +94,7 @@ defmodule Req.Mint do
           put_in(resp.trailers, Req.Fields.new_without_normalize_with_duplicates(trailers))
 
         case fun.({:trailers, trailers}, resp, acc, state) do
-          {:cont, resp, acc, state} ->
+          {:ok, resp, acc, state} ->
             {:cont, {resp, acc, state}}
 
           {:halt, resp, acc, state} ->
@@ -128,12 +128,12 @@ defmodule Req.Mint do
         resp = put_in(resp.status, status)
 
         case fun.({:status, status}, resp, acc, state) do
-          {:cont, resp, acc, state} ->
+          {:ok, resp, acc, state} ->
             resp =
               put_in(resp.headers, Req.Fields.new_without_normalize_with_duplicates(headers))
 
             case fun.({:headers, headers}, resp, acc, state) do
-              {:cont, resp, acc, state} ->
+              {:ok, resp, acc, state} ->
                 async = %Req.Response.Async{
                   pid: self(),
                   ref: ref,

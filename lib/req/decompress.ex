@@ -122,7 +122,7 @@ defmodule Req.Decompress do
 
       {:data, ""}, resp, acc, [{[format_string | _], _rest} | _] = state
       when is_binary(format_string) ->
-        {:cont, resp, acc, state}
+        {:ok, resp, acc, state}
 
       {:data, data}, resp, acc, [{codecs, rest} | state] ->
         codecs =
@@ -141,7 +141,7 @@ defmodule Req.Decompress do
 
         case decode_chunk(codecs, data) do
           {:ok, nil, codecs} ->
-            {:cont, resp, acc, [{codecs, rest} | state]}
+            {:ok, resp, acc, [{codecs, rest} | state]}
 
           {:ok, data, codecs} ->
             {tag, resp, acc, state} = fun.({:data, data}, resp, acc, state)
@@ -174,24 +174,12 @@ defmodule Req.Decompress do
                 Logger.debug("algorithm #{inspect(format_string)} is not supported")
             end
 
-            result =
-              case data do
-                nil ->
-                  {:cont, resp, acc, state}
-
-                data ->
-                  fun.({:data, data}, resp, acc, state)
-              end
-
-            case result do
-              {:cont, resp, acc, state} ->
+            case data do
+              nil ->
                 {:ok, resp, acc, state}
 
-              {:halt, resp, acc, state} ->
-                {:halt, resp, acc, state}
-
-              {{:error, exception}, resp, acc, state} ->
-                {{:error, exception}, resp, acc, state}
+              data ->
+                fun.({:data, data}, resp, acc, state)
             end
 
           {:error, exception} ->

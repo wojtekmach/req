@@ -174,12 +174,12 @@ defmodule Req.Finch do
     resp = put_in(resp.request, req)
 
     finch_fun = fn
-      {:status, status}, {:cont, resp, acc, state} ->
+      {:status, status}, {:ok, resp, acc, state} ->
         resp = put_in(resp.status, status)
 
         case fun.({:status, status}, resp, acc, state) do
-          {:cont, resp, acc, state} ->
-            {:cont, {:cont, resp, acc, state}}
+          {:ok, resp, acc, state} ->
+            {:cont, {:ok, resp, acc, state}}
 
           {:halt, resp, acc, state} ->
             {:halt, {:halt, resp, acc, state}}
@@ -188,12 +188,12 @@ defmodule Req.Finch do
             {:halt, {{:error, exception}, resp, acc, state}}
         end
 
-      {:headers, headers}, {:cont, resp, acc, state} ->
+      {:headers, headers}, {:ok, resp, acc, state} ->
         resp = put_in(resp.headers, Req.Fields.new_without_normalize_with_duplicates(headers))
 
         case fun.({:headers, headers}, resp, acc, state) do
-          {:cont, resp, acc, state} ->
-            {:cont, {:cont, resp, acc, state}}
+          {:ok, resp, acc, state} ->
+            {:cont, {:ok, resp, acc, state}}
 
           {:halt, resp, acc, state} ->
             {:halt, {:halt, resp, acc, state}}
@@ -202,10 +202,10 @@ defmodule Req.Finch do
             {:halt, {{:error, exception}, resp, acc, state}}
         end
 
-      {:data, data}, {:cont, resp, acc, state} ->
+      {:data, data}, {:ok, resp, acc, state} ->
         case fun.({:data, data}, resp, acc, state) do
-          {:cont, resp, acc, state} ->
-            {:cont, {:cont, resp, acc, state}}
+          {:ok, resp, acc, state} ->
+            {:cont, {:ok, resp, acc, state}}
 
           {:halt, resp, acc, state} ->
             {:halt, {:halt, resp, acc, state}}
@@ -214,12 +214,12 @@ defmodule Req.Finch do
             {:halt, {{:error, exception}, resp, acc, state}}
         end
 
-      {:trailers, trailers}, {:cont, resp, acc, state} ->
+      {:trailers, trailers}, {:ok, resp, acc, state} ->
         resp = put_in(resp.trailers, Req.Fields.new_without_normalize_with_duplicates(trailers))
 
         case fun.({:trailers, trailers}, resp, acc, state) do
-          {:cont, resp, acc, state} ->
-            {:cont, {:cont, resp, acc, state}}
+          {:ok, resp, acc, state} ->
+            {:cont, {:ok, resp, acc, state}}
 
           {:halt, resp, acc, state} ->
             {:halt, {:halt, resp, acc, state}}
@@ -229,10 +229,10 @@ defmodule Req.Finch do
         end
     end
 
-    initial = {:cont, resp, acc, state}
+    initial = {:ok, resp, acc, state}
 
     case Finch.stream_while(finch_req, finch_name, initial, finch_fun, finch_options) do
-      {:ok, {:cont, resp, acc, state}} ->
+      {:ok, {:ok, resp, acc, state}} ->
         {:ok, resp, acc, state}
 
       {:ok, {:halt, resp, acc, state}} ->
@@ -257,7 +257,7 @@ defmodule Req.Finch do
         resp = put_in(resp.status, status)
 
         case fun.({:status, status}, resp, acc, state) do
-          {:cont, resp, acc, state} ->
+          {:ok, resp, acc, state} ->
             stream_into_self_headers(ref, resp, acc, fun, state)
 
           {:halt, resp, acc, state} ->
@@ -280,7 +280,7 @@ defmodule Req.Finch do
         resp = put_in(resp.headers, Req.Fields.new_without_normalize_with_duplicates(headers))
 
         case fun.({:headers, headers}, resp, acc, state) do
-          {:cont, resp, acc, state} ->
+          {:ok, resp, acc, state} ->
             # TODO: handle trailers
             async = %Req.Response.Async{
               pid: self(),
@@ -341,19 +341,19 @@ defmodule Req.Finch do
 
         req_body_fun when is_function(req_body_fun, 1) ->
           wrapped_req_body_fun = fn
-            {:cont, resp, acc, state} ->
+            {:ok, resp, acc, state} ->
               case req_body_fun.(acc) do
                 {:data, chunk, acc} ->
-                  {:data, chunk, {:cont, resp, acc, state}}
+                  {:data, chunk, {:ok, resp, acc, state}}
 
                 {:done, chunk, acc} ->
                   {:data, chunk, {:done, resp, acc, state}}
 
                 {:done, acc} ->
-                  {:done, {:cont, resp, acc, state}}
+                  {:done, {:ok, resp, acc, state}}
 
                 {:halt, acc} ->
-                  {:halt, {:cont, resp, acc, state}}
+                  {:halt, {:ok, resp, acc, state}}
 
                 other ->
                   raise "expected req_body_fun to return {:data, chunk, acc}, {:done, chunk, acc}, " <>
@@ -361,7 +361,7 @@ defmodule Req.Finch do
               end
 
             {:done, resp, acc, state} ->
-              {:done, {:cont, resp, acc, state}}
+              {:done, {:ok, resp, acc, state}}
           end
 
           {:stream, wrapped_req_body_fun}

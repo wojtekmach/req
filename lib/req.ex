@@ -1143,7 +1143,7 @@ defmodule Req do
 
       :self ->
         stream_fun = fn _event, resp, acc, state ->
-          {:cont, resp, acc, state}
+          {:ok, resp, acc, state}
         end
 
         case run_stream(req, nil, stream_fun) do
@@ -1179,7 +1179,7 @@ defmodule Req do
         case fun.({:data, data}, {resp.request, resp}) do
           {:cont, {req, resp}} ->
             resp = put_in(resp.request, req)
-            {:cont, resp, acc, state}
+            {:ok, resp, acc, state}
 
           {:halt, {req, resp}} ->
             resp = put_in(resp.request, req)
@@ -1190,7 +1190,7 @@ defmodule Req do
         end
 
       _event, resp, acc, state ->
-        {:cont, resp, acc, state}
+        {:ok, resp, acc, state}
     end
 
     case run_stream(req, nil, stream_fun) do
@@ -1219,17 +1219,17 @@ defmodule Req do
   defp into_collectable(req, collectable) do
     stream_fun = fn
       {:status, 200}, resp, %Req.Buffer{}, state ->
-        {:cont, resp, Collectable.into(collectable), state}
+        {:ok, resp, Collectable.into(collectable), state}
 
       {:data, data}, resp, {acc, collector}, state ->
         acc = collector.(acc, {:cont, data})
-        {:cont, resp, {acc, collector}, state}
+        {:ok, resp, {acc, collector}, state}
 
       {:data, data}, resp, %Req.Buffer{} = buffer, state ->
-        {:cont, resp, %{buffer | iodata: [buffer.iodata | data]}, state}
+        {:ok, resp, %{buffer | iodata: [buffer.iodata | data]}, state}
 
       _event, resp, acc, state ->
-        {:cont, resp, acc, state}
+        {:ok, resp, acc, state}
     end
 
     case run_stream(req, %Req.Buffer{}, stream_fun) do
@@ -1326,15 +1326,8 @@ defmodule Req do
     resp = Req.Response.new(status: 200)
     resp = put_in(resp.request, req)
 
-    with {:cont, resp, acc, state} <- fun.({:status, 200}, resp, acc, state),
-         {:cont, resp, acc, state} <- fun.({:headers, resp.headers}, resp, acc, state) do
-      {:ok, resp, acc, state}
-    else
-      {:halt, resp, acc, state} ->
-        {:halt, resp, acc, state}
-
-      {{:error, err}, resp, acc, state} ->
-        {{:error, err}, resp, acc, state}
+    with {:ok, resp, acc, state} <- fun.({:status, 200}, resp, acc, state) do
+      fun.({:headers, resp.headers}, resp, acc, state)
     end
   end
 
@@ -1349,7 +1342,7 @@ defmodule Req do
       {:data, data}, resp, acc, state ->
         case fun.(data, resp, acc) do
           {:cont, acc} ->
-            {:cont, resp, acc, state}
+            {:ok, resp, acc, state}
 
           {:halt, acc} ->
             {:halt, resp, acc, state}
@@ -1359,7 +1352,7 @@ defmodule Req do
         end
 
       {tag, _value}, resp, acc, state when tag in [:status, :headers, :trailers] ->
-        {:cont, resp, acc, state}
+        {:ok, resp, acc, state}
     end
 
     case run_stream(req, acc, stream_fun) do
@@ -1393,10 +1386,10 @@ defmodule Req do
 
     stream_fun = fn
       {:data, data}, resp, %Req.Buffer{} = buffer, state ->
-        {:cont, resp, %{buffer | iodata: [buffer.iodata | data]}, state}
+        {:ok, resp, %{buffer | iodata: [buffer.iodata | data]}, state}
 
       {_tag, _value}, resp, acc, state ->
-        {:cont, resp, acc, state}
+        {:ok, resp, acc, state}
     end
 
     case run_stream(req, %Req.Buffer{}, stream_fun) do

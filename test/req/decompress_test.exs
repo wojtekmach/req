@@ -272,20 +272,20 @@ defmodule Req.DecompressTest do
         |> Map.replace!(:request, req)
         |> Req.Response.put_header("content-encoding", "gzip")
 
-      {:cont, resp, acc, state} = fun.({:status, 200}, resp, acc, state)
-      {:cont, resp, acc, state} = fun.({:headers, resp.headers}, resp, acc, state)
-      {:cont, resp, acc, state} = fun.({:data, :zlib.gzip("foo")}, resp, acc, state)
-      {:cont, resp, acc, state} = fun.({:trailers, Req.Fields.new([])}, resp, acc, state)
+      {:ok, resp, acc, state} = fun.({:status, 200}, resp, acc, state)
+      {:ok, resp, acc, state} = fun.({:headers, resp.headers}, resp, acc, state)
+      {:ok, resp, acc, state} = fun.({:data, :zlib.gzip("foo")}, resp, acc, state)
+      {:ok, resp, acc, state} = fun.({:trailers, Req.Fields.new([])}, resp, acc, state)
       {:ok, resp, acc, state}
     end
 
     fun = fn
       {:headers, _headers} = event, resp, events, state ->
         resp = Req.Response.delete_header(resp, "content-encoding")
-        {:cont, resp, [event | events], state}
+        {:ok, resp, [event | events], state}
 
       event, resp, events, state ->
-        {:cont, resp, [event | events], state}
+        {:ok, resp, [event | events], state}
     end
 
     assert {:ok, resp, events, []} = Req.Decompress.stream(req, [], fun, [], next)
