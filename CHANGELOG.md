@@ -1512,7 +1512,6 @@ See "Adapter" section in `Req.Request` module documentation for more information
   * Initial release
 
 [`compress_body`]:                        https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#compress_body/1
-[`compress_body`]:                        https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#compress_body/1
 [`encode_body`]:                          https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#encode_body/1
 [`put_base_url`]:                         https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#put_base_url/1
 [`put_params`]:                           https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#put_params/1
@@ -1551,6 +1550,14 @@ See "Adapter" section in `Req.Request` module documentation for more information
 [`Req.Response.update_private/4`]:        https://hexdocs.pm/req/0.8.0-rc.0/Req.Response.html#update_private/4
 [`Req.Response.to_map/1`]:                https://hexdocs.pm/req/0.8.0-rc.0/Req.Response.html#to_map/1
 [`Req.Response.Async`]:                   https://hexdocs.pm/req/0.8.0-rc.0/Req.Response.Async.html
+
+[`Req.Auth`]:                             https://hexdocs.pm/req/0.8.0-rc.0/Req.Auth.html
+[`Req.Checksum`]:                         https://hexdocs.pm/req/0.8.0-rc.0/Req.Checksum.html
+[`Req.Decode`]:                           https://hexdocs.pm/req/0.8.0-rc.0/Req.Decode.html
+[`Req.Decompress`]:                       https://hexdocs.pm/req/0.8.0-rc.0/Req.Decompress.html
+[`Req.Expect`]:                           https://hexdocs.pm/req/0.8.0-rc.0/Req.Expect.html
+[`Req.Redirect`]:                         https://hexdocs.pm/req/0.8.0-rc.0/Req.Redirect.html
+[`Req.Retry`]:                            https://hexdocs.pm/req/0.8.0-rc.0/Req.Retry.html
 
 [`Req.Finch`]:                            https://hexdocs.pm/req/0.8.0-rc.0/Req.Finch.html
 [`Req.Plug`]:                             https://hexdocs.pm/req/0.8.0-rc.0/Req.Plug.html
