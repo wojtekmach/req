@@ -1,7 +1,7 @@
 defmodule Req.MixProject do
   use Mix.Project
 
-  @version "0.8.0-dev"
+  @version "0.8.0-rc.0"
   @source_url "https://github.com/wojtekmach/req"
 
   def project do
@@ -79,7 +79,7 @@ defmodule Req.MixProject do
     for path <- ["README.md", "CHANGELOG.md"] do
       contents =
         Regex.replace(
-          ~r|^(\[[^\]]+\]:[ \t]*)https://hexdocs\.pm/req(?:/([A-Z][\w.]*)\.html(?:#(\S+/\d+))?)?$|m,
+          ~r|^(\[[^\]]+\]:[ \t]*)https://hexdocs\.pm/req(?:/#{Regex.escape(@version)})?(?:/([A-Z][\w.]*)\.html(?:#(\S+/\d+))?)?$|m,
           File.read!(path),
           fn _, prefix, mod, fun ->
             cond do
@@ -92,7 +92,7 @@ defmodule Req.MixProject do
 
       contents =
         Regex.replace(
-          ~r|\[([^\]]+)\]\(https://hexdocs\.pm/req/([A-Z][\w.]*)\.html#(\S+/\d+)\)|,
+          ~r|\[([^\]]+)\]\(https://hexdocs\.pm/req/(?:#{Regex.escape(@version)}/)?([A-Z][\w.]*)\.html#(\S+/\d+)\)|,
           contents,
           fn _, text, mod, fun -> "[#{text}](`#{mod}.#{fun}`)" end
         )

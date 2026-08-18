@@ -1,6 +1,46 @@
 # CHANGELOG
 
-## v0.7.2
+## v0.8.0-rc.0 (2026-08-18)
+
+Req v0.8 brings more ergonomic streaming with [`Req.stream/4`], streaming decompression and decoding, automatic NDJSON & SSE decoding, and more.
+
+Req v0.8 has revamped internals though most end-users should be unaffected. Req's initial design included response/error steps which are now deprecated as we couldn't use them for extensible streaming decoding. Instead, we're adding step _wrappers_.
+See ["Steps & Step Wrappers" section](`Req.Request#module-steps-step-wrappers`) in [`Req.Request`] module documentation for more information.
+
+Req v0.8 requires Elixir 1.18+.
+
+### Enhancements
+
+  * [`Req`]: Add [`Req.stream/4`].
+  * [`Req`]: Allow setting private through options, e.g.: `Req.new(private: %{foo: :bar})`.
+  * [`Req`]: Support request body streaming with `body: fun`
+
+  * [`Req.Response`]: Add `resp.request`. This is useful to inspect the final request after all steps have executed.
+
+  * [`Req.Decode`]: Support NDJSON
+  * [`Req.Decode`]: Support SSE
+  * [`Req.Decode`]: Support `decoders: [{content_type, decoder}]`.
+
+### Breaking Changes
+
+  * Remove jason dependency. `Req.post(url, json: term)` will now use `JSON.encode!/2`, not `Jason.encode!/2`, that is, `term` must implement [`JSON.Encoder`] protocol.
+  * Remove deprecated `:finch_request` option
+  * Remove deprecated `into: :legacy_self`
+  * Remove deprecated `cache` step
+  * Replace `compressed` and `decompress_body` with [`Req.Decompress`].
+  * Replace `handle_http_errors` with [`Req.Expect`].
+  * Replace `auth` and `http_digest` steps with [`Req.Auth`].
+  * Replace `redirect` with [`Req.Redirect`]
+  * Replace `retry` with [`Req.Retry`]
+  * Replace `checksum` with [`Req.Checksum`]
+  * Replace `decode_body` with [`Req.Decode`]
+
+### Deprecations
+
+  * [`Req`]: Deprecate `into: fun` in favour of [`Req.stream/4`].
+  * [`Req.Expect`]: Deprecate `:http_errors` option in favour of `:expect`.
+
+## v0.7.2 (2026-07-31)
 
   * [`encode_body`]: Bring back `form_multipart: [{string_name, value}]`.
   * [`put_aws_sigv4`]: Fix AWS SigV4 compatibility with Supabase Storage S3.
@@ -1471,75 +1511,79 @@ See "Adapter" section in `Req.Request` module documentation for more information
 
   * Initial release
 
-[`compress_body`]:       https://hexdocs.pm/req/Req.Steps.html#compress_body/1
-[`compress_body`]:       https://hexdocs.pm/req/Req.Steps.html#compress_body/1
-[`encode_body`]:         https://hexdocs.pm/req/Req.Steps.html#encode_body/1
-[`put_base_url`]:        https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
-[`put_params`]:          https://hexdocs.pm/req/Req.Steps.html#put_params/1
-[`put_path_params`]:     https://hexdocs.pm/req/Req.Steps.html#put_path_params/1
-[`put_user_agent`]:      https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
-[`put_range`]:           https://hexdocs.pm/req/Req.Steps.html#put_range/1
-[`put_aws_sigv4`]:       https://hexdocs.pm/req/Req.Steps.html#put_aws_sigv4/1
+[`compress_body`]:                        https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#compress_body/1
+[`compress_body`]:                        https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#compress_body/1
+[`encode_body`]:                          https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#encode_body/1
+[`put_base_url`]:                         https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#put_base_url/1
+[`put_params`]:                           https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#put_params/1
+[`put_path_params`]:                      https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#put_path_params/1
+[`put_user_agent`]:                       https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#put_user_agent/1
+[`put_range`]:                            https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#put_range/1
+[`put_aws_sigv4`]:                        https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#put_aws_sigv4/1
 
-[`Req`]:                        https://hexdocs.pm/req/Req.html
-[`Req.new/1`]:                  https://hexdocs.pm/req/Req.html#new/1
-[`Req.request/2`]:              https://hexdocs.pm/req/Req.html#request/2
-[`Req.run/2`]:                  https://hexdocs.pm/req/Req.html#run/2
-[`Req.run!/2`]:                 https://hexdocs.pm/req/Req.html#run!/2
-[`Req.merge/2`]:                https://hexdocs.pm/req/Req.html#merge/2
-[`Req.parse_message/2`]:        https://hexdocs.pm/req/Req.html#merge/2
-[`Req.cancel_async_request/1`]: https://hexdocs.pm/req/Req.html#merge/2
-[`Req.get_headers_list/1`]:     https://hexdocs.pm/req/Req.html#get_headers_list/1
+[`Req`]:                                  https://hexdocs.pm/req/0.8.0-rc.0/Req.html
+[`Req.new/1`]:                            https://hexdocs.pm/req/0.8.0-rc.0/Req.html#new/1
+[`Req.request/2`]:                        https://hexdocs.pm/req/0.8.0-rc.0/Req.html#request/2
+[`Req.run/2`]:                            https://hexdocs.pm/req/0.8.0-rc.0/Req.html#run/2
+[`Req.run!/2`]:                           https://hexdocs.pm/req/0.8.0-rc.0/Req.html#run!/2
+[`Req.merge/2`]:                          https://hexdocs.pm/req/0.8.0-rc.0/Req.html#merge/2
+[`Req.parse_message/2`]:                  https://hexdocs.pm/req/0.8.0-rc.0/Req.html#merge/2
+[`Req.cancel_async_request/1`]:           https://hexdocs.pm/req/0.8.0-rc.0/Req.html#merge/2
+[`Req.get_headers_list/1`]:               https://hexdocs.pm/req/0.8.0-rc.0/Req.html#get_headers_list/1
+[`Req.stream/4`]:                         https://hexdocs.pm/req/0.8.0-rc.0/Req.html#stream/4
 
-[`Req.Request`]:                     https://hexdocs.pm/req/Req.Request.html
-[`Req.Request.new/1`]:               https://hexdocs.pm/req/Req.Request.html#new/1
-[`Req.Request.put_option/3`]:        https://hexdocs.pm/req/Req.Request.html#put_option/3
-[`Req.Request.put_new_option/3`]:    https://hexdocs.pm/req/Req.Request.html#put_new_option/3
-[`Req.Request.merge_options/2`]:     https://hexdocs.pm/req/Req.Request.html#merge_options/2
-[`Req.Request.merge_new_options/2`]: https://hexdocs.pm/req/Req.Request.html#merge_new_options/2
-[`Req.Request.get_option/3`]:        https://hexdocs.pm/req/Req.Request.html#get_option/3
-[`Req.Request.fetch_option/2`]:      https://hexdocs.pm/req/Req.Request.html#fetch_option/2
-[`Req.Request.fetch_option!/2`]:     https://hexdocs.pm/req/Req.Request.html#fetch_option!/2
-[`Req.Request.delete_option/2`]:     https://hexdocs.pm/req/Req.Request.html#delete_option/2
-[`Req.Request.drop_options/2`]:      https://hexdocs.pm/req/Req.Request.html#drop_options/2
-[`Req.Request.update_private/4`]:    https://hexdocs.pm/req/Req.Request.html#update_private/4
+[`Req.Request`]:                          https://hexdocs.pm/req/0.8.0-rc.0/Req.Request.html
+[`Req.Request.new/1`]:                    https://hexdocs.pm/req/0.8.0-rc.0/Req.Request.html#new/1
+[`Req.Request.put_option/3`]:             https://hexdocs.pm/req/0.8.0-rc.0/Req.Request.html#put_option/3
+[`Req.Request.put_new_option/3`]:         https://hexdocs.pm/req/0.8.0-rc.0/Req.Request.html#put_new_option/3
+[`Req.Request.merge_options/2`]:          https://hexdocs.pm/req/0.8.0-rc.0/Req.Request.html#merge_options/2
+[`Req.Request.merge_new_options/2`]:      https://hexdocs.pm/req/0.8.0-rc.0/Req.Request.html#merge_new_options/2
+[`Req.Request.get_option/3`]:             https://hexdocs.pm/req/0.8.0-rc.0/Req.Request.html#get_option/3
+[`Req.Request.fetch_option/2`]:           https://hexdocs.pm/req/0.8.0-rc.0/Req.Request.html#fetch_option/2
+[`Req.Request.fetch_option!/2`]:          https://hexdocs.pm/req/0.8.0-rc.0/Req.Request.html#fetch_option!/2
+[`Req.Request.delete_option/2`]:          https://hexdocs.pm/req/0.8.0-rc.0/Req.Request.html#delete_option/2
+[`Req.Request.drop_options/2`]:           https://hexdocs.pm/req/0.8.0-rc.0/Req.Request.html#drop_options/2
+[`Req.Request.update_private/4`]:         https://hexdocs.pm/req/0.8.0-rc.0/Req.Request.html#update_private/4
 
-[`Req.Response`]:                  https://hexdocs.pm/req/Req.Response.html
-[`Req.Response.get_header/2`]:     https://hexdocs.pm/req/Req.Response.html#get_header/2
-[`Req.Response.delete_header/2`]:  https://hexdocs.pm/req/Req.Response.html#delete_header/2
-[`Req.Response.update_private/4`]: https://hexdocs.pm/req/Req.Response.html#update_private/4
-[`Req.Response.to_map/1`]:         https://hexdocs.pm/req/Req.Response.html#to_map/1
-[`Req.Response.Async`]:            https://hexdocs.pm/req/Req.Response.Async.html
+[`Req.Response`]:                         https://hexdocs.pm/req/0.8.0-rc.0/Req.Response.html
+[`Req.Response.get_header/2`]:            https://hexdocs.pm/req/0.8.0-rc.0/Req.Response.html#get_header/2
+[`Req.Response.delete_header/2`]:         https://hexdocs.pm/req/0.8.0-rc.0/Req.Response.html#delete_header/2
+[`Req.Response.update_private/4`]:        https://hexdocs.pm/req/0.8.0-rc.0/Req.Response.html#update_private/4
+[`Req.Response.to_map/1`]:                https://hexdocs.pm/req/0.8.0-rc.0/Req.Response.html#to_map/1
+[`Req.Response.Async`]:                   https://hexdocs.pm/req/0.8.0-rc.0/Req.Response.Async.html
 
-[`Req.Finch`]: https://hexdocs.pm/req/Req.Finch.html
-[`Req.Plug`]:  https://hexdocs.pm/req/Req.Plug.html
+[`Req.Finch`]:                            https://hexdocs.pm/req/0.8.0-rc.0/Req.Finch.html
+[`Req.Plug`]:                             https://hexdocs.pm/req/0.8.0-rc.0/Req.Plug.html
 
-[`Req.Test`]: https://hexdocs.pm/req/Req.Test.html
-[`Req.Test.stub/2`]: https://hexdocs.pm/req/Req.Test.html#stub/2
-[`Req.Test.json/2`]: https://hexdocs.pm/req/Req.Test.html#json/2
-[`Req.Test.html/2`]: https://hexdocs.pm/req/Req.Test.html#html/2
-[`Req.Test.text/2`]: https://hexdocs.pm/req/Req.Test.html#text/2
-[`Req.Test.allow/3`]: https://hexdocs.pm/req/Req.Test.html#allow/3
-[`Req.Test.raw_body/1`]: https://hexdocs.pm/req/Req.Test.html#raw_body/1
-[`Req.Test.transport_error/2`]: https://hexdocs.pm/req/Req.Test.html#transport_error/2
-[`Req.Test.expect/3`]: https://hexdocs.pm/req/Req.Test.html#expect/3
-[`Req.Test.verify!/0`]: https://hexdocs.pm/req/Req.Test.html#verify!/0
-[`Req.Test.verify!/1`]: https://hexdocs.pm/req/Req.Test.html#verify!/1
-[`Req.Test.verify_on_exit!/1`]: https://hexdocs.pm/req/Req.Test.html#verify_on_exit!/1
-[`Req.Test.set_req_test_from_context/1`]: https://hexdocs.pm/req/Req.Test.html#set_req_test_from_context/1
-[`Req.Test.set_req_test_to_private/1`]: https://hexdocs.pm/req/Req.Test.html#set_req_test_to_private/1
-[`Req.Test.set_req_test_to_shared/1`]: https://hexdocs.pm/req/Req.Test.html#set_req_test_to_shared/1
+[`Req.Test`]:                             https://hexdocs.pm/req/0.8.0-rc.0/Req.Test.html
+[`Req.Test.stub/2`]:                      https://hexdocs.pm/req/0.8.0-rc.0/Req.Test.html#stub/2
+[`Req.Test.json/2`]:                      https://hexdocs.pm/req/0.8.0-rc.0/Req.Test.html#json/2
+[`Req.Test.html/2`]:                      https://hexdocs.pm/req/0.8.0-rc.0/Req.Test.html#html/2
+[`Req.Test.text/2`]:                      https://hexdocs.pm/req/0.8.0-rc.0/Req.Test.html#text/2
+[`Req.Test.allow/3`]:                     https://hexdocs.pm/req/0.8.0-rc.0/Req.Test.html#allow/3
+[`Req.Test.raw_body/1`]:                  https://hexdocs.pm/req/0.8.0-rc.0/Req.Test.html#raw_body/1
+[`Req.Test.transport_error/2`]:           https://hexdocs.pm/req/0.8.0-rc.0/Req.Test.html#transport_error/2
+[`Req.Test.expect/3`]:                    https://hexdocs.pm/req/0.8.0-rc.0/Req.Test.html#expect/3
+[`Req.Test.verify!/0`]:                   https://hexdocs.pm/req/0.8.0-rc.0/Req.Test.html#verify!/0
+[`Req.Test.verify!/1`]:                   https://hexdocs.pm/req/0.8.0-rc.0/Req.Test.html#verify!/1
+[`Req.Test.verify_on_exit!/1`]:           https://hexdocs.pm/req/0.8.0-rc.0/Req.Test.html#verify_on_exit!/1
+[`Req.Test.set_req_test_from_context/1`]: https://hexdocs.pm/req/0.8.0-rc.0/Req.Test.html#set_req_test_from_context/1
+[`Req.Test.set_req_test_to_private/1`]:   https://hexdocs.pm/req/0.8.0-rc.0/Req.Test.html#set_req_test_to_private/1
+[`Req.Test.set_req_test_to_shared/1`]:    https://hexdocs.pm/req/0.8.0-rc.0/Req.Test.html#set_req_test_to_shared/1
 
-[`Req.Finch`]: https://hexdocs.pm/req/Req.Finch.html
-[`Req.Plug`]:  https://hexdocs.pm/req/Req.Plug.html
+[`Req.Finch`]:                            https://hexdocs.pm/req/0.8.0-rc.0/Req.Finch.html
+[`Req.Plug`]:                             https://hexdocs.pm/req/0.8.0-rc.0/Req.Plug.html
 
-[`Req.Steps`]: https://hexdocs.pm/req/Req.Steps.html
+[`Req.Steps`]:                            https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html
 
-[`Req.TransportError`]: https://hexdocs.pm/req/Req.TransportError.html
-[`Req.HTTPError`]: https://hexdocs.pm/req/Req.HTTPError.html
-[`Req.TooManyRedirectsError`]: https://hexdocs.pm/req/Req.TooManyRedirectsError.html
-[`Req.DecompressError`]: https://hexdocs.pm/req/Req.DecompressError.html
-[`Req.ArchiveError`]: https://hexdocs.pm/req/Req.ArchiveError.html
+[`Req.TransportError`]:                   https://hexdocs.pm/req/0.8.0-rc.0/Req.TransportError.html
+[`Req.HTTPError`]:                        https://hexdocs.pm/req/0.8.0-rc.0/Req.HTTPError.html
+[`Req.TooManyRedirectsError`]:            https://hexdocs.pm/req/0.8.0-rc.0/Req.TooManyRedirectsError.html
+[`Req.DecompressError`]:                  https://hexdocs.pm/req/0.8.0-rc.0/Req.DecompressError.html
+[`Req.ArchiveError`]:                     https://hexdocs.pm/req/0.8.0-rc.0/Req.ArchiveError.html
 
-[`Enumerable`]:  https://hexdocs.pm/elixir/Enumerable.html
-[`Collectable`]: https://hexdocs.pm/elixir/Collectable.html
+[`Enumerable`]:                           https://hexdocs.pm/elixir/Enumerable.html
+[`Collectable`]:                          https://hexdocs.pm/elixir/Collectable.html
+[`JSON.Encoder`]:                         https://hexdocs.pm/elixir/JSON.Encoder.html
+
+["Steps & Step Wrappers" section]:        https://hexdocs.pm/elixir/Req.Request.html#module-steps-step-wrappers

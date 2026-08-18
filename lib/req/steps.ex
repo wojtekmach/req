@@ -24,8 +24,6 @@ defmodule Req.Steps do
 
     * `Req.Expect`
 
-    * `Req.Into`
-
     * `Req.Redirect`
 
     * `Req.Retry`

@@ -17,10 +17,33 @@ defmodule DocsTest do
       |> Keyword.values()
       |> Enum.filter(&is_atom/1)
 
+    steps = steps -- [Req.Into]
+
     assert Enum.sort(listed) == Enum.sort(steps)
   end
 
-  @tag skip: Version.parse!(@version).pre != []
+  test "README.md links to hexdocs" do
+    rc? = match?(["rc" | _], Version.parse!(@version).pre)
+
+    links =
+      Regex.scan(~r|^\[[^\]]+\]:[ \t]+(https://hexdocs\.pm/req\S*)$|m, File.read!("README.md"),
+        capture: :all_but_first
+      )
+
+    assert links != []
+
+    for [link] <- links do
+      if rc? do
+        assert String.starts_with?(link, "https://hexdocs.pm/req/#{@version}/"),
+               "README.md has #{link} which should link to version #{@version}"
+      else
+        refute link =~ ~r|^https://hexdocs\.pm/req/\d|,
+               "README.md has #{link} which should be unversioned"
+      end
+    end
+  end
+
+  @tag skip: Version.parse!(@version).pre == ["dev"]
   test "version" do
     requirements =
       Regex.scan(~r/\{:req, "(~> [^"]+)"/, File.read!("README.md"), capture: :all_but_first)

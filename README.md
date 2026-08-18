@@ -11,7 +11,7 @@ With just a couple lines of code:
 
 ```elixir
 Mix.install([
-  {:req, "~> 0.8.0"}
+  {:req, "~> 0.8.0-rc"}
 ])
 
 Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
@@ -80,7 +80,7 @@ The easiest way to use Req is with [`Mix.install/2`]:
 
 ```elixir
 Mix.install([
-  {:req, "~> 0.8.0"}
+  {:req, "~> 0.8.0-rc"}
 ])
 
 Req.get!("https://api.github.com/repos/wojtekmach/req").body["description"]
@@ -174,7 +174,7 @@ Here is how they can be used:
 
 ```elixir
 Mix.install([
-  {:req, "~> 0.8.0"},
+  {:req, "~> 0.8.0-rc"},
   {:req_easyhtml, "~> 0.2.0"},
   {:req_s3, "~> 0.2.3"},
   {:req_hex, "~> 0.2.0"},
@@ -272,33 +272,33 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-[`Req.request/1`]:       https://hexdocs.pm/req/Req.html#request/1
-[`Req.stream/4`]:       https://hexdocs.pm/req/Req.html#stream/4
-[`Req.new/1`]:           https://hexdocs.pm/req/Req.html#new/1
-[`Req.get!/2`]:          https://hexdocs.pm/req/Req.html#get!/2
-[`Req.post!/2`]:         https://hexdocs.pm/req/Req.html#post!/2
-[`Req`]:                 https://hexdocs.pm/req
-[`Req.Request`]:         https://hexdocs.pm/req/Req.Request.html
-[`Req.Finch`]:           https://hexdocs.pm/req/Req.Finch.html
-[`Req.Plug`]:            https://hexdocs.pm/req/Req.Plug.html
-[`Req.Auth`]:            https://hexdocs.pm/req/Req.Auth.html
-[`Req.Checksum`]:        https://hexdocs.pm/req/Req.Checksum.html
-[`Req.Decode`]:          https://hexdocs.pm/req/Req.Decode.html
-[`Req.Decompress`]:      https://hexdocs.pm/req/Req.Decompress.html
-[`Req.Expect`]:          https://hexdocs.pm/req/Req.Expect.html
-[`Req.Redirect`]:        https://hexdocs.pm/req/Req.Redirect.html
-[`Req.Retry`]:           https://hexdocs.pm/req/Req.Retry.html
-[`Req.Steps`]:           https://hexdocs.pm/req/Req.Steps.html
-[`Req.Test`]:            https://hexdocs.pm/req/Req.Test.html
+[`Req`]:                 https://hexdocs.pm/req/0.8.0-rc.0/Req.html
+[`Req.request/1`]:       https://hexdocs.pm/req/0.8.0-rc.0/Req.html#request/1
+[`Req.stream/4`]:        https://hexdocs.pm/req/0.8.0-rc.0/Req.html#stream/4
+[`Req.new/1`]:           https://hexdocs.pm/req/0.8.0-rc.0/Req.html#new/1
+[`Req.get!/2`]:          https://hexdocs.pm/req/0.8.0-rc.0/Req.html#get!/2
+[`Req.post!/2`]:         https://hexdocs.pm/req/0.8.0-rc.0/Req.html#post!/2
+[`Req.Request`]:         https://hexdocs.pm/req/0.8.0-rc.0/Req.Request.html
+[`Req.Finch`]:           https://hexdocs.pm/req/0.8.0-rc.0/Req.Finch.html
+[`Req.Plug`]:            https://hexdocs.pm/req/0.8.0-rc.0/Req.Plug.html
+[`Req.Auth`]:            https://hexdocs.pm/req/0.8.0-rc.0/Req.Auth.html
+[`Req.Checksum`]:        https://hexdocs.pm/req/0.8.0-rc.0/Req.Checksum.html
+[`Req.Decode`]:          https://hexdocs.pm/req/0.8.0-rc.0/Req.Decode.html
+[`Req.Decompress`]:      https://hexdocs.pm/req/0.8.0-rc.0/Req.Decompress.html
+[`Req.Expect`]:          https://hexdocs.pm/req/0.8.0-rc.0/Req.Expect.html
+[`Req.Redirect`]:        https://hexdocs.pm/req/0.8.0-rc.0/Req.Redirect.html
+[`Req.Retry`]:           https://hexdocs.pm/req/0.8.0-rc.0/Req.Retry.html
+[`Req.Steps`]:           https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html
+[`Req.Test`]:            https://hexdocs.pm/req/0.8.0-rc.0/Req.Test.html
 
-[`compress_body`]:      https://hexdocs.pm/req/Req.Steps.html#compress_body/1
-[`encode_body`]:        https://hexdocs.pm/req/Req.Steps.html#encode_body/1
-[`put_base_url`]:       https://hexdocs.pm/req/Req.Steps.html#put_base_url/1
-[`put_params`]:         https://hexdocs.pm/req/Req.Steps.html#put_params/1
-[`put_path_params`]:    https://hexdocs.pm/req/Req.Steps.html#put_path_params/1
-[`put_range`]:          https://hexdocs.pm/req/Req.Steps.html#put_range/1
-[`put_user_agent`]:     https://hexdocs.pm/req/Req.Steps.html#put_user_agent/1
-[`put_aws_sigv4`]:       https://hexdocs.pm/req/Req.Steps.html#put_aws_sigv4/1
+[`compress_body`]:       https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#compress_body/1
+[`encode_body`]:         https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#encode_body/1
+[`put_base_url`]:        https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#put_base_url/1
+[`put_params`]:          https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#put_params/1
+[`put_path_params`]:     https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#put_path_params/1
+[`put_range`]:           https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#put_range/1
+[`put_user_agent`]:      https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#put_user_agent/1
+[`put_aws_sigv4`]:       https://hexdocs.pm/req/0.8.0-rc.0/Req.Steps.html#put_aws_sigv4/1
 
 [Finch]: https://github.com/sneako/finch
 [cURL]: https://curl.se
