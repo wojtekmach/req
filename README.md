@@ -240,6 +240,7 @@ There are many packages that extend the Req library. To get yours listed here, s
   * [`http_cookie`]
   * [`req_embed`]
   * [`req_proxy`]
+  * [`req_server_sent_events`] (supports SSE with `into: collectable | :self`)
 
 ## Presentations
 
@@ -313,3 +314,4 @@ limitations under the License.
 [`http_cookie`]: https://github.com/reisub/http_cookie
 [`req_embed`]: https://github.com/leandrocp/req_embed
 [`req_proxy`]: https://gitlab.com/wmde/technical-wishes/req_proxy
+[`req_server_sent_events`]: https://github.com/sgerrand/ex_req_server_sent_events
