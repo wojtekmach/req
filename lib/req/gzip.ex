@@ -22,7 +22,7 @@ defmodule Req.Gzip do
 
   @doc false
   def encode_chunk(z, data) do
-    IO.iodata_to_binary(:zlib.deflate(z, data))
+    IO.iodata_to_binary(:zlib.deflate(z, data, :sync))
   end
 
   @doc false

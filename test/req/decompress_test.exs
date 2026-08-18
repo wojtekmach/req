@@ -682,4 +682,28 @@ defmodule Req.DecompressTest do
     assert resp.body == nil
     assert acc == []
   end
+
+  @tag skip: adapter() == :httpc
+  test "into: collectable" do
+    %{req: req} =
+      serve(
+        "GET /": fn conn ->
+          # TODO: Remove when requiring OTP 28 (Elixir 1.21/22?)
+          if System.otp_release() >= "28" do
+            assert get_req_header(conn, "accept-encoding") == ["zstd, br, gzip"]
+          else
+            assert get_req_header(conn, "accept-encoding") == ["br, gzip"]
+          end
+
+          conn
+          |> put_resp_header("content-encoding", "x-gzip")
+          |> send_resp_chunked(Req.Gzip.encode_to_stream(["foo", "bar"]))
+        end
+      )
+
+    resp = Req.request!(req, compressed: true, into: [])
+    assert resp.status == 200
+    assert Req.Response.get_header(resp, "content-encoding") == []
+    assert resp.body == ["foo", "bar"]
+  end
 end
