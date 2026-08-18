@@ -9,6 +9,9 @@ defmodule Req.HTTPC do
       {:halt, acc} ->
         {:halt, resp, acc, state}
 
+      {:error, exception, acc} ->
+        {{:error, exception}, resp, acc, state}
+
       {:ok, body, acc} ->
         {profile, request, httpc_req, httpc_http_options, httpc_options} = build(request, body)
         resp = put_in(resp.request, request)
@@ -319,9 +322,12 @@ defmodule Req.HTTPC do
       {:halt, acc} ->
         {:halt, acc}
 
+      {:error, exception, acc} ->
+        {:error, exception, acc}
+
       other ->
         raise "expected req_body_fun to return {:data, chunk, acc}, {:done, chunk, acc}, " <>
-                "{:done, acc}, or {:halt, acc}, got: #{inspect(other)}"
+                "{:done, acc}, {:halt, acc}, or {:error, exception, acc}, got: #{inspect(other)}"
     end
   end
 

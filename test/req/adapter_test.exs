@@ -708,6 +708,26 @@ defmodule Req.AdapterTest do
       assert acc == ["chunk1", :done, "bar", "foo"]
     end
 
+    test "Req.stream - error" do
+      %{req: req} =
+        serve(fn conn ->
+          assert {:ok, "", conn} = Plug.Conn.read_body(conn)
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      {:error, err, resp, acc} =
+        Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
+          method: :post,
+          body: fn [] -> {:error, %RuntimeError{message: "oops"}, [:error]} end
+        )
+
+      assert err == %RuntimeError{message: "oops"}
+      assert resp.request.url == req.url
+      assert resp.status == nil
+      assert resp.body == nil
+      assert acc == [:error]
+    end
+
     test "Req.stream - errored" do
       %{req: req} =
         serve(fn conn ->
@@ -718,7 +738,7 @@ defmodule Req.AdapterTest do
 
       assert_raise RuntimeError,
                    "expected req_body_fun to return {:data, chunk, acc}, {:done, chunk, acc}, " <>
-                     "{:done, acc}, or {:halt, acc}, got: :oops",
+                     "{:done, acc}, {:halt, acc}, or {:error, exception, acc}, got: :oops",
                    fn ->
                      Req.stream(req, [], fn data, _resp, acc -> {:cont, [data | acc]} end,
                        method: :post,

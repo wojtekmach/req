@@ -39,7 +39,8 @@ defmodule Req.Request do
         * `enumerable` - stream request body
 
         * `req_body_fun` - stream request body chunks from a 1-arity function.
-          Only supported in `Req.stream/4`; the function receives the accumulator
+
+          Only supported in `Req.stream/4`. The function receives the accumulator
           passed to `Req.stream/4`.
 
           It should return one of:
@@ -53,6 +54,9 @@ defmodule Req.Request do
               streaming function.
 
             * `{:halt, acc}` - cancel request. On HTTP/1, this closes the connection.
+
+            * `{:error, exception, acc}` - cancel request and return `{:error, exception, resp, acc}`
+              from `Req.stream/4`.
 
     * `:into` - where to send the response body. It can be one of:
 
@@ -393,7 +397,8 @@ defmodule Req.Request do
              {:data, binary(), acc}
              | {:done, binary(), acc}
              | {:done, acc}
-             | {:halt, acc})
+             | {:halt, acc}
+             | {:error, Exception.t(), acc})
 
   @typep request_step() :: term()
 

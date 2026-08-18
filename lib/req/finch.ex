@@ -358,9 +358,12 @@ defmodule Req.Finch do
                 {:halt, acc} ->
                   {:halt, {:ok, resp, acc, state}}
 
+                {:error, exception, acc} ->
+                  {:halt, {{:error, exception}, resp, acc, state}}
+
                 other ->
                   raise "expected req_body_fun to return {:data, chunk, acc}, {:done, chunk, acc}, " <>
-                          "{:done, acc}, or {:halt, acc}, got: #{inspect(other)}"
+                          "{:done, acc}, {:halt, acc}, or {:error, exception, acc}, got: #{inspect(other)}"
               end
 
             {:done, resp, acc, state} ->

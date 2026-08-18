@@ -309,9 +309,12 @@ defmodule Req.Mint do
       {:halt, acc} ->
         {:halt, conn, acc}
 
+      {:error, exception, acc} ->
+        {:error, conn, exception, acc}
+
       other ->
         raise "expected req_body_fun to return {:data, chunk, acc}, {:done, chunk, acc}, " <>
-                "{:done, acc}, or {:halt, acc}, got: #{inspect(other)}"
+                "{:done, acc}, {:halt, acc}, or {:error, exception, acc}, got: #{inspect(other)}"
     end
   end
 

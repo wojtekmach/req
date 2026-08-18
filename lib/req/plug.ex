@@ -154,6 +154,10 @@ if Code.ensure_loaded?(Plug) do
         {:halt, acc} ->
           resp = put_in(resp.request, request)
           {:halt, resp, acc, state}
+
+        {:error, exception, acc} ->
+          resp = put_in(resp.request, request)
+          {{:error, exception}, resp, acc, state}
       end
     end
 
@@ -311,9 +315,12 @@ if Code.ensure_loaded?(Plug) do
         {:halt, acc} ->
           {:halt, acc}
 
+        {:error, exception, acc} ->
+          {:error, exception, acc}
+
         other ->
           raise "expected req_body_fun to return {:data, chunk, acc}, {:done, chunk, acc}, " <>
-                  "{:done, acc}, or {:halt, acc}, got: #{inspect(other)}"
+                  "{:done, acc}, {:halt, acc}, or {:error, exception, acc}, got: #{inspect(other)}"
       end
     end
 
