@@ -4,8 +4,7 @@
 
 Req v0.8 brings more ergonomic streaming with [`Req.stream/4`], streaming decompression and decoding, automatic NDJSON & SSE decoding, and more.
 
-Req v0.8 has revamped internals though most end-users should be unaffected. Req's initial design included response/error steps which are now deprecated as we couldn't use them for extensible streaming decoding. Instead, we're adding step _wrappers_.
-See ["Steps & Step Wrappers" section](`Req.Request#module-steps-step-wrappers`) in [`Req.Request`] module documentation for more information.
+Req v0.8 has revamped internals though most end-users should be unaffected. Req's initial design included response/error steps which are now deprecated as we couldn't use them for extensible streaming decoding. Instead, we're adding step _wrappers_. See ["Steps & Step Wrappers" section](`Req.Request#module-steps-step-wrappers`) in [`Req.Request`] module documentation for more information.
 
 Req v0.8 requires Elixir 1.18+.
 
