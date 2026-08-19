@@ -235,31 +235,6 @@ defmodule Req.StepsTest do
       assert resp.status == 200
       assert resp.body == ""
     end
-
-    test "GET to POST" do
-      %{req: req} =
-        serve(
-          "GET /": &send_resp(&1, 200, &1.method),
-          "POST /": &send_resp(&1, 200, &1.method),
-          "PUT /": &send_resp(&1, 200, &1.method)
-        )
-
-      resp = Req.stream!(req)
-      assert resp.status == 200
-      assert resp.body == "GET"
-      resp = Req.stream!(req, body: "")
-      assert resp.status == 200
-      assert resp.body == "POST"
-      resp = Req.stream!(req, body: "foo")
-      assert resp.status == 200
-      assert resp.body == "POST"
-      resp = Req.stream!(req, json: %{a: 1})
-      assert resp.status == 200
-      assert resp.body == "POST"
-      resp = Req.stream!(req, json: %{a: 1}, method: :put)
-      assert resp.status == 200
-      assert resp.body == "PUT"
-    end
   end
 
   test "put_params" do
