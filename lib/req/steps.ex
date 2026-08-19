@@ -436,9 +436,6 @@ defmodule Req.Steps do
     * `:json` - if set, encodes the request body as JSON (using `Jason.encode_to_iodata!/1`), sets
       the `accept` header to `application/json`, and the `content-type` header to `application/json`.
 
-  When the request has the default HTTP method, GET, and the request body is set, this step
-  automatically changes HTTP method to POST.
-
   ## Examples
 
   Encoding form (`application/x-www-form-urlencoded`):
@@ -474,11 +471,6 @@ defmodule Req.Steps do
 
       iex> Req.post!("https://httpbin.org/post", json: %{a: 1}).body["json"]
       %{"a" => 1}
-
-  Automatically change GET to POST when body is set:
-
-      iex> Req.request!("https://httpbin.org/post", json: %{a: 1}).body["json"]
-      %{"a" => 1}
   """
   @doc step: :request
   def encode_body(request) do
@@ -502,15 +494,6 @@ defmodule Req.Steps do
       true ->
         request
     end
-    |> get_to_post()
-  end
-
-  defp get_to_post(%Req.Request{method: :get, body: body} = req) when body != nil do
-    %{req | method: :post}
-  end
-
-  defp get_to_post(req) do
-    req
   end
 
   defp maybe_put_content_length(req, nil), do: req

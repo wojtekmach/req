@@ -179,21 +179,6 @@ defmodule Req.StepsTest do
       assert Req.post!(req, form_multipart: [a: 1], retry: :transient, retry_delay: 1).status ==
                200
     end
-
-    test "GET to POST" do
-      %{req: req} =
-        serve(
-          "GET /": &send_resp(&1, 200, &1.method),
-          "POST /": &send_resp(&1, 200, &1.method),
-          "PUT /": &send_resp(&1, 200, &1.method)
-        )
-
-      assert Req.request!(req).body == "GET"
-      assert Req.request!(req, body: "").body == "POST"
-      assert Req.request!(req, body: "foo").body == "POST"
-      assert Req.request!(req, json: %{a: 1}).body == "POST"
-      assert Req.request!(req, json: %{a: 1}, method: :put).body == "PUT"
-    end
   end
 
   test "put_params" do
