@@ -42,6 +42,10 @@ Req v0.8 requires Elixir 1.18+.
   * [`Req`]: Deprecate `into: fun` in favour of [`Req.stream/4`].
   * [`Req.Expect`]: Deprecate `:http_errors` option in favour of `:expect`.
 
+## v0.7.3 (2026-08-19)
+
+  * [`encode_body`]: Revert "Automatically change GET to POST when request body is set."
+
 ## v0.7.2 (2026-07-31)
 
   * [`encode_body`]: Bring back `form_multipart: [{string_name, value}]`.
