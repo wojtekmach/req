@@ -248,11 +248,16 @@ defmodule Req.StepsTest do
     resp = Req.stream!(req, params: [x: 1, y: 2])
     assert resp.status == 200
     assert resp.body == "x=1&y=2"
-    resp = Req.stream!(req, params: [x: 1, x: 2])
-    assert resp.status == 200
-    assert resp.body == "x=2"
 
-    resp = Req.stream!(req, url: "#{url}?x=1", params: [x: 9, y: 2])
+    resp = Req.stream!(req, url: "#{url}?x=1", params: [x: 2, x: 3])
+    assert resp.status == 200
+    assert resp.body == "x=2&x=3"
+
+    resp = Req.stream!(req, url: "#{url}?x=1&x=2&x=3", params: [x: 4, x: 5])
+    assert resp.status == 200
+    assert resp.body == "x=4&x=5&x=3"
+
+    resp = Req.stream!(req, url: "#{url}?y=1&x=1", params: [x: 9, y: 2])
     assert resp.status == 200
     assert resp.body == "x=9&y=2"
 

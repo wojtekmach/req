@@ -398,15 +398,24 @@ defmodule Req.Steps do
 
   defp put_params(request, new_params) do
     update_in(request.url.query, fn query ->
-      old_params = Enum.to_list(URI.query_decoder(query || ""))
-
-      new_params
-      |> Enum.reduce(old_params, fn {name, value}, acc ->
-        name = to_string(name)
-        List.keystore(acc, name, 0, {name, value})
-      end)
+      URI.query_decoder(query || "")
+      |> to_params_map()
+      |> Map.merge(to_params_map(new_params))
+      |> Enum.map(fn {{name, _index}, value} -> {name, value} end)
       |> URI.encode_query()
     end)
+  end
+
+  # params are grouped by name then keyed by the {name, index_in_group}
+  # to_params_map(x: 1, x: 2, y: 3)
+  # => %{{"x", 0} => 1, {"x", 1} => 2, {"y", 0} => 3}
+  defp to_params_map(enumerable) do
+    enumerable
+    |> Enum.group_by(fn {name, _value} -> to_string(name) end, fn {_name, value} -> value end)
+    |> Enum.flat_map(fn {name, values} ->
+      Enum.with_index(values) |> Enum.map(fn {value, index} -> {{name, index}, value} end)
+    end)
+    |> Map.new()
   end
 
   @doc """
