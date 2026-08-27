@@ -241,7 +241,7 @@ defmodule Req.Response do
   end
 
   @doc """
-  Returns the `retry-after` header delay value in seconds.
+  Returns the `retry-after` header delay value in milliseconds.
 
   Returns `nil` if the header is not found or the computed number of seconds is negative.
   """
