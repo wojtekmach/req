@@ -514,6 +514,13 @@ defmodule Req.Steps do
     "upgrade"
   ]
 
+  @aws_sigv4_generated_headers [
+    "authorization",
+    "x-amz-content-sha256",
+    "x-amz-date",
+    "x-amz-security-token"
+  ]
+
   @doc """
   Signs request with AWS Signature Version 4.
 
@@ -595,6 +602,11 @@ defmodule Req.Steps do
       end
 
       aws_options = ensure_aws_service(aws_options, request.url)
+
+      request =
+        Enum.reduce(@aws_sigv4_generated_headers, request, fn header, request ->
+          Req.Request.delete_header(request, header)
+        end)
 
       {body, options} =
         case request.body do
