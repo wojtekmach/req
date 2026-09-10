@@ -2,12 +2,13 @@ defmodule Req.Redirect do
   @moduledoc """
   Follows redirects.
 
-  The original request method may be changed to GET depending on the status code:
+  The original request method may be changed to GET:
 
-  | Code          | Method handling    |
-  | ------------- | ------------------ |
-  | 301, 302, 303 | Changed to GET     |
-  | 307, 308      | Method not changed |
+  | Code     | Method handling             |
+  | -------- | --------------------------- |
+  | 301, 302 | Change POST to GET          |
+  | 303      | Change to GET (except HEAD) |
+  | 307, 308 | Method not changed          |
 
   ## Request Options
 
@@ -132,7 +133,7 @@ defmodule Req.Redirect do
     # assume put_params step already run so remove :params option so it's not applied again
     |> Req.Request.delete_option(:params)
     |> remove_credentials_if_untrusted(redirect_trusted, response.request.url, location_url)
-    |> change_post_to_get(response.status)
+    |> change_method(response.status)
     |> Map.replace!(:url, location_url)
   end
 
@@ -164,18 +165,25 @@ defmodule Req.Redirect do
   # > Note: For historical reasons, a user agent MAY change the request method from
   # > POST to GET for the subsequent request.
   #
-  # And my understanding is essentially same applies for 303.
   # Also see https://everything.curl.dev/http/redirects
-  defp change_post_to_get(%{method: :post} = request, status) when status in 301..303 do
+  defp change_method(%{method: :post} = request, status) when status in [301, 302] do
+    change_to_get(request)
+  end
+
+  defp change_method(%{method: method} = request, 303) when method not in [:get, :head] do
+    change_to_get(request)
+  end
+
+  defp change_method(request, _status) do
+    request
+  end
+
+  defp change_to_get(request) do
     request
     |> Map.merge(%{method: :get, body: nil})
     |> Req.Request.drop_options([:json, :form, :form_multipart])
     |> Req.Request.delete_header("content-type")
     |> Req.Request.delete_header("content-length")
-  end
-
-  defp change_post_to_get(request, _status) do
-    request
   end
 
   defp remove_credentials_if_untrusted(request, true, _, _), do: request
