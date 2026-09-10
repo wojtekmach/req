@@ -115,21 +115,77 @@ defmodule Req.RedirectTest do
   end
 
   @tag :capture_log
-  test "change POST to GET drops the request body" do
+  test "change everything except GET and HEAD to GET on 303 and drop the request body" do
     %{req: req, url: url} =
       serve(
-        "POST /redirect": fn conn ->
-          send_redirect(conn, 303, "http://#{conn.host}:#{conn.port}/ok")
-        end,
+        "GET /redirect": &send_redirect(&1, 303, "/ok"),
+        "HEAD /redirect": &send_redirect(&1, 303, "/ok"),
+        "POST /redirect": &send_redirect(&1, 303, "/ok"),
+        "PUT /redirect": &send_redirect(&1, 303, "/ok"),
+        "PATCH /redirect": &send_redirect(&1, 303, "/ok"),
+        "DELETE /redirect": &send_redirect(&1, 303, "/ok"),
         "GET /ok": fn conn ->
           {:ok, body, conn} = read_body(conn)
           assert body == ""
           assert get_req_header(conn, "content-type") == []
           send_resp(conn, 200, "ok")
-        end
+        end,
+        "HEAD /ok": &send_resp(&1, 200, "")
       )
 
-    assert Req.post!(req, url: "#{url}/redirect", json: %{a: 1}).status == 200
+    resp = Req.get!(req, url: "#{url}/redirect")
+    assert resp.status == 200
+
+    resp = Req.head!(req, url: "#{url}/redirect")
+    assert resp.status == 200
+
+    resp = Req.post!(req, url: "#{url}/redirect", json: %{a: 1})
+    assert resp.status == 200
+
+    resp = Req.put!(req, url: "#{url}/redirect", json: %{a: 1})
+    assert resp.status == 200
+
+    resp = Req.patch!(req, url: "#{url}/redirect", json: %{a: 1})
+    assert resp.status == 200
+
+    resp = Req.delete!(req, url: "#{url}/redirect", json: %{a: 1})
+    assert resp.status == 200
+  end
+
+  @tag :capture_log
+  test "do not change PUT, PATCH and DELETE on 301 and 302" do
+    for status <- [301, 302] do
+      %{req: req, url: url} =
+        serve(
+          "PUT /redirect": &send_redirect(&1, status, "/ok"),
+          "PATCH /redirect": &send_redirect(&1, status, "/ok"),
+          "DELETE /redirect": &send_redirect(&1, status, "/ok"),
+          "PUT /ok": fn conn ->
+            {:ok, body, conn} = read_body(conn)
+            assert body == "body"
+            send_resp(conn, 200, "ok")
+          end,
+          "PATCH /ok": fn conn ->
+            {:ok, body, conn} = read_body(conn)
+            assert body == "body"
+            send_resp(conn, 200, "ok")
+          end,
+          "DELETE /ok": fn conn ->
+            {:ok, body, conn} = read_body(conn)
+            assert body == "body"
+            send_resp(conn, 200, "ok")
+          end
+        )
+
+      resp = Req.put!(req, url: "#{url}/redirect", body: "body")
+      assert resp.status == 200
+
+      resp = Req.patch!(req, url: "#{url}/redirect", body: "body")
+      assert resp.status == 200
+
+      resp = Req.delete!(req, url: "#{url}/redirect", body: "body")
+      assert resp.status == 200
+    end
   end
 
   test "do not change method on 307 and 308" do
