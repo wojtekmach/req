@@ -1,4 +1,7 @@
 defmodule Req.JSON do
+  require Req.JSONLibrary
+  @json_library Req.JSONLibrary.streaming_library()
+
   @moduledoc """
   JSON decoding using Elixir's `JSON` module.
 
@@ -8,7 +11,7 @@ defmodule Req.JSON do
 
   @doc false
   def decode_init(:buffer) do
-    {:continue, state} = :json.decode_start("", nil, %{null: nil})
+    {:continue, state} = @json_library.decode_start("", nil, %{null: nil})
     {:buffer, state}
   end
 
@@ -18,7 +21,7 @@ defmodule Req.JSON do
 
   @doc false
   def decode_chunk({:buffer, state}, data) do
-    case :json.decode_continue(data, state) do
+    case @json_library.decode_continue(data, state) do
       {:continue, state} ->
         {:ok, nil, {:buffer, state}}
 
@@ -44,7 +47,7 @@ defmodule Req.JSON do
   end
 
   def decode_finish({:buffer, state}) do
-    {decoded, nil, ""} = :json.decode_continue(:end_of_input, state)
+    {decoded, nil, ""} = @json_library.decode_continue(:end_of_input, state)
     {:ok, decoded}
   rescue
     err in ErlangError ->
