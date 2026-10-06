@@ -414,6 +414,23 @@ defmodule Req.DecodeTest do
       assert resp.body == files
     end
 
+    test "tar.gz + application/x-tar" do
+      files = [{~c"foo.txt", "bar"}]
+
+      %{req: req, url: url} =
+        serve(
+          "GET /foo.tar.gz": fn conn ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/x-tar", nil)
+            |> Plug.Conn.send_resp(200, create_tar(files, compressed: true))
+          end
+        )
+
+      resp = Req.stream!(req, url: "#{url}/foo.tar.gz", decoders: [:tar])
+      assert resp.status == 200
+      assert resp.body == files
+    end
+
     test "invalid" do
       %{req: req} =
         serve(
