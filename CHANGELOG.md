@@ -151,7 +151,7 @@ Req v0.8 requires Elixir 1.18+.
 
 ## v0.6.1 (2026-06-08)
 
-  * `compressed`, `decompress_body`: Disable automatic decompression
+  * `compressed`, `decompress_body`: **(BREAKING CHANGE)** Disable automatic decompression
 
     Decompression is now opt-in by setting `compressed: true`.
 
@@ -168,7 +168,7 @@ Req v0.8 requires Elixir 1.18+.
 
     Thanks to @PJUllrich for reporting it.
 
-  * `decode_body`: Drop automatic zip/tar/tgz/gz/zst/csv decoding,
+  * `decode_body`: **(BREAKING CHANGE)** Drop automatic zip/tar/tgz/gz/zst/csv decoding
     ([GHSA-655f-mp8p-96gv](https://github.com/wojtekmach/req/security/advisories/GHSA-655f-mp8p-96gv)).
 
     Req previously auto-decoded archive and compressed response bodies (`zip`,
