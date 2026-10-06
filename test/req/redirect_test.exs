@@ -116,7 +116,7 @@ defmodule Req.RedirectTest do
         )
 
       assert ExUnit.CaptureLog.capture_log(fn ->
-               {:ok, resp} = Req.stream(req, url: "#{url}/redirect", method: :post, body: "body")
+               resp = Req.stream!(req, url: "#{url}/redirect", method: :post, body: "body")
                assert resp.status == 200
                assert resp.body == "ok"
                assert resp.request.method == :get
@@ -210,7 +210,7 @@ defmodule Req.RedirectTest do
         )
 
       assert ExUnit.CaptureLog.capture_log(fn ->
-               {:ok, resp} = Req.stream(req, url: "#{url}/redirect", method: :post, body: "body")
+               resp = Req.stream!(req, url: "#{url}/redirect", method: :post, body: "body")
                assert resp.status == 200
                assert resp.body == "ok"
                assert resp.request.method == :post
@@ -540,6 +540,23 @@ defmodule Req.RedirectTest do
     assert resp.body == nil
     assert URI.to_string(resp.request.url) == "#{url}/ok"
     assert acc == ["ok"]
+  end
+
+  @tag :capture_log
+  test "Req.stream/4 emits body chunks for final response" do
+    %{req: req, url: url} =
+      serve(
+        "GET /redirect": &send_redirect(&1, 302, "/ok"),
+        "GET /ok": &send_resp(&1, 200, "ok")
+      )
+
+    {:ok, resp, acc} =
+      Req.stream(req, [], fn data, resp, acc -> {:cont, [{resp.status, data} | acc]} end,
+        url: "#{url}/redirect"
+      )
+
+    assert resp.status == 200
+    assert acc == [{200, "ok"}]
   end
 
   @tag :capture_log

@@ -10,6 +10,9 @@ defmodule Req.Redirect do
   | 303      | Change to GET (except HEAD) |
   | 307, 308 | Method not changed          |
 
+  Note: `Req.stream/4` emits body chunks only for the final response. It does not emit the bodies
+  of redirect responses.
+
   ## Request Options
 
     * `:redirect` - if set to `false`, disables automatic response redirects.
