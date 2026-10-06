@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## v0.7.5 (2026-10-06)
+
+  * [`put_aws_sigv4`]: Fix SigV4 signing on retries.
+  * [`redirect`]: Change method to GET (except HEAD) on HTTP 303.
+
 ## v0.7.4 (2026-08-26)
 
   * [`put_params`]: Allow explicit duplicates.
