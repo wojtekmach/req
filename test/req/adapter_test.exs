@@ -50,28 +50,18 @@ defmodule Req.AdapterTest do
 
     @tag :transport
     test "connect_options[:timeout]" do
-      parent = self()
-
-      %{url: url} =
-        start_tcp_server(fn _socket -> :ok end,
-          listen_options: [backlog: 1],
-          before_accept: fn listen_socket ->
-            {:ok, port} = :inet.port(listen_socket)
-            {:ok, _socket} = :gen_tcp.connect(~c"127.0.0.1", port, [:binary, active: false])
-            send(parent, :accept_queue_filled)
-            Process.sleep(:infinity)
-          end
-        )
+      # The server accepts the TCP connection but does not send a TLS response,
+      # triggering connect timeout.
+      %{url: url} = start_tcp_server(fn _socket -> Process.sleep(:infinity) end)
 
       req =
         Req.new(
           adapter: adapter_fun(),
-          url: %{url | host: "127.0.0.1"},
+          url: %{url | scheme: "https"},
           connect_options: [timeout: 50],
           retry: false
         )
 
-      assert_receive :accept_queue_filled
       assert {:error, %Req.TransportError{reason: :timeout}} = Req.request(req)
     end
 
