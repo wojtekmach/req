@@ -11,6 +11,7 @@ Req v0.8 requires Elixir 1.18+.
 ### Enhancements
 
   * [`Req`]: Add [`Req.stream/4`].
+  * [`Req`]: Add [`Req.query/2`] and [`Req.query!/2`].
   * [`Req`]: Allow setting private through options, e.g.: `Req.new(private: %{foo: :bar})`.
   * [`Req`]: Support request body streaming with `body: fun`.
 

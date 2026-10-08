@@ -793,6 +793,86 @@ defmodule Req do
   end
 
   @doc """
+  Makes a QUERY request and returns a response or an error.
+
+  `request` can be one of:
+
+    * an url (`String` or `URI`);
+
+    * a `Keyword` options;
+
+    * a `Req.Request` struct
+
+  See `new/1` for a list of available options.
+
+  ## Examples
+
+  With URL:
+
+      iex> {:ok, resp} = Req.query("https://httpbingo.org/anything", json: %{query: "hello"})
+      iex> resp.body["method"]
+      "QUERY"
+
+  With options:
+
+      iex> {:ok, resp} = Req.query(url: "https://httpbingo.org/anything", json: %{query: "hello"})
+      iex> resp.body["method"]
+      "QUERY"
+
+  With request struct:
+
+      iex> req = Req.new(base_url: "https://httpbingo.org")
+      iex> {:ok, resp} = Req.query(req, url: "/anything", json: %{query: "hello"})
+      iex> resp.body["method"]
+      "QUERY"
+
+  """
+  @doc type: :request
+  @spec query(url() | keyword() | Req.Request.t(), options :: keyword()) ::
+          {:ok, Req.Response.t()} | {:error, Exception.t()}
+  def query(request, options \\ []) do
+    request(%{new(request, options) | method: :query})
+  end
+
+  @doc """
+  Makes a QUERY request and returns a response or raises an error.
+
+  `request` can be one of:
+
+    * an url (`String` or `URI`);
+
+    * a `Keyword` options;
+
+    * a `Req.Request` struct
+
+  See `new/1` for a list of available options.
+
+  ## Examples
+
+  With URL:
+
+      iex> Req.query!("https://httpbingo.org/anything", json: %{query: "hello"}).body["method"]
+      "QUERY"
+
+  With options:
+
+      iex> Req.query!(url: "https://httpbingo.org/anything", json: %{query: "hello"}).body["method"]
+      "QUERY"
+
+  With request struct:
+
+      iex> req = Req.new(base_url: "https://httpbingo.org")
+      iex> Req.query!(req, url: "/anything", json: %{query: "hello"}).body["method"]
+      "QUERY"
+
+  """
+  @doc type: :request
+  @spec query!(url() | keyword() | Req.Request.t(), options :: keyword()) :: Req.Response.t()
+  def query!(request, options \\ []) do
+    request!(%{new(request, options) | method: :query})
+  end
+
+  @doc """
   Makes a POST request and returns a response or an error.
 
   `request` can be one of:
