@@ -108,6 +108,21 @@ defmodule ReqTest do
     assert req.private == %{a: 1, b: 2}
   end
 
+  test "query and query!" do
+    %{req: req} =
+      serve(fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        Plug.Conn.send_resp(conn, 200, "#{conn.method} #{body}")
+      end)
+
+    assert {:ok, response} = Req.query(req, body: "query body")
+
+    assert response.body == "QUERY query body"
+
+    response = Req.query!(req, body: "query body")
+    assert response.body == "QUERY query body"
+  end
+
   test "inspect" do
     assert inspect(Req.new(), pretty: true) == """
            Req.new(
