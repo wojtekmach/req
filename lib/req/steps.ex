@@ -310,9 +310,10 @@ defmodule Req.Steps do
   set `path_params_style: :curly`. Param names must start with a letter and can contain letters,
   digits, and underscores; this is true both for `:colon_params` as well as `{curly_params}`.
 
-  Path params are replaced in the request URL path. The path params are specified as a keyword
-  list of parameter names and values, as in the examples below. The values of the parameters are
-  converted to strings using the `String.Chars` protocol (`to_string/1`).
+  Path params are replaced in the request URL path. The path params are specified as a list
+  of `{name, value}` tuples, where names are atoms or strings. If atom and string names are
+  equal, the first matching tuple is used. The values of the parameters are converted to
+  strings using the `String.Chars` protocol (`to_string/1`).
 
   ## Request Options
 
@@ -331,7 +332,7 @@ defmodule Req.Steps do
       iex> Req.get!("https://httpbingo.org/status/:code", path_params: [code: 201]).status
       201
 
-      iex> Req.get!("https://httpbingo.org/status/{code}", path_params: [code: 201], path_params_style: :curly).status
+      iex> Req.get!("https://httpbingo.org/status/{code}", path_params: [{"code", 201}], path_params_style: :curly).status
       201
 
   """
@@ -366,11 +367,27 @@ defmodule Req.Steps do
 
       path ->
         Regex.replace(regex, path, fn match, key ->
-          case params[String.to_existing_atom(key)] do
-            nil -> match
-            value -> value |> to_string() |> URI.encode(&URI.char_unreserved?/1)
+          case find_path_param(params, key) do
+            {:ok, nil} -> match
+            {:ok, value} -> value |> to_string() |> URI.encode(&URI.char_unreserved?/1)
+            :error -> match
           end
         end)
+    end)
+  end
+
+  defp find_path_param(params, key) do
+    Enum.find_value(params, :error, fn
+      {^key, value} ->
+        {:ok, value}
+
+      {name, value} when is_atom(name) ->
+        if Atom.to_string(name) == key do
+          {:ok, value}
+        end
+
+      _other ->
+        nil
     end)
   end
 

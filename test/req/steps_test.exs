@@ -292,12 +292,44 @@ defmodule Req.StepsTest do
     resp =
       Req.stream!(req,
         url: "#{url}/{id}:bar",
-        path_params: [id: "abc|def"],
+        path_params: [{"id", "abc|def"}],
         path_params_style: :curly
       )
 
     assert resp.status == 200
     assert resp.body == "/abc%7Cdef:bar"
+  end
+
+  test "put_path_params with string keys" do
+    %{req: req, url: url} =
+      serve(&send_resp(&1, 200, &1.request_path))
+
+    resp = Req.stream!(req, url: "#{url}/:id", path_params: [{"id", "abc|def"}])
+    assert resp.status == 200
+    assert resp.body == "/abc%7Cdef"
+  end
+
+  test "put_path_params uses the first matching atom or string key" do
+    %{req: req, url: url} =
+      serve(&send_resp(&1, 200, &1.request_path))
+
+    resp =
+      Req.stream!(req,
+        url: "#{url}/:id",
+        path_params: [{"id", "string"}, id: "atom"]
+      )
+
+    assert resp.status == 200
+    assert resp.body == "/string"
+
+    resp =
+      Req.stream!(req,
+        url: "#{url}/:id",
+        path_params: [{:id, "atom"}, {"id", "string"}]
+      )
+
+    assert resp.status == 200
+    assert resp.body == "/atom"
   end
 
   @tag :transport
