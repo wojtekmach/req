@@ -63,6 +63,14 @@ defmodule ReqTest do
     assert headers == [{"x-a", "2"}, {"x-b", "1"}]
   end
 
+  test "params" do
+    req =
+      Req.new(params: [{"a", 1}, b: 1])
+      |> Req.merge(params: [{"b", 2}, {"b", 3}, {"c", 4}])
+
+    assert req.options[:params] == [{"a", 1}, {"b", 2}, {"b", 3}, {"c", 4}]
+  end
+
   test "respects userinfo in URL" do
     pid = self()
 

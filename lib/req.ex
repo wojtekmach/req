@@ -544,10 +544,11 @@ defmodule Req do
       iex> req.headers
       %{"authorization" => ["bearer bar"]}
 
-  Similarly to headers, `:params` are merged too:
+  Similarly to headers, `:params` are merged too. Atom and string parameter names
+  are considered equal:
 
       req = Req.new(url: "https://httpbingo.org/anything", params: [a: 1, b: 1])
-      req = Req.merge(req, params: [a: 2])
+      req = Req.merge(req, params: [{"a", 2}])
       Req.get!(req).body["args"]
       #=> %{"a" => ["2"], "b" => ["1"]}
   """
@@ -619,7 +620,7 @@ defmodule Req do
         request.options,
         &Map.merge(&1, Map.new(options), fn
           :params, old, new ->
-            Keyword.merge(old, new)
+            merge_params(old, new)
 
           _, _, new ->
             new
@@ -631,6 +632,13 @@ defmodule Req do
     else
       request
     end
+  end
+
+  defp merge_params(old, new) do
+    new = Enum.to_list(new)
+    new_names = MapSet.new(new, fn {name, _value} -> to_string(name) end)
+
+    Enum.reject(old, fn {name, _value} -> to_string(name) in new_names end) ++ new
   end
 
   @doc """
