@@ -15,6 +15,13 @@ defmodule Req.BrotliTest do
     assert chunks |> Req.Brotli.decode_stream() |> Enum.join() == "hello world"
   end
 
+  test "streaming decompression continues until all output is read" do
+    payload = :binary.copy("0123456789abcdef", 64 * 1024)
+    compressed = Req.Brotli.encode(payload)
+
+    assert [compressed] |> Req.Brotli.decode_stream() |> Enum.join() == payload
+  end
+
   test "invalid data" do
     assert Req.Brotli.decode("invalid") ==
              {:error, %Req.DecompressError{format: :br, data: "invalid", reason: :brotli_error}}
