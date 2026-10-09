@@ -1,6 +1,23 @@
 defmodule Req.RetryTest do
   use Req.Case, async: true
 
+  defmodule RetryOnceAdapter do
+    @behaviour Req.Adapter
+
+    @impl true
+    def stream(req, acc, fun, state) do
+      resp = %{Req.Response.new(status: nil, body: nil) | request: req}
+
+      if req.private[:req_retry_count] do
+        {:ok, resp, acc, state} = fun.({:status, 200}, %{resp | status: 200}, acc, state)
+        fun.({:data, "ok"}, resp, acc, state)
+      else
+        error = %Req.HTTPError{protocol: :http2, reason: req.private.http2_reason}
+        {{:error, error}, resp, acc, state}
+      end
+    end
+  end
+
   @tag :capture_log
   test "eventually successful - function" do
     %{req: req, url: url} =
@@ -291,6 +308,23 @@ defmodule Req.RetryTest do
     assert_received :ping
     assert_received :ping
     refute_received _
+  end
+
+  @tag :capture_log
+  test "retries transient HTTP/2 connection state errors" do
+    for reason <- [:disconnected, :read_only] do
+      req =
+        Req.new(
+          adapter: RetryOnceAdapter,
+          private: %{http2_reason: reason},
+          retry_delay: 0
+        )
+
+      resp = Req.stream!(req)
+      assert resp.status == 200
+      assert resp.body == "ok"
+      assert resp.request.private.req_retry_count == 1
+    end
   end
 
   test "retry: false" do
