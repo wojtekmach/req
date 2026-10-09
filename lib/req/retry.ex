@@ -12,8 +12,7 @@ defmodule Req.Retry do
 
             * `Req.TransportError` with `reason: :timeout | :econnrefused | :closed`
 
-            * `Req.HTTPError` with
-              `protocol: :http2, reason: :unprocessed | :pool_not_available | :disconnected | :read_only`
+            * `Req.HTTPError` with `protocol: :http2, reason: :unprocessed | :pool_not_available`
 
         * `:transient` - same as `:safe_transient` except retries all HTTP methods (POST, DELETE, etc.)
 
@@ -155,7 +154,7 @@ defmodule Req.Retry do
   end
 
   defp transient?(%Req.HTTPError{protocol: :http2, reason: reason})
-       when reason in [:unprocessed, :pool_not_available, :disconnected, :read_only] do
+       when reason in [:unprocessed, :pool_not_available] do
     true
   end
 

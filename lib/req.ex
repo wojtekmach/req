@@ -367,7 +367,7 @@ defmodule Req do
             * `Req.TransportError` with `reason: :timeout | :econnrefused | :closed`
 
             * `Req.HTTPError` with
-              `protocol: :http2, reason: :unprocessed | :pool_not_available | :disconnected | :read_only`
+              `protocol: :http2, reason: :unprocessed | :pool_not_available`
 
         * `:transient` - same as `:safe_transient` except retries all HTTP methods (POST, DELETE, etc.)
 
