@@ -26,6 +26,7 @@ Req v0.8 requires Elixir 1.18+.
 
 ### Breaking Changes
 
+  * Require Finch 0.22 or later.
   * Remove jason dependency. `Req.post(url, json: term)` will now use `JSON.encode!/2`, not `Jason.encode!/2`, that is, `term` must implement [`JSON.Encoder`] protocol.
   * Remove deprecated `:finch_request` option
   * Remove deprecated `into: :legacy_self`

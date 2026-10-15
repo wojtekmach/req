@@ -8,9 +8,9 @@ defmodule Req.Finch do
   ["Adapter" section in the `Req.Request`](Req.Request.html#module-adapter) module documentation
   for more information on adapters.
 
-  Finch returns `Mint.TransportError` exceptions on HTTP connection problems. These are automatically
+  Finch returns `Finch.TransportError` exceptions on HTTP connection problems. These are automatically
   converted to `Req.TransportError` exceptions. Similarly, HTTP-protocol-related errors,
-  `Mint.HTTPError` and `Finch.Error`, and converted to `Req.HTTPError`.
+  `Finch.HTTPError` and `Finch.Error`, are converted to `Req.HTTPError`.
 
   ## HTTP/1 Pools
 
@@ -396,34 +396,20 @@ defmodule Req.Finch do
     {req, finch_name, finch_req, finch_options}
   end
 
-  defp normalize_error(%Mint.TransportError{reason: reason}) do
+  defp normalize_error(%Finch.TransportError{reason: reason}) do
     %Req.TransportError{reason: reason}
   end
 
-  defp normalize_error(%Mint.HTTPError{module: Mint.HTTP1, reason: reason}) do
+  defp normalize_error(%Finch.HTTPError{module: Mint.HTTP1, reason: reason}) do
     %Req.HTTPError{protocol: :http1, reason: reason}
   end
 
-  defp normalize_error(%Mint.HTTPError{module: Mint.HTTP2, reason: reason}) do
+  defp normalize_error(%Finch.HTTPError{module: Mint.HTTP2, reason: reason}) do
     %Req.HTTPError{protocol: :http2, reason: reason}
   end
 
   defp normalize_error(%Finch.Error{reason: reason}) do
     %Req.HTTPError{protocol: :http2, reason: reason}
-  end
-
-  # TODO: When using finch ~> 0.22.0, convert to pattern matching
-  # and revisit explicitly handling Mint errors.
-  #
-  # Finch >= 0.22 wraps Mint errors in its own structs. Use `is_struct/2` so
-  # this still compiles against older Finch versions where these modules don't exist.
-  defp normalize_error(error) when is_struct(error, Finch.TransportError) do
-    %Req.TransportError{reason: error.reason}
-  end
-
-  defp normalize_error(error) when is_struct(error, Finch.HTTPError) do
-    protocol = if error.module == Mint.HTTP2, do: :http2, else: :http1
-    %Req.HTTPError{protocol: protocol, reason: error.reason}
   end
 
   defp normalize_error(error) do
