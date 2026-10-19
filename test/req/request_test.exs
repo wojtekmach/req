@@ -4,17 +4,14 @@ defmodule Req.RequestTest do
   # integration tests instead.
   doctest Req.Request, except: [delete_header: 2, new: 1]
 
-  setup do
-    bypass = Bypass.open()
-    [bypass: bypass, url: "http://localhost:#{bypass.port}"]
-  end
+  test "low-level API" do
+    %{url: url} =
+      start_http_server(fn conn ->
+        assert conn.request_path == "/ok"
+        send_resp(conn, 200, "ok")
+      end)
 
-  test "low-level API", c do
-    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
-
-    request = new(url: c.url <> "/ok")
+    request = new(url: URI.append_path(url, "/ok"))
     resp = Req.stream!(request)
     assert resp.status == 200
     assert resp.body == "ok"
@@ -29,13 +26,15 @@ defmodule Req.RequestTest do
     assert output =~ "Passing :url/:headers is deprecated"
   end
 
-  test "simple request step", c do
-    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
+  test "simple request step" do
+    %{url: url} =
+      start_http_server(fn conn ->
+        assert conn.request_path == "/ok"
+        send_resp(conn, 200, "ok")
+      end)
 
     request =
-      new(url: c.url <> "/not-found")
+      new(url: URI.append_path(url, "/not-found"))
       |> Req.Request.prepend_request_steps(
         foo: fn request ->
           put_in(request.url.path, "/ok")
@@ -47,10 +46,12 @@ defmodule Req.RequestTest do
     assert resp.body == "ok"
   end
 
-  test "step wrapper as function", c do
-    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
+  test "step wrapper as function" do
+    %{url: url} =
+      start_http_server(fn conn ->
+        assert conn.request_path == "/ok"
+        send_resp(conn, 200, "ok")
+      end)
 
     caller = self()
 
@@ -68,7 +69,7 @@ defmodule Req.RequestTest do
     end
 
     request =
-      new(url: c.url <> "/ok")
+      new(url: URI.append_path(url, "/ok"))
       |> Req.Request.prepend_request_steps(wrapper: wrapper)
 
     resp = Req.stream!(request)
@@ -77,13 +78,15 @@ defmodule Req.RequestTest do
     assert_received {:wrapper, "/ok", 200}
   end
 
-  test "step as MFArgs", c do
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
+  test "step as MFArgs" do
+    %{url: url} =
+      start_http_server(fn conn ->
+        assert conn.request_path == "/"
+        send_resp(conn, 200, "ok")
+      end)
 
     request =
-      new(url: c.url)
+      new(url: url)
       |> Req.Request.prepend_request_steps(foo: {__MODULE__, :simple_step, [:hi]})
 
     resp = Req.stream!(request)
@@ -97,12 +100,14 @@ defmodule Req.RequestTest do
     request
   end
 
-  test "response steps", c do
-    Bypass.expect(c.bypass, "GET", "/ok", fn conn ->
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
+  test "response steps" do
+    %{url: url} =
+      start_http_server(fn conn ->
+        assert conn.request_path == "/ok"
+        send_resp(conn, 200, "ok")
+      end)
 
-    request = new(url: c.url <> "/ok")
+    request = new(url: URI.append_path(url, "/ok"))
 
     request =
       put_in(request.response_steps,
@@ -117,10 +122,8 @@ defmodule Req.RequestTest do
     assert resp.body == "OK"
   end
 
-  test "error steps", c do
-    Bypass.down(c.bypass)
-
-    request = new(url: c.url <> "/ok")
+  test "error steps" do
+    request = new(url: "http://localhost:9999/ok")
 
     request =
       put_in(request.error_steps,
@@ -133,10 +136,8 @@ defmodule Req.RequestTest do
     assert err == %RuntimeError{message: "wrapped: connection refused"}
   end
 
-  test "transport error", c do
-    Bypass.down(c.bypass)
-
-    request = new(url: c.url <> "/ok")
+  test "transport error" do
+    request = new(url: "http://localhost:9999/ok")
 
     {:error, err, resp} = Req.stream(request)
     assert err == %Req.TransportError{reason: :econnrefused}

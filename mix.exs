@@ -135,7 +135,6 @@ defmodule Req.MixProject do
       {:plug, "~> 1.0", [optional: true] ++ plug_opts()},
       {:brotli, "~> 0.3.1", optional: true},
       {:aws_signature, "~> 0.3.2", only: :test},
-      {:bypass, "~> 2.1", only: :test},
       {:ex_doc, ">= 0.0.0", only: :docs, warn_if_outdated: true},
       {:bandit, "~> 1.0", only: :test}
     ]

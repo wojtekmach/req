@@ -1,21 +1,18 @@
 defmodule Req.DefaultOptionsTest do
-  use Req.Case
+  use Req.Case, async: false
 
-  setup do
-    bypass = Bypass.open()
-    [bypass: bypass, url: "http://localhost:#{bypass.port}"]
-  end
-
-  test "default options", c do
+  test "default options" do
     pid = self()
-
-    Bypass.expect(c.bypass, "GET", "/", fn conn ->
-      send(pid, {:params, conn.params})
-      Plug.Conn.send_resp(conn, 200, "ok")
-    end)
-
     Req.default_options(params: %{"foo" => "bar"})
-    resp = Req.stream!(c.url)
+
+    %{req: req} =
+      serve(fn conn ->
+        conn = fetch_query_params(conn)
+        send(pid, {:params, conn.query_params})
+        send_resp(conn, 200, "ok")
+      end)
+
+    resp = Req.stream!(req)
     assert resp.status == 200
     assert resp.body == "ok"
     assert_received {:params, %{"foo" => "bar"}}

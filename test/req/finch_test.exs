@@ -47,14 +47,6 @@ defmodule Req.FinchTest do
       assert resp.body == "ok"
     end
 
-    defmodule ExamplePlug do
-      def init(options), do: options
-
-      def call(conn, []) do
-        Plug.Conn.send_resp(conn, 200, "ok")
-      end
-    end
-
     test ":connect_options bad option" do
       assert_raise ArgumentError, "unknown option :timeou. Did you mean :timeout?", fn ->
         Req.stream!("http://localhost", connect_options: [timeou: 0])
@@ -74,17 +66,8 @@ defmodule Req.FinchTest do
     end
 
     test ":finch with IPv6 URL" do
-      start_supervised!(
-        {Plug.Cowboy,
-         scheme: :http,
-         plug: ExamplePlug,
-         ref: ExamplePlug.IPv6Named,
-         port: 0,
-         net: :inet6,
-         ipv6_v6only: true}
-      )
-
-      ipv6_port = :ranch.get_port(ExamplePlug.IPv6Named)
+      %{port: ipv6_port} =
+        start_http_server(&Plug.Conn.send_resp(&1, 200, "ok"), ip: {0, 0, 0, 0, 0, 0, 0, 1})
 
       finch_name = __MODULE__.IPv6Finch
 
