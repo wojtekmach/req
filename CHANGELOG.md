@@ -31,6 +31,7 @@ Req v0.8 requires Elixir 1.18+.
   * Remove deprecated `:finch_request` option
   * Remove deprecated `into: :legacy_self`
   * Remove deprecated `cache` step
+  * Remove deprecated `:decode_json` option in favour of `decoders: [json: &Jason.decode(&1, opts)]`
   * Replace `compressed` and `decompress_body` with [`Req.Decompress`].
   * Replace `handle_http_errors` with [`Req.Expect`].
   * Replace `auth` and `http_digest` steps with [`Req.Auth`].

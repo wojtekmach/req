@@ -570,7 +570,6 @@ defmodule Req do
     end
 
     if Keyword.has_key?(options, :decode_json) do
-      # TODO: mention in changelog
       raise "setting `decode_json: opts` is removed in favour of `decoders: [json: &Jason.decode(&1, opts)]`"
     end
 
