@@ -223,7 +223,8 @@ defmodule Req.HTTPC do
       end
 
     httpc_req =
-      if request.method in [:post, :put] do
+      if request.method in [:post, :put, :patch] or
+           (request.method == :delete and request.body != nil) do
         content_type =
           case Req.Request.get_header(request, "content-type") do
             [value] ->

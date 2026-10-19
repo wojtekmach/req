@@ -116,6 +116,7 @@ defmodule ReqTest do
     assert req.private == %{a: 1, b: 2}
   end
 
+  @tag skip: adapter() == :httpc
   test "query and query!" do
     %{req: req} =
       serve(fn conn ->

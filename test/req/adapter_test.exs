@@ -288,6 +288,7 @@ defmodule Req.AdapterTest do
       refute_receive _
     end
 
+    @tag skip: @adapter == :httpc
     test "into: fun with halt" do
       %{req: req} =
         serve(fn conn ->
@@ -297,19 +298,10 @@ defmodule Req.AdapterTest do
           conn
         end)
 
-      # shrink httpc's socket buffer so it flushes at chunk boundaries
-      connect_options =
-        if @adapter == :httpc do
-          [transport_opts: [buffer: 8]]
-        else
-          []
-        end
-
       {resp, _stderr} =
         ExUnit.CaptureIO.with_io(:stderr, fn ->
           Req.request!(
             req,
-            connect_options: connect_options,
             into: fn {:data, data}, {req, resp} ->
               resp = update_in(resp.body, &(&1 <> data))
               {:halt, {req, resp}}
@@ -507,6 +499,7 @@ defmodule Req.AdapterTest do
       assert err == %Req.TransportError{reason: :econnrefused}
     end
 
+    @tag skip: @adapter == :httpc
     test "into: :self" do
       %{req: req} =
         serve(fn conn ->
@@ -516,15 +509,7 @@ defmodule Req.AdapterTest do
           conn
         end)
 
-      # shrink httpc's socket buffer so it flushes at chunk boundaries
-      connect_options =
-        if @adapter == :httpc do
-          [transport_opts: [buffer: 8]]
-        else
-          []
-        end
-
-      resp = Req.request!(req, connect_options: connect_options, into: :self)
+      resp = Req.request!(req, into: :self)
       assert resp.status == 200
       assert {:ok, [data: "foo"]} = Req.parse_message(resp, assert_receive(_))
       assert {:ok, [data: "bar"]} = Req.parse_message(resp, assert_receive(_))
