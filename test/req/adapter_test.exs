@@ -518,6 +518,67 @@ defmodule Req.AdapterTest do
       refute_receive _
     end
 
+    @tag :transport
+    test "into: :self with trailers" do
+      %{url: url} =
+        start_tcp_server(fn socket ->
+          {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
+
+          data = """
+          HTTP/1.1 200 OK\r
+          transfer-encoding: chunked\r
+          trailer: x-foo, x-bar\r
+          \r
+          6\r
+          chunk1\r
+          0\r
+          x-foo: foo\r
+          x-bar: bar\r
+          \r
+          """
+
+          :ok = :gen_tcp.send(socket, data)
+        end)
+
+      resp = Req.request!(adapter: adapter_fun(), url: url, into: :self)
+      assert resp.status == 200
+      assert resp.headers["trailer"] == ["x-foo, x-bar"]
+      assert {:ok, [data: "chunk1"]} = Req.parse_message(resp, assert_receive(_))
+
+      assert {:ok, [trailers: [{"x-foo", "foo"}, {"x-bar", "bar"}]]} =
+               Req.parse_message(resp, assert_receive(_))
+
+      assert {:ok, [:done]} = Req.parse_message(resp, assert_receive(_))
+      refute_receive _
+    end
+
+    @tag :transport
+    test "into: :self enumerable with trailers" do
+      %{url: url} =
+        start_tcp_server(fn socket ->
+          {:ok, "GET / HTTP/1.1\r\n" <> _} = :gen_tcp.recv(socket, 0)
+
+          data = """
+          HTTP/1.1 200 OK\r
+          transfer-encoding: chunked\r
+          trailer: x-foo\r
+          \r
+          2\r
+          ok\r
+          0\r
+          x-foo: foo\r
+          \r
+          """
+
+          :ok = :gen_tcp.send(socket, data)
+        end)
+
+      resp = Req.request!(adapter: adapter_fun(), url: url, into: :self)
+      assert resp.status == 200
+      assert Enum.to_list(resp.body) == ["ok"]
+      refute_receive _
+    end
+
     test "into: :self with empty body" do
       %{req: req} =
         serve(fn conn ->

@@ -284,7 +284,6 @@ defmodule Req.Finch do
 
         case fun.({:headers, headers}, resp, acc, state) do
           {:ok, resp, acc, state} ->
-            # TODO: handle trailers
             async = %Req.Response.Async{
               pid: self(),
               ref: ref,

@@ -539,11 +539,9 @@ defmodule Req.HTTPC do
   end
 
   defp decode_trailers(trailers) do
-    Enum.reduce(trailers, %{}, fn {name, value}, acc ->
-      name = List.to_string(name)
-      value = List.to_string(value)
-      Map.update(acc, name, [value], &(&1 ++ [value]))
-    end)
+    for {name, value} <- trailers do
+      {List.to_string(name), List.to_string(value)}
+    end
   end
 
   @doc false
