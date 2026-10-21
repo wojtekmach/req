@@ -47,6 +47,106 @@ defmodule Req.FinchTest do
       assert resp.body == "ok"
     end
 
+    test "cross-origin redirect does not leak :hostname into Host header" do
+      %{port: port_b} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, Plug.Conn.get_req_header(conn, "host"))
+        end)
+
+      %{url: url_a} =
+        start_http_server(fn conn ->
+          conn
+          |> Plug.Conn.put_resp_header("location", "http://localhost:#{port_b}/")
+          |> Plug.Conn.send_resp(302, "")
+        end)
+
+      resp =
+        Req.get!(url_a,
+          connect_options: [hostname: "example.com"],
+          redirect_log_level: false
+        )
+
+      assert resp.status == 200
+      assert resp.body == "localhost:#{port_b}"
+    end
+
+    test "cross-origin redirect drops user-set host header" do
+      %{port: port_b} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, Plug.Conn.get_req_header(conn, "host"))
+        end)
+
+      %{url: url_a} =
+        start_http_server(fn conn ->
+          conn
+          |> Plug.Conn.put_resp_header("location", "http://localhost:#{port_b}/")
+          |> Plug.Conn.send_resp(302, "")
+        end)
+
+      resp =
+        Req.get!(url_a, headers: [host: "example.com"], redirect_log_level: false)
+
+      assert resp.status == 200
+      assert resp.body == "localhost:#{port_b}"
+    end
+
+    test "cross-origin redirect does not leak :hostname into http/2 :authority" do
+      %{port: port_b} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, conn.host)
+        end)
+
+      %{url: url_a} =
+        start_http_server(fn conn ->
+          conn
+          |> Plug.Conn.put_resp_header("location", "http://localhost:#{port_b}/")
+          |> Plug.Conn.send_resp(302, "")
+        end)
+
+      resp =
+        Req.get!(url_a,
+          connect_options: [hostname: "a.test", protocols: [:http2]],
+          redirect_log_level: false
+        )
+
+      assert resp.status == 200
+      assert resp.body == "localhost"
+    end
+
+    test "ipv6 host header includes port" do
+      %{port: port} =
+        start_http_server(
+          fn conn ->
+            Plug.Conn.send_resp(conn, 200, Plug.Conn.get_req_header(conn, "host"))
+          end,
+          ip: {0, 0, 0, 0, 0, 0, 0, 1}
+        )
+
+      resp = Req.get!("http://[::1]:#{port}/", redirect_log_level: false)
+
+      assert resp.status == 200
+      assert resp.body == "[::1]:#{port}"
+    end
+
+    test "ipv6 host header respects :hostname connect option" do
+      %{port: port} =
+        start_http_server(
+          fn conn ->
+            Plug.Conn.send_resp(conn, 200, Plug.Conn.get_req_header(conn, "host"))
+          end,
+          ip: {0, 0, 0, 0, 0, 0, 0, 1}
+        )
+
+      resp =
+        Req.get!("http://[::1]:#{port}/",
+          connect_options: [hostname: "a.test"],
+          redirect_log_level: false
+        )
+
+      assert resp.status == 200
+      assert resp.body == "a.test:#{port}"
+    end
+
     test ":connect_options bad option" do
       assert_raise ArgumentError, "unknown option :timeou. Did you mean :timeout?", fn ->
         Req.stream!("http://localhost", connect_options: [timeou: 0])

@@ -628,4 +628,101 @@ defmodule Req.RedirectTest do
     assert resp.body == "object"
     assert URI.to_string(resp.request.url) == "http://127.0.0.1:#{url.port}/bucket/key"
   end
+
+  test "cross-origin redirect drops :hostname connect option" do
+    pid = self()
+
+    plug = fn
+      %{host: "localhost"} = conn ->
+        send_redirect(conn, 302, "http://other.test/ok")
+
+      %{host: "other.test"} = conn ->
+        send_resp(conn, 200, "ok")
+    end
+
+    req =
+      Req.new(url: "http://localhost:8000/redirect", plug: plug)
+      |> Req.Request.append_request_steps(
+        capture: fn request ->
+          send(
+            pid,
+            {:request, request.options[:connect_options], Req.Request.get_header(request, "host")}
+          )
+
+          request
+        end
+      )
+
+    assert %Req.Response{status: 200, body: "ok"} =
+             Req.get!(req,
+               connect_options: [hostname: "localhost"],
+               redirect_log_level: false
+             )
+
+    assert_received {:request, [hostname: "localhost"], _}
+    assert_received {:request, connect_options, _}
+    refute connect_options[:hostname]
+  end
+
+  test "cross-origin redirect drops user-set host header" do
+    pid = self()
+
+    plug = fn
+      %{host: "localhost"} = conn ->
+        send_redirect(conn, 302, "http://other.test/ok")
+
+      %{host: "other.test"} = conn ->
+        send_resp(conn, 200, "ok")
+    end
+
+    req =
+      Req.new(url: "http://localhost:8000/redirect", plug: plug)
+      |> Req.Request.append_request_steps(
+        capture: fn request ->
+          send(pid, {:request, Req.Request.get_header(request, "host")})
+          request
+        end
+      )
+
+    assert %Req.Response{status: 200, body: "ok"} =
+             Req.get!(req, headers: [host: "localhost"], redirect_log_level: false)
+
+    assert_received {:request, ["localhost"]}
+    assert_received {:request, []}
+  end
+
+  test "same-origin redirect keeps :hostname connect option and host header" do
+    pid = self()
+
+    plug = fn
+      %{request_path: "/redirect"} = conn ->
+        send_redirect(conn, 302, "/ok")
+
+      %{request_path: "/ok"} = conn ->
+        send_resp(conn, 200, "ok")
+    end
+
+    req =
+      Req.new(url: "http://localhost:8000/redirect", plug: plug)
+      |> Req.Request.append_request_steps(
+        capture: fn request ->
+          send(
+            pid,
+            {:request, request.options[:connect_options], Req.Request.get_header(request, "host")}
+          )
+
+          request
+        end
+      )
+
+    assert %Req.Response{status: 200, body: "ok"} =
+             Req.get!(req,
+               connect_options: [hostname: "localhost"],
+               headers: [host: "localhost"],
+               redirect_log_level: false
+             )
+
+    assert_received {:request, [hostname: "localhost"], ["localhost"]}
+    assert_received {:request, [hostname: "localhost"], ["localhost"]}
+  end
 end

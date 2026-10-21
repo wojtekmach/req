@@ -31,6 +31,7 @@ defmodule Req.Utils do
     {url, options} = Keyword.pop!(options, :url)
     {headers, options} = Keyword.pop!(options, :headers)
     {body, options} = Keyword.pop!(options, :body)
+    {hostname, options} = Keyword.pop(options, :hostname)
     Keyword.validate!(options, [:body_digest])
 
     datetime = DateTime.truncate(datetime, :second)
@@ -42,7 +43,7 @@ defmodule Req.Utils do
 
     method = method |> Atom.to_string() |> String.upcase()
 
-    headers = canonical_host_header(headers, url)
+    headers = canonical_host_header(headers, url, hostname)
 
     aws_headers = [
       {"x-amz-content-sha256", body_digest},
@@ -116,6 +117,18 @@ defmodule Req.Utils do
     query
   end
 
+  # "example.com:8080" -> "example.com", "[::1]:8080" -> "[::1]"
+  defp strip_host_port("[" <> _ = host) do
+    case String.split(host, "]:", parts: 2) do
+      [host, _port] -> host <> "]"
+      _ -> host
+    end
+  end
+
+  defp strip_host_port(host) do
+    host |> String.split(":") |> hd()
+  end
+
   defp canonical_query(query) do
     for item <- String.split(query, "&", trim: true) do
       case String.split(item, "=") do
@@ -137,6 +150,14 @@ defmodule Req.Utils do
     Keyword.validate!(options, [:body_digest])
 
     headers = Enum.map(headers, fn {name, value} -> {String.downcase(name, :ascii), value} end)
+
+    # The client signs the host header it actually sends, which may carry the
+    # `:hostname` connect option rather than the URL host.
+    hostname =
+      case List.keyfind(headers, "host", 0) do
+        {"host", value} -> strip_host_port(value)
+        nil -> nil
+      end
 
     with {_, "AWS4-HMAC-SHA256 " <> params = authorization} <-
            List.keyfind(headers, "authorization", 0),
@@ -169,7 +190,8 @@ defmodule Req.Utils do
             method: method,
             url: url,
             headers: headers,
-            body: body
+            body: body,
+            hostname: hostname
           ] ++ options
         )
 
@@ -205,7 +227,7 @@ defmodule Req.Utils do
 
     canonical_headers =
       headers
-      |> canonical_host_header(url)
+      |> canonical_host_header(url, nil)
       |> format_canonical_headers()
 
     signed_headers = Enum.map_join(canonical_headers, ";", &elem(&1, 0))
@@ -272,14 +294,16 @@ defmodule Req.Utils do
     end
   end
 
-  defp canonical_host_header(headers, %URI{} = url) do
+  defp canonical_host_header(headers, %URI{} = url, hostname) do
     {_host_headers, headers} = Enum.split_with(headers, &match?({"host", _value}, &1))
+
+    host = hostname || url.host
 
     host_value =
       if is_nil(url.port) or URI.default_port(url.scheme) == url.port do
-        url.host
+        host
       else
-        "#{url.host}:#{url.port}"
+        "#{host}:#{url.port}"
       end
 
     [{"host", host_value} | headers]
