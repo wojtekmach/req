@@ -1,4 +1,7 @@
 defmodule Req.Steps do
+  require Req.JSONLibrary
+  @json_library Req.JSONLibrary.library()
+
   @moduledoc """
   A collection of built-in steps.
 
@@ -287,7 +290,7 @@ defmodule Req.Steps do
         |> then(&maybe_put_content_length(&1, multipart.size))
 
       data = request.options[:json] ->
-        %{request | body: JSON.encode_to_iodata!(data)}
+        %{request | body: @json_library.encode_to_iodata!(data)}
         |> Req.Request.put_new_header("content-type", "application/json")
         |> Req.Request.put_new_header("accept", "application/json")
 

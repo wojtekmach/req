@@ -1,4 +1,7 @@
 defmodule Req.Response do
+  require Req.JSONLibrary
+  @json_library Req.JSONLibrary.library()
+
   @moduledoc """
   The response struct.
 
@@ -148,7 +151,7 @@ defmodule Req.Response do
     response =
       update_in(response.headers, &Req.Fields.put_new(&1, "content-type", "application/json"))
 
-    Map.replace!(response, :body, JSON.encode!(body))
+    Map.replace!(response, :body, @json_library.encode!(body))
   end
 
   @doc """

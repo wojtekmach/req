@@ -1,4 +1,7 @@
 defmodule Req.Test do
+  require Req.JSONLibrary
+  @json_library Req.JSONLibrary.library()
+
   @moduledoc """
   Req testing conveniences.
 
@@ -200,7 +203,7 @@ defmodule Req.Test do
   if Code.ensure_loaded?(Plug.Test) do
     @spec json(Plug.Conn.t(), term()) :: Plug.Conn.t()
     def json(%Plug.Conn{} = conn, data) do
-      send_resp(conn, conn.status || 200, "application/json", JSON.encode_to_iodata!(data))
+      send_resp(conn, conn.status || 200, "application/json", @json_library.encode_to_iodata!(data))
     end
 
     defp send_resp(conn, default_status, default_content_type, body) do
