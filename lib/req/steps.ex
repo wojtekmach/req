@@ -652,7 +652,10 @@ defmodule Req.Steps do
               method: request.method,
               url: to_string(request.url),
               headers: headers,
-              body: body
+              body: body,
+              # Mint sends the `:hostname` connect option as the Host header
+              # (as well as TLS SNI), so the signature must cover it too.
+              hostname: request.options[:connect_options][:hostname]
             ] ++ options
         )
 

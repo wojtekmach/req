@@ -136,6 +136,7 @@ defmodule Req.Redirect do
     # assume put_params step already run so remove :params option so it's not applied again
     |> Req.Request.delete_option(:params)
     |> remove_credentials_if_untrusted(redirect_trusted, response.request.url, location_url)
+    |> remove_host_overrides_if_untrusted(response.request.url, location_url)
     |> change_method(response.status)
     |> Map.replace!(:url, location_url)
   end
@@ -199,6 +200,33 @@ defmodule Req.Redirect do
       request
       |> Req.Request.delete_header("authorization")
       |> Req.Request.delete_option(:auth)
+    end
+  end
+
+  # The `:hostname` connect option and any explicit `host` header describe the
+  # previous origin. Carrying them over to a different origin would send the
+  # wrong Host header, TLS SNI, and HTTP/2 :authority to the new origin.
+  defp remove_host_overrides_if_untrusted(request, url, location_url) do
+    if {location_url.host, location_url.scheme, location_url.port} ==
+         {url.host, url.scheme, url.port} do
+      request
+    else
+      request
+      |> Req.Request.delete_header("host")
+      |> delete_hostname_connect_option()
+    end
+  end
+
+  defp delete_hostname_connect_option(request) do
+    case request.options[:connect_options] do
+      nil ->
+        request
+
+      connect_options ->
+        case Keyword.delete(connect_options, :hostname) do
+          [] -> Req.Request.delete_option(request, :connect_options)
+          connect_options -> put_in(request.options[:connect_options], connect_options)
+        end
     end
   end
 end

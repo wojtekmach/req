@@ -323,8 +323,10 @@ defmodule Req.Finch do
       if !req.options[:inet6] and
            (req.url.host || "") =~ ":" do
         req = put_in(req.options[:inet6], true)
-        # ...and have to put them back for host header.
-        Req.Request.put_new_header(req, "host", "[#{req.url.host}]")
+        # URI.parse/1 strips `[` and `]`, so we have to put them back for the
+        # host header. Also mirror Mint's default host header: include the port
+        # when it's not the default one and prefer the `:hostname` connect option.
+        Req.Request.put_new_header(req, "host", ipv6_host_header(req))
       else
         req
       end
@@ -413,6 +415,19 @@ defmodule Req.Finch do
 
   defp normalize_error(error) do
     error
+  end
+
+  # Builds the explicit host header for IPv6 URLs, mirroring Mint's default
+  # host header: brackets around the literal, port unless it's the default,
+  # and the `:hostname` connect option when set.
+  defp ipv6_host_header(req) do
+    host = req.options[:connect_options][:hostname] || "[#{req.url.host}]"
+
+    if req.url.port == URI.default_port(req.url.scheme) do
+      host
+    else
+      "#{host}:#{req.url.port}"
+    end
   end
 
   defp add_private_options(finch_req, nil) do
