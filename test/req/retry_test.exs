@@ -168,6 +168,20 @@ defmodule Req.RetryTest do
   end
 
   @tag :capture_log
+  test "invalid retry-after" do
+    %{req: req} =
+      serve_sequence(
+        "GET /": &send_resp_retry_after(&1, "1.5"),
+        "GET /": &send_resp_retry_after(%{&1 | status: 503}, "soon"),
+        "GET /": &send_resp_retry_after(&1, ["1", "2"])
+      )
+
+    for status <- [429, 503, 429] do
+      assert Req.get!(req, max_retries: 0).status == status
+    end
+  end
+
+  @tag :capture_log
   test ":retry_delay" do
     pid = self()
 

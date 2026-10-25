@@ -274,13 +274,16 @@ defmodule Req.Case do
   end
 
   def send_resp_retry_after(conn, retry_after) do
+    headers = for value <- List.wrap(retry_after), do: {"retry-after", retry_after(value)}
+
     conn
-    |> Plug.Conn.put_resp_header("retry-after", retry_after(retry_after))
+    |> Plug.Conn.prepend_resp_headers(headers)
     |> Plug.Conn.send_resp(conn.status || 429, "")
   end
 
   defp retry_after(integer) when is_integer(integer), do: to_string(integer)
   defp retry_after(%DateTime{} = dt), do: Req.Utils.format_http_date(dt)
+  defp retry_after(binary) when is_binary(binary), do: binary
 
   def send_redirect(conn, status, url) do
     conn
