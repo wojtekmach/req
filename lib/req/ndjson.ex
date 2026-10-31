@@ -1,4 +1,7 @@
 defmodule Req.NDJSON do
+  require Req.JSONLibrary
+  @json_library Req.JSONLibrary.library()
+
   @moduledoc """
   [NDJSON] decoding.
 
@@ -97,7 +100,7 @@ defmodule Req.NDJSON do
   end
 
   defp decode_json(binary) do
-    case JSON.decode(binary) do
+    case @json_library.decode(binary) do
       {:ok, decoded} ->
         {:ok, decoded}
 
@@ -124,6 +127,13 @@ defmodule Req.NDJSON do
            data: binary,
            offset: offset
          }}
+      {:error, reason} ->
+        {:error,
+          %JSON.DecodeError{
+            message: inspect(reason),
+            data: binary,
+            offset: 0
+          }}
     end
   end
 end
