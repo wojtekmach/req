@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## Unreleased
+
+### Enhancements
+
+  * [`Req`]: Support `http_proxy`/`https_proxy` environment variables and matching
+    `:http_proxy`/`:https_proxy` options.
+
 ## v0.8.0-rc.0 (2026-08-18)
 
 Req v0.8 brings more ergonomic streaming with [`Req.stream/4`], streaming decompression and decoding, automatic NDJSON & SSE decoding, and more.
