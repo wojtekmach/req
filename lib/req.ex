@@ -451,6 +451,17 @@ defmodule Req do
 
         * `:client_settings` - Mint HTTP/2 client settings.
 
+    * `:http_proxy` - HTTP proxy URL, for example `"http://localhost:8888"`. If the URL
+      contains userinfo, for example `"http://user:pass@localhost:8888"`, the credentials
+      are sent as `proxy-authorization` headers. Defaults to the value of the `http_proxy`
+      environment variable. Set to `false` to disable the environment variable fallback.
+      Only used for `http://` requests when `:finch` is not set.
+      Explicit `connect_options: [proxy: ...]` takes precedence.
+
+    * `:https_proxy` - same as `:http_proxy`, for `https://` requests. Defaults to the value
+      of the `https_proxy` environment variable. Set to `false` to disable the environment
+      variable fallback.
+
     * `:inet6` - if set to true, uses IPv6. Defaults to `false`.
 
     * `:receive_timeout` - socket receive timeout in milliseconds, defaults to `15_000`.
