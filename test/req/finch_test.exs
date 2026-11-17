@@ -34,6 +34,135 @@ defmodule Req.FinchTest do
       assert resp.body == "ok"
     end
 
+    test ":http_proxy option" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      req = Req.new(base_url: url, http_proxy: "http://localhost:#{url.port}")
+      resp = Req.stream!(req)
+      assert resp.status == 200
+      assert resp.body == "ok"
+    end
+
+    test ":http_proxy option with credentials" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          assert ["Basic " <> credentials] = Plug.Conn.get_req_header(conn, "proxy-authorization")
+          assert Base.decode64!(credentials) == "user:pass"
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      req = Req.new(base_url: url, http_proxy: "http://user:pass@localhost:#{url.port}")
+      resp = Req.stream!(req)
+      assert resp.status == 200
+      assert resp.body == "ok"
+    end
+
+    test ":http_proxy option with percent-encoded credentials" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          assert ["Basic " <> credentials] = Plug.Conn.get_req_header(conn, "proxy-authorization")
+          assert Base.decode64!(credentials) == "user:p@ss:w0rd"
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      req = Req.new(base_url: url, http_proxy: "http://user:p%40ss%3Aw0rd@localhost:#{url.port}")
+      resp = Req.stream!(req)
+      assert resp.status == 200
+      assert resp.body == "ok"
+    end
+
+    test ":http_proxy with unsupported scheme" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      assert_raise ArgumentError, ~r/expected proxy URL scheme to be http or https/, fn ->
+        Req.stream!(base_url: url, http_proxy: "socks5://localhost:1080")
+      end
+    end
+
+    test ":https_proxy does not apply to http requests" do
+      %{url: url} =
+        start_http_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      req = Req.new(base_url: url, https_proxy: "http://localhost:1")
+      resp = Req.stream!(req)
+      assert resp.status == 200
+      assert resp.body == "ok"
+    end
+
+    test ":http_proxy with missing host" do
+      assert_raise ArgumentError, "expected proxy URL to include a host", fn ->
+        Req.stream!("http://example.com", http_proxy: "http://")
+      end
+    end
+
+    test ":http_proxy with out-of-range port" do
+      exception =
+        assert_raise ArgumentError, "invalid proxy URL", fn ->
+          Req.stream!("http://example.com", http_proxy: "http://user:s3cr3t@localhost:99999")
+        end
+
+      refute exception.message =~ "s3cr3t"
+    end
+
+    test ":http_proxy accepts an IPv6 host" do
+      # The proxy URL is accepted (no ArgumentError); the connection itself
+      # fails because nothing listens on [::1]:1.
+      assert {:error, %Req.TransportError{}} =
+               Req.get("http://example.com", http_proxy: "http://[::1]:1", retry: false)
+    end
+
+    test "proxy URL errors do not leak credentials" do
+      exception =
+        assert_raise ArgumentError, fn ->
+          Req.stream!("http://example.com", http_proxy: "socks5://user:s3cr3t@localhost:1080")
+        end
+
+      refute exception.message =~ "s3cr3t"
+      refute exception.message =~ "user"
+
+      malformed =
+        assert_raise ArgumentError, "invalid proxy URL", fn ->
+          Req.stream!("http://example.com", http_proxy: "http://user:s3cr3t@lo calhost:8080")
+        end
+
+      refute malformed.message =~ "s3cr3t"
+    end
+
+    test ":https_proxy option through CONNECT tunnel" do
+      %{url: url} =
+        start_https_server(fn conn ->
+          Plug.Conn.send_resp(conn, 200, "ok")
+        end)
+
+      proxy = start_connect_proxy(url.port)
+
+      req =
+        Req.new(
+          base_url: url,
+          https_proxy: "http://localhost:#{proxy.port}",
+          connect_options: [transport_opts: [verify: :verify_none]]
+        )
+
+      resp = Req.stream!(req)
+      assert resp.status == 200
+      assert resp.body == "ok"
+
+      # Cleanup/ownership proof: the accept loop is owned by the test supervisor;
+      # stopping it terminates the loop process AND closes its listen socket, so the
+      # port refuses new connections.
+      stop_supervised!(Task)
+      refute Process.alive?(proxy.pid)
+      assert {:error, :econnrefused} = :gen_tcp.connect(~c"localhost", proxy.port, [], 1_000)
+    end
+
     test ":connect_options :hostname" do
       %{url: url} =
         start_http_server(fn conn ->
@@ -241,6 +370,111 @@ defmodule Req.FinchTest do
       assert_raise ArgumentError, ~r/cannot set Finch pool options together with :name/, fn ->
         Req.stream!(finch: [name: Req.Finch, conn_max_idle_time: 10_000])
       end
+    end
+  end
+
+  # A minimal CONNECT proxy for testing https proxying end to end. The supervised
+  # accept-loop task owns the listen socket (created inside the task, so it closes
+  # when the task terminates) and each accepted client socket: the tunnel runs inline
+  # in the accept loop, so no socket ever changes hands. Pipes are short-lived
+  # spawned processes; after the first pipe ends, both sockets are closed and the
+  # helper waits for the remaining pipe to terminate.
+  defp start_connect_proxy(target_port) do
+    test_pid = self()
+    pid = start_supervised!({Task, fn -> connect_proxy_accept(test_pid, target_port) end})
+
+    port =
+      receive do
+        {:connect_proxy_port, port} -> port
+      after
+        5_000 -> raise "connect proxy did not report its port"
+      end
+
+    %{port: port, pid: pid}
+  end
+
+  defp connect_proxy_accept(test_pid, target_port) do
+    {:ok, listen} = :gen_tcp.listen(0, [:binary, packet: :raw, active: false, reuseaddr: true])
+    {:ok, port} = :inet.port(listen)
+    send(test_pid, {:connect_proxy_port, port})
+    connect_proxy_accept_loop(listen, target_port)
+  end
+
+  defp connect_proxy_accept_loop(listen, target_port) do
+    case :gen_tcp.accept(listen) do
+      {:ok, client} ->
+        connect_proxy_tunnel(client, target_port)
+        connect_proxy_accept_loop(listen, target_port)
+
+      {:error, :closed} ->
+        :ok
+    end
+  end
+
+  defp connect_proxy_tunnel(client, target_port) do
+    with {:ok, _headers} <- read_http_request_head(client, ""),
+         {:ok, target} <-
+           :gen_tcp.connect(~c"localhost", target_port, [:binary, packet: :raw, active: false]),
+         :ok <- :gen_tcp.send(client, "HTTP/1.1 200 Connection Established\r\n\r\n") do
+      pipe_bidirectional(client, target)
+    end
+
+    :gen_tcp.close(client)
+  end
+
+  defp read_http_request_head(socket, acc) do
+    case :gen_tcp.recv(socket, 0, 5_000) do
+      {:ok, data} ->
+        acc = acc <> data
+
+        if String.ends_with?(acc, "\r\n\r\n"),
+          do: {:ok, acc},
+          else: read_http_request_head(socket, acc)
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp pipe_bidirectional(client, target) do
+    parent = self()
+
+    spawn(fn ->
+      pipe(client, target)
+      send(parent, :piped)
+    end)
+
+    spawn(fn ->
+      pipe(target, client)
+      send(parent, :piped)
+    end)
+
+    receive do
+      :piped -> :ok
+    end
+
+    # Closing both ends must terminate the remaining pipe process; if it does not
+    # exit, the helper (and the test using it) fails instead of leaking it.
+    :gen_tcp.close(client)
+    :gen_tcp.close(target)
+
+    receive do
+      :piped -> :ok
+    after
+      5_000 -> raise "connect proxy pipe did not terminate after sockets closed"
+    end
+  end
+
+  defp pipe(from, to) do
+    case :gen_tcp.recv(from, 0) do
+      {:ok, data} ->
+        case :gen_tcp.send(to, data) do
+          :ok -> pipe(from, to)
+          {:error, _reason} -> :gen_tcp.close(to)
+        end
+
+      {:error, _reason} ->
+        :gen_tcp.close(to)
     end
   end
 end

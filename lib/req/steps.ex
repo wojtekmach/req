@@ -90,6 +90,8 @@ defmodule Req.Steps do
       :finch,
       :finch_private,
       :connect_options,
+      :http_proxy,
+      :https_proxy,
       :inet6,
       :request_timeout,
       :receive_timeout,

@@ -91,6 +91,17 @@ defmodule Req.Finch do
         * `:client_settings` - Mint HTTP/2 client settings, see `Mint.HTTP.connect/4` for more
         information.
 
+    * `:http_proxy` - HTTP proxy URL, for example `"http://localhost:8888"`. If the URL
+      contains userinfo, for example `"http://user:pass@localhost:8888"`, the credentials
+      are sent as `proxy-authorization` headers. Defaults to the value of the `http_proxy`
+      environment variable. Set to `false` to disable the environment variable fallback.
+      Only used for `http://` requests when `:finch` is not set.
+      Explicit `connect_options: [proxy: ...]` takes precedence.
+
+    * `:https_proxy` - same as `:http_proxy`, for `https://` requests. Defaults to the value
+      of the `https_proxy` environment variable. Set to `false` to disable the environment
+      variable fallback.
+
     * `:inet6` - if set to true, uses IPv6.
 
       If the request URL looks like IPv6 address, i.e., say, `[::1]`, it defaults to `true`
@@ -461,6 +472,8 @@ defmodule Req.Finch do
   end
 
   defp finch_name_options(req) do
+    req = put_proxy_from_options_or_env(req)
+
     if req.options[:finch] && Map.has_key?(req.options, :connect_options) do
       raise ArgumentError, "cannot set both :finch and :connect_options"
     end
@@ -517,6 +530,99 @@ defmodule Req.Finch do
       true ->
         {Req.Finch, build_options, request_options}
     end
+  end
+
+  # Sets `connect_options: [proxy: ..., proxy_headers: ...]` from the `:http_proxy` or
+  # `:https_proxy` option, falling back to the matching `http_proxy` or `https_proxy`
+  # environment variable, based on the request URL scheme.
+  #
+  # Explicit `connect_options: [proxy: ...]` always wins. When a custom `:finch` pool
+  # is given, the proxy options and environment variables are not applied, because the
+  # pool owns its connection settings.
+  defp put_proxy_from_options_or_env(req) do
+    if Map.has_key?(req.options, :finch) do
+      req
+    else
+      proxy_url =
+        case req.url && req.url.scheme do
+          "http" -> proxy_option_or_env(req.options, :http_proxy, "http_proxy")
+          "https" -> proxy_option_or_env(req.options, :https_proxy, "https_proxy")
+          _other -> nil
+        end
+
+      connect_options = Map.get(req.options, :connect_options, [])
+
+      if proxy_url && !connect_options[:proxy] do
+        {proxy, auth_headers} = parse_proxy_url(proxy_url)
+
+        connect_options =
+          connect_options
+          |> Keyword.put(:proxy, proxy)
+          |> Keyword.update(:proxy_headers, auth_headers, &(&1 ++ auth_headers))
+
+        put_in(req.options[:connect_options], connect_options)
+      else
+        req
+      end
+    end
+  end
+
+  # Returns the proxy option value for `key`. An explicit `false` disables the
+  # environment variable fallback; an unset option falls back to the environment.
+  defp proxy_option_or_env(options, key, env_var) do
+    case Map.fetch(options, key) do
+      {:ok, false} -> nil
+      {:ok, url} -> url
+      :error -> System.get_env(env_var)
+    end
+  end
+
+  defp parse_proxy_url(url) do
+    uri =
+      try do
+        URI.parse(url)
+      rescue
+        # URI.Error messages include the input, which may carry credentials
+        URI.Error -> raise ArgumentError, "invalid proxy URL"
+      end
+
+    scheme =
+      case uri.scheme do
+        "http" ->
+          :http
+
+        "https" ->
+          :https
+
+        other ->
+          raise ArgumentError,
+                "expected proxy URL scheme to be http or https, got: #{inspect(other)}"
+      end
+
+    if is_nil(uri.host) or uri.host == "" do
+      raise ArgumentError, "expected proxy URL to include a host"
+    end
+
+    # URI.parse parses malformed hosts leniently (e.g. "lo calhost"), and a host
+    # with whitespace crashes Mint later with an unhelpful error, so reject it here.
+    if uri.host =~ ~r/\s/ do
+      raise ArgumentError, "invalid proxy URL"
+    end
+
+    # URI.parse does not range-check ports (e.g. "http://h:99999" parses).
+    unless uri.port in 1..65535 do
+      raise ArgumentError, "invalid proxy URL"
+    end
+
+    proxy = {scheme, uri.host, uri.port, []}
+
+    proxy_headers =
+      case uri.userinfo do
+        nil -> []
+        userinfo -> [{"proxy-authorization", "Basic " <> Base.encode64(URI.decode(userinfo))}]
+      end
+
+    {proxy, proxy_headers}
   end
 
   @doc false
